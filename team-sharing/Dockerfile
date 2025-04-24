@@ -1,4 +1,4 @@
-FROM caddy:2.7.3
+FROM caddy:2.10.0
 
 COPY ./Caddyfile /etc/caddy/Caddyfile
 COPY ./main.sh /usr/src/www/main.sh
