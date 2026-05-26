@@ -232,9 +232,12 @@ export async function activate(
     },
     licenseDetail: licenseDetailResponse.data || undefined,
     licensePlanName: licenseDetailResponse.data?.name,
+    defaultEmbeddingModel: undefined,
+    defaultRerankModel: undefined,
     // 同步更新手动激活的 license key 显示值（用于设置页面输入框回显）
     ...(method === 'manual' ? { memorizedManualLicenseKey: licenseKey } : {}),
   }))
+  remote.invalidateSessionRagConfigCache()
   if (shouldTrackKeyVerifyEvent) {
     trackJkClickEvent(JK_EVENTS.KEY_VERIFY_SUCCESS, {
       pageName,
@@ -243,6 +246,6 @@ export async function activate(
       props: { content_add_info: { content: 'Chatbox AI' } },
     })
   }
-  log.info(`✅ Activated license key: ${licenseKey.slice(0, 8)}****`)
+  log.info(`✅ Activated license key: ${licenseKey.slice(0, 8)}**** and cleared default RAG fallback models`)
   return result
 }

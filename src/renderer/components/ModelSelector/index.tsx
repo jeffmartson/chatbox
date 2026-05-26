@@ -5,6 +5,7 @@ import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { DesktopModelSelector } from './DesktopModelSelector'
 import { MobileModelSelector } from './MobileModelSelector'
+import { filterModelsForSelector } from './filterModels'
 
 export type { FavoriteModel } from './shared'
 // Re-export shared components and utilities
@@ -45,14 +46,16 @@ export const ModelSelector = forwardRef<HTMLDivElement, ModelSelectorProps>(
 
     const filteredProviders = useMemo(() => {
       const filtered = providers.map((provider) => {
-        const models = provider.models?.filter(
+        const models = filterModelsForSelector(
+          provider.models,
+          modelFilter,
+          provider.id
+        )?.filter(
           (model) =>
-            (!model.type || model.type === 'chat') &&
-            (provider.id.toLowerCase().includes(search.toLowerCase()) ||
-              provider.name.toLowerCase().includes(search.toLowerCase()) ||
-              model.nickname?.toLowerCase().includes(search.toLowerCase()) ||
-              model.modelId?.toLowerCase().includes(search.toLowerCase())) &&
-            (!modelFilter || modelFilter(model, provider.id))
+            provider.id.toLowerCase().includes(search.toLowerCase()) ||
+            provider.name.toLowerCase().includes(search.toLowerCase()) ||
+            model.nickname?.toLowerCase().includes(search.toLowerCase()) ||
+            model.modelId?.toLowerCase().includes(search.toLowerCase())
         )
         return {
           ...provider,

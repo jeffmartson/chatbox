@@ -4,6 +4,28 @@ import { useMemo } from 'react'
 import { getModelManifest } from '@/packages/remote'
 import { useLanguage, useProviderSettings, useSettingsStore } from '@/stores/settingsStore'
 
+type ChatboxAIManifestModel = {
+  modelId: string
+  modelName: string
+  labels?: string[]
+  type?: ProviderModelInfo['type']
+  apiStyle?: ProviderModelInfo['apiStyle']
+  capabilities?: ProviderModelInfo['capabilities']
+  contextWindow?: number
+}
+
+function toProviderModelInfo(model: ChatboxAIManifestModel): ProviderModelInfo {
+  return {
+    modelId: model.modelId,
+    nickname: model.modelName,
+    labels: model.labels,
+    capabilities: model.capabilities,
+    type: model.type,
+    apiStyle: model.apiStyle,
+    contextWindow: model.contextWindow || undefined,
+  }
+}
+
 const useChatboxAIModels = () => {
   const language = useLanguage()
   const { providerSettings: chatboxAISettings, setProviderSettings } = useProviderSettings(ModelProviderEnum.ChatboxAI)
@@ -17,46 +39,28 @@ const useChatboxAIModels = () => {
         licenseKey,
         language,
       })
+      const models = res.models.map(toProviderModelInfo)
 
       // 只更新 ChatboxAI provider 的 models 配置，不影响其他 provider
-      if (res.models && res.models.length > 0) {
+      if (models.length > 0) {
         // 使用函数式更新，确保只修改 models 字段，保留其他配置
         setProviderSettings((prevChatboxAISettings) => ({
           // 保留现有的 ChatboxAI 配置（如 excludedModels 等）
           ...prevChatboxAISettings,
           // 只更新 models 字段
-          models: res.models.map((m) => ({
-            modelId: m.modelId,
-            nickname: m.modelName,
-            labels: m.labels,
-            capabilities: m.capabilities,
-            type: m.type,
-            apiStyle: m.apiStyle,
-            contextWindow: m.contextWindow || undefined,
-          })),
+          models,
         }))
       }
 
-      return res
+      return {
+        ...res,
+        models,
+      }
     },
     staleTime: 3600 * 1000,
   })
 
-  const allChatboxAIModels = useMemo(
-    () =>
-      data?.models.map(
-        (item) =>
-          ({
-            modelId: item.modelId,
-            nickname: item.modelName,
-            labels: item.labels,
-            capabilities: item.capabilities,
-            type: item.type,
-            contextWindow: item.contextWindow || undefined,
-          }) as ProviderModelInfo
-      ) || [],
-    [data]
-  )
+  const allChatboxAIModels = useMemo(() => data?.models || [], [data])
 
   const chatboxAIImageModels = useMemo(
     () =>
@@ -79,7 +83,12 @@ const useChatboxAIModels = () => {
     [allChatboxAIModels, chatboxAISettings]
   )
 
-  return { allChatboxAIModels, chatboxAIModels, chatboxAIImageModels, ...others }
+  return {
+    allChatboxAIModels,
+    chatboxAIModels,
+    chatboxAIImageModels,
+    ...others,
+  }
 }
 
 export default useChatboxAIModels

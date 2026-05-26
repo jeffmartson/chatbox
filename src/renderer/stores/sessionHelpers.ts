@@ -159,15 +159,38 @@ function hasUsableSessionAttachmentRagLicense(): boolean {
   return true
 }
 
+function hasDefaultSessionAttachmentEmbeddingModel(): boolean {
+  const defaultEmbeddingModel = settingsStore.getState().defaultEmbeddingModel
+  return Boolean(defaultEmbeddingModel?.provider && defaultEmbeddingModel.model)
+}
+
+function getDefaultSessionAttachmentEmbeddingModelLabel(): string {
+  const defaultEmbeddingModel = settingsStore.getState().defaultEmbeddingModel
+  return defaultEmbeddingModel?.provider && defaultEmbeddingModel.model
+    ? `${defaultEmbeddingModel.provider}:${defaultEmbeddingModel.model}`
+    : 'none'
+}
+
 async function canUseSessionAttachmentRag(): Promise<boolean> {
   const licenseKey = settingActions.getLicenseKey() || ''
   const hasUsableLicense = hasUsableSessionAttachmentRagLicense()
-  const capabilityCacheKey = `${licenseKey}:${hasUsableLicense ? 'active' : 'inactive'}`
+  const hasDefaultEmbeddingModel = hasDefaultSessionAttachmentEmbeddingModel()
+  const capabilityCacheKey = `${licenseKey}:${hasUsableLicense ? 'active' : 'inactive'}:${
+    hasDefaultEmbeddingModel ? 'default-embedding' : 'no-default-embedding'
+  }`
   if (sessionRagCapabilityCache?.key === capabilityCacheKey) {
     log.debug(
       `${SESSION_ATTACHMENT_RAG_LOG_PREFIX} Capability cache hit: embedding=${sessionRagCapabilityCache.value}, hasLicense=${Boolean(licenseKey)}`
     )
     return sessionRagCapabilityCache.value
+  }
+
+  if (hasDefaultEmbeddingModel) {
+    log.debug(
+      `${SESSION_ATTACHMENT_RAG_LOG_PREFIX} Capability enabled by default embedding model, hasLicense=${Boolean(licenseKey)}, platform=${platform.type}, embeddingModel=${getDefaultSessionAttachmentEmbeddingModelLabel()}`
+    )
+    sessionRagCapabilityCache = { key: capabilityCacheKey, value: true }
+    return true
   }
 
   if (!hasUsableLicense) {

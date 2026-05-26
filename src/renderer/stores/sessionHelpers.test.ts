@@ -7,6 +7,7 @@ const {
   authTokensState,
   sessionRagCapabilityState,
   parserState,
+  defaultEmbeddingModelState,
   mockParseFileLocally,
   mockGetSessionRagConfig,
   mockUploadAndCreateUserFile,
@@ -21,6 +22,9 @@ const {
   const authTokens = { hasTokens: true }
   const sessionRagCapability = { enabled: true }
   const parser = { type: 'local' as 'local' | 'chatbox-ai' | 'none' | 'mineru' }
+  const defaultEmbeddingModel = {
+    value: undefined as { provider: string; model: string } | undefined,
+  }
 
   return {
     blobStore: blobs,
@@ -29,6 +33,7 @@ const {
     authTokensState: authTokens,
     sessionRagCapabilityState: sessionRagCapability,
     parserState: parser,
+    defaultEmbeddingModelState: defaultEmbeddingModel,
     mockParseFileLocally: vi.fn(),
     mockGetSessionRagConfig: vi.fn(async () => ({
       models: { embedding: 'chatbox-ai:text-embedding-3-small', rerank: 'chatbox-ai:rerank' },
@@ -87,6 +92,7 @@ vi.mock('./settingsStore', () => ({
     getState: () => ({
       licenseKey: licenseState.key,
       licenseActivationMethod: licenseActivationState.method,
+      defaultEmbeddingModel: defaultEmbeddingModelState.value,
       extension: {
         documentParser: { type: parserState.type },
       },
@@ -157,6 +163,7 @@ describe('preprocessFile local parser fallback', () => {
     authTokensState.hasTokens = true
     sessionRagCapabilityState.enabled = true
     parserState.type = 'local'
+    defaultEmbeddingModelState.value = undefined
     mockParseFileLocally.mockReset()
     mockGetSessionRagConfig.mockClear()
     mockUploadAndCreateUserFile.mockReset()
@@ -314,6 +321,28 @@ describe('preprocessFile local parser fallback', () => {
     expect(result.sessionAttachmentAvailability).toBe('allowed')
     expect(result.sessionAttachmentBlockedReason).toBeUndefined()
     expect(result.tokenCountMap?.default).toBe(parsedContent.length)
+  })
+
+  it('uses session retrieval for over-threshold attachments without a Chatbox license when a default embedding model is configured', async () => {
+    const file = createFile('byok-large.pdf')
+    const parsedContent = 'a'.repeat(256 * 1024 + 1)
+    licenseState.key = undefined
+    sessionRagCapabilityState.enabled = false
+    defaultEmbeddingModelState.value = {
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+    }
+    blobStore.set('local-key', parsedContent)
+    mockParseFileLocally.mockResolvedValueOnce({ isSupported: true, key: 'local-key' })
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' })
+
+    expect(mockGetSessionRagConfig).not.toHaveBeenCalled()
+    expect(result.error).toBeUndefined()
+    expect(result.ragMode).toBe('session-retrieval')
+    expect(result.sessionAttachmentAvailability).toBe('allowed')
+    expect(result.tokenCountMap?.default).toBeUndefined()
+    expect(result.tokenCountMap?.default_preview).toBeDefined()
   })
 
   it('keeps very large BYOK attachments inline with a warning', async () => {

@@ -1,9 +1,10 @@
-import { tool } from 'ai'
 import type { SessionAttachmentQueryPlan } from '@shared/types'
+import { tool } from 'ai'
 import { z } from 'zod'
-import platform from '@/platform'
 import * as remote from '@/packages/remote'
+import platform from '@/platform'
 import * as settingActions from '@/stores/settingActions'
+import { settingsStore } from '@/stores/settingsStore'
 
 export async function getToolSet(attachmentIds: number[]) {
   const controller = platform.getSessionAttachmentRagController()
@@ -11,8 +12,14 @@ export async function getToolSet(attachmentIds: number[]) {
   const sessionRagConfig = await remote
     .getSessionRagConfig({ licenseKey: settingActions.getLicenseKey() || undefined })
     .catch(() => undefined)
-  const useRerank = !!sessionRagConfig?.capabilities?.session_attachment_rerank
-  const rerankModel = useRerank ? sessionRagConfig?.models?.rerank : undefined
+  const remoteRerankModel = sessionRagConfig?.capabilities?.session_attachment_rerank
+    ? sessionRagConfig?.models?.rerank
+    : undefined
+  const defaultRerankModel = settingsStore.getState().defaultRerankModel
+  const defaultRerankModelString = defaultRerankModel
+    ? `${defaultRerankModel.provider}:${defaultRerankModel.model}`
+    : undefined
+  const rerankModel = defaultRerankModelString || remoteRerankModel
   const readyAttachments = attachments.filter((attachment) => attachment.status === 'ready')
   const indexingAttachments = attachments.filter(
     (attachment) => attachment.status === 'pending' || attachment.status === 'indexing'
@@ -34,7 +41,7 @@ export async function getToolSet(attachmentIds: number[]) {
     recallTopK: 20,
     finalTopK: Math.max(1, Math.min(limit ?? 8, 12)),
     rerank: {
-      enabled: !!(useRerank && rerankModel),
+      enabled: !!rerankModel,
       model: rerankModel,
     },
   })

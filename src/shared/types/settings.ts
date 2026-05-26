@@ -288,6 +288,14 @@ export enum Theme {
   System,
 }
 
+const DefaultModelSelectionSchema = z
+  .object({
+    provider: z.string(),
+    model: z.string(),
+  })
+  .optional()
+  .catch(undefined)
+
 export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   providers: z.record(z.string(), ProviderSettingsSchema).optional().catch(undefined),
   customProviders: z.array(CustomProviderBaseInfoSchema).optional().catch(undefined),
@@ -330,6 +338,8 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
     })
     .optional()
     .catch(undefined),
+  defaultEmbeddingModel: DefaultModelSelectionSchema,
+  defaultRerankModel: DefaultModelSelectionSchema,
 
   // chatboxai
   licenseKey: z.string().optional(),

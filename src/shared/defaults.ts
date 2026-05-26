@@ -89,6 +89,7 @@ export function settings(): Settings {
 
     hasExpiredLicense: false,
     chatboxAIDesktopPromptDismissed: false,
+    hasExpiredLicense: false,
 
     enableMarkdownRendering: true,
     enableLaTeXRendering: true,
@@ -106,6 +107,9 @@ export function settings(): Settings {
     autoLaunch: false,
     autoUpdate: true,
     betaUpdate: false,
+
+    defaultEmbeddingModel: undefined,
+    defaultRerankModel: undefined,
 
     shortcuts: {
       quickToggle: 'Alt+`', // 快速切换窗口显隐的快捷键
