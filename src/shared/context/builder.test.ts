@@ -278,6 +278,52 @@ describe('buildContext', () => {
       expect(msg2?.contentParts.some((p) => p.type === 'tool-call')).toBe(false)
       expect(msg6?.contentParts.some((p) => p.type === 'tool-call')).toBe(true)
     })
+
+    it('should preserve tool calls for explicitly protected messages', async () => {
+      const messages: Message[] = [
+        createMessage({ id: '1', role: 'user' }),
+        createMessage({
+          id: '2',
+          role: 'assistant',
+          contentParts: [
+            { type: 'text', text: 'Tool call to preserve' },
+            { type: 'tool-call', state: 'result', toolCallId: 'tc1', toolName: 'search', args: {}, result: {} },
+          ],
+        }),
+        createMessage({ id: '3', role: 'user' }),
+        createMessage({
+          id: '4',
+          role: 'assistant',
+          contentParts: [
+            { type: 'text', text: 'Tool call to clean' },
+            { type: 'tool-call', state: 'result', toolCallId: 'tc2', toolName: 'search', args: {}, result: {} },
+          ],
+        }),
+        createMessage({ id: '5', role: 'user' }),
+        createMessage({
+          id: '6',
+          role: 'assistant',
+          contentParts: [
+            { type: 'text', text: 'Recent tool call' },
+            { type: 'tool-call', state: 'result', toolCallId: 'tc3', toolName: 'search', args: {}, result: {} },
+          ],
+        }),
+      ]
+
+      const result = await buildContext(messages, {
+        attachmentResolver: createMockResolver(),
+        keepToolCallRounds: 1,
+        preserveToolCallMessageIds: ['2'],
+      })
+
+      const preservedMessage = result.find((m) => m.id === '2')
+      const cleanedMessage = result.find((m) => m.id === '4')
+      const recentMessage = result.find((m) => m.id === '6')
+
+      expect(preservedMessage?.contentParts.some((p) => p.type === 'tool-call')).toBe(true)
+      expect(cleanedMessage?.contentParts.some((p) => p.type === 'tool-call')).toBe(false)
+      expect(recentMessage?.contentParts.some((p) => p.type === 'tool-call')).toBe(true)
+    })
   })
 
   describe('attachment injection', () => {

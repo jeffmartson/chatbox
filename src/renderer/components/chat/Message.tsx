@@ -1,5 +1,16 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, type ActionIconProps, Flex, Image as Img, Loader, Text, Tooltip as Tooltip1 } from '@mantine/core'
+import {
+  ActionIcon,
+  type ActionIconProps,
+  Button,
+  Flex,
+  Image as Img,
+  Loader,
+  Modal,
+  Stack,
+  Text,
+  Tooltip as Tooltip1,
+} from '@mantine/core'
 import { Box, Grid, useTheme } from '@mui/material'
 import type { Message, MessagePicture, MessageToolCallPart, SessionType } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
@@ -41,7 +52,13 @@ import { getSession } from '@/stores/chatStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import '../../static/Block.css'
-import { generateMore, modifyMessage, regenerateInNewFork, removeMessage } from '@/stores/sessionActions'
+import {
+  generateMore,
+  modifyMessage,
+  regenerateInNewFork,
+  removeMessage,
+  retryFromLastToolCallAfterApiError,
+} from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import ActionMenu, { type ActionMenuItemProps } from '../ActionMenu'
 import { isContainRenderableCode, MessageArtifact } from '../Artifact'
@@ -108,6 +125,7 @@ const _Message: FC<Props> = (props) => {
 
   const [previewArtifact, setPreviewArtifact] = useState(autoPreviewArtifacts)
   const [shouldThrowError, setShouldThrowError] = useState(false)
+  const [retryChoiceOpened, setRetryChoiceOpened] = useState(false)
 
   const contentLength = useMemo(() => {
     return getMessageText(msg).length
@@ -141,6 +159,47 @@ const _Message: FC<Props> = (props) => {
     handleStop()
     regenerateInNewFork(sessionId, msg)
   }, [handleStop, sessionId, msg])
+
+  const lastStepForRetry = useMemo(() => {
+    if (!msg.error) return undefined
+    for (let index = msg.contentParts.length - 1; index >= 0; index -= 1) {
+      const part = msg.contentParts[index]
+      if (part.type === 'tool-call') {
+        const toolCallPart = part as MessageToolCallPart
+        if (toolCallPart.state === 'result' || toolCallPart.state === 'error') {
+          return toolCallPart
+        }
+      }
+    }
+    return undefined
+  }, [msg.contentParts, msg.error])
+
+  const handleRetryWholeMessage = useCallback(() => {
+    setRetryChoiceOpened(false)
+    handleRefresh()
+  }, [handleRefresh])
+
+  const handleRetryLastStep = useCallback(() => {
+    if (!lastStepForRetry) return
+    setRetryChoiceOpened(false)
+    retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
+  }, [lastStepForRetry, sessionId, msg.id])
+
+  const handleErrorTipRetry = useCallback(() => {
+    if (lastStepForRetry) {
+      retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
+      return
+    }
+    handleRefresh()
+  }, [handleRefresh, lastStepForRetry, sessionId, msg.id])
+
+  const handleMessageRetry = useCallback(() => {
+    if (lastStepForRetry) {
+      setRetryChoiceOpened(true)
+      return
+    }
+    handleRefresh()
+  }, [handleRefresh, lastStepForRetry])
 
   const onGenerateMore = useCallback(() => {
     generateMore(sessionId, msg.id)
@@ -417,10 +476,16 @@ const _Message: FC<Props> = (props) => {
 
   const isUserBubble = isBubbleLayout && msg.role === 'user'
   const statusElements = <MessageStatuses statuses={leadingStatuses} />
+  const errorTipsElement = (
+    <MessageErrTips
+      msg={msg}
+      onRetry={msg.role === 'assistant' ? handleErrorTipRetry : undefined}
+      isBubbleLayout={isBubbleLayout}
+    />
+  )
 
   const messageContent = (
     <>
-      {!isBubbleLayout && statusElements}
       <div
         className={cn(
           isBubbleLayout ? 'inline-block max-w-full' : msg.role === 'assistant' ? 'w-full' : 'inline-block',
@@ -440,7 +505,6 @@ const _Message: FC<Props> = (props) => {
               : ''
         )}
       >
-        {isBubbleLayout && statusElements}
         <Box
           className={cn('msg-content', { 'msg-content-small': small })}
           sx={small ? { fontSize: theme.typography.body2.fontSize } : {}}
@@ -565,11 +629,25 @@ const _Message: FC<Props> = (props) => {
             onReport={platform.type === 'mobile' ? onReport : undefined}
           />
         )}
-        <MessageErrTips
-          msg={msg}
-          onRetry={msg.role === 'assistant' ? handleRefresh : undefined}
-          isBubbleLayout={isBubbleLayout}
-        />
+        {isBubbleLayout && errorTipsElement}
+        <Modal
+          opened={retryChoiceOpened}
+          onClose={() => setRetryChoiceOpened(false)}
+          title={t('Retry failed response')}
+          centered
+        >
+          <Stack gap="sm">
+            <Text size="sm" c="chatbox-secondary">
+              {t('The response failed after the last step. What would you like to retry?')}
+            </Text>
+            <Button color="chatbox-brand" onClick={handleRetryLastStep}>
+              {t('Retry from last step')}
+            </Button>
+            <Button variant="light" color="chatbox-brand" onClick={handleRetryWholeMessage}>
+              {t('Retry whole message')}
+            </Button>
+          </Stack>
+        </Modal>
         {needCollapse && !isCollapsed && CollapseButton}
         {msg.generating && contentParts.length === 0 && (
           <div
@@ -581,6 +659,8 @@ const _Message: FC<Props> = (props) => {
             <Loading />
           </div>
         )}
+        {!isBubbleLayout && msg.error && <div className="mt-2">{errorTipsElement}</div>}
+        {leadingStatuses && leadingStatuses.length > 0 && <div className="mt-2">{statusElements}</div>}
       </div>
     </>
   )
@@ -623,7 +703,7 @@ const _Message: FC<Props> = (props) => {
         }
       >
         {!msg.generating && msg.role === 'assistant' && (
-          <MessageActionIcon icon={IconReload} tooltip={t('Reply Again')} onClick={handleRefresh} />
+          <MessageActionIcon icon={IconReload} tooltip={t('Reply Again')} onClick={handleMessageRetry} />
         )}
         {msg.role !== 'assistant' && (
           <MessageActionIcon icon={IconArrowDown} tooltip={t('Reply Again Below')} onClick={onGenerateMore} />

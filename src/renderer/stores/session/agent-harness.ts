@@ -30,6 +30,7 @@ import { getOCRModel, ocrImagesInMessages } from './ocr-helper'
 import { buildToolsForSession } from './tools-builder'
 
 const log = getLogger('agent-generation-harness')
+const RECENT_TOOL_CALL_CACHE_WINDOW_MS = 5 * 60 * 1000
 
 export interface AgentGenerationSideEffects {
   lockAgentMode?: (reason: Exclude<AgentModeLockReason, null>) => void
@@ -51,6 +52,7 @@ export interface PrepareAgentGenerationHarnessOptions {
   agentModeSupported: boolean
   signal: AbortSignal
   providerOptions?: SessionSettings['providerOptions']
+  preserveLastPromptMessageToolCalls?: boolean
   sideEffects?: AgentGenerationSideEffects
   sandboxProviderFactory?: () => SandboxProvider | null
   isPro?: () => boolean
@@ -96,6 +98,29 @@ function isSimpleAutoModeFile(file: MessageFile): boolean {
 
 export function shouldAutoEnableAgentForFiles(files: readonly MessageFile[]): boolean {
   return files.length > 1 || files.some((file) => !isSimpleAutoModeFile(file))
+}
+
+function getToolCallPreserveMessageIds(
+  messages: Message[],
+  targetMsgIx: number,
+  preserveLastPromptMessageToolCalls: boolean
+): string[] {
+  const ids = new Set<string>()
+  const targetMessage = messages[targetMsgIx]
+  const previousMessage = messages[targetMsgIx - 1]
+
+  if (preserveLastPromptMessageToolCalls && previousMessage) {
+    ids.add(previousMessage.id)
+  }
+
+  if (targetMessage?.timestamp !== undefined && previousMessage?.timestamp !== undefined) {
+    const interval = targetMessage.timestamp - previousMessage.timestamp
+    if (interval >= 0 && interval <= RECENT_TOOL_CALL_CACHE_WINDOW_MS) {
+      ids.add(previousMessage.id)
+    }
+  }
+
+  return [...ids]
 }
 
 export async function refreshSessionAttachmentStatuses(messages: Message[]): Promise<Message[]> {
@@ -178,6 +203,7 @@ export async function prepareAgentGenerationHarness(
     agentModeSupported,
     signal,
     providerOptions,
+    preserveLastPromptMessageToolCalls = false,
     sideEffects,
     sandboxProviderFactory = createSandboxProvider,
     isPro = () => true,
@@ -212,11 +238,17 @@ export async function prepareAgentGenerationHarness(
 
   const attachmentResolver = createAttachmentResolver()
   const messagesForPrompt = await refreshSessionAttachmentStatuses(messages.slice(0, targetMsgIx))
+  const preserveToolCallMessageIds = getToolCallPreserveMessageIds(
+    messages,
+    targetMsgIx,
+    preserveLastPromptMessageToolCalls
+  )
   let promptMsgs = await buildContext(messagesForPrompt, {
     attachmentResolver,
     compactionPoints: session.compactionPoints,
     modelSupportToolUseForFile: model.isSupportToolUse('read-file'),
     maxContextMessageCount: settings.maxContextMessageCount,
+    preserveToolCallMessageIds,
     sandboxMode: canExecuteCode,
   })
 

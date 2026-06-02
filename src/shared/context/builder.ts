@@ -15,6 +15,7 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     maxContextMessageCount,
     compactionPoints,
     keepToolCallRounds = 2,
+    preserveToolCallMessageIds,
     modelSupportToolUseForFile = false,
     sandboxMode = false,
   } = options
@@ -29,7 +30,12 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     return []
   }
 
-  let contextMessages = applyCompaction(completedMessages, compactionPoints, keepToolCallRounds)
+  let contextMessages = applyCompaction(
+    completedMessages,
+    compactionPoints,
+    keepToolCallRounds,
+    preserveToolCallMessageIds
+  )
 
   contextMessages = filterErrorMessages(contextMessages)
 
@@ -50,19 +56,20 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
 function applyCompaction(
   messages: Message[],
   compactionPoints: CompactionPoint[] | undefined,
-  keepToolCallRounds: number
+  keepToolCallRounds: number,
+  preserveToolCallMessageIds: string[] | undefined
 ): Message[] {
   const latestCompactionPoint = findLatestCompactionPoint(compactionPoints)
 
   if (!latestCompactionPoint) {
-    return cleanToolCalls(messages, keepToolCallRounds)
+    return cleanToolCalls(messages, keepToolCallRounds, preserveToolCallMessageIds)
   }
 
   const boundaryIndex = messages.findIndex((m) => m.id === latestCompactionPoint.boundaryMessageId)
   const summaryMessage = messages.find((m) => m.id === latestCompactionPoint.summaryMessageId)
 
   if (boundaryIndex === -1) {
-    return cleanToolCalls(messages, keepToolCallRounds)
+    return cleanToolCalls(messages, keepToolCallRounds, preserveToolCallMessageIds)
   }
 
   const messagesAfterBoundary = messages.slice(boundaryIndex + 1).filter((m) => !m.isSummary)
@@ -79,7 +86,7 @@ function applyCompaction(
     contextMessages = [systemMessage, ...contextMessages]
   }
 
-  return cleanToolCalls(contextMessages, keepToolCallRounds)
+  return cleanToolCalls(contextMessages, keepToolCallRounds, preserveToolCallMessageIds)
 }
 
 function findLatestCompactionPoint(compactionPoints?: CompactionPoint[]): CompactionPoint | undefined {
@@ -91,15 +98,16 @@ function findLatestCompactionPoint(compactionPoints?: CompactionPoint[]): Compac
   })
 }
 
-function cleanToolCalls(messages: Message[], keepRounds: number): Message[] {
+function cleanToolCalls(messages: Message[], keepRounds: number, preserveToolCallMessageIds?: string[]): Message[] {
   if (messages.length === 0 || keepRounds < 0) {
     return messages.map((m) => ({ ...m }))
   }
 
   const roundBoundaryIndex = findRoundBoundaryIndex(messages, keepRounds)
+  const preserveToolCallMessageIdSet = new Set(preserveToolCallMessageIds ?? [])
 
   return messages.map((message, index) => {
-    if (index >= roundBoundaryIndex) {
+    if (index >= roundBoundaryIndex || preserveToolCallMessageIdSet.has(message.id)) {
       return { ...message }
     }
     return removeToolCallParts(message)

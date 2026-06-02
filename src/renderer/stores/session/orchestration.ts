@@ -203,6 +203,28 @@ function findToolCallPart(message: Message, toolCallId: string): MessageToolCall
   )
 }
 
+function findLastRetryableToolCallPart(message: Message): MessageToolCallPart | undefined {
+  for (let index = message.contentParts.length - 1; index >= 0; index -= 1) {
+    const part = message.contentParts[index]
+    if (part.type === 'tool-call') {
+      const toolCallPart = part as MessageToolCallPart
+      if (isRetryableToolCallStep(toolCallPart)) {
+        return toolCallPart
+      }
+    }
+  }
+  return undefined
+}
+
+function isRetryableToolCallStep(part: MessageToolCallPart): boolean {
+  return part.state === 'result' || part.state === 'error'
+}
+
+function keepContentPartsThroughToolCall(message: Message, toolCallId: string): MessageContentParts {
+  const index = message.contentParts.findIndex((part) => part.type === 'tool-call' && part.toolCallId === toolCallId)
+  return index >= 0 ? message.contentParts.slice(0, index + 1) : message.contentParts
+}
+
 export function shouldPersistStreamingChunk(
   chunkType: ModelStreamPart<ToolSet>['type'],
   elapsedMs: number,
@@ -276,6 +298,7 @@ export async function orchestrateGeneration(
       agentModeSupported,
       signal: controller.signal,
       providerOptions: settings.providerOptions,
+      preserveLastPromptMessageToolCalls: Boolean(options?.appendToMessage),
       isPro: settingActions.isPro,
       sideEffects: {
         lockAgentMode: (reason) => {
@@ -589,4 +612,39 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
       true
     )
   }
+}
+
+export async function retryFromLastToolCallAfterApiError(sessionId: string, messageId: string, toolCallId: string) {
+  const session = await chatStore.getSession(sessionId)
+  if (!session) return
+
+  const location = findMessageLocation(session, messageId)
+  const message = location ? location.list[location.index] : undefined
+  if (!message) return
+  const part = findToolCallPart(message, toolCallId)
+  const lastRetryableToolCall = findLastRetryableToolCallPart(message)
+  if (
+    !part ||
+    !isRetryableToolCallStep(part) ||
+    !message.error ||
+    lastRetryableToolCall?.toolCallId !== toolCallId
+  ) {
+    return
+  }
+
+  const retrySourceMessage: Message = {
+    ...message,
+    generating: false,
+    error: undefined,
+    errorCode: undefined,
+    errorExtra: undefined,
+    contentParts: keepContentPartsThroughToolCall(message, toolCallId),
+  }
+
+  await modifyMessage(sessionId, retrySourceMessage, true)
+  await orchestrateGeneration(
+    sessionId,
+    { ...retrySourceMessage, generating: true },
+    { operationType: 'regenerate', appendToMessage: true }
+  )
 }
