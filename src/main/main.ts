@@ -774,6 +774,166 @@ ipcMain.handle('parseFileLocally', async (event, dataJSON: string) => {
   }
 })
 
+const FS_READ_DEFAULT_LINES = 500
+const FS_READ_MAX_LINES = 2000
+const FS_MAX_LINE_LENGTH = 2000
+const FS_LIST_MAX_ENTRIES = 200
+const FS_SEARCH_MAX_RESULTS = 100
+
+function truncateFsLine(line: string) {
+  return line.length > FS_MAX_LINE_LENGTH ? `${line.slice(0, FS_MAX_LINE_LENGTH - 3)}...` : line
+}
+
+function isSubPath(parent: string, child: string) {
+  const relative = path.relative(parent, child)
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative))
+}
+
+function matchesInclude(filePath: string, include?: string) {
+  if (!include) return true
+  if (include.startsWith('*.')) {
+    return filePath.endsWith(include.slice(1))
+  }
+  return path.basename(filePath).includes(include.replaceAll('*', ''))
+}
+
+ipcMain.handle('fs:read', async (_event, params: { filePath: string; offset?: number; limit?: number }) => {
+  try {
+    const resolved = path.resolve(params.filePath)
+    const stat = await fs.promises.stat(resolved)
+    if (!stat.isFile()) {
+      return { success: false, error: 'Path is not a file' }
+    }
+
+    const text = await fs.promises.readFile(resolved, 'utf8')
+    const lines = text.split('\n')
+    const startLine = Math.max(1, Math.floor(params.offset ?? 1))
+    const limit = Math.min(FS_READ_MAX_LINES, Math.max(1, Math.floor(params.limit ?? FS_READ_DEFAULT_LINES)))
+    const selected = lines.slice(startLine - 1, startLine - 1 + limit)
+    const content = selected.map(truncateFsLine).join('\n')
+    const endLine = selected.length > 0 ? startLine + selected.length - 1 : startLine
+
+    return {
+      success: true,
+      content,
+      startLine,
+      endLine,
+      totalLines: lines.length,
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('fs:list', async (_event, params: { dirPath: string }) => {
+  try {
+    const resolved = path.resolve(params.dirPath)
+    const entries = await fs.promises.readdir(resolved, { withFileTypes: true })
+    const rows = await Promise.all(
+      entries.slice(0, FS_LIST_MAX_ENTRIES).map(async (entry) => {
+        const entryPath = path.join(resolved, entry.name)
+        const stat = await fs.promises.stat(entryPath).catch(() => null)
+        const type = entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
+        const size = stat?.size ?? 0
+        return `${type}\t${size}\t${entry.name}`
+      })
+    )
+    const suffix =
+      entries.length > FS_LIST_MAX_ENTRIES ? `\n... ${entries.length - FS_LIST_MAX_ENTRIES} more entries` : ''
+    return { success: true, content: rows.join('\n') + suffix }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('fs:search', async (_event, params: { pattern: string; dirPath: string; include?: string }) => {
+  try {
+    const root = path.resolve(params.dirPath)
+    const results: string[] = []
+    const visit = async (dir: string) => {
+      if (results.length >= FS_SEARCH_MAX_RESULTS) return
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => [])
+      for (const entry of entries) {
+        if (results.length >= FS_SEARCH_MAX_RESULTS) break
+        const entryPath = path.join(dir, entry.name)
+        if (!isSubPath(root, entryPath)) continue
+        if (entry.isDirectory()) {
+          if (!['node_modules', '.git', 'dist', 'out', 'build'].includes(entry.name)) {
+            await visit(entryPath)
+          }
+          continue
+        }
+        if (!entry.isFile() || !matchesInclude(entryPath, params.include)) continue
+        const text = await fs.promises.readFile(entryPath, 'utf8').catch(() => '')
+        if (!text) continue
+        const lines = text.split('\n')
+        for (let index = 0; index < lines.length; index++) {
+          if (lines[index].includes(params.pattern)) {
+            results.push(`${path.relative(root, entryPath)}:${index + 1}: ${truncateFsLine(lines[index])}`)
+            if (results.length >= FS_SEARCH_MAX_RESULTS) break
+          }
+        }
+      }
+    }
+    await visit(root)
+    return { success: true, content: results.join('\n') }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('fs:write', async (_event, params: { filePath: string; content: string }) => {
+  try {
+    const resolved = path.resolve(params.filePath)
+    await fs.promises.mkdir(path.dirname(resolved), { recursive: true })
+    await fs.promises.writeFile(resolved, params.content, 'utf8')
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle(
+  'fs:edit',
+  async (
+    _event,
+    params: {
+      filePath: string
+      search?: string
+      replace?: string
+      edits?: Array<{ search: string; replace: string }>
+    }
+  ) => {
+    try {
+      const edits = params.edits?.length
+        ? params.edits
+        : params.search !== undefined && params.replace !== undefined
+          ? [{ search: params.search, replace: params.replace }]
+          : []
+      if (edits.length === 0) {
+        return { success: false, error: 'No edits provided' }
+      }
+      const resolved = path.resolve(params.filePath)
+      let text = await fs.promises.readFile(resolved, 'utf8')
+      for (let index = 0; index < edits.length; index++) {
+        const edit = edits[index]
+        const first = text.indexOf(edit.search)
+        if (first === -1) {
+          return { success: false, error: `Edit ${index + 1}: search text not found` }
+        }
+        if (text.indexOf(edit.search, first + edit.search.length) !== -1) {
+          return { success: false, error: `Edit ${index + 1}: search text is not unique` }
+        }
+        text = text.slice(0, first) + edit.replace + text.slice(first + edit.search.length)
+      }
+      await fs.promises.writeFile(resolved, text, 'utf8')
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+)
+
 ipcMain.handle('parseUrl', async (event, url: string) => {
   // const result = await readability(url, { maxLength: 1000 })
   // const key = 'parseUrl-' + uuidv4()

@@ -7,7 +7,6 @@ import { createModel, createModelDependencies } from '@/adapters'
 import { getLogger } from '@/lib/utils'
 import { convertToModelMessages, injectModelSystemPrompt } from '@/packages/model-calls/message-utils'
 import platform from '@/platform'
-import { featureFlags } from '@/utils/feature-flags'
 import { lastUsedModelStore } from './lastUsedModelStore'
 import { queryClient } from './queryClient'
 import { createInitialState, processStreamChunk } from './session/stream-chunk-processor'
@@ -185,14 +184,10 @@ async function generateTaskResponse(taskId: string, targetMsg: Message, contextM
 
     const promptMessages = [systemMessage, ...filteredContext]
 
-    const skillSettings = settingsStore.getState().getSettings().skills
-    const enabledSkillNames = featureFlags.skills ? skillSettings.enabledSkillNames : []
-
     const { tools, instructions } = await buildToolsForSession(model, {
       webBrowsing: true,
       messages: promptMessages,
-      sandboxEnabled: true,
-      enabledSkillNames,
+      agentMode: 'on',
     })
 
     let injectedMessages = injectModelSystemPrompt(

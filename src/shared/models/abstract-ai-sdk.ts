@@ -12,7 +12,9 @@ import {
   simulateStreamingMiddleware,
   stepCountIs,
   streamText,
+  type PrepareStepFunction,
   type TextStreamPart,
+  type ToolCallRepairFunction,
   type ToolSet,
   type TypedToolCall,
   type TypedToolError,
@@ -30,6 +32,7 @@ import type {
 } from '../types'
 import type { ModelDependencies } from '../types/adapters'
 import { ApiError, ChatboxAIAPIError } from './errors'
+import { repairToolCallJson } from './tool-call-json-repair'
 import type {
   CallChatCompletionOptions,
   ChatStreamOptions,
@@ -281,6 +284,8 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
       messages,
       stopWhen: stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER),
       tools: options.tools as T | undefined,
+      prepareStep: options.prepareStep as PrepareStepFunction<T> | undefined,
+      experimental_repairToolCall: repairToolCallJson as ToolCallRepairFunction<T>,
       abortSignal: options.signal,
       ...callSettings,
       // Billable POST retries are handled explicitly by the `ai-retry` wrapper above
@@ -456,6 +461,35 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     }
   }
 
+  private processToolInputError<T extends ToolSet>(
+    chunk: Extract<TextStreamPart<T>, { type: 'tool-input-error' }>,
+    contentParts: MessageContentParts,
+    options: CallChatCompletionOptions
+  ): void {
+    let toolCallPart = contentParts.find((p) => p.type === 'tool-call' && p.toolCallId === chunk.toolCallId) as
+      | MessageToolCallPart
+      | undefined
+
+    if (!toolCallPart) {
+      toolCallPart = {
+        type: 'tool-call',
+        state: 'call',
+        toolCallId: chunk.toolCallId,
+        toolName: chunk.toolName,
+        args: chunk.input,
+      }
+      contentParts.push(toolCallPart)
+    }
+
+    toolCallPart.state = 'error'
+    toolCallPart.result = {
+      error: chunk.errorText,
+      input: chunk.input,
+      toolName: chunk.toolName,
+    }
+    options.onResultChange?.({ contentParts })
+  }
+
   private updateToolResultPart(toolResult: ToolExecutionResult, contentParts: MessageContentParts): void {
     const toolCallPart = contentParts.find((p) => p.type === 'tool-call' && p.toolCallId === toolResult.toolCallId) as
       | MessageToolCallPart
@@ -594,6 +628,13 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
         finalizeReasoningDuration()
         this.processToolErrors([chunk], contentParts, _options)
         break
+      case 'tool-input-error':
+        finalizeReasoningDuration()
+        this.processToolInputError(chunk, contentParts, _options)
+        return {
+          currentTextPart: undefined,
+          currentReasoningPart: undefined,
+        }
 
       case 'file':
         if (chunk.file.mediaType?.startsWith('image/') && chunk.file.base64) {
@@ -693,6 +734,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
       messages: coreMessages,
       stopWhen: stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER),
       tools: options.tools,
+      experimental_repairToolCall: repairToolCallJson as ToolCallRepairFunction<T>,
       abortSignal: options.signal,
       ...callSettings,
       // Billable POST retries are handled explicitly by the `ai-retry` wrapper in

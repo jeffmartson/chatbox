@@ -413,4 +413,36 @@ describe('preprocessFile local parser fallback', () => {
     expect(result.byteLength).toBe(SESSION_ATTACHMENT_RAG_MAX_PARSED_BYTE_LENGTH + 1)
     expect(result.tokenCountMap?.default).toBe(parsedContent.length)
   })
+
+  it('backfills raw binary storage for cached non-text files', async () => {
+    const file = createFile('cached.pdf', 'raw-pdf-content')
+    const storageKey = `file:/tmp/${file.name}-${file.size}-${file.lastModified}`
+    const rawStorageKey = `${storageKey}_raw`
+    blobStore.set(storageKey, 'cached parsed content')
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' }, { agentMode: true })
+
+    expect(result.error).toBeUndefined()
+    expect(result.storageKey).toBe(storageKey)
+    expect(result.rawStorageKey).toBe(rawStorageKey)
+    expect(blobStore.get(rawStorageKey)).toMatch(/^data:application\/pdf;base64,/)
+  })
+
+  it('uses raw-only sandbox descriptors for supported documents when agent mode has no parser', async () => {
+    parserState.type = 'none'
+    const file = createFile('no-parser.pdf', 'raw-pdf-content')
+    const storageKey = `file:/tmp/${file.name}-${file.size}-${file.lastModified}`
+    const rawStorageKey = `${storageKey}_raw`
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' }, { agentMode: true })
+
+    expect(mockParseFileLocally).not.toHaveBeenCalled()
+    expect(mockUploadAndCreateUserFile).not.toHaveBeenCalled()
+    expect(result.error).toBeUndefined()
+    expect(result.content).toContain('[File: no-parser.pdf')
+    expect(result.storageKey).toBe(storageKey)
+    expect(result.rawStorageKey).toBe(rawStorageKey)
+    expect(result.parserType).toBe('sandbox-raw')
+    expect(blobStore.get(rawStorageKey)).toMatch(/^data:application\/pdf;base64,/)
+  })
 })

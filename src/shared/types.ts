@@ -21,6 +21,16 @@ export type ExportChatScope = 'all_threads' | 'current_thread'
 
 export type ExportChatFormat = 'Markdown' | 'TXT' | 'HTML'
 
+// Agent Mode
+export type AgentModeValue = 'auto' | 'on' | 'off'
+export type AgentModeLockReason = 'file_upload' | 'load_skill' | 'message_sent' | null
+
+export interface AgentModeEntry {
+  value: AgentModeValue
+  locked: boolean
+  lockReason: AgentModeLockReason
+}
+
 export function isChatSession(session: Session) {
   return session.type === 'chat' || !session.type
 }

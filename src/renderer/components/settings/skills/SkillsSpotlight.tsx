@@ -1,7 +1,7 @@
 import { Avatar, Badge, Flex, Loader, Text } from '@mantine/core'
 import { createSpotlight, Spotlight, type SpotlightActionData, type SpotlightActionGroupData } from '@mantine/spotlight'
-import type { MarketplaceSkill } from '@shared/types/skills'
-import { IconDownload, IconSearch, IconWorld } from '@tabler/icons-react'
+import type { MarketplaceSkill, SkillInfo } from '@shared/types/skills'
+import { IconDownload, IconReplace, IconSearch } from '@tabler/icons-react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +23,19 @@ const SEARCH_SCROLL_THRESHOLD = 48
 const SEARCH_DEBOUNCE_MS = 500
 const SEARCH_MIN_QUERY_LENGTH = 2
 
+export function buildDetailsText(
+  source: string,
+  translatedDescription: string,
+  originalDescription: string,
+  translationEnabled: boolean
+): string {
+  const descriptionText =
+    translationEnabled && translatedDescription
+      ? [translatedDescription, originalDescription].filter(Boolean).join(' · ')
+      : originalDescription
+  return [source, descriptionText].filter(Boolean).join(' · ')
+}
+
 function getSearchResultKey(skill: MarketplaceSkill): string {
   if (skill.id) {
     return skill.id
@@ -30,8 +43,15 @@ function getSearchResultKey(skill: MarketplaceSkill): string {
   return `${skill.source}/${skill.skillId || skill.name}`
 }
 
+function getEntryUniqueKey(entry: SkillRegistryEntry | MarketplaceSkill): string {
+  if ('id' in entry && entry.id) {
+    return entry.id
+  }
+  return `${entry.source}/${entry.name}`
+}
+
 const SkillsSpotlight: FC<{
-  installedSkillNames: string[]
+  installedSkills: SkillInfo[]
   onInstallComplete: () => void
 }> = (props) => {
   const { t } = useTranslation()
@@ -269,9 +289,20 @@ const SkillsSpotlight: FC<{
 
   const isInstalled = useCallback(
     (entry: SkillRegistryEntry | MarketplaceSkill): boolean => {
-      return props.installedSkillNames.includes(getPrimarySkillKey(entry))
+      const key = getPrimarySkillKey(entry)
+      const entrySource = entry.source
+      return props.installedSkills.some((s) => s.name === key && s.source?.repo === entrySource)
     },
-    [getPrimarySkillKey, props.installedSkillNames]
+    [getPrimarySkillKey, props.installedSkills]
+  )
+
+  const getConflictingSkill = useCallback(
+    (entry: SkillRegistryEntry | MarketplaceSkill): SkillInfo | undefined => {
+      const key = getPrimarySkillKey(entry)
+      const entrySource = entry.source
+      return props.installedSkills.find((s) => s.name === key && s.source?.repo !== entrySource)
+    },
+    [getPrimarySkillKey, props.installedSkills]
   )
 
   const handleInstall = useCallback(
@@ -280,8 +311,22 @@ const SkillsSpotlight: FC<{
         return
       }
 
-      const entryKey = getPrimarySkillKey(entry)
-      setInstalling(entryKey)
+      const conflicting = getConflictingSkill(entry)
+      if (conflicting) {
+        const confirmReplace = window.confirm(
+          t(
+            'Skill "{{name}}" is already installed from {{existingSource}}. Replace with the version from {{newSource}}?',
+            {
+              name: getPrimarySkillKey(entry),
+              existingSource: conflicting.source?.repo ?? t('unknown source'),
+              newSource: entry.source,
+            }
+          )
+        )
+        if (!confirmReplace) return
+      }
+
+      setInstalling(getEntryUniqueKey(entry))
       try {
         const payload: MarketplaceSkill =
           'id' in entry
@@ -320,7 +365,46 @@ const SkillsSpotlight: FC<{
         setInstalling(null)
       }
     },
-    [getPrimarySkillKey, isInstalled, props.onInstallComplete, t]
+    [getConflictingSkill, getPrimarySkillKey, isInstalled, props.onInstallComplete, t]
+  )
+
+  const buildRightSection = useCallback(
+    (entry: SkillRegistryEntry | MarketplaceSkill, entryInstalled: boolean) => {
+      if (entryInstalled) {
+        return (
+          <Badge size="xs" color="green">
+            {t('Installed')}
+          </Badge>
+        )
+      }
+      if (installing === getEntryUniqueKey(entry)) {
+        return (
+          <Badge size="xs" color="blue">
+            {t('Installing')}
+          </Badge>
+        )
+      }
+      const conflicting = getConflictingSkill(entry)
+      if (conflicting) {
+        return (
+          <Badge size="xs" variant="light" color="orange" radius="sm">
+            <Flex align="center" gap={4}>
+              <ScalableIcon icon={IconReplace} size={10} />
+              {t('Replace {{source}}', { source: conflicting.source?.repo ?? '?' })}
+            </Flex>
+          </Badge>
+        )
+      }
+      return (
+        <Flex align="center" gap={4}>
+          <ScalableIcon icon={IconDownload} size={12} />
+          <Text size="xs" c="dimmed">
+            {entry.installs ?? 0}
+          </Text>
+        </Flex>
+      )
+    },
+    [getConflictingSkill, installing, t]
   )
 
   const actions: (SpotlightActionGroupData | SpotlightActionData)[] = useMemo(() => {
@@ -329,17 +413,13 @@ const SkillsSpotlight: FC<{
     groups.push({
       group: String(t('Popular Skills')),
       actions: SKILLS_POPULAR.map((entry) => {
-        const entryKey = getPrimarySkillKey(entry)
         const entryInstalled = isInstalled(entry)
         const translated = translatedPopular.get(entry.name)
         const translatedTitle = translated?.title && translated.title !== entry.title ? translated.title : ''
         const translatedDescription =
           translated?.description && translated.description !== entry.description ? translated.description : ''
         const label = translationEnabled && translatedTitle ? `${entry.title} · ${translatedTitle}` : entry.title
-        const details =
-          translationEnabled && translatedDescription
-            ? `${translatedDescription} · ${entry.description} · ${entry.source}`
-            : `${entry.description} · ${entry.source}`
+        const details = buildDetailsText(entry.source, translatedDescription, entry.description, translationEnabled)
         return {
           id: `popular-${entry.name}`,
           label,
@@ -349,22 +429,7 @@ const SkillsSpotlight: FC<{
             void handleInstall(entry)
           },
           leftSection: <Avatar name={entry.name} color="initials" size={20} src={entry.icon} />,
-          rightSection: entryInstalled ? (
-            <Badge size="xs" color="green">
-              {t('Installed')}
-            </Badge>
-          ) : installing === entryKey ? (
-            <Badge size="xs" color="blue">
-              {t('Installing')}
-            </Badge>
-          ) : (
-            <Flex align="center" gap={4}>
-              <ScalableIcon icon={IconDownload} size={12} />
-              <Text size="xs" c="dimmed">
-                {entry.installs ?? 0}
-              </Text>
-            </Flex>
-          ),
+          rightSection: buildRightSection(entry, entryInstalled),
         }
       }),
     })
@@ -387,7 +452,6 @@ const SkillsSpotlight: FC<{
       groups.push({
         group: String(t('Search Results')),
         actions: searchResults.map((skill) => {
-          const skillKey = getPrimarySkillKey(skill)
           const skillInstalled = isInstalled(skill)
           const translated = translatedSearch.get(getSearchResultKey(skill))
           const translatedName = translated?.name && translated.name !== skill.name ? translated.name : ''
@@ -395,10 +459,7 @@ const SkillsSpotlight: FC<{
           const translatedDescription =
             translated?.description && translated.description !== originalDescription ? translated.description : ''
           const label = translationEnabled && translatedName ? `${skill.name} · ${translatedName}` : skill.name
-          const details =
-            translationEnabled && translatedDescription
-              ? [translatedDescription, originalDescription, skill.source].filter(Boolean).join(' · ')
-              : [originalDescription, skill.source].filter(Boolean).join(' · ')
+          const details = buildDetailsText(skill.source, translatedDescription, originalDescription, translationEnabled)
           return {
             id: `search-${skill.id || skill.name}`,
             label,
@@ -408,30 +469,7 @@ const SkillsSpotlight: FC<{
               void handleInstall(skill)
             },
             leftSection: <Avatar name={skill.name} color="initials" size={20} />,
-            rightSection: skillInstalled ? (
-              <Badge size="xs" color="green">
-                {t('Installed')}
-              </Badge>
-            ) : installing === skillKey ? (
-              <Badge size="xs" color="blue">
-                {t('Installing')}
-              </Badge>
-            ) : (
-              <Flex align="center" gap={8}>
-                <Flex align="center" gap={2}>
-                  <ScalableIcon icon={IconWorld} size={12} />
-                  <Text size="xs" c="dimmed" lineClamp={1}>
-                    {skill.source}
-                  </Text>
-                </Flex>
-                <Flex align="center" gap={2}>
-                  <ScalableIcon icon={IconDownload} size={12} />
-                  <Text size="xs" c="dimmed">
-                    {skill.installs ?? 0}
-                  </Text>
-                </Flex>
-              </Flex>
-            ),
+            rightSection: buildRightSection(skill, skillInstalled),
           }
         }),
       })
@@ -491,9 +529,9 @@ const SkillsSpotlight: FC<{
 
     return groups
   }, [
+    buildRightSection,
     getPrimarySkillKey,
     handleInstall,
-    installing,
     isInstalled,
     handleLoadMore,
     hasNextPage,

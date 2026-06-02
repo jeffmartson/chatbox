@@ -324,9 +324,12 @@ export async function deleteSession(id: string) {
   // Clean up UI state and caches to prevent memory leaks
   uiStore.getState().clearSessionWebBrowsing(id)
   uiStore.getState().removeSessionKnowledgeBase(id)
+  uiStore.getState().clearSessionAgentMode(id)
   cleanupSessionAtomCache(id)
   clearScrollPositionCache(id)
   delete sessionUpdateQueues[id]
+  // Clean up sandbox temp directory (best-effort, non-blocking)
+  platform.sandboxReset?.({ sessionId: id }).catch(() => {})
 }
 
 export async function deleteSessions(ids: string[]) {

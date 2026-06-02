@@ -421,6 +421,112 @@ describe('buildContext', () => {
       expect(text).toContain('query_session_attachment')
       expect(text).not.toContain('large parsed content should stay out of context')
     })
+
+    it('should use ATTACHMENT_FILE metadata tags in sandbox mode', async () => {
+      const resolver = createMockResolver(new Map([['file-key', 'parsed content should stay out of sandbox prompt']]))
+
+      const messages: Message[] = [
+        createMessage({
+          id: '1',
+          role: 'user',
+          contentParts: [{ type: 'text', text: 'Analyze the spreadsheet' }],
+          files: [
+            {
+              id: 'file-1',
+              name: 'budget.xlsx',
+              fileType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              storageKey: 'file-key',
+              rawStorageKey: 'file-key-raw',
+              parserType: 'local',
+              byteLength: 4096,
+            },
+          ],
+        }),
+      ]
+
+      const result = await buildContext(messages, { attachmentResolver: resolver, sandboxMode: true })
+
+      expect(resolver.read).not.toHaveBeenCalled()
+      const textContent = result[0].contentParts.find((p) => p.type === 'text')
+      const text = (textContent as { type: 'text'; text: string }).text
+      expect(text).toContain('<ATTACHMENT_FILE>')
+      expect(text).not.toContain('<ATTACHED_FILES>')
+      expect(text).toContain('<FILE_NAME>budget.xlsx</FILE_NAME>')
+      expect(text).toContain('<SANDBOX_MODE>true</SANDBOX_MODE>')
+      expect(text).toContain('<SANDBOX_PATH>budget.xlsx</SANDBOX_PATH>')
+      expect(text).toContain('<PARSED_SANDBOX_PATH>budget.xlsx_parsed.txt</PARSED_SANDBOX_PATH>')
+      expect(text).toContain('code_execution')
+      expect(text).not.toContain('parsed content should stay out of sandbox prompt')
+    })
+
+    it('should omit parsed sandbox path for raw-only sandbox files', async () => {
+      const resolver = createMockResolver(new Map())
+
+      const messages: Message[] = [
+        createMessage({
+          id: '1',
+          role: 'user',
+          contentParts: [{ type: 'text', text: 'Inspect this binary' }],
+          files: [
+            {
+              id: 'file-1',
+              name: 'archive.bin',
+              fileType: 'application/octet-stream',
+              storageKey: 'file-key',
+              rawStorageKey: 'file-key-raw',
+              parserType: 'sandbox-raw',
+            },
+          ],
+        }),
+      ]
+
+      const result = await buildContext(messages, { attachmentResolver: resolver, sandboxMode: true })
+
+      const textContent = result[0].contentParts.find((p) => p.type === 'text')
+      const text = (textContent as { type: 'text'; text: string }).text
+      expect(text).toContain('<SANDBOX_PATH>archive.bin</SANDBOX_PATH>')
+      expect(text).not.toContain('<PARSED_SANDBOX_PATH>')
+      expect(text).toContain('Use read_file or code_execution on SANDBOX_PATH')
+    })
+
+    it('should preserve session retrieval cues in sandbox mode', async () => {
+      const resolver = createMockResolver(new Map([['file-key', 'large parsed content should stay out of context']]))
+
+      const messages: Message[] = [
+        createMessage({
+          id: '1',
+          role: 'user',
+          contentParts: [{ type: 'text', text: 'Use the attached manual' }],
+          files: [
+            {
+              id: 'file-1',
+              name: 'manual.pdf',
+              fileType: 'application/pdf',
+              storageKey: 'file-key',
+              rawStorageKey: 'file-key-raw',
+              ragMode: 'session-retrieval',
+              sessionAttachmentId: 42,
+              sessionAttachmentIndexStatus: 'ready',
+            },
+          ],
+        }),
+      ]
+
+      const result = await buildContext(messages, { attachmentResolver: resolver, sandboxMode: true })
+
+      expect(resolver.read).not.toHaveBeenCalled()
+      const textContent = result[0].contentParts.find((p) => p.type === 'text')
+      const text = (textContent as { type: 'text'; text: string }).text
+      expect(text).toContain('<ATTACHMENT_FILE>')
+      expect(text).not.toContain('<ATTACHED_FILES>')
+      expect(text).toContain('<FILE_KEY>session-attachment:42</FILE_KEY>')
+      expect(text).toContain('<RETRIEVAL_MODE>session_attachment_rag</RETRIEVAL_MODE>')
+      expect(text).toContain('<INDEX_STATUS>ready</INDEX_STATUS>')
+      expect(text).toContain('<SANDBOX_PATH>manual.pdf</SANDBOX_PATH>')
+      expect(text).toContain('<PARSED_SANDBOX_PATH>manual.pdf_parsed.txt</PARSED_SANDBOX_PATH>')
+      expect(text).toContain('query_session_attachment')
+      expect(text).not.toContain('large parsed content should stay out of context')
+    })
   })
 
   describe('immutability', () => {

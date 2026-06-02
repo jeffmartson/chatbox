@@ -89,7 +89,6 @@ export function settings(): Settings {
 
     hasExpiredLicense: false,
     chatboxAIDesktopPromptDismissed: false,
-    hasExpiredLicense: false,
 
     enableMarkdownRendering: true,
     enableLaTeXRendering: true,
@@ -100,6 +99,7 @@ export function settings(): Settings {
     pasteLongTextAsAFile: true,
 
     autoGenerateTitle: true,
+    showCommandExplanation: true,
 
     autoCompaction: true,
     compactionThreshold: 0.6,
@@ -120,6 +120,7 @@ export function settings(): Settings {
       sessionListNavNext: 'mod+tab', // 切换到下一个会话的快捷键
       sessionListNavPrev: 'mod+shift+tab', // 切换到上一个会话的快捷键
       sessionListNavTargetIndex: 'mod', // 会话导航的快捷键
+      messageListRefreshContext: 'mod+r', // 刷新上下文的快捷键
       dialogOpenSearch: 'mod+k', // 打开搜索对话框的快捷键
       inputBoxSendMessage: 'Enter', // 发送消息的快捷键
       inputBoxSendMessageWithoutResponse: 'Ctrl+Enter', // 发送但不生成回复的快捷键
@@ -152,8 +153,9 @@ export function settings(): Settings {
       enabledBuiltinServers: [],
     },
     skills: {
-      enabledSkillNames: [],
+      enabledSkillNames: ['chatbox-product-info'],
       translationEnabled: true,
+      builtinDefaultsInitialized: true,
     },
   }
 }

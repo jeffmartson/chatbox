@@ -1,6 +1,4 @@
-import * as codeReview from './code-review'
+import * as chatboxProductInfo from './chatbox-product-info'
 import * as dataAnalysis from './data-analysis'
-import * as translationExpert from './translation-expert'
-import * as writingAssistant from './writing-assistant'
 
-export const builtinSkills = [translationExpert, codeReview, writingAssistant, dataAnalysis]
+export const builtinSkills = [dataAnalysis, chatboxProductInfo]

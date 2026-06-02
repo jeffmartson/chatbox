@@ -1,0 +1,44 @@
+# Chatbox Pro 技术设计文档
+
+> Last updated: 2026-03
+
+本目录包含 Chatbox Pro 的系统设计与技术决策文档，面向工程师和技术负责人。
+
+如需了解产品功能概述（面向非技术人员），请参阅 [`docs/product/`](../product/index.md)。
+
+## 文档目录
+
+| 文档 | 描述 |
+|------|------|
+| [跨平台架构](./architecture.md) | 应用整体架构、平台抽象层、进程模型、模块划分 |
+| [AI 供应商系统](./ai-providers.md) | 模型供应商注册表、OAuth 登录集成、模型类层级、能力声明、自建供应商 |
+| [会话管理系统](./session-management.md) | 数据模型、模块拆分、新会话机制、线程历史、消息分叉 |
+| [存储架构](./storage.md) | 混合存储策略、跨平台方案、版本迁移历史 |
+| [Token 估算系统](./token-estimation.md) | 异步队列架构、优先级调度、Real Context 一致性 |
+| [上下文管理系统](./context-management.md) | 上下文构建流程、AttachmentResolver 抽象、Compaction 机制 |
+| [知识库（RAG 系统）](./knowledge-base.md) | 向量数据库、文档索引、语义搜索、跨平台限制 |
+| [Session Attachment RAG 评测](./session-attachment-rag-eval.md) | 大文件问答 RAG 的模型工具调用评测、真实 Chatbox 流程与 fixture 策略 |
+| [工具与集成系统](./tools-and-integrations.md) | MCP 服务器、Web 搜索、内置工具集、Tool 构建 |
+| [Agent Skills 技术设计](./agent-skills.md) | Skills 发现/解析、IPC 通道、上下文注入与会话级配置 |
+| [Chat 代码执行](./code-execution.md) | Agent Mode、Code Execution 工具集、SandboxProvider 抽象、会话隔离 |
+| [Task 模式](./task-mode.md) | 沙箱管理、IPC 通道、7 个 AI 工具、TaskSession 数据层、路由架构 |
+| [状态管理](./state-management.md) | 三层状态体系（Jotai/Zustand/React Query）、协作关系 |
+| [构建与部署](./build-and-deployment.md) | 构建工具链、依赖管理、签名打包、CI/CD |
+| [自动更新系统](./auto-updater.md) | electron-updater 机制、状态管理、Feed URL Fallback、本地测试方法 |
+| [关键技术决策记录](./key-decisions.md) | 14 项关键决策、替代方案分析、权衡理由 |
+
+## 文档定位
+
+- **本目录**（`docs/technical/`）：**怎样**设计的？技术架构与决策记录
+- **产品文档**（`docs/product/`）：**做什么**？产品功能说明，面向非技术人员
+- **实现文档**（`docs/`）：**怎样**实现的？开发指南和代码规范
+- **AGENTS.md**：开发工作流和快速命令
+
+## 如何维护
+
+每个文档都包含 `Last updated: YYYY-MM` 标记。当系统设计发生变化时：
+
+1. 更新相关文档内容
+2. 更新该文档的 `Last updated` 时间戳
+3. 如果涉及多个文档，同时更新所有相关文件
+4. 提交 commit 时说明变更原因

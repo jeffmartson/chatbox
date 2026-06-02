@@ -4,6 +4,7 @@ import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-
 import { ApiError } from '../../../models/errors'
 import type { CallChatCompletionOptions } from '../../../models/types'
 import type { ProviderModelInfo, ToolUseScope } from '../../../types'
+import { isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import type { ModelDependencies } from '../../../types/adapters'
 
 interface Options {
@@ -63,13 +64,7 @@ export default class DeepSeek extends AbstractAISDKModel {
   }
 
   isSupportToolUse(scope?: ToolUseScope) {
-    if (
-      scope &&
-      ['web-browsing', 'read-file'].includes(scope) &&
-      /deepseek-(v3|r1)$/.test(this.options.model.modelId.toLowerCase())
-    ) {
-      return false
-    }
+    if (isDeepSeekWeakToolUse(this.options.model.modelId, scope)) return false
     return super.isSupportToolUse()
   }
 

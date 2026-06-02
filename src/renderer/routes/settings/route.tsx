@@ -71,6 +71,7 @@ const ITEMS = [
         {
           key: 'skills',
           label: 'Skills',
+          noTranslate: true,
           icon: <IconWand className="w-full h-full" />,
         },
       ]
@@ -193,7 +194,7 @@ export function SettingsRoot() {
                   span={true}
                   className={`!text-inherit ${isSmallScreen ? 'min-h-[32px] leading-[32px]' : ''}`}
                 >
-                  {t(item.label)}
+                  {'noTranslate' in item && item.noTranslate ? item.label : t(item.label)}
                 </Text>
                 {item.key === 'chatbox-ai' && isChatboxAIActivated && (
                   <Indicator size={8} color="chatbox-success" className="ml-auto" />

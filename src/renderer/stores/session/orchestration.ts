@@ -1,104 +1,223 @@
 import { buildContext } from '@shared/context'
-import { ChatboxAIAPIError, OCRError } from '@shared/models/errors'
-import type { ChatStreamOptions, ModelStreamPart } from '@shared/models/types'
-import { type Message, type MessageContentParts, ModelProviderEnum } from '@shared/types'
-import { getMessageText, sequenceMessages } from '@shared/utils/message'
+import type { ModelStreamPart } from '@shared/models/types'
+import type { Message, MessageContentParts, MessageToolCallPart, Session, SessionSettings } from '@shared/types'
+import { getMessageText } from '@shared/utils/message'
 import type { ToolSet } from 'ai'
-import { t } from 'i18next'
 import { createModel, createModelDependencies } from '@/adapters'
-import { getLogger } from '@/lib/utils'
 import * as appleAppStore from '@/packages/apple_app_store'
-import { convertToModelMessages, injectModelSystemPrompt } from '@/packages/model-calls/message-utils'
 import { estimateTokensFromMessages } from '@/packages/token'
+import {
+  denyAllPendingApprovals,
+  FileMutationApprovalPausedError,
+  UserExecApprovalPausedError,
+} from '@/packages/user-exec-approval'
 import platform from '@/platform'
+import { createSandboxProvider } from '@/sandbox'
 import storage from '@/storage'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
-import { featureFlags } from '@/utils/feature-flags'
-import { SESSION_ATTACHMENT_RAG_LOG_PREFIX } from '../../../shared/session-attachment-rag/logging'
 import * as chatStore from '../chatStore'
+import * as settingActions from '../settingActions'
 import { settingsStore } from '../settingsStore'
 import { uiStore } from '../uiStore'
+import { prepareAgentGenerationHarness, refreshSessionAttachmentStatuses } from './agent-harness'
 import { createAttachmentResolver } from './attachment-resolver'
-import { applyLegacyToolFallback } from './legacy-tool-fallback'
-import { persistStreamingMessage, updateStreamingCache } from './messages'
-import { getOCRModel, ocrImagesInMessages } from './ocr-helper'
+import { findMessageLocation } from './forks'
+import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
 import { createInitialState, processStreamChunk } from './stream-chunk-processor'
 import { buildToolsForSession } from './tools-builder'
 import {
   findTargetMessageIndex,
+  getSessionAgentMode,
   getSessionWebBrowsing,
   handleGenerationError,
   initializeTargetMessage,
   trackGenerateEvent,
 } from './utils'
 
-const log = getLogger('session-orchestration')
+const MAX_TOOL_CALLS_BEFORE_CONFIRMATION = 25
 
-async function refreshSessionAttachmentStatuses(messages: Message[]): Promise<Message[]> {
-  if (platform.type !== 'desktop') {
-    return messages
+type ExecutableTool = {
+  execute?: (input: unknown, context: { toolCallId?: string; approved?: boolean }) => unknown
+}
+
+class ToolCallLimitPausedError extends Error {
+  constructor(
+    readonly toolCallId: string,
+    readonly toolName: string,
+    readonly maxToolCalls: number
+  ) {
+    super(`Tool call limit reached before executing ${toolName}`)
+    this.name = 'ToolCallLimitPausedError'
   }
+}
 
-  const ids = Array.from(
-    new Set(
-      messages.flatMap((message) =>
-        (message.files ?? [])
-          .filter((file) => file.sessionAttachmentId)
-          .map((file) => file.sessionAttachmentId as number)
-      )
+function isToolCallLimitPausedError(error: unknown): error is ToolCallLimitPausedError {
+  return (
+    error instanceof ToolCallLimitPausedError ||
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        error.name === 'ToolCallLimitPausedError' &&
+        'toolCallId' in error &&
+        typeof error.toolCallId === 'string' &&
+        'maxToolCalls' in error &&
+        typeof error.maxToolCalls === 'number'
     )
   )
+}
 
-  if (ids.length === 0) {
-    return messages
-  }
-
-  const controller = platform.getSessionAttachmentRagController()
-  const attachments = await controller.getAttachments(ids)
-  log.debug(
-    `${SESSION_ATTACHMENT_RAG_LOG_PREFIX} Refreshed attachment statuses: count=${attachments.length}, statuses=${attachments
-      .map((attachment) => `${attachment.id}:${attachment.indexStatus ?? attachment.status}`)
-      .join(',')}`
+function isUserExecApprovalPausedError(error: unknown): error is UserExecApprovalPausedError {
+  return (
+    error instanceof UserExecApprovalPausedError ||
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        error.name === 'UserExecApprovalPausedError' &&
+        'toolCallId' in error &&
+        typeof error.toolCallId === 'string' &&
+        'command' in error &&
+        typeof error.command === 'string'
+    )
   )
-  const availabilityMap = new Map(attachments.map((attachment) => [attachment.id, attachment.availability]))
-  const indexStatusMap = new Map(attachments.map((attachment) => [attachment.id, attachment.indexStatus]))
-  const chunkCountMap = new Map(attachments.map((attachment) => [attachment.id, attachment.chunkCount]))
-  const totalChunksMap = new Map(attachments.map((attachment) => [attachment.id, attachment.totalChunks]))
-  const embeddedChunksMap = new Map(attachments.map((attachment) => [attachment.id, attachment.embeddedChunks]))
-  const indexingStageMap = new Map(attachments.map((attachment) => [attachment.id, attachment.indexingStage]))
+}
 
-  return messages.map((message) => {
-    if (!message.files?.length) {
-      return message
+function isFileMutationApprovalPausedError(error: unknown): error is FileMutationApprovalPausedError {
+  return (
+    error instanceof FileMutationApprovalPausedError ||
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        error.name === 'FileMutationApprovalPausedError' &&
+        'toolCallId' in error &&
+        typeof error.toolCallId === 'string' &&
+        'title' in error &&
+        typeof error.title === 'string' &&
+        'preview' in error &&
+        typeof error.preview === 'string'
+    )
+  )
+}
+
+function getToolCallPause(error: unknown): {
+  toolCallId: string
+  pauseReason: MessageToolCallPart['pauseReason']
+} | null {
+  if (isToolCallLimitPausedError(error)) {
+    return {
+      toolCallId: error.toolCallId,
+      pauseReason: { type: 'tool_call_limit', maxToolCalls: error.maxToolCalls },
+    }
+  }
+  if (isUserExecApprovalPausedError(error)) {
+    return {
+      toolCallId: error.toolCallId,
+      pauseReason: {
+        type: 'user_exec_approval',
+        command: error.command,
+        explanation: error.explanation,
+        explanationError: error.explanationError,
+      },
+    }
+  }
+  if (isFileMutationApprovalPausedError(error)) {
+    return {
+      toolCallId: error.toolCallId,
+      pauseReason: { type: 'file_mutation_approval', title: error.title, preview: error.preview },
+    }
+  }
+  return null
+}
+
+function withToolCallLimitPause(tools: ToolSet, maxToolCalls: number): ToolSet {
+  let toolCallsSinceConfirmation = 0
+  const wrappedTools: Record<string, unknown> = {}
+
+  for (const [toolName, toolValue] of Object.entries(tools as Record<string, unknown>)) {
+    if (!toolValue || typeof toolValue !== 'object') {
+      wrappedTools[toolName] = toolValue
+      continue
     }
 
-    const files = message.files.map((file) => {
-      if (!file.sessionAttachmentId) {
-        return file
-      }
-      return {
-        ...file,
-        sessionAttachmentAvailability:
-          availabilityMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentAvailability,
-        sessionAttachmentIndexStatus: indexStatusMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentIndexStatus,
-        sessionAttachmentStatus: indexStatusMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentStatus,
-        sessionAttachmentChunkCount: chunkCountMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentChunkCount,
-        sessionAttachmentTotalChunks: totalChunksMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentTotalChunks,
-        sessionAttachmentEmbeddedChunks:
-          embeddedChunksMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentEmbeddedChunks,
-        sessionAttachmentIndexingStage:
-          indexingStageMap.get(file.sessionAttachmentId) ?? file.sessionAttachmentIndexingStage,
-      }
-    })
+    const executableTool = toolValue as ExecutableTool
+    if (typeof executableTool.execute !== 'function') {
+      wrappedTools[toolName] = toolValue
+      continue
+    }
 
-    return { ...message, files }
+    const originalExecute = executableTool.execute
+    wrappedTools[toolName] = {
+      ...toolValue,
+      execute: (input: unknown, context: { toolCallId?: string; approved?: boolean }) => {
+        if (toolCallsSinceConfirmation >= maxToolCalls) {
+          const toolCallId = context.toolCallId
+          if (!toolCallId) {
+            return { error: `Tool call limit reached (${maxToolCalls}). Please continue manually.` }
+          }
+          throw new ToolCallLimitPausedError(toolCallId, toolName, maxToolCalls)
+        }
+
+        toolCallsSinceConfirmation += 1
+        return originalExecute(input, context)
+      },
+    }
+  }
+
+  return wrappedTools as ToolSet
+}
+
+function markToolCallPaused(
+  contentParts: MessageContentParts,
+  toolCallId: string,
+  pauseReason: MessageToolCallPart['pauseReason']
+): MessageContentParts {
+  return contentParts.map((part) => {
+    if (part.type !== 'tool-call' || part.toolCallId !== toolCallId) return part
+    return {
+      ...part,
+      state: 'paused',
+      pauseReason,
+    } satisfies MessageToolCallPart
   })
+}
+
+function updateToolCallPart(
+  message: Message,
+  toolCallId: string,
+  updater: (part: MessageToolCallPart) => MessageToolCallPart
+): Message {
+  return {
+    ...message,
+    contentParts: message.contentParts.map((part) => {
+      if (part.type !== 'tool-call' || part.toolCallId !== toolCallId) return part
+      return updater(part as MessageToolCallPart)
+    }),
+  }
+}
+
+function findToolCallPart(message: Message, toolCallId: string): MessageToolCallPart | undefined {
+  return message.contentParts.find(
+    (part): part is MessageToolCallPart => part.type === 'tool-call' && part.toolCallId === toolCallId
+  )
+}
+
+export function shouldPersistStreamingChunk(
+  chunkType: ModelStreamPart<ToolSet>['type'],
+  elapsedMs: number,
+  persistInterval: number
+) {
+  // Tool calls can block the stream for a long time (for example while waiting
+  // on user_exec approval), so persist them immediately instead of relying on
+  // the periodic 2s flush.
+  return chunkType === 'tool-call' || elapsedMs >= persistInterval
 }
 
 export async function orchestrateGeneration(
   sessionId: string,
   targetMsg: Message,
-  options?: { operationType?: 'send_message' | 'regenerate' }
+  options?: { operationType?: 'send_message' | 'regenerate'; appendToMessage?: boolean }
 ) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)
@@ -123,8 +242,12 @@ export async function orchestrateGeneration(
   const found = findTargetMessageIndex(session, targetMsg.id)
   if (!found) return
   const { messages, index: targetMsgIx } = found
+  const promptTargetMsgIx = options?.appendToMessage ? targetMsgIx + 1 : targetMsgIx
 
   const controller = new AbortController()
+  let processorState = createInitialState()
+  const infoParts: MessageContentParts = []
+  let promptMsgs: Message[] = []
 
   try {
     const dependencies = await createModelDependencies()
@@ -132,71 +255,39 @@ export async function orchestrateGeneration(
     const sessionKnowledgeBaseMap = uiStore.getState().sessionKnowledgeBaseMap
     const knowledgeBase = sessionKnowledgeBaseMap[sessionId]
     const webBrowsing = getSessionWebBrowsing(sessionId, settings.provider)
+    const agentModeSupported = platform.type === 'desktop'
+    const { value: storedAgentModeValue } = getSessionAgentMode(sessionId)
+    const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
+    const agentModeEntry = uiStore.getState().sessionAgentModeMap[sessionId]
 
-    const attachmentResolver = createAttachmentResolver()
-    const messagesForPrompt = await refreshSessionAttachmentStatuses(messages.slice(0, targetMsgIx))
-    let promptMsgs = await buildContext(messagesForPrompt, {
-      attachmentResolver,
-      compactionPoints: session.compactionPoints,
-      modelSupportToolUseForFile: model.isSupportToolUse('read-file'),
-      maxContextMessageCount: settings.maxContextMessageCount,
-    })
-
-    const infoParts: MessageContentParts = []
-
-    if (
-      !model.isSupportVision() &&
-      promptMsgs.some((m) => m.contentParts.some((c) => c.type === 'image' && !c.ocrResult))
-    ) {
-      const ocrResult = getOCRModel(globalSettings, configs, dependencies)
-      if (!ocrResult) {
-        throw ChatboxAIAPIError.fromCodeName('model_not_support_image_2', 'model_not_support_image_2')
-      }
-      try {
-        await ocrImagesInMessages(promptMsgs, ocrResult.model)
-      } catch (err) {
-        throw new OCRError(ocrResult.providerName, err instanceof Error ? err : new Error(`${err}`))
-      }
-      infoParts.push({
-        type: 'info',
-        text: t('Current model {{modelName}} does not support image input, using OCR to process images', {
-          modelName: model.modelId,
-        }),
-      })
-    }
-
-    const { promptMsgs: updatedMsgs, fallbackToolCallPart } = await applyLegacyToolFallback({
+    const prepared = await prepareAgentGenerationHarness({
+      session,
+      settings,
+      globalSettings,
+      configs,
+      messages,
+      targetMsgIx: promptTargetMsgIx,
       model,
-      promptMsgs,
+      dependencies,
       knowledgeBase,
       webBrowsing,
+      agentModeValue,
+      agentModeLocked: Boolean(agentModeEntry?.locked),
+      agentModeSupported,
       signal: controller.signal,
+      providerOptions: settings.providerOptions,
+      isPro: settingActions.isPro,
+      sideEffects: {
+        lockAgentMode: (reason) => {
+          uiStore.getState().lockSessionAgentMode(sessionId, reason)
+        },
+      },
     })
-    promptMsgs = updatedMsgs
-
-    const { tools, instructions } = await buildToolsForSession(model, {
-      webBrowsing,
-      knowledgeBase,
-      messages: promptMsgs,
-    })
-
-    let injectedMessages = injectModelSystemPrompt(
-      model.modelId,
-      promptMsgs,
-      instructions,
-      model.isSupportSystemMessage() ? 'system' : 'user'
-    )
-
-    if (!model.isSupportSystemMessage()) {
-      injectedMessages = injectedMessages.map((m) => ({ ...m, role: m.role === 'system' ? 'user' : m.role }))
+    promptMsgs = prepared.promptMsgs
+    if (!options?.appendToMessage) {
+      infoParts.push(...prepared.infoParts)
     }
-
-    injectedMessages = sequenceMessages(injectedMessages)
-
-    const coreMessages = await convertToModelMessages(injectedMessages, {
-      modelSupportVision: model.isSupportVision(),
-      preserveReasoning: settings.provider === ModelProviderEnum.DeepSeek,
-    })
+    const { coreMessages, tools, fallbackToolCallPart } = prepared
 
     targetMsg = {
       ...targetMsg,
@@ -204,24 +295,27 @@ export async function orchestrateGeneration(
     }
     updateStreamingCache(sessionId, targetMsg)
 
-    const chatOptions: ChatStreamOptions = {
-      sessionId: session.id,
-      signal: controller.signal,
-      providerOptions: settings.providerOptions,
-    }
+    const chatOptions = { ...prepared.chatOptions }
 
     if (Object.keys(tools).length > 0) {
-      chatOptions.tools = tools as ToolSet
+      chatOptions.tools = withToolCallLimitPause(tools as ToolSet, MAX_TOOL_CALLS_BEFORE_CONFIRMATION)
     }
 
     const stream = model.chatStream(coreMessages, chatOptions) as AsyncGenerator<ModelStreamPart<ToolSet>>
 
-    let processorState = createInitialState(fallbackToolCallPart ? [fallbackToolCallPart] : undefined)
+    processorState = createInitialState(
+      options?.appendToMessage ? targetMsg.contentParts : fallbackToolCallPart ? [fallbackToolCallPart] : undefined
+    )
 
     const streamCallbacks = {
       onFileReceived: async (mediaType: string, base64: string) => {
         const storageKey = StorageKeyGenerator.picture(`${session.id}:${targetMsg.id}`)
         await storage.setBlob(storageKey, `data:${mediaType};base64,${base64}`)
+        return storageKey
+      },
+      onLargeToolResult: async (toolCallId: string, serialized: string) => {
+        const storageKey = `tool-result:${session.id}:${toolCallId}`
+        await storage.setBlob(storageKey, serialized)
         return storageKey
       },
     }
@@ -257,7 +351,7 @@ export async function orchestrateGeneration(
         firstTokenLatency,
       }
 
-      const shouldPersist = Date.now() - lastPersistTimestamp >= persistInterval
+      const shouldPersist = shouldPersistStreamingChunk(chunk.type, Date.now() - lastPersistTimestamp, persistInterval)
       if (shouldPersist) {
         void persistStreamingMessage(sessionId, targetMsg)
       } else {
@@ -287,8 +381,31 @@ export async function orchestrateGeneration(
 
     await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
     appleAppStore.tickAfterMessageGenerated()
+    // Defensive: deny any approvals that are still pending after normal completion
+    denyAllPendingApprovals()
   } catch (err: unknown) {
+    const pause = getToolCallPause(err)
+    if (pause) {
+      denyAllPendingApprovals()
+      targetMsg = {
+        ...targetMsg,
+        generating: false,
+        cancel: undefined,
+        contentParts: [
+          ...infoParts,
+          ...markToolCallPaused(processorState.contentParts, pause.toolCallId, pause.pauseReason),
+        ],
+        tokensUsed: targetMsg.tokensUsed ?? estimateTokensFromMessages([...promptMsgs, targetMsg]),
+        status: [],
+        finishReason: 'tool-call-paused',
+        usage: processorState.usage,
+      }
+      await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+      return
+    }
+
     if (controller.signal.aborted) {
+      denyAllPendingApprovals()
       targetMsg = {
         ...targetMsg,
         generating: false,
@@ -299,7 +416,177 @@ export async function orchestrateGeneration(
       return
     }
 
+    denyAllPendingApprovals()
     targetMsg = handleGenerationError(err, targetMsg, settings)
     await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+  }
+}
+
+async function buildToolsForPausedToolCall(session: Session, settings: SessionSettings, targetMsg: Message) {
+  const dependencies = await createModelDependencies()
+  const model = await createModel(settings, dependencies)
+  const location = findTargetMessageIndex(session, targetMsg.id)
+  const messagesBeforeTarget = location ? location.messages.slice(0, location.index) : session.messages
+  const hasFiles = messagesBeforeTarget.some((message) => message.files?.length)
+  const agentModeSupported = platform.type === 'desktop'
+  const { value: storedAgentModeValue } = getSessionAgentMode(session.id)
+  const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
+  const effectiveAgentMode = !agentModeSupported
+    ? 'off'
+    : agentModeValue === 'off'
+      ? 'off'
+      : hasFiles || agentModeValue === 'on'
+        ? 'on'
+        : 'auto'
+
+  const sandboxProvider = effectiveAgentMode !== 'off' ? createSandboxProvider() : null
+  let canExecuteCode = Boolean(sandboxProvider && model.isSupportToolUse('agent'))
+  if (canExecuteCode && sandboxProvider?.type === 'cloud' && !settingActions.isPro()) {
+    canExecuteCode = false
+  }
+  if (canExecuteCode && sandboxProvider) {
+    const availability = await sandboxProvider.checkAvailability()
+    if (!availability.available) {
+      canExecuteCode = false
+    }
+  }
+
+  const attachmentResolver = createAttachmentResolver()
+  const messagesForPrompt = await refreshSessionAttachmentStatuses(messagesBeforeTarget)
+  const promptMsgs = await buildContext(messagesForPrompt, {
+    attachmentResolver,
+    compactionPoints: session.compactionPoints,
+    modelSupportToolUseForFile: model.isSupportToolUse('read-file'),
+    maxContextMessageCount: settings.maxContextMessageCount,
+    sandboxMode: canExecuteCode,
+  })
+
+  const sessionKnowledgeBaseMap = uiStore.getState().sessionKnowledgeBaseMap
+  const knowledgeBase = sessionKnowledgeBaseMap[session.id]
+  const webBrowsing = getSessionWebBrowsing(session.id, settings.provider)
+  const codeExecutionOption =
+    canExecuteCode && sandboxProvider
+      ? {
+          sessionId: session.id,
+          provider: sandboxProvider,
+          files: messagesBeforeTarget.flatMap(
+            (message) =>
+              message.files?.map((file) => ({
+                storageKey: file.storageKey || '',
+                rawStorageKey: file.rawStorageKey,
+                name: file.name,
+              })) || []
+          ),
+        }
+      : undefined
+
+  const { tools } = await buildToolsForSession(model, {
+    webBrowsing,
+    knowledgeBase,
+    messages: promptMsgs,
+    agentMode: effectiveAgentMode,
+    sessionSettings: settings,
+    codeExecution: codeExecutionOption,
+    onAgentModeActivated: () => {
+      uiStore.getState().lockSessionAgentMode(session.id, 'load_skill')
+    },
+  })
+
+  return { tools }
+}
+
+export async function stopPausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+  const session = await chatStore.getSession(sessionId)
+  if (!session) return
+  const location = findMessageLocation(session, messageId)
+  const message = location ? location.list[location.index] : undefined
+  if (!message) return
+  const part = findToolCallPart(message, toolCallId)
+  if (!part || part.state !== 'paused') return
+
+  if (part.pauseReason?.type === 'user_exec_approval' || part.pauseReason?.type === 'file_mutation_approval') {
+    const deniedResult =
+      part.pauseReason.type === 'user_exec_approval'
+        ? { success: false, exitCode: null, stdout: '', stderr: 'Command denied by user.' }
+        : { success: false, error: 'File mutation denied by user.' }
+    const nextMessage = updateToolCallPart(message, toolCallId, (toolPart) => ({
+      ...toolPart,
+      state: 'result',
+      pauseReason: undefined,
+      result: deniedResult,
+    }))
+    await modifyMessage(sessionId, nextMessage, true)
+    await orchestrateGeneration(
+      sessionId,
+      { ...nextMessage, generating: true },
+      { operationType: 'regenerate', appendToMessage: true }
+    )
+    return
+  }
+
+  await modifyMessage(
+    sessionId,
+    updateToolCallPart(message, toolCallId, (toolPart) => ({
+      ...toolPart,
+      state: 'error',
+      pauseReason: undefined,
+      result: { error: 'Tool execution stopped by user.' },
+    })),
+    true
+  )
+}
+
+export async function continuePausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+  const session = await chatStore.getSession(sessionId)
+  const settings = await chatStore.getSessionSettings(sessionId)
+  if (!session || !settings) return
+
+  const location = findMessageLocation(session, messageId)
+  let message = location ? location.list[location.index] : undefined
+  if (!message) return
+  const part = findToolCallPart(message, toolCallId)
+  if (!part || part.state !== 'paused') return
+
+  message = updateToolCallPart(message, toolCallId, (toolPart) => ({
+    ...toolPart,
+    state: 'call',
+    pauseReason: undefined,
+    result: undefined,
+    resultStorageKey: undefined,
+  }))
+  await modifyMessage(sessionId, message, false)
+
+  try {
+    const { tools } = await buildToolsForPausedToolCall(session, settings, message)
+    const toolValue = (tools as Record<string, unknown>)[part.toolName]
+    const executableTool = toolValue && typeof toolValue === 'object' ? (toolValue as ExecutableTool) : undefined
+    if (typeof executableTool?.execute !== 'function') {
+      throw new Error(`Tool "${part.toolName}" is not available`)
+    }
+
+    const result = await executableTool.execute(part.args, { toolCallId, approved: true })
+    message = updateToolCallPart(message, toolCallId, (toolPart) => ({
+      ...toolPart,
+      state: 'result',
+      result,
+    }))
+    await modifyMessage(sessionId, message, true)
+
+    await orchestrateGeneration(
+      sessionId,
+      { ...message, generating: true },
+      { operationType: 'regenerate', appendToMessage: true }
+    )
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    await modifyMessage(
+      sessionId,
+      updateToolCallPart(message, toolCallId, (toolPart) => ({
+        ...toolPart,
+        state: 'error',
+        result: { error: errorMessage },
+      })),
+      true
+    )
   }
 }

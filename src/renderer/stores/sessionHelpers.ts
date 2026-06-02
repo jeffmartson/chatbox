@@ -1,4 +1,4 @@
-import { isSessionAttachmentRagSupportedFilePath, isTextFilePath } from '@shared/file-extensions'
+import { isSessionAttachmentRagSupportedFilePath, isSupportedFile, isTextFilePath } from '@shared/file-extensions'
 import type {
   ExportChatFormat,
   ExportChatScope,
@@ -75,6 +75,48 @@ function getContentStats(content: string): ContentStats {
 
 function isParsedContentVeryLarge(stats: ContentStats): boolean {
   return stats.byteLength > SESSION_ATTACHMENT_RAG_MAX_PARSED_BYTE_LENGTH
+}
+
+async function storeRawFileBlob(file: File, rawKey: string): Promise<boolean> {
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuffer)
+    // Chunked base64 encoding to avoid call stack overflow on large files.
+    const CHUNK_SIZE = 8192
+    let binary = ''
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length))
+      binary += String.fromCharCode(...chunk)
+    }
+    const dataURL = `data:${file.type || 'application/octet-stream'};base64,${btoa(binary)}`
+    await storage.setBlob(rawKey, dataURL)
+    log.debug(`Stored raw binary for non-text file: ${file.name}`)
+    return true
+  } catch (err) {
+    log.warn(`Failed to store raw binary for ${file.name}:`, err)
+    return false
+  }
+}
+
+function buildParsedContentTooLargeAttachmentResult(
+  file: File,
+  content: string,
+  storageKey: string,
+  parserType: string | undefined,
+  stats: ContentStats
+): AttachmentPreparationResult {
+  return {
+    file,
+    content,
+    storageKey,
+    ragMode: 'session-retrieval',
+    parserType,
+    lineCount: stats.lineCount,
+    byteLength: stats.byteLength,
+    sessionAttachmentAvailability: 'blocked',
+    sessionAttachmentBlockedReason: SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR,
+    error: SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR,
+  }
 }
 
 export function computePreviewMetadata(
@@ -332,10 +374,14 @@ async function parseFileWithMineruService(
  */
 export async function prepareFileAttachment(
   file: File,
-  settings: SessionSettings
+  settings: SessionSettings,
+  options?: { agentMode?: boolean }
 ): Promise<AttachmentPreparationResult> {
   try {
     const uniqKey = StorageKeyGenerator.fileUniqKey(file)
+
+    const rawKey = `${uniqKey}_raw`
+    const isTextFile = isTextFilePath(file.name)
 
     // Check if file has already been processed (cache hit)
     const existingContent = await storage.getBlob(uniqKey).catch(() => null)
@@ -379,12 +425,18 @@ export async function prepareFileAttachment(
 
       await storage.setItem(`${uniqKey}_tokenMap`, tokenCountMap)
 
+      // Ensure cached non-text files still have the raw binary needed by sandbox code execution.
+      const hasRaw = !isTextFile
+        ? Boolean((await storage.getBlob(rawKey).catch(() => null)) ?? (await storeRawFileBlob(file, rawKey)))
+        : false
+
       return {
         file,
         content: existingContent,
         storageKey: uniqKey,
         ragMode: shouldUseSessionAttachmentRag ? 'session-retrieval' : 'inline',
         parserType: existingParserType,
+        rawStorageKey: hasRaw ? rawKey : undefined,
         tokenCountMap,
         lineCount,
         byteLength,
@@ -393,7 +445,35 @@ export async function prepareFileAttachment(
       }
     }
 
+    // Store raw binary for non-text files (used by sandbox code execution path)
+    if (!isTextFile) {
+      await storeRawFileBlob(file, rawKey)
+    }
+
     let result: { content: string; storageKey: string; tokenCountMap: Record<string, number>; parserType: string }
+
+    // In agent mode, skip content parsing when no parser can produce text.
+    // The raw binary is already stored above — the sandbox can use it directly.
+    // Store a short descriptor as the "parsed content" so the storageKey is valid.
+    if (
+      options?.agentMode &&
+      !isTextFile &&
+      (!isSupportedFile(file.name) || getEffectiveDocumentParserConfig().type === 'none')
+    ) {
+      log.debug(`Agent mode: skipping content parsing for sandbox-only file: ${file.name}`)
+      const sizeKB = (file.size / 1024).toFixed(1)
+      const descriptor = `[File: ${file.name} (${sizeKB} KB)]`
+      await storage.setBlob(uniqKey, descriptor)
+      return {
+        file,
+        content: descriptor,
+        storageKey: uniqKey,
+        rawStorageKey: rawKey,
+        ragMode: 'inline',
+        parserType: 'sandbox-raw',
+      }
+    }
+
     if (isTextFilePath(file.name)) {
       log.debug(`Text file detected, using local parser: ${file.name}`)
       result = await parseFileWithLocalFallback(file, uniqKey)
@@ -481,6 +561,7 @@ export async function prepareFileAttachment(
       storageKey: result.storageKey,
       ragMode: shouldUseSessionAttachmentRag ? 'session-retrieval' : 'inline',
       parserType: result.parserType,
+      rawStorageKey: !isTextFile ? rawKey : undefined,
       tokenCountMap,
       lineCount,
       byteLength,
@@ -658,7 +739,9 @@ export function constructUserMessage(
   if (preprocessedFiles.length > 0) {
     msg.files = preprocessedFiles.map((f) => {
       const localPath =
-        f.ragMode === 'session-retrieval' ? undefined : f.localPath || platform.getLocalFilePath(f.file) || undefined
+        f.ragMode === 'session-retrieval'
+          ? undefined
+          : f.localPath || platform.getLocalFilePath(f.file) || f.file.path || undefined
 
       return {
         id: f.storageKey || f.file.name,
@@ -666,6 +749,7 @@ export function constructUserMessage(
         fileType: f.file.type,
         parserType: f.parserType,
         storageKey: f.storageKey || undefined,
+        rawStorageKey: f.rawStorageKey,
         localPath,
         ragMode: f.ragMode ?? 'inline',
         sessionAttachmentId: f.sessionAttachmentId,

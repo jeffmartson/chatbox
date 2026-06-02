@@ -18,7 +18,8 @@ import type {
   ModelStreamPart,
 } from '../../../models/types'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
-import type { ChatboxAILicenseDetail, ProviderModelInfo } from '../../../types'
+import type { ChatboxAILicenseDetail, ProviderModelInfo, ToolUseScope } from '../../../types'
+import { isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import type { ModelDependencies } from '../../../types/adapters'
 
 interface Options {
@@ -317,7 +318,8 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
     ].includes(this.options.model.modelId)
   }
 
-  public isSupportToolUse() {
-    return true
+  public isSupportToolUse(scope?: ToolUseScope) {
+    if (isDeepSeekWeakToolUse(this.options.model.modelId, scope)) return false
+    return super.isSupportToolUse()
   }
 }

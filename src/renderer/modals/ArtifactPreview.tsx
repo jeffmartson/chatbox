@@ -10,9 +10,10 @@ import { useIsSmallScreen } from '@/hooks/useScreenChange'
 
 export interface ArtifactPreviewProps {
   htmlCode: string
+  previewUrl?: string
 }
 
-const ArtifactPreview = NiceModal.create(({ htmlCode }: ArtifactPreviewProps) => {
+const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl }: ArtifactPreviewProps) => {
   const modal = useModal()
   const { t } = useTranslation()
   const [reloadSign, setReloadSign] = useState(0)
@@ -59,7 +60,7 @@ const ArtifactPreview = NiceModal.create(({ htmlCode }: ArtifactPreviewProps) =>
       transitionProps={{ transition: 'slide-up', duration: 200 }}
     >
       <Stack h="100%" gap="md">
-        <Artifact htmlCode={htmlCode} reloadSign={reloadSign} className="flex-1" />
+        <Artifact htmlCode={htmlCode} previewUrl={previewUrl} reloadSign={reloadSign} className="flex-1" />
         {!isSmallScreen && (
           <Flex justify="flex-end" align="center" gap="md">
             <Button variant="transparent" onClick={onReload}>

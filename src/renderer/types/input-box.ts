@@ -12,6 +12,7 @@ export type AttachmentPreparationResult = {
   inputFileKey?: string
   content: string
   storageKey: string
+  rawStorageKey?: string
   localPath?: string
   ragMode?: 'inline' | 'session-retrieval'
   parserType?: string

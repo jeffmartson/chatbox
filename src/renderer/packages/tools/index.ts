@@ -15,7 +15,23 @@ export function getToolName(toolName: string): string {
     edit_file: t('Edit File'),
     delete_file: t('Delete File'),
     read_file: t('Read File'),
+    write_file: t('Write File'),
+    search_files: t('Search Files'),
     parse_link: t('Parse Link'),
+    code_execution: t('Code Execution'),
+    create_download: t('Create Download'),
+    search_file_content: t('Search File Content'),
+    sandbox_bash: t('Terminal'),
+    sandbox_read: t('Read File'),
+    sandbox_write: t('Write File'),
+    sandbox_edit: t('Edit File'),
+    sandbox_grep: t('Search File Content'),
+    sandbox_ls: t('List Directory'),
+    sandbox_find: t('Find Files'),
+    load_skill: t('Load Skill'),
+    install_skill: t('Install Skill'),
+    user_exec: t('Run Command'),
+    parse_file: t('Parse File'),
   }
 
   return toolNames[toolName] || toolName

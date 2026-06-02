@@ -7,6 +7,8 @@ import {
   finalizeReasoningDuration,
   processStreamChunk,
   type StreamProcessorCallbacks,
+  TOOL_RESULT_PREVIEW_LENGTH,
+  TOOL_RESULT_SIZE_LIMIT,
 } from './stream-chunk-processor'
 
 const callbacks: StreamProcessorCallbacks = {
@@ -88,6 +90,168 @@ describe('processStreamChunk', () => {
     expect(result.state.contentParts).toHaveLength(0)
   })
 
+  it('emits generic preparing status when reasoning ends', async () => {
+    const state = createInitialState()
+    const reasoning = await processStreamChunk(chunk('reasoning-delta', { text: 'Thinking...' }), state, callbacks)
+    const result = await processStreamChunk(chunk('reasoning-end', { id: 'r1' }), reasoning.state, callbacks)
+
+    expect(result.skipUpdate).toBe(true)
+    expect(result.statusChunk).toEqual({
+      type: 'status',
+      status: { type: 'preparing_tool_call' },
+    })
+  })
+
+  it('emits tool-specific preparing status on tool input start', async () => {
+    const state = createInitialState()
+    const result = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc1', toolName: 'code_execution' }),
+      state,
+      callbacks
+    )
+
+    expect(result.skipUpdate).toBe(true)
+    expect(result.statusChunk).toEqual({
+      type: 'status',
+      status: { type: 'preparing_tool_call', toolName: 'code_execution' },
+    })
+  })
+
+  it('keeps tool input deltas as status-only updates', async () => {
+    const state = createInitialState([{ type: 'reasoning', text: 'Thinking...', duration: 100 }])
+    const result = await processStreamChunk(
+      chunk('tool-input-delta', { toolCallId: 'tc1', inputTextDelta: '{"code":' }),
+      state,
+      callbacks
+    )
+
+    expect(result.skipUpdate).toBe(true)
+    expect(result.statusChunk).toBeUndefined()
+    expect(result.state.contentParts).toEqual(state.contentParts)
+  })
+
+  it('does not report progress for small or fast tool input', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(0)
+      const start = await processStreamChunk(
+        chunk('tool-input-start', { toolCallId: 'tc1', toolName: 'code_execution' }),
+        createInitialState(),
+        callbacks
+      )
+      vi.setSystemTime(1000)
+      const smallResult = await processStreamChunk(
+        chunk('tool-input-delta', { toolCallId: 'tc1', inputTextDelta: '{"code":"one\\ntwo"' }),
+        start.state,
+        callbacks
+      )
+
+      expect(smallResult.statusChunk).toBeUndefined()
+
+      vi.setSystemTime(2000)
+      const fastStart = await processStreamChunk(
+        chunk('tool-input-start', { toolCallId: 'tc2', toolName: 'code_execution' }),
+        createInitialState(),
+        callbacks
+      )
+      vi.setSystemTime(2200)
+      const fastResult = await processStreamChunk(
+        chunk('tool-input-delta', {
+          toolCallId: 'tc2',
+          inputTextDelta: `{"code":"${Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join('\\n')}"`,
+        }),
+        fastStart.state,
+        callbacks
+      )
+
+      expect(fastResult.statusChunk).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports line progress for code execution tool input after the display threshold', async () => {
+    vi.useFakeTimers()
+    const state = createInitialState()
+    vi.setSystemTime(0)
+    const start = await processStreamChunk(
+      chunk('tool-input-start', { toolCallId: 'tc1', toolName: 'code_execution' }),
+      state,
+      callbacks
+    )
+    vi.setSystemTime(1000)
+    const result = await processStreamChunk(
+      chunk('tool-input-delta', {
+        toolCallId: 'tc1',
+        inputTextDelta: `{"code":"${Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join('\\n')}"`,
+      }),
+      start.state,
+      callbacks
+    )
+    vi.useRealTimers()
+
+    expect(result.skipUpdate).toBe(true)
+    expect(result.statusChunk).toEqual({
+      type: 'status',
+      status: { type: 'preparing_tool_call', toolName: 'code_execution', progress: { kind: 'lines', value: 12 } },
+    })
+  })
+
+  it('reports line progress for file write and edit tool input', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    const writeStart = await processStreamChunk(
+      chunk('tool-input-start', { toolCallId: 'tc1', toolName: 'sandbox_write' }),
+      createInitialState(),
+      callbacks
+    )
+    vi.setSystemTime(1000)
+    const writeResult = await processStreamChunk(
+      chunk('tool-input-delta', {
+        toolCallId: 'tc1',
+        inputTextDelta: `{"content":"${Array.from({ length: 11 }, (_, index) => `line ${index + 1}`).join('\\n')}"`,
+      }),
+      writeStart.state,
+      callbacks
+    )
+
+    expect(writeResult.statusChunk).toEqual({
+      type: 'status',
+      status: { type: 'preparing_tool_call', toolName: 'sandbox_write', progress: { kind: 'lines', value: 11 } },
+    })
+
+    vi.setSystemTime(2000)
+    const editStart = await processStreamChunk(
+      chunk('tool-input-start', { toolCallId: 'tc2', toolName: 'edit_file' }),
+      createInitialState(),
+      callbacks
+    )
+    vi.setSystemTime(3000)
+    const editResult = await processStreamChunk(
+      chunk('tool-input-delta', {
+        toolCallId: 'tc2',
+        inputTextDelta: `{"new_text":"${Array.from({ length: 10 }, (_, index) => `line ${index + 1}`).join('\\n')}"`,
+      }),
+      editStart.state,
+      callbacks
+    )
+    vi.useRealTimers()
+
+    expect(editResult.statusChunk).toEqual({
+      type: 'status',
+      status: { type: 'preparing_tool_call', toolName: 'edit_file', progress: { kind: 'lines', value: 10 } },
+    })
+  })
+
+  it('keeps tool input end as a status-only update', async () => {
+    const state = createInitialState([{ type: 'reasoning', text: 'Thinking...', duration: 100 }])
+    const result = await processStreamChunk(chunk('tool-input-end', { toolCallId: 'tc1' }), state, callbacks)
+
+    expect(result.skipUpdate).toBe(true)
+    expect(result.statusChunk).toBeUndefined()
+    expect(result.state.contentParts).toEqual(state.contentParts)
+  })
+
   it('handles tool-call', async () => {
     const state = createInitialState()
     const result = await processStreamChunk(
@@ -138,6 +302,77 @@ describe('processStreamChunk', () => {
     expect(part.result.error).toBe('failed')
   })
 
+  it('throws tool-call limit pause errors instead of storing them as tool results', async () => {
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'code_execution', args: {} }),
+      state,
+      callbacks
+    )
+    const error = new Error('Tool call limit reached before executing code_execution')
+    error.name = 'ToolCallLimitPausedError'
+
+    await expect(
+      processStreamChunk(
+        chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'code_execution' }),
+        r1.state,
+        callbacks
+      )
+    ).rejects.toBe(error)
+    expect((r1.state.contentParts[0] as { state: string }).state).toBe('call')
+  })
+
+  it.each(['UserExecApprovalPausedError', 'FileMutationApprovalPausedError'])(
+    'throws %s instead of storing it as a tool result',
+    async (errorName) => {
+      const state = createInitialState()
+      const r1 = await processStreamChunk(
+        chunk('tool-call', { toolCallId: 'tc1', toolName: 'user_exec', args: {} }),
+        state,
+        callbacks
+      )
+      const error = new Error('approval required')
+      error.name = errorName
+
+      await expect(
+        processStreamChunk(
+          chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'user_exec' }),
+          r1.state,
+          callbacks
+        )
+      ).rejects.toBe(error)
+      expect((r1.state.contentParts[0] as { state: string }).state).toBe('call')
+    }
+  )
+
+  it('handles tool-input-error by creating an error tool-call part', async () => {
+    const state = createInitialState()
+    const result = await processStreamChunk(
+      chunk('tool-input-error', {
+        toolCallId: 'tc1',
+        toolName: 'code_execution',
+        input: '{"code":"console.log(1)",',
+        errorText: 'Invalid JSON',
+      }),
+      state,
+      callbacks
+    )
+
+    expect(result.state.contentParts).toHaveLength(1)
+    expect(result.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      state: 'error',
+      toolCallId: 'tc1',
+      toolName: 'code_execution',
+      args: '{"code":"console.log(1)",',
+      result: {
+        error: 'Invalid JSON',
+        input: '{"code":"console.log(1)",',
+        toolName: 'code_execution',
+      },
+    })
+  })
+
   it('handles file chunk by calling onFileReceived callback', async () => {
     const mockCallback = { onFileReceived: vi.fn(async () => 'stored-key') }
     const state = createInitialState()
@@ -175,5 +410,57 @@ describe('processStreamChunk', () => {
     const result = await processStreamChunk(chunk('error'), state, callbacks)
     expect(result.skipUpdate).toBe(false)
     expect(result.state.contentParts).toHaveLength(0)
+  })
+
+  it('offloads large tool-result to blob storage via onLargeToolResult', async () => {
+    const largeResult = 'x'.repeat(TOOL_RESULT_SIZE_LIMIT + 100)
+    const mockCallbacks: StreamProcessorCallbacks = {
+      onFileReceived: vi.fn(async () => 'mock-key'),
+      onLargeToolResult: vi.fn(async () => 'tool-result:sess:tc1'),
+    }
+
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'web_search', args: {} }),
+      state,
+      mockCallbacks
+    )
+    const r2 = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: largeResult }),
+      r1.state,
+      mockCallbacks
+    )
+
+    const part = r2.state.contentParts[0] as { state: string; result: string; resultStorageKey: string }
+    expect(part.state).toBe('result')
+    expect(part.resultStorageKey).toBe('tool-result:sess:tc1')
+    expect(part.result).toBe(largeResult.slice(0, TOOL_RESULT_PREVIEW_LENGTH))
+    expect(mockCallbacks.onLargeToolResult).toHaveBeenCalledWith('tc1', largeResult)
+  })
+
+  it('does not offload small tool-result even when callback is provided', async () => {
+    const smallResult = { data: 'small' }
+    const mockCallbacks: StreamProcessorCallbacks = {
+      onFileReceived: vi.fn(async () => 'mock-key'),
+      onLargeToolResult: vi.fn(async () => 'should-not-be-called'),
+    }
+
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: {} }),
+      state,
+      mockCallbacks
+    )
+    const r2 = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: smallResult }),
+      r1.state,
+      mockCallbacks
+    )
+
+    const part = r2.state.contentParts[0] as { state: string; result: unknown; resultStorageKey?: string }
+    expect(part.state).toBe('result')
+    expect(part.result).toEqual(smallResult)
+    expect(part.resultStorageKey).toBeUndefined()
+    expect(mockCallbacks.onLargeToolResult).not.toHaveBeenCalled()
   })
 })

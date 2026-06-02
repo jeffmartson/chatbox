@@ -52,4 +52,11 @@ export interface ContextBuilderOptions {
    * Default: false
    */
   modelSupportToolUseForFile?: boolean
+
+  /**
+   * When true, inject <ATTACHMENT_FILE> metadata instead of file content.
+   * Files are available in the sandbox for code_execution / read_file tools.
+   * Default: false
+   */
+  sandboxMode?: boolean
 }

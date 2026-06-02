@@ -84,7 +84,8 @@ export function needsTaskCompaction(taskId: string): Promise<boolean> {
   const tokenModel: TokenModel = { provider: model.providerId, modelId: model.modelId }
   const contextWindow = getModelContextWindowFromSettings(model.providerId, model.modelId, globalSettings)
   const contextMessages = computeContextAfterCompaction(session.messages, session.compactionPoints)
-  const tokens = sumCachedTokensFromMessages(contextMessages, tokenModel)
+  const hasFiles = contextMessages.some((m) => m.files?.length)
+  const tokens = sumCachedTokensFromMessages(contextMessages, tokenModel, hasFiles)
   const overflowResult = checkOverflow({
     tokens,
     modelId: model.modelId,

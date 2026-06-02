@@ -1,6 +1,14 @@
 import * as Sentry from '@sentry/react'
 import { AIProviderNoImplementedPaintError, ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
-import type { Message, ModelProvider, Session, SessionSettings, SessionType, Settings } from '@shared/types'
+import type {
+  AgentModeEntry,
+  Message,
+  ModelProvider,
+  Session,
+  SessionSettings,
+  SessionType,
+  Settings,
+} from '@shared/types'
 import { ModelProviderEnum } from '@shared/types'
 import { identity, pickBy } from 'lodash'
 import { getModelDisplayName } from '@/packages/model-setting-utils'
@@ -18,6 +26,15 @@ export function getSessionWebBrowsing(sessionId: string, provider: string | unde
   }
   // Default: true for ChatboxAI, false for others
   return provider === ModelProviderEnum.ChatboxAI
+}
+
+const defaultAgentModeEntry: AgentModeEntry = { value: 'auto', locked: false, lockReason: null }
+
+/**
+ * Get session-level agent mode setting
+ */
+export function getSessionAgentMode(sessionId: string): AgentModeEntry {
+  return uiStore.getState().sessionAgentModeMap[sessionId] ?? defaultAgentModeEntry
 }
 
 /**

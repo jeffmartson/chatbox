@@ -2,6 +2,44 @@ import { tool } from 'ai'
 import z from 'zod'
 import platform from '@/platform'
 
+interface SandboxEditOperation {
+  old_text: string
+  new_text: string
+}
+
+interface SandboxEditInput {
+  file_path: string
+  old_text?: string
+  new_text?: string
+  edits?: SandboxEditOperation[]
+}
+
+const sandboxEditOperationsSchema = z
+  .object({
+    old_text: z.string().describe('Exact text to find; must be unique within the current file content'),
+    new_text: z.string().describe('Replacement text'),
+  })
+  .array()
+  .min(1)
+
+const sandboxEditInputSchema = z
+  .object({
+    file_path: z.string().describe('File path to edit'),
+    old_text: z.string().optional().describe('Legacy single edit: exact text to find; must be unique'),
+    new_text: z.string().optional().describe('Legacy single edit: replacement text'),
+    edits: sandboxEditOperationsSchema
+      .optional()
+      .describe('Multiple exact search-and-replace edits to apply atomically in order'),
+  })
+  .refine((input) => !!input.edits?.length || (input.old_text !== undefined && input.new_text !== undefined), {
+    message: 'Provide either edits or old_text/new_text',
+  })
+
+function normalizeSandboxEdits(input: SandboxEditInput): SandboxEditOperation[] {
+  if (input.edits?.length) return input.edits
+  return [{ old_text: input.old_text ?? '', new_text: input.new_text ?? '' }]
+}
+
 const toolSetDescription = `
 Use these tools to interact with a sandboxed environment for executing code, reading/writing files, and exploring the file system.
 All file paths are relative to the sandbox working directory.
@@ -23,7 +61,8 @@ Write content to a file, creating it if it doesn't exist or overwriting if it do
 Use for creating new files or replacing entire file contents.
 
 ## sandbox_edit
-Perform a search-and-replace edit within a file. The search text must be an exact, unique match.
+Perform one or more search-and-replace edits within a file. Prefer edits[] for multiple changes in one call.
+Each search text must be an exact, unique match at the time it is applied.
 Use for making targeted modifications to existing files without rewriting the whole file.
 
 ## sandbox_grep
@@ -134,29 +173,23 @@ const sandbox_write = tool({
 })
 
 const sandbox_edit = tool({
-  description: 'Search and replace text in a file. The search text must be an exact unique match within the file.',
-  inputSchema: z.object({
-    file_path: z.string().describe('File path to edit'),
-    old_text: z.string().describe('Exact text to find (must be unique in file)'),
-    new_text: z.string().describe('Replacement text'),
-  }),
-  execute: async (
-    input: { file_path: string; old_text: string; new_text: string },
-    _context: { abortSignal?: AbortSignal }
-  ) => {
+  description:
+    'Search and replace text in a file. Prefer edits[] for multiple changes in one call. Each search text must be an exact unique match within the file.',
+  inputSchema: sandboxEditInputSchema,
+  execute: async (input: SandboxEditInput, _context: { abortSignal?: AbortSignal }) => {
     if (!platform.sandboxEdit) {
       return 'Sandbox not available on this platform'
     }
     try {
+      const edits = normalizeSandboxEdits(input)
       const result = await platform.sandboxEdit({
         filePath: input.file_path,
-        search: input.old_text,
-        replace: input.new_text,
+        edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),
       })
       if (!result.success) {
         return `Error editing file: ${result.error}`
       }
-      return `Successfully edited ${input.file_path}`
+      return `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${input.file_path}`
     } catch (error) {
       return `Error editing file: ${error instanceof Error ? error.message : String(error)}`
     }

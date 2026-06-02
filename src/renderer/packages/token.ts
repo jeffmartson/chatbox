@@ -95,12 +95,20 @@ export function estimateTokensFromMessages(
   }
 }
 
+// Fixed token estimate for sandbox metadata XML per attachment item
+export const SANDBOX_METADATA_PER_ITEM_TOKENS = 15
+// Fixed token estimate for sandbox <ATTACHMENT_FILE> metadata wrappers.
+export const SANDBOX_METADATA_BASE_TOKENS = 40
+
 /**
  * Sum cached token values from messages without calculation.
  * Used by needsCompaction for non-blocking token count checks.
  * Actual calculation is done by InputBox's useTokenEstimation.
+ *
+ * @param sandboxMode - When true, attachment tokens use fixed metadata estimate
+ *                      instead of cached content tokens
  */
-export function sumCachedTokensFromMessages(messages: Message[], model?: TokenModel): number {
+export function sumCachedTokensFromMessages(messages: Message[], model?: TokenModel, sandboxMode = false): number {
   if (messages.length === 0) {
     return 0
   }
@@ -130,17 +138,26 @@ export function sumCachedTokensFromMessages(messages: Message[], model?: TokenMo
       total += tokensPerName
     }
 
-    // Read cached file tokens
-    if (msg.files?.length) {
-      for (const file of msg.files) {
-        total += file.tokenCountMap?.[cacheKey] ?? 0
-      }
-    }
+    const fileCount = msg.files?.length ?? 0
+    const linkCount = msg.links?.length ?? 0
+    const attachmentCount = fileCount + linkCount
 
-    // Read cached link tokens
-    if (msg.links?.length) {
-      for (const link of msg.links) {
-        total += link.tokenCountMap?.[cacheKey] ?? 0
+    if (sandboxMode && attachmentCount > 0) {
+      // In sandbox mode, only metadata XML is sent — use fixed estimate
+      total += SANDBOX_METADATA_BASE_TOKENS + attachmentCount * SANDBOX_METADATA_PER_ITEM_TOKENS
+    } else {
+      // Read cached file tokens
+      if (msg.files?.length) {
+        for (const file of msg.files) {
+          total += file.tokenCountMap?.[cacheKey] ?? 0
+        }
+      }
+
+      // Read cached link tokens
+      if (msg.links?.length) {
+        for (const link of msg.links) {
+          total += link.tokenCountMap?.[cacheKey] ?? 0
+        }
       }
     }
   }

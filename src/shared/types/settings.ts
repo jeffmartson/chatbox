@@ -408,6 +408,7 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   pasteLongTextAsAFile: z.boolean().default(true), // 是否将长文本粘贴为文件
 
   autoGenerateTitle: z.boolean().default(true),
+  showCommandExplanation: z.boolean().default(true), // AI 解释待审批的 user_exec 命令
 
   autoCompaction: z.boolean().default(true),
   compactionThreshold: z.number().min(0.4).max(0.9).default(0.6),
@@ -421,8 +422,9 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   extension: ExtensionSettingsSchema,
   mcp: MCPSettingsSchema,
   skills: SkillSettingsSchema.catch({
-    enabledSkillNames: [],
+    enabledSkillNames: ['chatbox-product-info'],
     translationEnabled: true,
+    builtinDefaultsInitialized: true,
   }),
 })
 

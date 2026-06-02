@@ -48,10 +48,16 @@ import { isContainRenderableCode, MessageArtifact } from '../Artifact'
 import { AssistantAvatar, SystemAvatar, UserAvatar } from '../common/Avatar'
 import { ScalableIcon } from '../common/ScalableIcon'
 import Loading from '../icons/Loading'
-import { ReasoningContentUI, ToolCallPartUI, WebSearchGroupUI } from '../message-parts/ToolCallPartUI'
+import {
+  DownloadArtifactsUI,
+  ReasoningContentUI,
+  ToolCallGroupUI,
+  ToolCallPartUI,
+  WebSearchGroupUI,
+} from '../message-parts/ToolCallPartUI'
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
-import MessageStatuses from './MessageLoading'
+import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
 
 interface Props {
   id?: string
@@ -256,9 +262,29 @@ const _Message: FC<Props> = (props) => {
   }, [trackWithSessionName])
 
   const contentParts = msg.contentParts || []
+  const leadingStatuses = useMemo(
+    () => msg.status?.filter((status) => status.type !== 'preparing_tool_call'),
+    [msg.status]
+  )
+  const preparingToolCallStatuses = useMemo(
+    () => msg.status?.filter((status) => status.type === 'preparing_tool_call'),
+    [msg.status]
+  )
+  const downloadArtifactParts = useMemo(
+    () =>
+      contentParts.filter(
+        (item): item is MessageToolCallPart =>
+          item.type === 'tool-call' && (item as MessageToolCallPart).toolName === 'create_download'
+      ),
+    [contentParts]
+  )
 
   const groupedContentParts = useMemo(() => {
-    const groups: Array<{ type: 'web_search_group'; parts: MessageToolCallPart[] } | (typeof contentParts)[number]> = []
+    const groups: Array<
+      | { type: 'web_search_group'; parts: MessageToolCallPart[] }
+      | { type: 'tool_call_group'; parts: MessageToolCallPart[] }
+      | (typeof contentParts)[number]
+    > = []
     for (const item of contentParts) {
       if (item.type === 'tool-call' && (item as MessageToolCallPart).toolName === 'web_search') {
         const last = groups[groups.length - 1]
@@ -266,6 +292,13 @@ const _Message: FC<Props> = (props) => {
           last.parts.push(item as MessageToolCallPart)
         } else {
           groups.push({ type: 'web_search_group', parts: [item as MessageToolCallPart] })
+        }
+      } else if (item.type === 'tool-call') {
+        const last = groups[groups.length - 1]
+        if (last && 'parts' in last && last.type === 'tool_call_group') {
+          last.parts.push(item as MessageToolCallPart)
+        } else {
+          groups.push({ type: 'tool_call_group', parts: [item as MessageToolCallPart] })
         }
       } else {
         groups.push(item)
@@ -383,7 +416,7 @@ const _Message: FC<Props> = (props) => {
   const [actionMenuOpened, setActionMenuOpened] = useState(false)
 
   const isUserBubble = isBubbleLayout && msg.role === 'user'
-  const statusElements = <MessageStatuses statuses={msg.status} />
+  const statusElements = <MessageStatuses statuses={leadingStatuses} />
 
   const messageContent = (
     <>
@@ -503,12 +536,28 @@ const _Message: FC<Props> = (props) => {
                       )}
                     </div>
                   )
+                ) : 'parts' in item && item.type === 'tool_call_group' ? (
+                  <ToolCallGroupUI
+                    key={`tool-call-group-${msg.id}-${index}`}
+                    parts={item.parts}
+                    sessionId={sessionId}
+                    messageId={msg.id}
+                  />
                 ) : item.type === 'tool-call' ? (
-                  <ToolCallPartUI key={item.toolCallId} part={item as MessageToolCallPart} />
+                  <ToolCallPartUI
+                    key={item.toolCallId}
+                    part={item as MessageToolCallPart}
+                    sessionId={sessionId}
+                    messageId={msg.id}
+                  />
                 ) : null
               )}
             </div>
           )}
+          <DownloadArtifactsUI parts={downloadArtifactParts} />
+          {preparingToolCallStatuses?.map((status) => (
+            <PreparingToolCallStatus key={`preparing-tool-call-${status.toolName ?? 'tool-call'}`} status={status} />
+          ))}
         </Box>
         {props.sessionType === 'picture' && contentParts.filter((p) => p.type === 'image').length > 0 && (
           <PictureGallery

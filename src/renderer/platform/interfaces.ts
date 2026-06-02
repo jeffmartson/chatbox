@@ -82,6 +82,27 @@ export interface Platform extends Storage {
   parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean }>
   getLocalFilePath(file: File): string
   readLocalFileContent?(filePath: string): Promise<string | null>
+  fsRead?(params: { filePath: string; offset?: number; limit?: number }): Promise<{
+    success: boolean
+    content?: string
+    startLine?: number
+    endLine?: number
+    totalLines?: number
+    error?: string
+  }>
+  fsList?(params: { dirPath: string }): Promise<{ success: boolean; content?: string; error?: string }>
+  fsSearch?(params: {
+    pattern: string
+    dirPath: string
+    include?: string
+  }): Promise<{ success: boolean; content?: string; error?: string }>
+  fsWrite?(params: { filePath: string; content: string }): Promise<{ success: boolean; error?: string }>
+  fsEdit?(params: {
+    filePath: string
+    search?: string
+    replace?: string
+    edits?: Array<{ search: string; replace: string }>
+  }): Promise<{ success: boolean; error?: string }>
 
   // Parse file using MinerU service (Desktop only)
   parseFileWithMineru?(
@@ -108,32 +129,71 @@ export interface Platform extends Storage {
   getSessionMetaStorage(): SessionMetaStorage
 
   // Sandbox operations (Desktop only)
-  sandboxInit?(config: { workingDirectory: string }): Promise<{ success: boolean; error?: string }>
+  sandboxInit?(config: { workingDirectory: string; sessionId?: string }): Promise<{ success: boolean; error?: string }>
   sandboxExec?(params: {
     command: string
     timeout?: number
+    sessionId?: string
   }): Promise<{ stdout: string; stderr: string; exitCode: number }>
-  sandboxRead?(params: { filePath: string }): Promise<{ success: boolean; content?: string; error?: string }>
-  sandboxWrite?(params: { filePath: string; content: string }): Promise<{ success: boolean; error?: string }>
+  sandboxRead?(params: {
+    filePath: string
+    sessionId?: string
+  }): Promise<{ success: boolean; content?: string; error?: string }>
+  sandboxWrite?(params: {
+    filePath: string
+    content: string
+    sessionId?: string
+  }): Promise<{ success: boolean; error?: string }>
   sandboxEdit?(params: {
     filePath: string
-    search: string
-    replace: string
+    search?: string
+    replace?: string
+    edits?: Array<{ search: string; replace: string }>
+    sessionId?: string
   }): Promise<{ success: boolean; error?: string }>
-  sandboxLs?(params: { dirPath: string }): Promise<{ success: boolean; content?: string; error?: string }>
+  sandboxLs?(params: {
+    dirPath: string
+    sessionId?: string
+  }): Promise<{ success: boolean; content?: string; error?: string }>
   sandboxGrep?(params: {
     pattern: string
     dirPath?: string
     include?: string
+    sessionId?: string
   }): Promise<{ success: boolean; content?: string; error?: string }>
   sandboxFind?(params: {
     dirPath: string
     pattern?: string
+    sessionId?: string
   }): Promise<{ success: boolean; content?: string; error?: string }>
-  sandboxKill?(): Promise<{ killed: boolean }>
-  sandboxReset?(): Promise<{ success: boolean; error?: string }>
-  sandboxStatus?(): Promise<{ state: string; workingDirectory?: string | null; platform?: string }>
+  sandboxKill?(params?: { sessionId?: string }): Promise<{ killed: boolean }>
+  sandboxReset?(params?: { sessionId?: string }): Promise<{ success: boolean; error?: string }>
+  sandboxStatus?(params?: {
+    sessionId?: string
+  }): Promise<{ state: string; workingDirectory?: string | null; platform?: string }>
   sandboxCheckAvailability?(): Promise<{ available: boolean; reason?: string }>
+
+  // Sandbox temp dir operations (Desktop only, for code execution)
+  sandboxInitTemp?(params: {
+    sessionId: string
+  }): Promise<{ success: boolean; workingDirectory?: string; error?: string }>
+  sandboxCopyFile?(params: {
+    content: string
+    targetFilename: string
+    sessionId?: string
+  }): Promise<{ success: boolean; sandboxPath?: string; error?: string }>
+  sandboxCopyBlob?(params: {
+    blobKey: string
+    targetFilename: string
+    sessionId?: string
+  }): Promise<{ success: boolean; sandboxPath?: string; error?: string }>
+  sandboxExportFile?(params: {
+    sandboxPath: string
+    suggestedName?: string
+  }): Promise<{ success: boolean; localPath?: string; error?: string }>
+  sandboxReadFileBase64?(params: { filePath: string }): Promise<{ success: boolean; base64?: string; error?: string }>
+  sandboxCreateHtmlPreview?(params: { filePath: string }): Promise<{ success: boolean; url?: string; error?: string }>
+  sandboxNodeCommand?(): Promise<string>
 
   // Directory dialog (Desktop only)
   openDirectoryDialog?(): Promise<{ canceled: boolean; path?: string }>

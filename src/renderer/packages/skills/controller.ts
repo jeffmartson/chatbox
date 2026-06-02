@@ -20,6 +20,21 @@ interface SkillUpdateResult {
   error?: string
 }
 
+const skillsChangeListeners = new Set<() => void>()
+
+export function notifySkillsChanged(): void {
+  for (const listener of skillsChangeListeners) {
+    listener()
+  }
+}
+
+export function subscribeSkillsChanged(listener: () => void): () => void {
+  skillsChangeListeners.add(listener)
+  return () => {
+    skillsChangeListeners.delete(listener)
+  }
+}
+
 export const skillsController = {
   discoverSkills(): Promise<SkillInfo[]> {
     return window.electronAPI.invoke('skills:discover')
@@ -41,16 +56,36 @@ export const skillsController = {
     return window.electronAPI.invoke('skills:execute-script', { skillName, scriptName, args })
   },
 
-  installSkill(owner: string, repo: string, skillPath: string): Promise<SkillInstallResult> {
-    return window.electronAPI.invoke('skills:install', { owner, repo, skillPath })
+  async installSkill(owner: string, repo: string, skillPath: string): Promise<SkillInstallResult> {
+    const result = await window.electronAPI.invoke('skills:install', { owner, repo, skillPath })
+    if (result.success) notifySkillsChanged()
+    return result
   },
 
-  installMarketplaceSkill(skill: MarketplaceSkill): Promise<SkillInstallResult> {
-    return window.electronAPI.invoke('skills:install-marketplace', skill)
+  async installFromSandbox(sandboxPath: string, sessionId?: string, sourceInfo?: string): Promise<SkillInstallResult> {
+    const result = await window.electronAPI.invoke('skills:install-from-sandbox', {
+      sandboxPath,
+      sessionId,
+      sourceInfo,
+    })
+    if (result.success) notifySkillsChanged()
+    return result
   },
 
-  deleteSkill(name: string): Promise<{ success: boolean; error?: string }> {
-    return window.electronAPI.invoke('skills:delete', name)
+  userExec(command: string, timeout?: number): Promise<SkillScriptResult> {
+    return window.electronAPI.invoke('skills:user-exec', { command, timeout })
+  },
+
+  async installMarketplaceSkill(skill: MarketplaceSkill): Promise<SkillInstallResult> {
+    const result = await window.electronAPI.invoke('skills:install-marketplace', skill)
+    if (result.success) notifySkillsChanged()
+    return result
+  },
+
+  async deleteSkill(name: string): Promise<{ success: boolean; error?: string }> {
+    const result = await window.electronAPI.invoke('skills:delete', name)
+    if (result.success) notifySkillsChanged()
+    return result
   },
 
   scanRepo(owner: string, repo: string): Promise<Array<{ name: string; path: string; description?: string }>> {

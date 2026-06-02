@@ -57,6 +57,10 @@ function Index() {
   const sessionWebBrowsingMap = useUIStore((s) => s.sessionWebBrowsingMap)
   const setSessionWebBrowsing = useUIStore((s) => s.setSessionWebBrowsing)
   const clearSessionWebBrowsing = useUIStore((s) => s.clearSessionWebBrowsing)
+  const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
+  const setSessionAgentMode = useUIStore((s) => s.setSessionAgentMode)
+  const lockSessionAgentMode = useUIStore((s) => s.lockSessionAgentMode)
+  const clearSessionAgentMode = useUIStore((s) => s.clearSessionAgentMode)
   const [session, setSession] = useState<Session>({
     id: 'new',
     ...initEmptyChatSession(),
@@ -181,6 +185,16 @@ function Index() {
         clearSessionWebBrowsing('new')
       }
 
+      // Transfer agent mode setting from "new" session to the actual session
+      const newAgentMode = sessionAgentModeMap['new']
+      if (newAgentMode) {
+        setSessionAgentMode(newSession.id, newAgentMode.value)
+        if (newAgentMode.locked) {
+          lockSessionAgentMode(newSession.id, newAgentMode.lockReason)
+        }
+        clearSessionAgentMode('new')
+      }
+
       switchCurrentSession(newSession.id)
       localStorage.removeItem('new-chat')
 
@@ -198,6 +212,10 @@ function Index() {
       sessionWebBrowsingMap,
       setSessionWebBrowsing,
       clearSessionWebBrowsing,
+      sessionAgentModeMap,
+      setSessionAgentMode,
+      lockSessionAgentMode,
+      clearSessionAgentMode,
     ]
   )
 

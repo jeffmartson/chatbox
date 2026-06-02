@@ -18,6 +18,7 @@ export type ModelSelectorProps = PropsWithChildren<
     onSelect?: (provider: ModelProvider | string, model: string) => void
     onDropdownOpen?: () => void
     modelFilter?: (model: ProviderModelInfo, providerId?: string) => boolean
+    modelDisabledCheck?: (model: ProviderModelInfo, providerId?: string) => string | undefined
     selectedProviderId?: string
     selectedModelId?: string
     searchPosition?: 'top' | 'bottom'
@@ -33,6 +34,7 @@ export const ModelSelector = forwardRef<HTMLDivElement, ModelSelectorProps>(
       onDropdownOpen,
       children,
       modelFilter,
+      modelDisabledCheck,
       selectedProviderId,
       selectedModelId,
       searchPosition = 'bottom',
@@ -99,6 +101,7 @@ export const ModelSelector = forwardRef<HTMLDivElement, ModelSelectorProps>(
         onSearchChange={setSearch}
         onOptionSubmit={handleOptionSubmit}
         modelFilter={modelFilter}
+        modelDisabledCheck={modelDisabledCheck}
       >
         {children}
       </MobileModelSelector>
@@ -117,6 +120,7 @@ export const ModelSelector = forwardRef<HTMLDivElement, ModelSelectorProps>(
         onOptionSubmit={handleOptionSubmit}
         onDropdownOpen={onDropdownOpen}
         modelFilter={modelFilter}
+        modelDisabledCheck={modelDisabledCheck}
         comboboxProps={comboboxProps}
         searchPosition={searchPosition}
       >

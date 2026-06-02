@@ -4,14 +4,14 @@ import { z } from 'zod'
 
 /**
  * SkillSource: Metadata about where a skill comes from
- * - type: Source type (builtin, local, marketplace, github)
+ * - type: Source type (builtin, local, marketplace, github, chat, claude-code)
  * - repo: Optional repository URL or identifier
  * - commitHash: Optional commit hash for version tracking
  * - installedAt: Optional ISO timestamp of installation
  * - skillPath: Optional file system path to skill
  */
 export interface SkillSource {
-  type: 'builtin' | 'local' | 'marketplace' | 'github'
+  type: 'builtin' | 'local' | 'marketplace' | 'github' | 'chat' | 'claude-code'
   repo?: string
   commitHash?: string
   installedAt?: string
@@ -61,13 +61,11 @@ export interface SkillMetadata {
  * - Extends SkillMetadata with path and isBuiltin
  * - path: File system path to the skill
  * - isBuiltin: Whether this is a built-in skill
- * - bodyTokenEstimate: Optional estimated token count for skill body
- * - source: Optional source metadata (builtin, local, marketplace, github)
+ * - source: Optional source metadata (builtin, local, marketplace, github, chat, claude-code)
  */
 export interface SkillInfo extends SkillMetadata {
   path: string
   isBuiltin: boolean
-  bodyTokenEstimate?: number
   source?: SkillSource
 }
 
@@ -77,10 +75,12 @@ export interface SkillInfo extends SkillMetadata {
  * Zod schema for skill settings
  * - enabledSkillNames: Array of custom skill names to enable
  * - translationEnabled: Whether translation feature is enabled for skills
+ * - builtinDefaultsInitialized: Whether one-time default built-in skills have been applied
  */
 export const SkillSettingsSchema = z.object({
-  enabledSkillNames: z.array(z.string()).default([]),
+  enabledSkillNames: z.array(z.string()).default(['chatbox-product-info']),
   translationEnabled: z.boolean().default(true),
+  builtinDefaultsInitialized: z.boolean().default(false),
 })
 
 // ===== Type Exports =====

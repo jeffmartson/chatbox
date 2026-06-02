@@ -53,6 +53,7 @@ export async function getToolSet(attachmentIds: number[]) {
 Large uploaded files are available through retrieval tools instead of full inline context.
 The conversation may contain <ATTACHMENT_FILE> tags with <RETRIEVAL_MODE>session_attachment_rag</RETRIEVAL_MODE>.
 Treat those tags as real uploaded files. Their full content is not in the prompt.
+When code execution is available, the same <ATTACHMENT_FILE> tags may also include <SANDBOX_PATH> and <PARSED_SANDBOX_PATH>; those fields describe sandbox file paths and do not replace retrieval for document-specific questions.
 
 ### Ready files
 ${readyList}

@@ -1,8 +1,8 @@
+import type { JSONValue } from '@ai-sdk/provider'
+import type { ReasoningPart } from '@ai-sdk/provider-utils'
 import type { Message, MessageContentParts, MessageToolCallPart } from '@shared/types'
 import type { ModelDependencies } from '@shared/types/adapters'
-import type { ReasoningPart } from '@ai-sdk/provider-utils'
 import type { FilePart, ImagePart, ModelMessage, TextPart, ToolCallPart } from 'ai'
-import type { JSONValue } from '@ai-sdk/provider'
 import dayjs from 'dayjs'
 import { compact } from 'lodash'
 import { createModelDependencies } from '@/adapters'
@@ -84,7 +84,7 @@ async function convertAssistantContentParts(
   const results: Array<TextPart | FilePart | ToolCallPart | ReasoningPart | null> = await Promise.all(
     contentParts.map(async (c) => {
       if (c.type === 'tool-call') {
-        if (c.state === 'call') return null
+        if (c.state === 'call' || c.state === 'paused') return null
         return {
           type: 'tool-call' as const,
           toolCallId: c.toolCallId,
@@ -126,7 +126,7 @@ async function emitAssistantMessages(
   options?: { preserveReasoning?: boolean }
 ): Promise<void> {
   const toolCallIndices = contentParts
-    .map((c, i) => (c.type === 'tool-call' && c.state !== 'call' ? i : -1))
+    .map((c, i) => (c.type === 'tool-call' && (c.state === 'result' || c.state === 'error') ? i : -1))
     .filter((i) => i !== -1)
 
   if (toolCallIndices.length === 0) {
@@ -146,6 +146,25 @@ async function emitAssistantMessages(
     }
 
     const tc = contentParts[tcIdx] as MessageToolCallPart
+    let toolOutput: { type: 'error-text'; value: string } | { type: 'json'; value: JSONValue }
+    if (tc.state === 'error') {
+      toolOutput = { type: 'error-text' as const, value: stringifyErrorResult(tc.result) }
+    } else if (tc.resultStorageKey) {
+      // The full result was offloaded to blob storage — send the preview + a hint.
+      // tc.result is always a plain string here (truncated from the serialized form).
+      const preview = String(tc.result ?? '')
+      toolOutput = {
+        type: 'json' as const,
+        value: {
+          _truncated: true,
+          preview,
+          fullResultFileKey: tc.resultStorageKey,
+          hint: 'Result was too large and has been truncated. Use the read_file tool with the fullResultFileKey above to read the complete result.',
+        } as JSONValue,
+      }
+    } else {
+      toolOutput = { type: 'json' as const, value: (tc.result ?? null) as JSONValue }
+    }
     output.push({
       role: 'tool' as const,
       content: [
@@ -153,10 +172,7 @@ async function emitAssistantMessages(
           type: 'tool-result' as const,
           toolCallId: tc.toolCallId,
           toolName: tc.toolName,
-          output:
-            tc.state === 'error'
-              ? { type: 'error-text' as const, value: stringifyErrorResult(tc.result) }
-              : { type: 'json' as const, value: (tc.result ?? null) as JSONValue },
+          output: toolOutput,
         },
       ],
     })

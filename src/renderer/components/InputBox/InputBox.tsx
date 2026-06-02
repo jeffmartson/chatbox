@@ -20,6 +20,7 @@ import {
   isSupportedFile,
 } from '@shared/file-extensions'
 import { KNOWLEDGE_BASE_MAX_FILE_SIZE, KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL } from '@shared/knowledge-base'
+import { isDeepSeekWeakToolUse } from '@shared/models/utils/deepseek'
 import { getModel } from '@shared/providers'
 import { formatNumber } from '@shared/utils'
 import {
@@ -31,13 +32,11 @@ import {
   IconCirclePlus,
   IconFilePencil,
   IconFolder,
-  IconHammer,
   IconLink,
   IconPhoto,
   IconPlayerStopFilled,
   IconPlus,
   IconSettings,
-  IconVocabulary,
   IconWorldWww,
 } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
@@ -76,15 +75,16 @@ import * as atoms from '@/stores/atoms'
 import { compactionUIStateMapAtom } from '@/stores/atoms/compactionAtoms'
 import * as chatStore from '@/stores/chatStore'
 import { useSession, useSessionSettings } from '@/stores/chatStore'
+import { getSessionAgentMode } from '@/stores/session/utils'
 import { settingsStore, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { delay } from '@/utils'
-import { featureFlags } from '@/utils/feature-flags'
 import { trackEvent } from '@/utils/track'
 import {
   type KnowledgeBase,
   type Message,
   ModelProviderEnum,
+  type ProviderModelInfo,
   type SessionAttachment,
   type SessionAttachmentIndexingStage,
   type SessionType,
@@ -101,10 +101,10 @@ import { CompressionModal } from '../common/CompressionModal'
 import { ScalableIcon } from '../common/ScalableIcon'
 import Disclaimer from '../Disclaimer'
 import ProviderImageIcon from '../icons/ProviderImageIcon'
-import KnowledgeBaseMenu from '../knowledge-base/KnowledgeBaseMenu'
 import ModelSelector from '../ModelSelector'
-import MCPMenu from '../mcp/MCPMenu'
+import AgentModeButton from './AgentModeButton'
 import { FileMiniCard, ImageMiniCard, LinkMiniCard } from './Attachments'
+import { getAgentModeUIState } from './agentModeState'
 import { ImageUploadInput } from './ImageUploadInput'
 import {
   cleanupFile,
@@ -329,6 +329,13 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const { knowledgeBase, setKnowledgeBase } = useKnowledgeBase({ isNewSession })
 
+    // Agent mode value for conditional toolbar rendering
+    const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
+    const agentModeEntry = useMemo(() => {
+      const entry = sessionAgentModeMap[currentSessionId || 'new']
+      return entry ?? getSessionAgentMode(currentSessionId || 'new')
+    }, [sessionAgentModeMap, currentSessionId])
+
     const [showCompressionModal, setShowCompressionModal] = useState(false)
 
     const [links, setLinks] = useAtom(atoms.inputBoxLinksFamily(currentSessionId || 'new'))
@@ -511,12 +518,31 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       return (providerInfo?.models || providerInfo?.defaultSettings?.models)?.find((m) => m.modelId === model.modelId)
     }, [providers, model])
 
-    // Check if model supports tool use for files
-    const { data: modelSupportToolUseForFile = false, isFetched: isModelToolCapabilityFetched } = useQuery({
+    // When agent mode is on, block models that don't support agent tools in the model selector.
+    const agentModeDisabledMessage = t('This model does not support Agent Mode')
+    const modelDisabledCheck = useCallback(
+      (m: ProviderModelInfo) => {
+        const sid = currentSessionId || 'new'
+        const entry = getSessionAgentMode(sid)
+        if (entry.value !== 'on') return undefined
+        if (!m.capabilities?.includes('tool_use')) return agentModeDisabledMessage
+        if (isDeepSeekWeakToolUse(m.modelId, 'agent')) return agentModeDisabledMessage
+        return undefined
+      },
+      [currentSessionId, agentModeDisabledMessage]
+    )
+
+    // Check model tool use capabilities for agent mode and file handling.
+    // Uses 'agent' scope as the gate — models with weak function calling
+    // (e.g. DeepSeek V3/R1) return false, disabling agent mode entirely.
+    const {
+      data: modelToolCapabilities = { agentMode: false, readFile: false },
+      isFetched: isModelToolCapabilityFetched,
+    } = useQuery({
       queryKey: ['model-tool-capability', model?.provider, model?.modelId],
       queryFn: async () => {
         if (!model?.provider || !model?.modelId) {
-          return false
+          return { agentMode: false, readFile: false }
         }
 
         try {
@@ -531,18 +557,33 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           }
 
           const modelInstance = getModel(settings, globalSettings, configs, dependencies)
-          return modelInstance.isSupportToolUse('read-file')
+          return {
+            agentMode: modelInstance.isSupportToolUse('agent'),
+            readFile: modelInstance.isSupportToolUse('read-file'),
+          }
         } catch (e) {
           console.debug('useModelToolCapability: failed to check capability', e)
-          return false
+          return { agentMode: false, readFile: false }
         }
       },
       enabled: !!(model?.provider && model?.modelId),
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
     })
+    const modelSupportToolUseForFile = modelToolCapabilities.readFile
+    const modelSupportsAgentMode = modelToolCapabilities.agentMode
     const showSessionRetrievalToolWarning =
       hasSessionRetrievalFiles && isModelToolCapabilityFetched && !modelSupportToolUseForFile
+    const agentModeUIState = useMemo(
+      () => getAgentModeUIState(agentModeEntry, model ? modelSupportsAgentMode : true),
+      [agentModeEntry, model, modelSupportsAgentMode]
+    )
+
+    // Determine sandbox mode: files exist in session and model supports tool use for files
+    const sandboxMode = useMemo(() => {
+      if (!modelSupportToolUseForFile || !currentSession) return false
+      return currentSession.messages.some((m) => m.files?.length)
+    }, [modelSupportToolUseForFile, currentSession?.messages])
 
     // Calculate token counts using unified cache layer
     const { contextTokens, currentInputTokens, totalTokens, isCalculating, pendingTasks, messageCount } =
@@ -552,6 +593,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         settings: currentSessionMergedSettings || {},
         model,
         modelSupportToolUseForFile,
+        sandboxMode,
         constructedMessage: preConstructedMessage.message,
       })
 
@@ -912,7 +954,11 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
       // 异步预处理文件，失败时标记为 error，并吞掉异常避免 Promise.all reject
       return sessionHelpers
-        .prepareFileAttachment(file, { provider: model?.provider || '', modelId: model?.modelId || '' })
+        .prepareFileAttachment(
+          file,
+          { provider: model?.provider || '', modelId: model?.modelId || '' },
+          { agentMode: isAgentModeActive }
+        )
         .then(async (preprocessedFile) => {
           if (!activeFilePreprocessingKeysRef.current.has(fileKey)) {
             return
@@ -988,6 +1034,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       }
     }
 
+    // In agent mode, allow all file types (sandbox can handle archives, binaries, etc.)
+    // On mobile/web, effectiveValue is always 'off' (set by getAgentModeUIState)
+    const isAgentModeActive = agentModeUIState.effectiveValue !== 'off'
+
     const insertFiles = async (files: File[]) => {
       const MAX_IMAGES = 8
       const MAX_ATTACHMENTS = 20
@@ -1026,8 +1076,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
             continue
           }
 
-          // Check if file type is supported
-          if (!isSupportedFile(file.name)) {
+          // In agent mode, skip file type validation (sandbox handles any file type)
+          if (!isAgentModeActive && !isSupportedFile(file.name)) {
             const unsupportedType = getUnsupportedFileType(file.name)
             let errorMsg = t('Unsupported file type: {{fileName}}', { fileName: file.name })
             if (unsupportedType === 'iwork') {
@@ -1193,13 +1243,14 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const { getRootProps, getInputProps } = useDropzone({
       onDrop: (acceptedFiles: File[], fileRejections) => {
         insertFiles(acceptedFiles)
-        // Show toast for rejected files
+        // Show toast for rejected files (only in non-agent mode, agent mode accepts all)
         if (fileRejections.length > 0) {
           const rejectedNames = fileRejections.map((r) => r.file.name).join(', ')
           toastActions.add(t('Unsupported file type: {{fileName}}', { fileName: rejectedNames }))
         }
       },
-      accept: getFileAcceptConfig(),
+      // In agent mode, accept all file types; otherwise restrict to supported formats
+      accept: isAgentModeActive ? undefined : getFileAcceptConfig(),
       noClick: true,
       noKeyboard: true,
     })
@@ -1551,7 +1602,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 className="hidden"
                 onChange={onFileInputChange}
                 multiple
-                accept={getFileAcceptString()}
+                accept={isAgentModeActive ? undefined : getFileAcceptString()}
               />
 
               {/* Left Group: Tool Buttons */}
@@ -1563,60 +1614,46 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                   t={t}
                 />
 
-                {featureFlags.mcp && (
-                  <MCPMenu>
-                    {(enabledTools) => (
-                      <UnstyledButton className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors">
-                        <IconHammer
-                          size={toolbarIconSize}
-                          strokeWidth={1.8}
-                          className={
-                            enabledTools > 0
-                              ? 'text-[var(--chatbox-tint-brand)]'
-                              : 'text-[var(--chatbox-tint-secondary)]'
-                          }
-                        />
-                        {enabledTools > 0 && (
-                          <Text size="xs" className="text-[var(--chatbox-tint-brand)]">
-                            {enabledTools}
-                          </Text>
-                        )}
-                      </UnstyledButton>
-                    )}
-                  </MCPMenu>
-                )}
-
-                {featureFlags.knowledgeBase && !isSmallScreen && (
-                  <KnowledgeBaseMenu currentKnowledgeBaseId={knowledgeBase?.id} onSelect={handleKnowledgeBaseSelect}>
-                    <UnstyledButton className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors">
-                      <IconVocabulary
+                {/* Web Search - only visible when agent mode is off or on non-desktop */}
+                {(platform.type !== 'desktop' || agentModeUIState.effectiveValue === 'off') && (
+                  <Tooltip label={t('Web Search')} position="top" withArrow disabled={isSmallScreen}>
+                    <UnstyledButton
+                      onClick={() => {
+                        setWebBrowsingMode(!webBrowsingMode)
+                        dom.focusMessageInput()
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors"
+                    >
+                      <IconWorldWww
                         size={toolbarIconSize}
                         strokeWidth={1.8}
                         className={
-                          knowledgeBase ? 'text-[var(--chatbox-tint-brand)]' : 'text-[var(--chatbox-tint-secondary)]'
+                          webBrowsingMode ? 'text-[var(--chatbox-tint-brand)]' : 'text-[var(--chatbox-tint-secondary)]'
                         }
                       />
                     </UnstyledButton>
-                  </KnowledgeBaseMenu>
+                  </Tooltip>
                 )}
 
-                <Tooltip label={t('Web Search')} position="top" withArrow disabled={isSmallScreen}>
-                  <UnstyledButton
-                    onClick={() => {
-                      setWebBrowsingMode(!webBrowsingMode)
+                {/* Agent Mode Panel - desktop only */}
+                {platform.type === 'desktop' && (
+                  <AgentModeButton
+                    sessionId={currentSessionId || 'new'}
+                    iconSize={toolbarIconSize}
+                    modelSupportsAgentMode={model ? modelSupportsAgentMode : true}
+                    webBrowsingMode={webBrowsingMode}
+                    onWebBrowsingChange={(v) => {
+                      setWebBrowsingMode(v)
                       dom.focusMessageInput()
                     }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors"
-                  >
-                    <IconWorldWww
-                      size={toolbarIconSize}
-                      strokeWidth={1.8}
-                      className={
-                        webBrowsingMode ? 'text-[var(--chatbox-tint-brand)]' : 'text-[var(--chatbox-tint-secondary)]'
-                      }
-                    />
-                  </UnstyledButton>
-                </Tooltip>
+                    currentKnowledgeBaseId={knowledgeBase?.id}
+                    onKnowledgeBaseSelect={handleKnowledgeBaseSelect}
+                    onSkillSelect={(name) => {
+                      messageInputFieldRef.current?.setValue(`/${name} `)
+                      dom.focusMessageInput()
+                    }}
+                  />
+                )}
 
                 {!isSmallScreen &&
                   (showRollbackThreadButton ? (
@@ -1754,6 +1791,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                       onSelect={onSelectModel}
                       selectedProviderId={model?.provider}
                       selectedModelId={model?.modelId}
+                      modelDisabledCheck={modelDisabledCheck}
                       position="top-end"
                       transitionProps={{
                         transition: 'fade-up',

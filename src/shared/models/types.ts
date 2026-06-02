@@ -1,4 +1,4 @@
-import type { ModelMessage, TextStreamPart, ToolSet } from 'ai'
+import type { ModelMessage, PrepareStepFunction, TextStreamPart, ToolSet } from 'ai'
 import {
   type MessageContentParts,
   type MessageStatus,
@@ -67,6 +67,7 @@ export interface ChatStreamOptions {
   tools?: ToolSet
   providerOptions?: ProviderOptions
   maxSteps?: number
+  prepareStep?: PrepareStepFunction<ToolSet>
 }
 
 export type ModelStatus = MessageStatus

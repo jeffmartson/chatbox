@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 import ActionMenu, { type ActionMenuItemProps } from '@/components/ActionMenu'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { useSkillTranslation } from '@/hooks/useSkillTranslation'
-import { skillsController } from '@/packages/skills/controller'
+import { notifySkillsChanged, skillsController } from '@/packages/skills/controller'
 import { toastError } from '@/packages/toast'
 import { settingsStore, useSettingsStore } from '@/stores/settingsStore'
 import GitHubInstallModal, { type DetectedSkill } from './GitHubInstallModal'
@@ -104,18 +104,17 @@ const SkillCard: FC<{
         </Text>
       </Tooltip>
 
-      {(skill.bodyTokenEstimate != null || skill.source?.repo) && (
+      {(skill.source?.repo || (skill.source?.type && skill.source.type !== 'local')) && (
         <Flex mt={8} gap={6} wrap="wrap">
-          {skill.bodyTokenEstimate != null && (
-            <Badge size="xs" variant="light" color="chatbox-brand" radius="sm">
-              ~{skill.bodyTokenEstimate.toLocaleString()} tokens
-            </Badge>
-          )}
-          {skill.source?.repo && (
+          {skill.source?.repo ? (
             <Badge size="xs" variant="light" color="gray" radius="sm">
               {skill.source.repo}
             </Badge>
-          )}
+          ) : skill.source?.type && skill.source.type !== 'local' ? (
+            <Badge size="xs" variant="light" color="gray" radius="sm">
+              {skill.source.type}
+            </Badge>
+          ) : null}
         </Flex>
       )}
     </Paper>
@@ -205,7 +204,47 @@ export const SkillsSection: FC = () => {
     setLoading(true)
     try {
       const discovered = await skillsController.discoverSkills()
-      setSkills(discovered)
+      const defaultEnabledBuiltinSkillNames = discovered
+        .filter((skill) => skill.isBuiltin && skill.name === 'chatbox-product-info')
+        .map((skill) => skill.name)
+      const discoveredNames = new Set(discovered.map((skill) => skill.name))
+      const currentSkillSettings = settingsStore.getState().skills
+      const enabledSkillNames = currentSkillSettings.builtinDefaultsInitialized
+        ? currentSkillSettings.enabledSkillNames
+        : [...new Set([...currentSkillSettings.enabledSkillNames, ...defaultEnabledBuiltinSkillNames])]
+      const enabledNameSet = new Set(enabledSkillNames)
+      const originalIndexByName = new Map(discovered.map((skill, index) => [skill.name, index]))
+      const sortedDiscovered = [...discovered].sort((a, b) => {
+        const aEnabled = enabledNameSet.has(a.name)
+        const bEnabled = enabledNameSet.has(b.name)
+        if (aEnabled !== bEnabled) {
+          return aEnabled ? -1 : 1
+        }
+        return (originalIndexByName.get(a.name) ?? 0) - (originalIndexByName.get(b.name) ?? 0)
+      })
+      setSkills(sortedDiscovered)
+      settingsStore.setState((state) => {
+        const enabledSkillNames = (
+          state.skills.builtinDefaultsInitialized
+            ? state.skills.enabledSkillNames
+            : [...new Set([...state.skills.enabledSkillNames, ...defaultEnabledBuiltinSkillNames])]
+        ).filter((name) => discoveredNames.has(name))
+        if (
+          state.skills.builtinDefaultsInitialized &&
+          enabledSkillNames.length === state.skills.enabledSkillNames.length &&
+          enabledSkillNames.every((name, index) => name === state.skills.enabledSkillNames[index])
+        ) {
+          return state
+        }
+        return {
+          skills: {
+            ...state.skills,
+            enabledSkillNames,
+            builtinDefaultsInitialized: true,
+          },
+        }
+      })
+      notifySkillsChanged()
     } catch (err) {
       console.error('Failed to discover skills:', err)
     } finally {
@@ -217,17 +256,19 @@ export const SkillsSection: FC = () => {
     fetchSkills()
   }, [fetchSkills])
 
-  const originalUserSkillByPath = useMemo(() => {
+  const originalSkillByPath = useMemo(() => {
     return new Map(skills.filter((skill) => !skill.isBuiltin).map((skill) => [skill.path, skill]))
   }, [skills])
 
-  const userSkills = translatedSkills.filter((skill) => !skill.isBuiltin)
+  const builtinSkills = translatedSkills.filter((skill) => skill.isBuiltin)
+  const userSkills = translatedSkills.filter((skill) => !skill.isBuiltin && skill.source?.type !== 'claude-code')
+  const claudeCodeSkills = translatedSkills.filter((skill) => skill.source?.type === 'claude-code')
 
   const getOriginalUserSkill = useCallback(
     (skill: SkillInfo) => {
-      return originalUserSkillByPath.get(skill.path) ?? skill
+      return originalSkillByPath.get(skill.path) ?? skill
     },
-    [originalUserSkillByPath]
+    [originalSkillByPath]
   )
 
   const handleUserToggle = useCallback((name: string, enabled: boolean) => {
@@ -387,6 +428,23 @@ export const SkillsSection: FC = () => {
         </Paper>
       )}
 
+      {builtinSkills.length > 0 && (
+        <>
+          <SectionHeader title={t('Built-in Skills')} count={builtinSkills.length} className="mb-3" />
+          <SimpleGrid type="container" cols={{ base: 1, '450px': 2, '800px': 3, '1200px': 4 }} mb="xl">
+            {builtinSkills.map((skill) => (
+              <SkillCard
+                key={skill.path}
+                skill={skill}
+                translatedName={getTranslatedName(skill)}
+                enabled={skillSettings.enabledSkillNames.includes(skill.name)}
+                onToggle={handleUserToggle}
+              />
+            ))}
+          </SimpleGrid>
+        </>
+      )}
+
       <SectionHeader
         title={t('User Skills')}
         count={userSkills.length}
@@ -453,6 +511,26 @@ export const SkillsSection: FC = () => {
         </SimpleGrid>
       )}
 
+      {claudeCodeSkills.length > 0 && (
+        <>
+          <SectionHeader title={t('Claude Code Skills')} count={claudeCodeSkills.length} className="mt-6 mb-3" />
+          <SimpleGrid type="container" cols={{ base: 1, '450px': 2, '800px': 3, '1200px': 4 }}>
+            {claudeCodeSkills.map((skill) => {
+              const originalSkill = getOriginalUserSkill(skill)
+              return (
+                <SkillCard
+                  key={originalSkill.path}
+                  skill={skill}
+                  translatedName={getTranslatedName(skill)}
+                  enabled={skillSettings.enabledSkillNames.includes(originalSkill.name)}
+                  onToggle={(name, enabled) => handleUserToggle(originalSkill.name || name, enabled)}
+                />
+              )
+            })}
+          </SimpleGrid>
+        </>
+      )}
+
       <GitHubInstallModal
         opened={installModalOpen}
         onClose={() => setInstallModalOpen(false)}
@@ -464,10 +542,7 @@ export const SkillsSection: FC = () => {
         }}
       />
 
-      <SkillsSpotlight
-        installedSkillNames={skills.filter((s) => !s.isBuiltin).map((s) => s.name)}
-        onInstallComplete={fetchSkills}
-      />
+      <SkillsSpotlight installedSkills={skills.filter((s) => !s.isBuiltin)} onInstallComplete={fetchSkills} />
     </>
   )
 }

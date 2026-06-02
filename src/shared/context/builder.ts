@@ -1,3 +1,4 @@
+import { isTextFilePath } from '../file-extensions'
 import type { CompactionPoint, Message, MessageContentParts } from '../types'
 import type { AttachmentResolver, ContextBuilderOptions } from './types'
 
@@ -15,6 +16,7 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     compactionPoints,
     keepToolCallRounds = 2,
     modelSupportToolUseForFile = false,
+    sandboxMode = false,
   } = options
 
   if (messages.length === 0) {
@@ -35,7 +37,12 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     contextMessages = applyMessageLimit(contextMessages, maxContextMessageCount)
   }
 
-  contextMessages = await injectAttachments(contextMessages, attachmentResolver, modelSupportToolUseForFile)
+  contextMessages = await injectAttachments(
+    contextMessages,
+    attachmentResolver,
+    modelSupportToolUseForFile,
+    sandboxMode
+  )
 
   return contextMessages
 }
@@ -166,8 +173,14 @@ function applyMessageLimit(messages: Message[], maxCount: number): Message[] {
 async function injectAttachments(
   messages: Message[],
   resolver: AttachmentResolver,
-  modelSupportToolUseForFile: boolean
+  modelSupportToolUseForFile: boolean,
+  sandboxMode: boolean
 ): Promise<Message[]> {
+  // In sandbox mode, inject the same attachment XML envelope but keep file content out of the prompt.
+  if (sandboxMode) {
+    return messages.map((msg) => injectSandboxFileMetadata(msg))
+  }
+
   const allStorageKeys = new Set<string>()
   for (const msg of messages) {
     if (msg.files) {
@@ -202,6 +215,53 @@ async function injectAttachments(
   }
 
   return messages.map((msg) => processMessageAttachments(msg, attachmentContents, modelSupportToolUseForFile))
+}
+
+function formatFileSize(bytes: number | undefined): string {
+  if (!bytes) return 'unknown'
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function escapeXmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function injectSandboxFileMetadata(msg: Message): Message {
+  const hasFiles = msg.files && msg.files.length > 0
+
+  if (!hasFiles) {
+    return { ...msg }
+  }
+
+  let result = { ...msg }
+  let index = 1
+
+  if (msg.files) {
+    for (const file of msg.files) {
+      const isText = isTextFilePath(file.name)
+      const attachment = buildSandboxAttachment({
+        index: index++,
+        name: file.name,
+        key: file.sessionAttachmentId ? `session-attachment:${file.sessionAttachmentId}` : (file.storageKey ?? file.id),
+        size: formatFileSize(file.byteLength),
+        sandboxPath: file.name,
+        parsedSandboxPath:
+          !isText && file.storageKey && file.parserType !== 'sandbox-raw' ? `${file.name}_parsed.txt` : undefined,
+        retrieval:
+          file.ragMode === 'session-retrieval'
+            ? {
+                status: file.sessionAttachmentIndexStatus ?? file.sessionAttachmentStatus ?? 'pending',
+                blockedReason: file.sessionAttachmentBlockedReason,
+              }
+            : undefined,
+      })
+      result = mergeAttachmentContent(result, attachment)
+    }
+  }
+
+  return result
 }
 
 function processMessageAttachments(
@@ -340,6 +400,58 @@ function buildRetrievalAttachment(params: {
     'answer normally without retrieval.',
     '</SYSTEM_REMINDER>\n',
   ].join('')
+  text += '</ATTACHMENT_FILE>\n'
+  return text
+}
+
+function buildSandboxAttachment(params: {
+  index: number
+  name: string
+  key: string
+  size: string
+  sandboxPath: string
+  parsedSandboxPath?: string
+  retrieval?: {
+    status: string
+    blockedReason?: string
+  }
+}): string {
+  const { index, name, key, size, sandboxPath, parsedSandboxPath, retrieval } = params
+  let text = '\n\n<ATTACHMENT_FILE>\n'
+  text += `<FILE_INDEX>${index}</FILE_INDEX>\n`
+  text += `<FILE_NAME>${escapeXmlText(name)}</FILE_NAME>\n`
+  text += `<FILE_KEY>${escapeXmlText(key)}</FILE_KEY>\n`
+  text += `<FILE_SIZE>${escapeXmlText(size)}</FILE_SIZE>\n`
+  text += '<FILE_CONTENT>\n'
+  text += '</FILE_CONTENT>\n'
+  text += '<SANDBOX_MODE>true</SANDBOX_MODE>\n'
+  text += `<SANDBOX_PATH>${escapeXmlText(sandboxPath)}</SANDBOX_PATH>\n`
+  if (parsedSandboxPath) {
+    text += `<PARSED_SANDBOX_PATH>${escapeXmlText(parsedSandboxPath)}</PARSED_SANDBOX_PATH>\n`
+  }
+  if (retrieval) {
+    text += '<RETRIEVAL_MODE>session_attachment_rag</RETRIEVAL_MODE>\n'
+    text += `<INDEX_STATUS>${escapeXmlText(retrieval.status)}</INDEX_STATUS>\n`
+    if (retrieval.blockedReason) {
+      text += `<BLOCKED_REASON>${escapeXmlText(retrieval.blockedReason)}</BLOCKED_REASON>\n`
+    }
+    text += [
+      '<SYSTEM_REMINDER>',
+      'This uploaded file is indexed for retrieval and is also available in the sandbox working directory. ',
+      'For document-specific questions about this file, use query_session_attachment and then ',
+      'read_session_attachment_parents before answering. Use code_execution or read_file when direct file processing is needed.',
+      '</SYSTEM_REMINDER>\n',
+    ].join('')
+  } else {
+    text += [
+      '<SYSTEM_REMINDER>',
+      'This uploaded file is available in the sandbox working directory, not inlined in the conversation. ',
+      parsedSandboxPath
+        ? 'Use read_file on PARSED_SANDBOX_PATH for extracted text, or code_execution on SANDBOX_PATH for the original binary.'
+        : 'Use read_file or code_execution on SANDBOX_PATH to inspect it.',
+      '</SYSTEM_REMINDER>\n',
+    ].join('')
+  }
   text += '</ATTACHMENT_FILE>\n'
   return text
 }

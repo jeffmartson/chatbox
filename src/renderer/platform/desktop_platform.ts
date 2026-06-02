@@ -269,6 +269,31 @@ export default class DesktopPlatform implements Platform {
     return result.text || null
   }
 
+  async fsRead(params: { filePath: string; offset?: number; limit?: number }) {
+    return this.ipc.invoke('fs:read', params)
+  }
+
+  async fsList(params: { dirPath: string }) {
+    return this.ipc.invoke('fs:list', params)
+  }
+
+  async fsSearch(params: { pattern: string; dirPath: string; include?: string }) {
+    return this.ipc.invoke('fs:search', params)
+  }
+
+  async fsWrite(params: { filePath: string; content: string }) {
+    return this.ipc.invoke('fs:write', params)
+  }
+
+  async fsEdit(params: {
+    filePath: string
+    search?: string
+    replace?: string
+    edits?: Array<{ search: string; replace: string }>
+  }) {
+    return this.ipc.invoke('fs:edit', params)
+  }
+
   async parseFileWithMineru(
     file: File,
     apiToken: string
@@ -347,52 +372,88 @@ export default class DesktopPlatform implements Platform {
     return this._sessionMetaStorage
   }
 
-  public async sandboxInit(config: { workingDirectory: string }) {
+  public async sandboxInit(config: { workingDirectory: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:init', config)
   }
 
-  public async sandboxExec(params: { command: string; timeout?: number }) {
+  public async sandboxExec(params: { command: string; timeout?: number; sessionId?: string }) {
     return this.ipc.invoke('sandbox:exec', params)
   }
 
-  public async sandboxRead(params: { filePath: string }) {
+  public async sandboxRead(params: { filePath: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:read', params)
   }
 
-  public async sandboxWrite(params: { filePath: string; content: string }) {
+  public async sandboxWrite(params: { filePath: string; content: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:write', params)
   }
 
-  public async sandboxEdit(params: { filePath: string; search: string; replace: string }) {
+  public async sandboxEdit(params: {
+    filePath: string
+    search?: string
+    replace?: string
+    edits?: Array<{ search: string; replace: string }>
+    sessionId?: string
+  }) {
     return this.ipc.invoke('sandbox:edit', params)
   }
 
-  public async sandboxLs(params: { dirPath: string }) {
+  public async sandboxLs(params: { dirPath: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:ls', params)
   }
 
-  public async sandboxGrep(params: { pattern: string; dirPath?: string; include?: string }) {
+  public async sandboxGrep(params: { pattern: string; dirPath?: string; include?: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:grep', params)
   }
 
-  public async sandboxFind(params: { dirPath: string; pattern?: string }) {
+  public async sandboxFind(params: { dirPath: string; pattern?: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:find', params)
   }
 
-  public async sandboxKill() {
-    return this.ipc.invoke('sandbox:kill')
+  public async sandboxKill(params?: { sessionId?: string }) {
+    return this.ipc.invoke('sandbox:kill', params)
   }
 
-  public async sandboxReset() {
-    return this.ipc.invoke('sandbox:reset')
+  public async sandboxReset(params?: { sessionId?: string }) {
+    return this.ipc.invoke('sandbox:reset', params)
   }
 
-  public async sandboxStatus() {
-    return this.ipc.invoke('sandbox:status')
+  public async sandboxStatus(params?: { sessionId?: string }) {
+    return this.ipc.invoke('sandbox:status', params)
   }
 
   public async sandboxCheckAvailability() {
     return this.ipc.invoke('sandbox:check-availability')
+  }
+
+  public async sandboxInitTemp(params: { sessionId: string }) {
+    return this.ipc.invoke('sandbox:init-temp', params)
+  }
+
+  public async sandboxCopyFile(params: { content: string; targetFilename: string; sessionId?: string }) {
+    return this.ipc.invoke('sandbox:copy-file', params)
+  }
+
+  public async sandboxCopyBlob(params: { blobKey: string; targetFilename: string; sessionId?: string }) {
+    return this.ipc.invoke('sandbox:copy-blob', params)
+  }
+
+  public async sandboxExportFile(params: { sandboxPath: string; suggestedName?: string }) {
+    return this.ipc.invoke('sandbox:export-file', params)
+  }
+
+  public async sandboxNodeCommand() {
+    return this.ipc.invoke('sandbox:node-command')
+  }
+
+  public async sandboxReadFileBase64(params: {
+    filePath: string
+  }): Promise<{ success: boolean; base64?: string; error?: string }> {
+    return this.ipc.invoke('sandbox:read-file-base64', params)
+  }
+
+  public async sandboxCreateHtmlPreview(params: { filePath: string }) {
+    return this.ipc.invoke('sandbox:create-html-preview', params)
   }
 
   public async openDirectoryDialog() {

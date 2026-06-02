@@ -50,6 +50,7 @@ export const MessageFileSchema = z.object({
   url: z.string().optional(),
   storageKey: z.string().optional(),
   localPath: z.string().optional(),
+  rawStorageKey: z.string().optional(),
   chatboxAIFileUUID: z.string().optional(),
   ragMode: z.enum(['inline', 'session-retrieval']).optional(),
   sessionAttachmentId: z.number().optional(),
@@ -122,11 +123,32 @@ export const MessageReasoningPartSchema = z.object({
 
 export const MessageToolCallPartSchema = z.object({
   type: z.literal('tool-call'),
-  state: z.enum(['call', 'result', 'error']),
+  state: z.enum(['call', 'result', 'error', 'paused']),
   toolCallId: z.string(),
   toolName: z.string(),
   args: z.unknown(),
   result: z.unknown().optional(),
+  pauseReason: z
+    .discriminatedUnion('type', [
+      z.object({
+        type: z.literal('tool_call_limit'),
+        maxToolCalls: z.number(),
+      }),
+      z.object({
+        type: z.literal('user_exec_approval'),
+        command: z.string(),
+        explanation: z.string().optional(),
+        explanationError: z.boolean().optional(),
+      }),
+      z.object({
+        type: z.literal('file_mutation_approval'),
+        title: z.string(),
+        preview: z.string(),
+      }),
+    ])
+    .optional(),
+  /** When the original result exceeded the size limit, the full result is stored in blob storage under this key. */
+  resultStorageKey: z.string().optional(),
 })
 
 export const MessageContentPartSchema = z.discriminatedUnion('type', [
@@ -147,7 +169,7 @@ export const StreamTextResultSchema = z.object({
 })
 
 // Tool and provider schemas
-export const ToolUseScopeSchema = z.enum(['web-browsing', 'knowledge-base', 'read-file'])
+export const ToolUseScopeSchema = z.enum(['agent', 'web-browsing', 'knowledge-base', 'read-file'])
 
 export const ModelProviderSchema = z.union([z.nativeEnum(ModelProviderEnum), z.string()])
 
@@ -166,6 +188,16 @@ export const MessageStatusSchema = z.discriminatedUnion('type', [
     attempt: z.number(),
     maxAttempts: z.number(),
     error: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('preparing_tool_call'),
+    toolName: z.string().optional(),
+    progress: z
+      .object({
+        kind: z.enum(['size_kb', 'lines']),
+        value: z.number(),
+      })
+      .optional(),
   }),
 ])
 
@@ -326,6 +358,7 @@ export type MessageReasoningPart = z.infer<typeof MessageReasoningPartSchema>
 export type MessageToolCallPart<Args = unknown, Result = unknown> = z.infer<typeof MessageToolCallPartSchema> & {
   args: Args
   result?: Result
+  resultStorageKey?: string
 }
 export type MessageContentParts = z.infer<typeof MessageContentPartsSchema>
 export type StreamTextResult = z.infer<typeof StreamTextResultSchema>

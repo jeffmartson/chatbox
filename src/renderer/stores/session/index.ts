@@ -59,7 +59,7 @@ export {
 } from './naming'
 export { getOCRModel, ocrImagesInMessages } from './ocr-helper'
 // Orchestration and AI helpers
-export { orchestrateGeneration } from './orchestration'
+export { continuePausedToolCall, orchestrateGeneration, stopPausedToolCall } from './orchestration'
 export { createLoadingPictures } from './pictures'
 // Thread operations (9 functions)
 export {
