@@ -2,8 +2,7 @@ import type { ModelInterface } from '@shared/models/types'
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import type { AgentModeValue, KnowledgeBase, Message, SessionSettings } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
-import { type ToolSet, tool } from 'ai'
-import { z } from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import { mcpController } from '@/packages/mcp/controller'
 import { generateCommandExplanation } from '@/packages/model-calls/command-explanation'
 import { buildChatboxCliToolSet } from '@/packages/model-calls/toolsets/chatbox-cli'
@@ -271,23 +270,32 @@ In long conversations, earlier tool call results may be automatically compressed
   return { tools, instructions, initialActiveTools }
 }
 
-function buildLoadSkillTool(options: BuildToolsOptions) {
-  return tool({
+function buildLoadSkillTool(options: BuildToolsOptions): ToolSet[string] {
+  return {
     description:
       "Load a skill by name to get its full instructions. Call this when the user's request " +
       'matches an available skill. Available skills are listed in the system instructions.',
-    inputSchema: z.object({
-      name: z.string().describe('The name of the skill to load'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'The name of the skill to load',
+        },
+      },
+      required: ['name'],
+      additionalProperties: false,
     }),
-    execute: async (input: { name: string }) => {
+    execute: async (input) => {
+      const skillInput = input as { name: string }
       const skillSettings = settingsStore.getState().getSettings().skills
-      if (!skillSettings.enabledSkillNames.includes(input.name)) {
-        return { error: `Skill "${input.name}" is not enabled. Check available skills in the system instructions.` }
+      if (!skillSettings.enabledSkillNames.includes(skillInput.name)) {
+        return { error: `Skill "${skillInput.name}" is not enabled. Check available skills in the system instructions.` }
       }
 
-      const result = await skillsController.loadSkill(input.name)
+      const result = await skillsController.loadSkill(skillInput.name)
       if (!result) {
-        return { error: `Skill "${input.name}" not found or could not be loaded.` }
+        return { error: `Skill "${skillInput.name}" not found or could not be loaded.` }
       }
 
       // Trigger agent mode activation
@@ -299,29 +307,41 @@ function buildLoadSkillTool(options: BuildToolsOptions) {
 
       return { instructions: result.body }
     },
-  })
+  }
 }
 
-function buildInstallSkillTool(options: BuildToolsOptions) {
-  return tool({
+function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
+  return {
     description:
       'Install a skill from a prepared directory. ' +
       'First use code_execution (sandbox) to download/unpack the skill files, ensure the directory ' +
       'contains a valid SKILL.md with name and description fields, then call this tool. ' +
       'The skill will be auto-enabled after installation.',
-    inputSchema: z.object({
-      sandboxPath: z.string().describe('Path to the skill directory (must contain SKILL.md)'),
-      sourceInfo: z.string().optional().describe('Where the skill came from (URL, repo, etc.) for tracking'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        sandboxPath: {
+          type: 'string',
+          description: 'Path to the skill directory (must contain SKILL.md)',
+        },
+        sourceInfo: {
+          type: 'string',
+          description: 'Where the skill came from (URL, repo, etc.) for tracking',
+        },
+      },
+      required: ['sandboxPath'],
+      additionalProperties: false,
     }),
-    execute: async (input: { sandboxPath: string; sourceInfo?: string }) => {
+    execute: async (input) => {
+      const installInput = input as { sandboxPath: string; sourceInfo?: string }
       if (!options.codeExecution) {
         return { error: 'Code execution not available. Agent mode with sandbox is required.' }
       }
 
       const result = await skillsController.installFromSandbox(
-        input.sandboxPath,
+        installInput.sandboxPath,
         options.codeExecution.sessionId,
-        input.sourceInfo
+        installInput.sourceInfo
       )
 
       if (!result.success) {
@@ -352,24 +372,31 @@ function buildInstallSkillTool(options: BuildToolsOptions) {
         message: `Skill "${result.skillName}" installed and enabled. You can now use load_skill("${result.skillName}") to load it.`,
       }
     },
-  })
+  }
 }
 
-function buildUserExecTool(options: BuildToolsOptions) {
-  return tool({
+function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
+  return {
     description:
       "Execute a command in the user's real environment (not sandbox). " +
       'RESTRICTED: Only use when a loaded skill explicitly requires running a command in the user environment. ' +
       'Do NOT use for general tasks — use code_execution (sandbox) instead. ' +
       "Runs in the user's login shell with full system access. " +
       'The user must approve the command before it runs.',
-    inputSchema: z.object({
-      command: z.string().describe('Shell command to execute'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          description: 'Shell command to execute',
+        },
+      },
+      required: ['command'],
+      additionalProperties: false,
     }),
-    execute: async (
-      input: { command: string },
-      { toolCallId, approved: alreadyApproved }: { toolCallId: string; approved?: boolean }
-    ) => {
+    execute: async (input, toolOptions) => {
+      const execInput = input as { command: string }
+      const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       const recentUserMsgs = options.messages
         .filter((m) => m.role === 'user')
         .slice(-3)
@@ -385,7 +412,8 @@ function buildUserExecTool(options: BuildToolsOptions) {
           }
         : undefined
 
-      const approved = alreadyApproved || (await requestUserExecApproval(toolCallId, input.command, explanationCtx))
+      const approved =
+        alreadyApproved || (await requestUserExecApproval(toolOptions.toolCallId, execInput.command, explanationCtx))
 
       if (!approved) {
         return {
@@ -396,7 +424,7 @@ function buildUserExecTool(options: BuildToolsOptions) {
         }
       }
 
-      const result = await skillsController.userExec(input.command)
+      const result = await skillsController.userExec(execInput.command)
 
       try {
         options.onAgentModeActivated?.()
@@ -411,5 +439,5 @@ function buildUserExecTool(options: BuildToolsOptions) {
         stderr: result.stderr,
       }
     },
-  })
+  }
 }

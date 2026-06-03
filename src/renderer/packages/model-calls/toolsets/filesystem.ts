@@ -1,8 +1,6 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import { shellQuote } from '@shared/utils/shell'
-import type { ToolSet } from 'ai'
-import { tool } from 'ai'
-import { z } from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 
@@ -23,26 +21,46 @@ interface EditFileInput {
   edits?: EditOperation[]
 }
 
-const editOperationsSchema = z
-  .object({
-    old_text: z.string().describe('Exact text to replace; must be unique within the current file content'),
-    new_text: z.string().describe('Replacement text'),
-  })
-  .array()
-  .min(1)
-
-const editFileInputSchema = z
-  .object({
-    file_path: z.string().describe('File path to edit'),
-    old_text: z.string().optional().describe('Legacy single edit: exact text to replace; must be unique'),
-    new_text: z.string().optional().describe('Legacy single edit: replacement text'),
-    edits: editOperationsSchema
-      .optional()
-      .describe('Multiple exact search-and-replace edits to apply atomically in order'),
-  })
-  .refine((input) => !!input.edits?.length || (input.old_text !== undefined && input.new_text !== undefined), {
-    message: 'Provide either edits or old_text/new_text',
-  })
+const editFileInputSchema = jsonSchema({
+  type: 'object',
+  properties: {
+    file_path: {
+      type: 'string',
+      description: 'File path to edit',
+    },
+    old_text: {
+      type: 'string',
+      description: 'Legacy single edit: exact text to replace; must be unique',
+    },
+    new_text: {
+      type: 'string',
+      description: 'Legacy single edit: replacement text',
+    },
+    edits: {
+      type: 'array',
+      minItems: 1,
+      description: 'Multiple exact search-and-replace edits to apply atomically in order',
+      items: {
+        type: 'object',
+        properties: {
+          old_text: {
+            type: 'string',
+            description: 'Exact text to replace; must be unique within the current file content',
+          },
+          new_text: {
+            type: 'string',
+            description: 'Replacement text',
+          },
+        },
+        required: ['old_text', 'new_text'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['file_path'],
+  anyOf: [{ required: ['edits'] }, { required: ['old_text', 'new_text'] }],
+  additionalProperties: false,
+})
 
 function isAbsolutePath(filePath: string): boolean {
   return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
@@ -140,127 +158,168 @@ fs.writeFileSync(filePath, text, 'utf8')
 }
 
 export function buildFilesystemTools(context: FilesystemContext): { tools: ToolSet; description: string } {
-  const list_files = tool({
+  const list_files: ToolSet[string] = {
     description:
       'List files in a directory. Relative paths are resolved in the session sandbox. Absolute paths read the user filesystem.',
-    inputSchema: z.object({
-      path: z.string().describe('Directory path to list'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Directory path to list',
+        },
+      },
+      required: ['path'],
+      additionalProperties: false,
     }),
-    execute: async (input: { path: string }) => {
-      if (await shouldUseSandbox(context, input.path)) {
+    execute: async (input) => {
+      const listInput = input as { path: string }
+      if (await shouldUseSandbox(context, listInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
         if (!context.provider) return { error: 'Sandbox is not available' }
         const result = await context.provider.exec({
           language: 'bash',
-          code: `ls -la ${shellQuote(input.path)}`,
+          code: `ls -la ${shellQuote(listInput.path)}`,
           timeout: 10_000,
         })
         return result.exitCode === 0 ? { content: result.stdout } : { error: result.stderr || result.stdout }
       }
-      const pathError = requireAbsoluteRealPath(input.path)
+      const pathError = requireAbsoluteRealPath(listInput.path)
       if (pathError) return pathError
       if (!platform.fsList) return { error: 'Filesystem access is not available on this platform' }
-      const result = await platform.fsList({ dirPath: input.path })
+      const result = await platform.fsList({ dirPath: listInput.path })
       return result.success ? { content: result.content ?? '' } : { error: result.error }
     },
-  })
+  }
 
-  const search_files = tool({
+  const search_files: ToolSet[string] = {
     description:
       'Search text in files. Relative paths search the session sandbox. Absolute paths search the user filesystem.',
-    inputSchema: z.object({
-      path: z.string().describe('Directory path to search'),
-      query: z.string().describe('Literal text to search for'),
-      include: z.string().optional().describe('Optional file name filter, for example "*.ts"'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Directory path to search',
+        },
+        query: {
+          type: 'string',
+          description: 'Literal text to search for',
+        },
+        include: {
+          type: 'string',
+          description: 'Optional file name filter, for example "*.ts"',
+        },
+      },
+      required: ['path', 'query'],
+      additionalProperties: false,
     }),
-    execute: async (input: { path: string; query: string; include?: string }) => {
-      if (await shouldUseSandbox(context, input.path)) {
+    execute: async (input) => {
+      const searchInput = input as { path: string; query: string; include?: string }
+      if (await shouldUseSandbox(context, searchInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
-        const include = input.include ? ` --include=${shellQuote(input.include)}` : ''
+        const include = searchInput.include ? ` --include=${shellQuote(searchInput.include)}` : ''
         if (!context.provider) return { error: 'Sandbox is not available' }
         const result = await context.provider.exec({
           language: 'bash',
-          code: `grep -RInF${include} -- ${shellQuote(input.query)} ${shellQuote(input.path)} | head -100`,
+          code: `grep -RInF${include} -- ${shellQuote(searchInput.query)} ${shellQuote(searchInput.path)} | head -100`,
           timeout: 10_000,
         })
         return result.exitCode === 0 || result.exitCode === 1
           ? { content: result.stdout }
           : { error: result.stderr || result.stdout }
       }
-      const pathError = requireAbsoluteRealPath(input.path)
+      const pathError = requireAbsoluteRealPath(searchInput.path)
       if (pathError) return pathError
       if (!platform.fsSearch) return { error: 'Filesystem access is not available on this platform' }
-      const result = await platform.fsSearch({ dirPath: input.path, pattern: input.query, include: input.include })
+      const result = await platform.fsSearch({
+        dirPath: searchInput.path,
+        pattern: searchInput.query,
+        include: searchInput.include,
+      })
       return result.success ? { content: result.content ?? '' } : { error: result.error }
     },
-  })
+  }
 
-  const write_file = tool({
+  const write_file: ToolSet[string] = {
     description:
       'Write a file. Relative sandbox paths are written directly. Writing absolute user filesystem paths requires user approval.',
-    inputSchema: z.object({
-      file_path: z.string().describe('File path to write'),
-      content: z.string().describe('Full file content'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        file_path: {
+          type: 'string',
+          description: 'File path to write',
+        },
+        content: {
+          type: 'string',
+          description: 'Full file content',
+        },
+      },
+      required: ['file_path', 'content'],
+      additionalProperties: false,
     }),
-    execute: async (
-      input: { file_path: string; content: string },
-      { toolCallId, approved: alreadyApproved }: { toolCallId: string; approved?: boolean }
-    ) => {
-      if (await shouldUseSandbox(context, input.file_path)) {
-        const result = await writeSandboxFile(context, input.file_path, input.content)
-        return result.success ? { success: true, file_path: input.file_path } : { error: result.error }
+    execute: async (input, toolOptions) => {
+      const writeInput = input as { file_path: string; content: string }
+      const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
+      if (await shouldUseSandbox(context, writeInput.file_path)) {
+        const result = await writeSandboxFile(context, writeInput.file_path, writeInput.content)
+        return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
       }
-      const pathError = requireAbsoluteRealPath(input.file_path)
+      const pathError = requireAbsoluteRealPath(writeInput.file_path)
       if (pathError) return pathError
       if (!platform.fsWrite) return { error: 'Filesystem access is not available on this platform' }
       const approved =
         alreadyApproved ||
-        (await requestFileMutationApproval(toolCallId, `Write file: ${input.file_path}`, previewContent(input.content)))
+        (await requestFileMutationApproval(
+          toolOptions.toolCallId,
+          `Write file: ${writeInput.file_path}`,
+          previewContent(writeInput.content)
+        ))
       if (!approved) return { success: false, error: 'File write denied by user.' }
-      const result = await platform.fsWrite({ filePath: input.file_path, content: input.content })
-      return result.success ? { success: true, file_path: input.file_path } : { error: result.error }
+      const result = await platform.fsWrite({ filePath: writeInput.file_path, content: writeInput.content })
+      return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
     },
-  })
+  }
 
-  const edit_file = tool({
+  const edit_file: ToolSet[string] = {
     description:
       'Edit a file with one or more exact search-and-replace edits. Prefer edits[] for multiple changes in one call. Each old_text must be unique at the time it is applied. Relative sandbox paths are edited directly. Editing absolute user filesystem paths requires user approval.',
     inputSchema: editFileInputSchema,
-    execute: async (
-      input: EditFileInput,
-      { toolCallId, approved: alreadyApproved }: { toolCallId: string; approved?: boolean }
-    ) => {
-      const edits = normalizeEdits(input)
-      if (await shouldUseSandbox(context, input.file_path)) {
-        const result = await editSandboxFile(context, input.file_path, edits)
+    execute: async (input, toolOptions) => {
+      const editInput = input as EditFileInput
+      const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
+      const edits = normalizeEdits(editInput)
+      if (await shouldUseSandbox(context, editInput.file_path)) {
+        const result = await editSandboxFile(context, editInput.file_path, edits)
         return result.success
-          ? { success: true, file_path: input.file_path, edits: edits.length }
+          ? { success: true, file_path: editInput.file_path, edits: edits.length }
           : { error: result.error }
       }
-      const pathError = requireAbsoluteRealPath(input.file_path)
+      const pathError = requireAbsoluteRealPath(editInput.file_path)
       if (pathError) return pathError
       if (!platform.fsEdit) return { error: 'Filesystem access is not available on this platform' }
       const approved =
         alreadyApproved ||
         (await requestFileMutationApproval(
-          toolCallId,
+          toolOptions.toolCallId,
           edits.length === 1
-            ? `Edit file: ${input.file_path}`
-            : `Edit file: ${input.file_path} (${edits.length} edits)`,
+            ? `Edit file: ${editInput.file_path}`
+            : `Edit file: ${editInput.file_path} (${edits.length} edits)`,
           previewEdits(edits)
         ))
       if (!approved) return { success: false, error: 'File edit denied by user.' }
       const result = await platform.fsEdit({
-        filePath: input.file_path,
+        filePath: editInput.file_path,
         edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),
       })
       return result.success
-        ? { success: true, file_path: input.file_path, edits: edits.length }
+        ? { success: true, file_path: editInput.file_path, edits: edits.length }
         : { error: result.error }
     },
-  })
+  }
 
   return {
     tools: {

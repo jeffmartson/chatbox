@@ -1,6 +1,5 @@
 import type { ChatboxAILicenseDetail } from '@shared/types/settings'
-import { tool } from 'ai'
-import { z } from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import * as remote from '@/packages/remote'
 import { settingsStore } from '@/stores/settingsStore'
 
@@ -86,23 +85,31 @@ function parseAction(command: string): 'help' | 'status' | 'license' | 'quota' |
 }
 
 export function buildChatboxCliToolSet(options?: { onUsed?: () => void }) {
-  const chatbox_cli = tool({
+  const chatbox_cli: ToolSet[string] = {
     description:
       'Run a virtual Chatbox account CLI command. This is a controlled tool, not a real shell. ' +
       'Use it for Chatbox account, license, plan, quota, and billing status questions. ' +
       'Supported commands: help, status, license, quota, refresh.',
-    inputSchema: z.object({
-      command: z
-        .string()
-        .describe('Virtual CLI command, e.g. "chatbox account status", "chatbox quota", or "chatbox license refresh"'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          description:
+            'Virtual CLI command, e.g. "chatbox account status", "chatbox quota", or "chatbox license refresh"',
+        },
+      },
+      required: ['command'],
+      additionalProperties: false,
     }),
-    execute: async (input: { command: string }) => {
+    execute: async (input) => {
+      const cliInput = input as { command: string }
       options?.onUsed?.()
-      const action = parseAction(input.command)
+      const action = parseAction(cliInput.command)
       if (action === 'help') return help()
       if (action === 'unknown') {
         return {
-          error: `Unsupported chatbox_cli command: ${input.command}`,
+          error: `Unsupported chatbox_cli command: ${cliInput.command}`,
           ...help(),
         }
       }
@@ -144,7 +151,7 @@ export function buildChatboxCliToolSet(options?: { onUsed?: () => void }) {
       }
       return status
     },
-  })
+  }
 
   return {
     description: `

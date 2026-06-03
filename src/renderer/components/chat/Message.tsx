@@ -104,22 +104,20 @@ const _Message: FC<Props> = (props) => {
   const { t } = useTranslation()
   const theme = useTheme()
   const isSmallScreen = useIsSmallScreen()
-  const {
-    userAvatarKey,
-    showMessageTimestamp,
-    showModelName,
-    showTokenCount,
-    showWordCount,
-    showTokenUsed,
-    showFirstTokenLatency,
-    enableMarkdownRendering,
-    enableLaTeXRendering,
-    enableMermaidRendering,
-    autoPreviewArtifacts,
-    autoCollapseCodeBlock,
-    showAvatar,
-    messageLayout,
-  } = useSettingsStore((state) => state)
+  const userAvatarKey = useSettingsStore((state) => state.userAvatarKey)
+  const showMessageTimestamp = useSettingsStore((state) => state.showMessageTimestamp)
+  const showModelName = useSettingsStore((state) => state.showModelName)
+  const showTokenCount = useSettingsStore((state) => state.showTokenCount)
+  const showWordCount = useSettingsStore((state) => state.showWordCount)
+  const showTokenUsed = useSettingsStore((state) => state.showTokenUsed)
+  const showFirstTokenLatency = useSettingsStore((state) => state.showFirstTokenLatency)
+  const enableMarkdownRendering = useSettingsStore((state) => state.enableMarkdownRendering)
+  const enableLaTeXRendering = useSettingsStore((state) => state.enableLaTeXRendering)
+  const enableMermaidRendering = useSettingsStore((state) => state.enableMermaidRendering)
+  const autoPreviewArtifacts = useSettingsStore((state) => state.autoPreviewArtifacts)
+  const autoCollapseCodeBlock = useSettingsStore((state) => state.autoCollapseCodeBlock)
+  const showAvatar = useSettingsStore((state) => state.showAvatar)
+  const messageLayout = useSettingsStore((state) => state.messageLayout)
 
   const isBubbleLayout = messageLayout === 'bubble'
 

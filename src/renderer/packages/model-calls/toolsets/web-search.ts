@@ -1,6 +1,5 @@
 import { ChatboxAIAPIError } from '@shared/models/errors'
-import { tool } from 'ai'
-import z from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import * as remote from '@/packages/remote'
 import { getParseLinkProvider, webSearchExecutor } from '@/packages/web-search'
 import platform from '@/platform'
@@ -22,34 +21,49 @@ export function getToolSetDescription(options: { includeParseLink: boolean }) {
   return options.includeParseLink ? `${webSearchDescription}${parseLinkDescription}` : webSearchDescription
 }
 
-export const webSearchTool = tool({
+export const webSearchTool: ToolSet[string] = {
   description:
     'Search the web for information. Use it when fresh, real-time, or source-specific data would improve the answer (current events, recent releases, live data, facts you are unsure about). For questions you can answer confidently from your own knowledge, answer directly instead. Use short, concise queries (English preferred).',
-  inputSchema: z.object({
-    query: z.string().describe('the search query'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'the search query' },
+    },
+    required: ['query'],
+    additionalProperties: false,
   }),
-  execute: async (input: { query: string }, { abortSignal }: { abortSignal?: AbortSignal }) => {
-    return await webSearchExecutor({ query: input.query }, { abortSignal })
+  execute: async (input, { abortSignal }) => {
+    const searchInput = input as { query: string }
+    return await webSearchExecutor({ query: searchInput.query }, { abortSignal })
   },
-})
+}
 
 const DEFAULT_PARSE_LINK_MAX_CHARS = 12_000
 
-export const parseLinkTool = tool({
+export const parseLinkTool: ToolSet[string] = {
   description:
     'Parses the readable content of a web page. Use this when you need detailed information from a specific URL — typically one the user shared or that was returned by a prior search.',
-  inputSchema: z.object({
-    url: z.string().url().describe('The URL to parse. Always include the schema, e.g. https://example.com'),
-    maxLength: z
-      .number()
-      .int()
-      .min(500)
-      .max(50_000)
-      .optional()
-      .describe('Optional maximum number of characters to return from the parsed content.'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      url: {
+        type: 'string',
+        format: 'uri',
+        description: 'The URL to parse. Always include the schema, e.g. https://example.com',
+      },
+      maxLength: {
+        type: 'integer',
+        minimum: 500,
+        maximum: 50_000,
+        description: 'Optional maximum number of characters to return from the parsed content.',
+      },
+    },
+    required: ['url'],
+    additionalProperties: false,
   }),
-  execute: async (input: { url: string; maxLength?: number }, { abortSignal }: { abortSignal?: AbortSignal }) => {
-    const maxLength = input.maxLength ?? DEFAULT_PARSE_LINK_MAX_CHARS
+  execute: async (input, { abortSignal }) => {
+    const parseInput = input as { url: string; maxLength?: number }
+    const maxLength = parseInput.maxLength ?? DEFAULT_PARSE_LINK_MAX_CHARS
     const normalizedMaxLength = Math.min(Math.max(maxLength, 500), 50_000)
 
     const searchProvider = settingActions.getExtensionSettings().webSearch.provider
@@ -63,16 +77,16 @@ export const parseLinkTool = tool({
           'chatbox_search_license_key_required'
         )
       }
-      const parsed = await remote.parseUserLinkPro({ licenseKey, url: input.url, abortSignal })
+      const parsed = await remote.parseUserLinkPro({ licenseKey, url: parseInput.url, abortSignal })
       const storedContent = await platform.getStoreBlob(parsed.storageKey)
       if (storedContent == null) {
-        const technical = `parse_link storage blob missing for URL ${input.url} (storageKey: ${parsed.storageKey})`
+        const technical = `parse_link storage blob missing for URL ${parseInput.url} (storageKey: ${parsed.storageKey})`
         throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_failed') ?? new Error(technical)
       }
       const content = storedContent.trim()
       const truncatedContent = content.slice(0, normalizedMaxLength)
       return {
-        url: input.url,
+        url: parseInput.url,
         title: parsed.title,
         content: truncatedContent,
         originalLength: content.length,
@@ -86,9 +100,9 @@ export const parseLinkTool = tool({
       const technical = `parse_link is not supported by the configured search provider "${searchProvider}"`
       throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_not_supported') ?? new Error(technical)
     }
-    const result = await provider.parseLink(input.url, abortSignal)
+    const result = await provider.parseLink(parseInput.url, abortSignal)
     if (!result) {
-      const technical = `parse_link returned no result for URL ${input.url} (provider: ${searchProvider})`
+      const technical = `parse_link returned no result for URL ${parseInput.url} (provider: ${searchProvider})`
       throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_failed') ?? new Error(technical)
     }
     const truncatedContent = result.content.slice(0, normalizedMaxLength)
@@ -100,7 +114,7 @@ export const parseLinkTool = tool({
       truncated: result.content.length > truncatedContent.length,
     }
   },
-})
+}
 
 export default {
   description: getToolSetDescription({ includeParseLink: true }),

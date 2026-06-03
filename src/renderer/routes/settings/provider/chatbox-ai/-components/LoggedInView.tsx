@@ -50,7 +50,10 @@ interface LoggedInViewProps {
 export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
   ({ onLogout, language, onShowLicenseSelectionModal, onSwitchToLicenseKey }, ref) => {
     const { t } = useTranslation()
-    const settings = useSettingsStore((state) => state)
+    const licenseKey = useSettingsStore((state) => state.licenseKey)
+    const licenseActivationMethod = useSettingsStore((state) => state.licenseActivationMethod)
+    const licenseInstances = useSettingsStore((state) => state.licenseInstances)
+    const lastSelectedLicenseByUser = useSettingsStore((state) => state.lastSelectedLicenseByUser)
     const [selectedLicenseKey, setSelectedLicenseKey] = useState<string | null>(null)
     const [displayLicenseKey, setDisplayLicenseKey] = useState<string | null>(null) // 用于显示在Select中的key，即使激活失败也保留
     const [activationError, setActivationError] = useState<string | null>(null)
@@ -103,7 +106,7 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
       console.log('[licenseDetailResponse] ', licenseDetail)
     }
     const normalizedQueryError = queryError as LicenseDetailQueryError | null
-    const lastSelectedLicenseKey = userProfile ? settings.lastSelectedLicenseByUser?.[userProfile.email] : undefined
+    const lastSelectedLicenseKey = userProfile ? lastSelectedLicenseByUser?.[userProfile.email] : undefined
     // 合并两种错误来源：1) API 返回 200 但带有 error 字段  2) API 返回 4xx/5xx 被 ofetch 抛出
     const licenseDetailError =
       licenseDetailResponse?.error || normalizedQueryError?.data?.error || normalizedQueryError?.error
@@ -132,9 +135,9 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
       if (!userProfile || licenses.length === 0) return
 
       const needActivation =
-        !settings.licenseKey ||
-        settings.licenseActivationMethod !== 'login' ||
-        !settings.licenseInstances?.[settings.licenseKey]
+        !licenseKey ||
+        licenseActivationMethod !== 'login' ||
+        !licenseInstances?.[licenseKey]
 
       if (needActivation) {
         // 确定要激活的license
@@ -275,15 +278,15 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
         }
       } else {
         // 已激活直接显示。如用户在 loggedinview 和 licenseview 切换
-        setSelectedLicenseKey(settings.licenseKey || null)
-        setDisplayLicenseKey(settings.licenseKey || null)
+        setSelectedLicenseKey(licenseKey || null)
+        setDisplayLicenseKey(licenseKey || null)
       }
     }, [
       userProfile,
       licenses,
-      settings.licenseKey,
-      settings.licenseActivationMethod,
-      settings.licenseInstances,
+      licenseKey,
+      licenseActivationMethod,
+      licenseInstances,
       lastSelectedLicenseKey,
       onShowLicenseSelectionModal,
     ])
@@ -299,7 +302,7 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
         try {
           settingsStore.setState({
             lastSelectedLicenseByUser: {
-              ...settings.lastSelectedLicenseByUser,
+              ...lastSelectedLicenseByUser,
               [userProfile.email]: newKey,
             },
           })
@@ -320,7 +323,7 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
           setSwitchingLicense(false)
         }
       },
-      [userProfile, settings.lastSelectedLicenseByUser, switchingLicense]
+      [userProfile, lastSelectedLicenseByUser, switchingLicense]
     )
 
     if (profileError || licensesError) {

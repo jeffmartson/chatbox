@@ -24,8 +24,10 @@ interface LicenseKeyViewProps {
 
 export const LicenseKeyView = forwardRef<HTMLDivElement, LicenseKeyViewProps>(({ language, onSwitchToLogin }, ref) => {
   const { t } = useTranslation()
-
-  const settings = useSettingsStore((state) => state)
+  const licenseKey = useSettingsStore((state) => state.licenseKey)
+  const licenseInstances = useSettingsStore((state) => state.licenseInstances)
+  const memorizedManualLicenseKeySetting = useSettingsStore((state) => state.memorizedManualLicenseKey)
+  const licenseActivationMethod = useSettingsStore((state) => state.licenseActivationMethod)
 
   const {
     memorizedManualLicenseKey,
@@ -38,7 +40,14 @@ export const LicenseKeyView = forwardRef<HTMLDivElement, LicenseKeyViewProps>(({
     activate,
     deactivate,
     setIsDeactivating,
-  } = useLicenseActivation({ settings })
+  } = useLicenseActivation({
+    settings: {
+      licenseKey,
+      licenseInstances,
+      memorizedManualLicenseKey: memorizedManualLicenseKeySetting,
+      licenseActivationMethod,
+    },
+  })
 
   const handleDeactivate = async () => {
     setIsDeactivating(true)

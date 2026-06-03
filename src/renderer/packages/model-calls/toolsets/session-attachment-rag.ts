@@ -1,6 +1,5 @@
 import type { SessionAttachmentQueryPlan } from '@shared/types'
-import { tool } from 'ai'
-import { z } from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import * as remote from '@/packages/remote'
 import platform from '@/platform'
 import * as settingActions from '@/stores/settingActions'
@@ -46,6 +45,65 @@ export async function getToolSet(attachmentIds: number[]) {
     },
   })
 
+  const tools: ToolSet = {
+    list_session_attachments: {
+      description: 'List large uploaded attachments in the current session and show their readiness status.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      }),
+      execute: async () => controller.getAttachments(attachmentIds),
+    },
+    query_session_attachment: {
+      description: 'Search across ready large uploaded attachments with a semantic query.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'A semantic query rewritten from the user request',
+          },
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 12,
+            default: 8,
+          },
+        },
+        required: ['query'],
+        additionalProperties: false,
+      }),
+      execute: async (input) => {
+        const queryInput = input as { query: string; limit?: number }
+        return controller.query({
+          attachmentIds,
+          query: queryInput.query,
+          plan: buildQueryPlan(queryInput.limit),
+        })
+      },
+    },
+    read_session_attachment_parents: {
+      description: 'Read parent blocks for search hits from large uploaded attachments.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          parentIds: {
+            type: 'array',
+            items: { type: 'number' },
+            description: 'Parent block IDs returned by query_session_attachment',
+          },
+        },
+        required: ['parentIds'],
+        additionalProperties: false,
+      }),
+      execute: async (input) => {
+        const readInput = input as { parentIds: number[] }
+        return controller.readParents({ parentIds: readInput.parentIds, attachmentIds })
+      },
+    },
+  }
+
   return {
     description: `
 ## Session Attachments
@@ -75,33 +133,6 @@ ${indexingList ? `### Still indexing\n${indexingList}\n` : ''}${failedList ? `##
 - If a file is still indexing, tell the user it is not ready yet instead of guessing.
 - If a file has failed, tell the user indexing failed and ask them to retry instead of guessing.
 `,
-    tools: {
-      list_session_attachments: tool({
-        description: 'List large uploaded attachments in the current session and show their readiness status.',
-        inputSchema: z.object({}),
-        execute: async () => controller.getAttachments(attachmentIds),
-      }),
-      query_session_attachment: tool({
-        description: 'Search across ready large uploaded attachments with a semantic query.',
-        inputSchema: z.object({
-          query: z.string().describe('A semantic query rewritten from the user request'),
-          limit: z.number().int().min(1).max(12).default(8).optional(),
-        }),
-        execute: async (input: { query: string; limit?: number }) =>
-          controller.query({
-            attachmentIds,
-            query: input.query,
-            plan: buildQueryPlan(input.limit),
-          }),
-      }),
-      read_session_attachment_parents: tool({
-        description: 'Read parent blocks for search hits from large uploaded attachments.',
-        inputSchema: z.object({
-          parentIds: z.array(z.number()).describe('Parent block IDs returned by query_session_attachment'),
-        }),
-        execute: async (input: { parentIds: number[] }) =>
-          controller.readParents({ parentIds: input.parentIds, attachmentIds }),
-      }),
-    },
+    tools,
   }
 }

@@ -1,5 +1,4 @@
-import { tool } from 'ai'
-import z from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import platform from '@/platform'
 
 interface SandboxEditOperation {
@@ -14,26 +13,46 @@ interface SandboxEditInput {
   edits?: SandboxEditOperation[]
 }
 
-const sandboxEditOperationsSchema = z
-  .object({
-    old_text: z.string().describe('Exact text to find; must be unique within the current file content'),
-    new_text: z.string().describe('Replacement text'),
-  })
-  .array()
-  .min(1)
-
-const sandboxEditInputSchema = z
-  .object({
-    file_path: z.string().describe('File path to edit'),
-    old_text: z.string().optional().describe('Legacy single edit: exact text to find; must be unique'),
-    new_text: z.string().optional().describe('Legacy single edit: replacement text'),
-    edits: sandboxEditOperationsSchema
-      .optional()
-      .describe('Multiple exact search-and-replace edits to apply atomically in order'),
-  })
-  .refine((input) => !!input.edits?.length || (input.old_text !== undefined && input.new_text !== undefined), {
-    message: 'Provide either edits or old_text/new_text',
-  })
+const sandboxEditInputSchema = jsonSchema({
+  type: 'object',
+  properties: {
+    file_path: {
+      type: 'string',
+      description: 'File path to edit',
+    },
+    old_text: {
+      type: 'string',
+      description: 'Legacy single edit: exact text to find; must be unique',
+    },
+    new_text: {
+      type: 'string',
+      description: 'Legacy single edit: replacement text',
+    },
+    edits: {
+      type: 'array',
+      minItems: 1,
+      description: 'Multiple exact search-and-replace edits to apply atomically in order',
+      items: {
+        type: 'object',
+        properties: {
+          old_text: {
+            type: 'string',
+            description: 'Exact text to find; must be unique within the current file content',
+          },
+          new_text: {
+            type: 'string',
+            description: 'Replacement text',
+          },
+        },
+        required: ['old_text', 'new_text'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['file_path'],
+  anyOf: [{ required: ['edits'] }, { required: ['old_text', 'new_text'] }],
+  additionalProperties: false,
+})
 
 function normalizeSandboxEdits(input: SandboxEditInput): SandboxEditOperation[] {
   if (input.edits?.length) return input.edits
@@ -106,19 +125,31 @@ function abortableExec(
   ])
 }
 
-const sandbox_bash = tool({
+const sandbox_bash: ToolSet[string] = {
   description: 'Execute a shell command in the sandbox environment.',
-  inputSchema: z.object({
-    command: z.string().describe('The shell command to execute in the sandbox'),
-    timeout: z.number().optional().describe('Timeout in milliseconds (default: 120000)'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      command: {
+        type: 'string',
+        description: 'The shell command to execute in the sandbox',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds (default: 120000)',
+      },
+    },
+    required: ['command'],
+    additionalProperties: false,
   }),
-  execute: async (input: { command: string; timeout?: number }, { abortSignal }: { abortSignal?: AbortSignal }) => {
+  execute: async (input, { abortSignal }) => {
+    const bashInput = input as { command: string; timeout?: number }
     if (!platform.sandboxExec) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const timeout = input.timeout ?? DEFAULT_BASH_TIMEOUT
-      const result = await abortableExec(platform.sandboxExec({ command: input.command, timeout }), abortSignal)
+      const timeout = bashInput.timeout ?? DEFAULT_BASH_TIMEOUT
+      const result = await abortableExec(platform.sandboxExec({ command: bashInput.command, timeout }), abortSignal)
       return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -127,19 +158,28 @@ const sandbox_bash = tool({
       return `Error executing command: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_read = tool({
+const sandbox_read: ToolSet[string] = {
   description: 'Read the content of a file in the sandbox.',
-  inputSchema: z.object({
-    file_path: z.string().describe('File path relative to working directory'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      file_path: {
+        type: 'string',
+        description: 'File path relative to working directory',
+      },
+    },
+    required: ['file_path'],
+    additionalProperties: false,
   }),
-  execute: async (input: { file_path: string }, _context: { abortSignal?: AbortSignal }) => {
+  execute: async (input) => {
+    const readInput = input as { file_path: string }
     if (!platform.sandboxRead) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const result = await platform.sandboxRead({ filePath: input.file_path })
+      const result = await platform.sandboxRead({ filePath: readInput.file_path })
       if (!result.success) {
         return `Error reading file: ${result.error}`
       }
@@ -148,73 +188,98 @@ const sandbox_read = tool({
       return `Error reading file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_write = tool({
+const sandbox_write: ToolSet[string] = {
   description: 'Write content to a file in the sandbox, creating or overwriting it.',
-  inputSchema: z.object({
-    file_path: z.string().describe('File path relative to working directory'),
-    content: z.string().describe('Full content to write to the file'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      file_path: {
+        type: 'string',
+        description: 'File path relative to working directory',
+      },
+      content: {
+        type: 'string',
+        description: 'Full content to write to the file',
+      },
+    },
+    required: ['file_path', 'content'],
+    additionalProperties: false,
   }),
-  execute: async (input: { file_path: string; content: string }, _context: { abortSignal?: AbortSignal }) => {
+  execute: async (input) => {
+    const writeInput = input as { file_path: string; content: string }
     if (!platform.sandboxWrite) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const result = await platform.sandboxWrite({ filePath: input.file_path, content: input.content })
+      const result = await platform.sandboxWrite({ filePath: writeInput.file_path, content: writeInput.content })
       if (!result.success) {
         return `Error writing file: ${result.error}`
       }
-      return `Successfully wrote to ${input.file_path}`
+      return `Successfully wrote to ${writeInput.file_path}`
     } catch (error) {
       return `Error writing file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_edit = tool({
+const sandbox_edit: ToolSet[string] = {
   description:
     'Search and replace text in a file. Prefer edits[] for multiple changes in one call. Each search text must be an exact unique match within the file.',
   inputSchema: sandboxEditInputSchema,
-  execute: async (input: SandboxEditInput, _context: { abortSignal?: AbortSignal }) => {
+  execute: async (input) => {
+    const editInput = input as SandboxEditInput
     if (!platform.sandboxEdit) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const edits = normalizeSandboxEdits(input)
+      const edits = normalizeSandboxEdits(editInput)
       const result = await platform.sandboxEdit({
-        filePath: input.file_path,
+        filePath: editInput.file_path,
         edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),
       })
       if (!result.success) {
         return `Error editing file: ${result.error}`
       }
-      return `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${input.file_path}`
+      return `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${editInput.file_path}`
     } catch (error) {
       return `Error editing file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_grep = tool({
+const sandbox_grep: ToolSet[string] = {
   description: 'Search file contents using a regex or literal pattern. Returns matching lines with file paths.',
-  inputSchema: z.object({
-    pattern: z.string().describe('Search pattern (regex or literal)'),
-    path: z.string().optional().describe('Directory to search (default: .)'),
-    include: z.string().optional().describe('File filter glob (e.g., "*.ts")'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      pattern: {
+        type: 'string',
+        description: 'Search pattern (regex or literal)',
+      },
+      path: {
+        type: 'string',
+        description: 'Directory to search (default: .)',
+      },
+      include: {
+        type: 'string',
+        description: 'File filter glob (e.g., "*.ts")',
+      },
+    },
+    required: ['pattern'],
+    additionalProperties: false,
   }),
-  execute: async (
-    input: { pattern: string; path?: string; include?: string },
-    _context: { abortSignal?: AbortSignal }
-  ) => {
+  execute: async (input) => {
+    const grepInput = input as { pattern: string; path?: string; include?: string }
     if (!platform.sandboxGrep) {
       return 'Sandbox not available on this platform'
     }
     try {
       const result = await platform.sandboxGrep({
-        pattern: input.pattern,
-        dirPath: input.path,
-        include: input.include,
+        pattern: grepInput.pattern,
+        dirPath: grepInput.path,
+        include: grepInput.include,
       })
       if (!result.success) {
         return `Error searching: ${result.error}`
@@ -224,19 +289,27 @@ const sandbox_grep = tool({
       return `Error searching: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_ls = tool({
+const sandbox_ls: ToolSet[string] = {
   description: 'List directory contents in the sandbox.',
-  inputSchema: z.object({
-    path: z.string().optional().describe('Directory path (default: .)'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'Directory path (default: .)',
+      },
+    },
+    additionalProperties: false,
   }),
-  execute: async (input: { path?: string }, _context: { abortSignal?: AbortSignal }) => {
+  execute: async (input) => {
+    const lsInput = input as { path?: string }
     if (!platform.sandboxLs) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const result = await platform.sandboxLs({ dirPath: input.path || '.' })
+      const result = await platform.sandboxLs({ dirPath: lsInput.path || '.' })
       if (!result.success) {
         return `Error listing directory: ${result.error}`
       }
@@ -245,20 +318,31 @@ const sandbox_ls = tool({
       return `Error listing directory: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
-const sandbox_find = tool({
+const sandbox_find: ToolSet[string] = {
   description: 'Find files by name pattern (glob) in the sandbox.',
-  inputSchema: z.object({
-    pattern: z.string().optional().describe('Glob pattern for file name search'),
-    path: z.string().optional().describe('Directory to search (default: .)'),
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      pattern: {
+        type: 'string',
+        description: 'Glob pattern for file name search',
+      },
+      path: {
+        type: 'string',
+        description: 'Directory to search (default: .)',
+      },
+    },
+    additionalProperties: false,
   }),
-  execute: async (input: { pattern?: string; path?: string }, _context: { abortSignal?: AbortSignal }) => {
+  execute: async (input) => {
+    const findInput = input as { pattern?: string; path?: string }
     if (!platform.sandboxFind) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const result = await platform.sandboxFind({ dirPath: input.path || '.', pattern: input.pattern })
+      const result = await platform.sandboxFind({ dirPath: findInput.path || '.', pattern: findInput.pattern })
       if (!result.success) {
         return `Error finding files: ${result.error}`
       }
@@ -267,7 +351,7 @@ const sandbox_find = tool({
       return `Error finding files: ${error instanceof Error ? error.message : String(error)}`
     }
   },
-})
+}
 
 export default {
   description: toolSetDescription,

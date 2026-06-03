@@ -1,9 +1,7 @@
 import { isTextFilePath } from '@shared/file-extensions'
 import { DEFAULT_EXEC_TIMEOUT, type SandboxProvider } from '@shared/sandbox-provider'
 import { escapeSingleQuotes } from '@shared/utils/shell'
-import type { ToolSet } from 'ai'
-import { tool } from 'ai'
-import { z } from 'zod'
+import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
 
@@ -117,22 +115,36 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
     return { success: true }
   }
 
-  const code_execution = tool({
+  const code_execution: ToolSet[string] = {
     description:
       'Run short Node.js or Bash code in a sandbox for lightweight file processing, data analysis, ' +
       'calculations, simple HTML/SVG/Canvas chart generation, and file conversion. Prefer Node.js built-ins ' +
       'and shell tools. Avoid installing packages or creating projects unless the user explicitly asks for ' +
       'that and the task cannot be completed with the available runtime. Generated files can be made ' +
       'downloadable via create_download.',
-    inputSchema: z.object({
-      code: z.string().describe('The code to execute'),
-      language: z.enum(['node', 'bash']).default('node').describe('Programming language'),
-      timeout: z.number().optional().describe('Timeout in ms (default: 120000)'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: 'The code to execute',
+        },
+        language: {
+          type: 'string',
+          enum: ['node', 'bash'],
+          default: 'node',
+          description: 'Programming language',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Timeout in ms (default: 120000)',
+        },
+      },
+      required: ['code'],
+      additionalProperties: false,
     }),
-    execute: async (
-      input: { code: string; language: 'node' | 'bash'; timeout?: number },
-      { abortSignal }: { abortSignal?: AbortSignal }
-    ) => {
+    execute: async (input, { abortSignal }) => {
+      const codeInput = input as { code: string; language?: 'node' | 'bash'; timeout?: number }
       const setupResult = await ensureSandbox()
       if (!setupResult.success) {
         return { stdout: '', stderr: setupResult.error || 'Sandbox setup failed', exitCode: 1 }
@@ -143,9 +155,9 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       }
 
       const result = await provider.exec({
-        code: input.code,
-        language: input.language,
-        timeout: input.timeout ?? DEFAULT_EXEC_TIMEOUT,
+        code: codeInput.code,
+        language: codeInput.language ?? 'node',
+        timeout: codeInput.timeout ?? DEFAULT_EXEC_TIMEOUT,
       })
 
       return {
@@ -154,51 +166,53 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         exitCode: result.exitCode,
       }
     },
-  })
+  }
 
   const READ_FILE_MAX_LINES = 2000
   const READ_FILE_DEFAULT_LINES = 500
 
-  const read_file = tool({
+  const read_file: ToolSet[string] = {
     description:
       'Read the content of a file in the sandbox working directory, or an absolute user filesystem path when explicitly provided. ' +
       'For document files (PDF, DOCX, etc.), read the path from <PARSED_SANDBOX_PATH> instead of the binary. ' +
       'Output is truncated to fit context. Use offset to continue reading large files.',
-    inputSchema: z.object({
-      file_path: z
-        .string()
-        .describe('Path to file in the sandbox working directory, or an absolute user filesystem path'),
-      offset: z
-        .number()
-        .int()
-        .min(1)
-        .optional()
-        .describe('Line number to start reading from (1-indexed). Defaults to 1.'),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(READ_FILE_MAX_LINES)
-        .optional()
-        .describe(`Max number of lines to read. Defaults to ${READ_FILE_DEFAULT_LINES}, max ${READ_FILE_MAX_LINES}.`),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        file_path: {
+          type: 'string',
+          description: 'Path to file in the sandbox working directory, or an absolute user filesystem path',
+        },
+        offset: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Line number to start reading from (1-indexed). Defaults to 1.',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: READ_FILE_MAX_LINES,
+          description: `Max number of lines to read. Defaults to ${READ_FILE_DEFAULT_LINES}, max ${READ_FILE_MAX_LINES}.`,
+        },
+      },
+      required: ['file_path'],
+      additionalProperties: false,
     }),
-    execute: async (
-      input: { file_path: string; offset?: number; limit?: number },
-      _context: { abortSignal?: AbortSignal }
-    ) => {
-      if (isAbsolutePath(input.file_path)) {
+    execute: async (input) => {
+      const readInput = input as { file_path: string; offset?: number; limit?: number }
+      if (isAbsolutePath(readInput.file_path)) {
         const status = await provider.getStatus().catch(() => null)
         const sandboxRoot = status?.workingDirectory
-        if ((!sandboxRoot || !isInsideRoot(sandboxRoot, input.file_path)) && platform.fsRead) {
+        if ((!sandboxRoot || !isInsideRoot(sandboxRoot, readInput.file_path)) && platform.fsRead) {
           const result = await platform.fsRead({
-            filePath: input.file_path,
-            offset: input.offset,
-            limit: input.limit,
+            filePath: readInput.file_path,
+            offset: readInput.offset,
+            limit: readInput.limit,
           })
-          if (!result.success) return { error: result.error || `File not found: ${input.file_path}` }
+          if (!result.success) return { error: result.error || `File not found: ${readInput.file_path}` }
           const hasMore = !!result.endLine && !!result.totalLines && result.endLine < result.totalLines
           return {
-            file_path: input.file_path,
+            file_path: readInput.file_path,
             content: truncateOutput(result.content ?? '', MAX_STDOUT_LENGTH),
             startLine: result.startLine,
             endLine: result.endLine,
@@ -217,9 +231,9 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         return { error: setupResult.error || 'Sandbox setup failed' }
       }
 
-      const startLine = input.offset ?? 1
-      const limit = input.limit ?? READ_FILE_DEFAULT_LINES
-      const escapedPath = escapeSingleQuotes(input.file_path)
+      const startLine = readInput.offset ?? 1
+      const limit = readInput.limit ?? READ_FILE_DEFAULT_LINES
+      const escapedPath = escapeSingleQuotes(readInput.file_path)
       // Coerce to safe integers
       const safeStart = Math.max(1, Math.floor(Number(startLine)))
       const safeLimit = Math.max(1, Math.floor(Number(limit)))
@@ -233,7 +247,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       })
 
       if (result.exitCode !== 0) {
-        return { error: `File not found: ${input.file_path}` }
+        return { error: `File not found: ${readInput.file_path}` }
       }
 
       const stdout = result.stdout
@@ -253,7 +267,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       const hasMore = endLine < totalLines
 
       return {
-        file_path: input.file_path,
+        file_path: readInput.file_path,
         content: truncateOutput(content, MAX_STDOUT_LENGTH),
         startLine: safeStart,
         endLine,
@@ -263,19 +277,31 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
           : {}),
       }
     },
-  })
+  }
 
-  const create_download = tool({
+  const create_download: ToolSet[string] = {
     description:
       'Mark a file in the sandbox as downloadable. Returns metadata for rendering a download button. ' +
       'Use after generating files (PDFs, charts, spreadsheets, etc.) with code_execution.',
-    inputSchema: z.object({
-      file_path: z.string().describe('Path to the file in the sandbox working directory'),
-      display_name: z.string().describe('Display name for the download button'),
+    inputSchema: jsonSchema({
+      type: 'object',
+      properties: {
+        file_path: {
+          type: 'string',
+          description: 'Path to the file in the sandbox working directory',
+        },
+        display_name: {
+          type: 'string',
+          description: 'Display name for the download button',
+        },
+      },
+      required: ['file_path', 'display_name'],
+      additionalProperties: false,
     }),
-    execute: async (input: { file_path: string; display_name: string }, _context: { abortSignal?: AbortSignal }) => {
+    execute: async (input) => {
+      const downloadInput = input as { file_path: string; display_name: string }
       // Verify the file exists and resolve to absolute path (so download survives app restart)
-      const escapedPath = escapeSingleQuotes(input.file_path)
+      const escapedPath = escapeSingleQuotes(downloadInput.file_path)
       const checkResult = await provider.exec({
         code: `test -f '${escapedPath}' && realpath '${escapedPath}' || echo "not_found"`,
         language: 'bash',
@@ -283,17 +309,17 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       })
       const resolved = checkResult.stdout.trim()
       if (!resolved || resolved === 'not_found') {
-        return { error: `File not found: ${input.file_path}` }
+        return { error: `File not found: ${downloadInput.file_path}` }
       }
 
       return {
         downloadable: true,
         file_path: resolved,
-        display_name: input.display_name,
+        display_name: downloadInput.display_name,
         provider_type: provider.type,
       }
     },
-  })
+  }
 
   const description = `
 ## Code Execution

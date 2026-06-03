@@ -49,7 +49,7 @@
     "eval:session-rag:chatbox": "node scripts/session-rag-eval/run-chatbox-flow-eval.mjs",
     "lint": "biome lint .",
     "lint:fix": "biome lint . --write",
-    "check": "tsc --noEmit",
+    "check": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
     "format": "biome format --write",
     "check:biome": "biome check",
     "check:ci": "biome ci",

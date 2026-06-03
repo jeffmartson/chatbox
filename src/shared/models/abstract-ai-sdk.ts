@@ -47,6 +47,14 @@ const RETRY_CONFIG = {
   BACKOFF_FACTOR: 2,
 } as const
 
+type ToolInputErrorChunk = {
+  type: 'tool-input-error'
+  toolCallId: string
+  toolName: string
+  input: unknown
+  errorText: string
+}
+
 /**
  * Retryable from a billing-safety perspective: upstream rejected or crashed
  * before running the model, so retrying will not cause duplicate charges.
@@ -461,8 +469,8 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     }
   }
 
-  private processToolInputError<T extends ToolSet>(
-    chunk: Extract<TextStreamPart<T>, { type: 'tool-input-error' }>,
+  private processToolInputError(
+    chunk: ToolInputErrorChunk,
     contentParts: MessageContentParts,
     options: CallChatCompletionOptions
   ): void {
@@ -578,7 +586,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
   }
 
   private async processStreamChunk<T extends ToolSet>(
-    chunk: TextStreamPart<T>,
+    chunk: TextStreamPart<T> | ToolInputErrorChunk,
     contentParts: MessageContentParts,
     currentTextPart: MessageTextPart | undefined,
     currentReasoningPart: MessageReasoningPart | undefined,
@@ -630,7 +638,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
         break
       case 'tool-input-error':
         finalizeReasoningDuration()
-        this.processToolInputError(chunk, contentParts, _options)
+        this.processToolInputError(chunk as ToolInputErrorChunk, contentParts, _options)
         return {
           currentTextPart: undefined,
           currentReasoningPart: undefined,
