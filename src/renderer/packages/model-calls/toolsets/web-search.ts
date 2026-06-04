@@ -40,6 +40,18 @@ export const webSearchTool: ToolSet[string] = {
 
 const DEFAULT_PARSE_LINK_MAX_CHARS = 12_000
 
+function buildParseLinkResult(params: { url: string; title: string; content: string; maxLength: number }) {
+  const content = params.content.trim()
+  const truncatedContent = content.slice(0, params.maxLength)
+  return {
+    url: params.url,
+    title: params.title,
+    content: truncatedContent,
+    originalLength: content.length,
+    truncated: content.length > truncatedContent.length,
+  }
+}
+
 export const parseLinkTool: ToolSet[string] = {
   description:
     'Parses the readable content of a web page. Use this when you need detailed information from a specific URL — typically one the user shared or that was returned by a prior search.',
@@ -68,30 +80,31 @@ export const parseLinkTool: ToolSet[string] = {
 
     const searchProvider = settingActions.getExtensionSettings().webSearch.provider
 
-    // Chatbox AI (build-in) path: requires a license key (any tier — backend has no Pro gate).
+    // Chatbox AI (build-in) path: licensed users use the authenticated parser; BYOK users fall back to free parser.
     if (searchProvider === 'build-in') {
       const licenseKey = settingActions.getLicenseKey()
-      if (!licenseKey) {
-        throw ChatboxAIAPIError.fromCodeName(
-          'parse_link via Chatbox AI requires a license key, but none is configured',
-          'chatbox_search_license_key_required'
-        )
+      if (licenseKey) {
+        const parsed = await remote.parseUserLinkPro({ licenseKey, url: parseInput.url, abortSignal })
+        const storedContent = await platform.getStoreBlob(parsed.storageKey)
+        if (storedContent == null) {
+          const technical = `parse_link storage blob missing for URL ${parseInput.url} (storageKey: ${parsed.storageKey})`
+          throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_failed') ?? new Error(technical)
+        }
+        return buildParseLinkResult({
+          url: parseInput.url,
+          title: parsed.title,
+          content: storedContent,
+          maxLength: normalizedMaxLength,
+        })
       }
-      const parsed = await remote.parseUserLinkPro({ licenseKey, url: parseInput.url, abortSignal })
-      const storedContent = await platform.getStoreBlob(parsed.storageKey)
-      if (storedContent == null) {
-        const technical = `parse_link storage blob missing for URL ${parseInput.url} (storageKey: ${parsed.storageKey})`
-        throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_failed') ?? new Error(technical)
-      }
-      const content = storedContent.trim()
-      const truncatedContent = content.slice(0, normalizedMaxLength)
-      return {
+
+      const freeParsed = await remote.parseUserLinkFree({ url: parseInput.url })
+      return buildParseLinkResult({
         url: parseInput.url,
-        title: parsed.title,
-        content: truncatedContent,
-        originalLength: content.length,
-        truncated: content.length > truncatedContent.length,
-      }
+        title: freeParsed.title,
+        content: freeParsed.text,
+        maxLength: normalizedMaxLength,
+      })
     }
 
     // Third-party provider path (e.g. Tavily). Throws if API key missing or extraction fails.
@@ -105,14 +118,12 @@ export const parseLinkTool: ToolSet[string] = {
       const technical = `parse_link returned no result for URL ${parseInput.url} (provider: ${searchProvider})`
       throw ChatboxAIAPIError.fromCodeName(technical, 'parse_link_failed') ?? new Error(technical)
     }
-    const truncatedContent = result.content.slice(0, normalizedMaxLength)
-    return {
+    return buildParseLinkResult({
       url: result.url,
       title: result.title,
-      content: truncatedContent,
-      originalLength: result.content.length,
-      truncated: result.content.length > truncatedContent.length,
-    }
+      content: result.content,
+      maxLength: normalizedMaxLength,
+    })
   },
 }
 

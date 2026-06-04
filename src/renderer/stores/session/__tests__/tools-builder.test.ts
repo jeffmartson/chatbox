@@ -8,6 +8,7 @@ const {
   settingsState,
   getSettingsMock,
   isProMock,
+  webSearchProvider,
   buildCodeExecutionToolsMock,
   getSessionAttachmentRagToolSetMock,
   skillsChangedListeners,
@@ -23,6 +24,7 @@ const {
   },
   getSettingsMock: vi.fn(),
   isProMock: vi.fn(),
+  webSearchProvider: { current: 'build-in' },
   buildCodeExecutionToolsMock: vi.fn(),
   getSessionAttachmentRagToolSetMock: vi.fn(),
   skillsChangedListeners: new Set<() => void>(),
@@ -84,7 +86,7 @@ vi.mock('@/packages/remote', () => ({
 vi.mock('@/stores/settingActions', () => ({
   getExtensionSettings: () => ({
     webSearch: {
-      provider: 'build-in',
+      provider: webSearchProvider.current,
     },
   }),
   isPro: isProMock,
@@ -99,6 +101,8 @@ vi.mock('@/packages/model-calls/toolsets/web-search', () => {
   const { z } = require('zod')
   return {
     default: { description: 'web search toolset' },
+    getToolSetDescription: ({ includeParseLink }: { includeParseLink: boolean }) =>
+      includeParseLink ? 'web search toolset\n## parse_link' : 'web search toolset',
     webSearchTool: tool({ description: 'web_search', inputSchema: z.object({}), execute: async () => ({}) }),
     parseLinkTool: tool({ description: 'parse_link', inputSchema: z.object({}), execute: async () => ({}) }),
   }
@@ -199,6 +203,7 @@ beforeEach(() => {
   settingsState.licensePlanName = undefined
   settingsState.licenseActivationMethod = undefined
   settingsState.hasExpiredLicense = false
+  webSearchProvider.current = 'build-in'
   isProMock.mockReturnValue(true)
   buildCodeExecutionToolsMock.mockReturnValue({
     description: 'code execution toolset',
@@ -302,6 +307,34 @@ describe('buildToolsForSession', () => {
     }
     expect(result.tools.code_execution).toBeDefined()
     expect(result.initialActiveTools).toBeUndefined()
+  })
+
+  test('webBrowsing=true exposes parse_link when configured search provider supports it', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: true,
+      messages: [],
+      agentMode: 'off',
+    })
+
+    expect(result.tools.web_search).toBeDefined()
+    expect(result.tools.parse_link).toBeDefined()
+    expect(result.instructions).toContain('## parse_link')
+  })
+
+  test('webBrowsing=true does not expose parse_link when configured search provider does not support it', async () => {
+    webSearchProvider.current = 'bing'
+    const model = createMockModel()
+
+    const result = await buildToolsForSession(model, {
+      webBrowsing: true,
+      messages: [],
+      agentMode: 'off',
+    })
+
+    expect(result.tools.web_search).toBeDefined()
+    expect(result.tools.parse_link).toBeUndefined()
+    expect(result.instructions).not.toContain('## parse_link')
   })
 
   test('agentMode="auto" without codeExecution — load_skill only, no code-exec tools', async () => {

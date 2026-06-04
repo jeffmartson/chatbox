@@ -2,7 +2,7 @@ import NiceModal from '@ebay/nice-modal-react'
 import { Tooltip, Typography } from '@mui/material'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import type { SessionAttachmentIndexingStage } from '@shared/types'
-import { AlertCircle, CheckCircle, Eye, Link, Link2, Loader2, RotateCw, Trash2 } from 'lucide-react'
+import { AlertCircle, CheckCircle, Eye, Link2, Loader2, RotateCw, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -420,67 +420,5 @@ export function MessageAttachment(props: {
         )}
       </div>
     </Tooltip>
-  )
-}
-
-export function LinkMiniCard(props: {
-  url: string
-  onDelete: () => void
-  status?: 'processing' | 'completed' | 'error'
-  errorMessage?: string
-  onErrorClick?: () => void
-}) {
-  const { url, onDelete, status, errorMessage, onErrorClick } = props
-  const { t } = useTranslation()
-  const label = url.replace(/^https?:\/\//, '')
-
-  const handleClick = () => {
-    if (status === 'error' && onErrorClick) {
-      onErrorClick()
-    }
-  }
-
-  // 获取翻译后的错误消息
-  const translatedError = getTranslatedErrorMessage(errorMessage, t)
-
-  return (
-    <div
-      className="w-[100px] h-[100px] p-1 m-1 inline-flex items-center justify-center
-                                bg-white shadow-sm rounded-md border-solid border-gray-400/20
-                                hover:shadow-lg hover:cursor-pointer hover:scale-105 transition-all duration-200
-                                group/file-mini-card relative"
-      onClick={handleClick}
-    >
-      <Tooltip title={status === 'error' && translatedError ? translatedError : url}>
-        <div className="flex flex-col justify-center items-center">
-          <Link className="w-8 h-8 text-black" strokeWidth={1} />
-          <Typography className="w-20 pt-1 text-black text-center" noWrap sx={{ fontSize: '10px' }}>
-            {label}
-          </Typography>
-        </div>
-      </Tooltip>
-
-      {/* Status indicator */}
-      {status && (
-        <div className="absolute bottom-1 left-1">
-          {status === 'processing' && <Loader2 size="16" className="animate-spin text-blue-500" />}
-          {status === 'completed' && <CheckCircle size="16" className="text-green-500" />}
-          {status === 'error' && <AlertCircle size="16" className="text-red-500" />}
-        </div>
-      )}
-
-      {onDelete && (
-        <MiniButton
-          className="hidden group-hover/file-mini-card:inline-block
-                    absolute top-0 right-0 m-1 p-1 rounded-full shadow-lg text-red-500"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        >
-          <Trash2 size="18" strokeWidth={2} />
-        </MiniButton>
-      )}
-    </div>
   )
 }

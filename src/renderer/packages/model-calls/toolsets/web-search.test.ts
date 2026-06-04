@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const getLicenseKeyMock = vi.fn()
 const getExtensionSettingsMock = vi.fn()
 const parseUserLinkProMock = vi.fn()
+const parseUserLinkFreeMock = vi.fn()
 const getStoreBlobMock = vi.fn()
 const getParseLinkProviderMock = vi.fn()
 const webSearchExecutorMock = vi.fn()
@@ -15,6 +16,7 @@ vi.mock('@/stores/settingActions', () => ({
 
 vi.mock('@/packages/remote', () => ({
   parseUserLinkPro: (...args: unknown[]) => parseUserLinkProMock(...args),
+  parseUserLinkFree: (...args: unknown[]) => parseUserLinkFreeMock(...args),
 }))
 
 vi.mock('@/platform', () => ({
@@ -34,7 +36,10 @@ import { parseLinkTool } from '@/packages/model-calls/toolsets/web-search'
 type ParseLinkInput = { url: string; maxLength?: number }
 
 type ParseLinkToolLike = {
-  execute: (input: ParseLinkInput, context: { abortSignal?: AbortSignal }) => Promise<{
+  execute: (
+    input: ParseLinkInput,
+    context: { abortSignal?: AbortSignal }
+  ) => Promise<{
     url: string
     title: string
     content: string
@@ -53,6 +58,7 @@ describe('parseLinkTool', () => {
     getLicenseKeyMock.mockReset()
     getExtensionSettingsMock.mockReset()
     parseUserLinkProMock.mockReset()
+    parseUserLinkFreeMock.mockReset()
     getStoreBlobMock.mockReset()
     getParseLinkProviderMock.mockReset()
   })
@@ -66,13 +72,19 @@ describe('parseLinkTool', () => {
       getExtensionSettingsMock.mockReturnValue({ webSearch: { provider: 'build-in' } })
     })
 
-    it('throws license key required when no license is configured', async () => {
+    it('falls back to the free parser when no license is configured', async () => {
       getLicenseKeyMock.mockReturnValue('')
+      parseUserLinkFreeMock.mockResolvedValue({ title: 'Free Title', text: 'Free content.' })
 
-      await expect(execParseLink({ url: 'https://example.com' })).rejects.toMatchObject({
-        detail: { name: 'chatbox_search_license_key_required' },
-      })
+      const result = await execParseLink({ url: 'https://example.com' })
+
       expect(parseUserLinkProMock).not.toHaveBeenCalled()
+      expect(parseUserLinkFreeMock).toHaveBeenCalledWith({ url: 'https://example.com' })
+      expect(result).toMatchObject({
+        url: 'https://example.com',
+        title: 'Free Title',
+        content: 'Free content.',
+      })
       expect(getParseLinkProviderMock).not.toHaveBeenCalled()
     })
 

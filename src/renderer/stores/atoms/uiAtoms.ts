@@ -26,7 +26,6 @@ const defaultPreConstructedMessageState = (): PreConstructedMessageState => ({
   },
 })
 
-export const inputBoxLinksFamily = atomFamily((_sessionId: string) => atom<{ url: string }[]>([]))
 export const inputBoxPreConstructedMessageFamily = atomFamily((_sessionId: string) =>
   atom(defaultPreConstructedMessageState())
 )

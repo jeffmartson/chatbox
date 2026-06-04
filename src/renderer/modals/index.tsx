@@ -1,7 +1,7 @@
 import NiceModal from '@ebay/nice-modal-react'
+import CopilotSettingsModal from '../routes/copilots/-components/CopilotSettingsModal'
 import AppStoreRating from './AppStoreRating'
 import ArtifactPreview from './ArtifactPreview'
-import AttachLink from './AttachLink'
 import ClearSessionList from './ClearSessionList'
 import ContentViewer from './ContentViewer'
 import EdgeOneDeploySuccess from './EdgeOneDeploySuccess'
@@ -14,7 +14,6 @@ import ReportContent from './ReportContent'
 import SessionSettings from './SessionSettings'
 import ThreadNameEdit from './ThreadNameEdit'
 import Welcome from './Welcome'
-import CopilotSettingsModal from '../routes/copilots/-components/CopilotSettingsModal'
 
 NiceModal.register('welcome', Welcome)
 NiceModal.register('file-parse-error', FileParseError)
@@ -26,7 +25,6 @@ NiceModal.register('clear-session-list', ClearSessionList)
 NiceModal.register('export-chat', ExportChat)
 NiceModal.register('message-edit', MessageEdit)
 NiceModal.register('json-viewer', JsonViewer)
-NiceModal.register('attach-link', AttachLink)
 NiceModal.register('report-content', ReportContent)
 NiceModal.register('model-edit', ModelEdit)
 NiceModal.register('thread-name-edit', ThreadNameEdit)

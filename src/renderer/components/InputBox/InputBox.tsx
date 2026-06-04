@@ -32,7 +32,6 @@ import {
   IconCirclePlus,
   IconFilePencil,
   IconFolder,
-  IconLink,
   IconPhoto,
   IconPlayerStopFilled,
   IconPlus,
@@ -42,7 +41,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useAtom, useAtomValue } from 'jotai'
-import _, { pick } from 'lodash'
+import { pick } from 'lodash'
 import type React from 'react'
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
@@ -103,19 +102,10 @@ import Disclaimer from '../Disclaimer'
 import ProviderImageIcon from '../icons/ProviderImageIcon'
 import ModelSelector from '../ModelSelector'
 import AgentModeButton from './AgentModeButton'
-import { FileMiniCard, ImageMiniCard, LinkMiniCard } from './Attachments'
+import { FileMiniCard, ImageMiniCard } from './Attachments'
 import { getAgentModeUIState } from './agentModeState'
 import { ImageUploadInput } from './ImageUploadInput'
-import {
-  cleanupFile,
-  cleanupLink,
-  markFileProcessing,
-  markLinkProcessing,
-  onFileProcessed,
-  onLinkProcessed,
-  storeFilePromise,
-  storeLinkPromise,
-} from './preprocessState'
+import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
 import TokenCountMenu from './TokenCountMenu'
 
 export type InputBoxPayload = {
@@ -338,7 +328,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const [showCompressionModal, setShowCompressionModal] = useState(false)
 
-    const [links, setLinks] = useAtom(atoms.inputBoxLinksFamily(currentSessionId || 'new'))
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [unreadyAttachmentSubmitPrompt, setUnreadyAttachmentSubmitPrompt] = useState<{
       opened: boolean
@@ -353,30 +342,28 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         text,
         pictureKeys,
         preConstructedMessage.preprocessedFiles,
-        preConstructedMessage.preprocessedLinks
+        []
       )
       setPreConstructedMessage((prev) => ({
         ...prev,
         text,
         pictureKeys,
         attachments,
-        links,
+        links: [],
         message: constructedMessage,
       }))
     }, [
       preConstructedMessage.draftMessageId,
       pictureKeys,
       attachments,
-      links,
       preConstructedMessage.preprocessedFiles,
-      preConstructedMessage.preprocessedLinks,
       setPreConstructedMessage,
     ])
 
     const flushRef = useRef(flushPreConstructedMessage)
     flushRef.current = flushPreConstructedMessage
 
-    // When non-text deps change (pictures, attachments, links), flush immediately
+    // When non-text deps change (pictures, attachments), flush immediately
     useEffect(() => {
       flushRef.current()
     }, [flushPreConstructedMessage])
@@ -389,10 +376,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       const hasProcessingFiles = Object.values(preConstructedMessage.preprocessingStatus.files || {}).some(
         (status) => status === 'processing'
       )
-      const hasProcessingLinks = Object.values(preConstructedMessage.preprocessingStatus.links || {}).some(
-        (status) => status === 'processing'
-      )
-      return hasProcessingFiles || hasProcessingLinks
+      return hasProcessingFiles
     }, [preConstructedMessage.preprocessingStatus])
 
     // Check if any preprocessing has errors
@@ -400,10 +384,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       const hasErrorFiles = Object.values(preConstructedMessage.preprocessingStatus.files || {}).some(
         (status) => status === 'error'
       )
-      const hasErrorLinks = Object.values(preConstructedMessage.preprocessingStatus.links || {}).some(
-        (status) => status === 'error'
-      )
-      return hasErrorFiles || hasErrorLinks
+      return hasErrorFiles
     }, [preConstructedMessage.preprocessingStatus])
 
     const hasBlockedSessionRagFiles = useMemo(
@@ -430,8 +411,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     )
 
     const disableSubmit = useMemo(
-      () => !(hasTextContent || links?.length || attachments?.length || pictureKeys?.length),
-      [hasTextContent, links, attachments, pictureKeys]
+      () => !(hasTextContent || attachments?.length || pictureKeys?.length),
+      [hasTextContent, attachments, pictureKeys]
     )
 
     const { providers } = useProviders()
@@ -718,7 +699,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const getNextHistoryInputRef = useRef(getNextHistoryInput)
     getNextHistoryInputRef.current = getNextHistoryInput
     const insertFilesRef = useRef<(files: File[]) => void>(() => {})
-    const insertLinksRef = useRef<(urls: string[]) => void>(() => {})
 
     const closeSelectModelErrorTipCb = useRef<NodeJS.Timeout>()
     const handleSubmit = async (needGenerating = true, options: SubmitOptions = {}) => {
@@ -783,7 +763,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           latestInputRef.current,
           pictureKeys,
           preprocessedFilesForSubmit,
-          preConstructedMessage.preprocessedLinks
+          []
         )
         if (!latestMessage) {
           console.error('No constructed message available')
@@ -797,7 +777,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           needGenerating,
           onUserMessageReady: () => {
             messageInputFieldRef.current?.clearDraft()
-            setLinks([])
             draftMessageIdRef.current = undefined
             setPreConstructedMessage({
               draftMessageId: undefined,
@@ -847,9 +826,11 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           'Shift+Enter': event.keyCode === 13 && event.shiftKey,
           'Ctrl+Shift+Enter': event.keyCode === 13 && event.ctrlKey && event.shiftKey,
         }
+        const isSendShortcut = isPressedHash[shortcuts.inputBoxSendMessage]
+        const isSendWithoutResponseShortcut = isPressedHash[shortcuts.inputBoxSendMessageWithoutResponse]
 
         // 发送消息
-        if (isPressedHash[shortcuts.inputBoxSendMessage]) {
+        if (isSendShortcut) {
           if (platform.type === 'mobile' && isSmallScreen && shortcuts.inputBoxSendMessage === 'Enter') {
             // 移动端点击回车不会发送消息
             return
@@ -860,7 +841,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         }
 
         // 发送消息但不生成回复
-        if (isPressedHash[shortcuts.inputBoxSendMessageWithoutResponse]) {
+        if (isSendWithoutResponseShortcut) {
           event.preventDefault()
           handleSubmitRef.current(false)
           return
@@ -913,38 +894,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       if (res) {
         setShowRollbackThreadButton(false)
       }
-    }
-
-    // ----- Preprocessing helpers -----
-    const startLinkPreprocessing = (url: string) => {
-      // 设置为处理中状态
-      setPreConstructedMessage((prev) => markLinkProcessing(prev, url))
-
-      // 异步预处理链接，失败时标记为 error，并吞掉异常避免 Promise.all reject
-      const preprocessPromise = sessionHelpers
-        .preprocessLink(url, { provider: model?.provider || '', modelId: model?.modelId || '' })
-        .then((preprocessedLink) => {
-          setPreConstructedMessage((prev) => onLinkProcessed(prev, url, preprocessedLink, 6))
-        })
-        .catch((error) => {
-          setPreConstructedMessage((prev) =>
-            onLinkProcessed(
-              prev,
-              url,
-              {
-                url,
-                title: '',
-                content: '',
-                storageKey: '',
-                error: (error as Error)?.message || 'Failed to preprocess the link.',
-              },
-              6
-            )
-          )
-        })
-
-      // Store the promise
-      setPreConstructedMessage((prev) => storeLinkPromise(prev, url, preprocessPromise))
     }
 
     const startFilePreprocessing = (file: File) => {
@@ -1010,28 +959,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         .finally(() => {
           activeFilePreprocessingKeysRef.current.delete(fileKey)
         })
-    }
-
-    const insertLinks = (urls: string[]) => {
-      const MAX_LINKS = 6
-      const dedupedLinks = _.uniqBy([...(links || []), ...urls.map((u) => ({ url: u }))], 'url')
-      // 保留最先添加的前 6 个链接，多出来的直接丢弃（而非静默丢掉最早的）
-      const newLinks = dedupedLinks.slice(0, MAX_LINKS)
-      setLinks(newLinks)
-
-      if (dedupedLinks.length > newLinks.length) {
-        toastActions.add(
-          t('Only the first {{limit}} links can be attached. The extra links were skipped.', { limit: MAX_LINKS })
-        )
-      }
-
-      // 只预处理实际保留下来的链接（findIndex 返回 -1 表示该链接已被裁剪，跳过）
-      for (const url of urls) {
-        const linkIndex = newLinks.findIndex((l) => l.url === url)
-        if (linkIndex >= 0 && linkIndex < MAX_LINKS) {
-          startLinkPreprocessing(url)
-        }
-      }
     }
 
     // In agent mode, allow all file types (sandbox can handle archives, binaries, etc.)
@@ -1151,7 +1078,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       }
     }
     insertFilesRef.current = insertFiles
-    insertLinksRef.current = insertLinks
 
     const onFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       if (!event.target.files) {
@@ -1183,6 +1109,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         if (sessionType === 'picture') {
           return
         }
+
         if (event.clipboardData?.items) {
           // 对于 Doc/PPT/XLS 等文件中的内容，粘贴时一般会有 4 个 items，分别是 text 文本、html、某格式和图片
           // 因为 getAsString 为异步操作，无法根据 items 中的内容来定制不同的粘贴行为，因此这里选择了最简单的做法：
@@ -1203,16 +1130,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
             }
             hasText = true
             if (item.kind === 'string' && item.type === 'text/plain') {
-              // 插入链接：如果复制的是链接，则插入链接
               item.getAsString((text) => {
                 const raw = text.trim()
-                if (raw.startsWith('http://') || raw.startsWith('https://')) {
-                  const urls = raw
-                    .split(/\s+/)
-                    .map((url) => url.trim())
-                    .filter((url) => url.startsWith('http://') || url.startsWith('https://'))
-                  insertLinksRef.current(urls)
-                }
                 if (pasteLongTextAsAFile && raw.length > 3000) {
                   const file = new File([text], `pasted_text_${Date.now()}.txt`, {
                     type: 'text/plain',
@@ -1231,13 +1150,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       },
       [sessionType, pasteLongTextAsAFile]
     )
-
-    const handleAttachLink = async () => {
-      const links: string[] = await NiceModal.show('attach-link')
-      if (links) {
-        insertLinks(links)
-      }
-    }
 
     // 拖拽上传
     const { getRootProps, getInputProps } = useDropzone({
@@ -1387,7 +1299,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               </ActionIcon>
             </Flex>
 
-            {(!!pictureKeys.length || !!attachments.length || !!links.length) && (
+            {(!!pictureKeys.length || !!attachments.length) && (
               <Flex
                 align="center"
                 wrap="wrap"
@@ -1562,33 +1474,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     />
                   )
                 })}
-                {links?.map((link) => {
-                  const linkKey = StorageKeyGenerator.linkUniqKey(link.url)
-                  const status = preConstructedMessage.preprocessingStatus.links[linkKey]
-                  const preprocessedLink = preConstructedMessage.preprocessedLinks.find(
-                    (l) => StorageKeyGenerator.linkUniqKey(l.url) === linkKey
-                  )
-                  return (
-                    <LinkMiniCard
-                      key={linkKey}
-                      url={link.url}
-                      status={status}
-                      errorMessage={preprocessedLink?.error}
-                      onErrorClick={() => {
-                        if (preprocessedLink?.error) {
-                          void NiceModal.show('file-parse-error', {
-                            errorCode: preprocessedLink.error,
-                            fileName: link.url,
-                          })
-                        }
-                      }}
-                      onDelete={() => {
-                        setLinks(links.filter((l) => l.url !== link.url))
-                        setPreConstructedMessage((prev) => cleanupLink(prev, link.url))
-                      }}
-                    />
-                  )
-                })}
               </Flex>
             )}
 
@@ -1607,12 +1492,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
               {/* Left Group: Tool Buttons */}
               <Flex align="center" gap={0}>
-                <AttachmentMenu
-                  onImageUploadClick={onImageUploadClick}
-                  onFileUploadClick={onFileUploadClick}
-                  handleAttachLink={handleAttachLink}
-                  t={t}
-                />
+                <AttachmentMenu onImageUploadClick={onImageUploadClick} onFileUploadClick={onFileUploadClick} t={t} />
 
                 {/* Web Search - only visible when agent mode is off or on non-desktop */}
                 {(platform.type !== 'desktop' || agentModeUIState.effectiveValue === 'off') && (
@@ -1876,9 +1756,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 const AttachmentMenu: React.FC<{
   onImageUploadClick: () => void
   onFileUploadClick: () => void
-  handleAttachLink: () => void
   t: (key: string) => string
-}> = ({ onImageUploadClick, onFileUploadClick, handleAttachLink, t }) => {
+}> = ({ onImageUploadClick, onFileUploadClick, t }) => {
   const isSmallScreen = useIsSmallScreen()
   const toolbarIconSize = isSmallScreen ? 22 : 18
   return (
@@ -1905,9 +1784,6 @@ const AttachmentMenu: React.FC<{
         </Menu.Item>
         <Menu.Item leftSection={<IconFolder size={16} />} onClick={onFileUploadClick}>
           {t('Select File')}
-        </Menu.Item>
-        <Menu.Item leftSection={<IconLink size={16} />} onClick={handleAttachLink}>
-          {t('Attach Link')}
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>

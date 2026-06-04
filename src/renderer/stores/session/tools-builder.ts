@@ -290,7 +290,9 @@ function buildLoadSkillTool(options: BuildToolsOptions): ToolSet[string] {
       const skillInput = input as { name: string }
       const skillSettings = settingsStore.getState().getSettings().skills
       if (!skillSettings.enabledSkillNames.includes(skillInput.name)) {
-        return { error: `Skill "${skillInput.name}" is not enabled. Check available skills in the system instructions.` }
+        return {
+          error: `Skill "${skillInput.name}" is not enabled. Check available skills in the system instructions.`,
+        }
       }
 
       const result = await skillsController.loadSkill(skillInput.name)

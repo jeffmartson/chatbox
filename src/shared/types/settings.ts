@@ -151,7 +151,7 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
 })
 
 const UnifiedTokenUsageDetailSchema = z.object({
-  type: z.string(), // "plan" | "trial" | "invitation_reward" | ... (more types in future)
+  type: z.string(), // "plan" | "invitation_reward" | ... (more types in future)
   token_usage: z.number(),
   token_limit: z.number(),
   expires_at: z.string().nullish(),
