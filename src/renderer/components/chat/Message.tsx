@@ -616,7 +616,7 @@ const _Message: FC<Props> = (props) => {
               )}
             </div>
           )}
-          <DownloadArtifactsUI parts={downloadArtifactParts} />
+          {!msg.generating && <DownloadArtifactsUI parts={downloadArtifactParts} />}
           {preparingToolCallStatuses?.map((status) => (
             <PreparingToolCallStatus key={`preparing-tool-call-${status.toolName ?? 'tool-call'}`} status={status} />
           ))}
