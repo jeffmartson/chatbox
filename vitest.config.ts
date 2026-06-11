@@ -3,7 +3,9 @@ import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => {
-  const isModelProviderRun = process.argv.some((arg) => arg.includes('test/integration/model-provider'))
+  // Live-API suite must be opted into explicitly (set by the test:model-provider script);
+  // an argv/path heuristic could silently run real API calls with keys auto-loaded from .env
+  const isModelProviderRun = process.env.RUN_MODEL_PROVIDER_TESTS === '1'
 
   return {
     test: {

@@ -1,8 +1,17 @@
+import { isDeepSeekReasoningModel } from '../models/utils/deepseek'
 import type { ModelProvider, ProviderModelInfo, ProviderOptions } from '../types'
 import { ModelProviderEnum } from '../types'
 import { type GoogleThinkingLevel, getGoogleThinkingMode, getSupportedGoogleThinkingLevels } from './google-thinking'
 
 export type ReasoningControlLevel = 'off' | 'low' | 'medium' | 'high'
+
+export type ReasoningControlDisabledReason =
+  | 'requires-anthropic-api-style'
+  | 'requires-google-api-style'
+  | 'requires-openai-api-style'
+  | 'requires-deepseek-api-style'
+  | 'requires-qwen-api-style'
+  | 'requires-xai-api-style'
 
 export interface ReasoningControlCapabilities {
   supported: boolean
@@ -15,7 +24,7 @@ export interface ReasoningControlCapabilities {
     | 'openrouter-reasoning'
     | 'toggle'
     | 'xai-effort'
-  disabledReason?: string
+  disabledReason?: ReasoningControlDisabledReason
 }
 
 export interface ReasoningControlOption {
@@ -56,7 +65,6 @@ const CLAUDE_BUDGET_MODELS = [
   /(?:^|\/)claude-haiku-4-5/i,
   /(?:^|\/)claude-opus-4(?![.-]?5)(?![.-]?7)(?![.-]?8)/i,
 ]
-const DEEPSEEK_THINKING_MODELS = [/deepseek-reasoner/i, /deepseek-r1/i, /deepseek-v[0-9.]+(?:-thinking|-pro|-flash)?/i]
 const QWEN_THINKING_MODELS = [/^qwen3/i, /(?:^|\/)qwen3/i]
 const GROK_REASONING_EFFORT_MODELS = [
   /(?:^|\/)grok-4\.3(?:-latest)?$/i,
@@ -67,6 +75,38 @@ const GROK_REASONING_EFFORT_MODELS = [
 
 function matchesAny(modelId: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(modelId))
+}
+
+/**
+ * Claude models that use adaptive thinking effort instead of a token budget.
+ * Shared with the Claude provider so capability detection and request
+ * construction stay in sync.
+ */
+export function isClaudeAdaptiveThinkingModel(modelId: string): boolean {
+  return matchesAny(modelId, CLAUDE_ADAPTIVE_EFFORT_MODELS)
+}
+
+function isOpenAIStyleEffectiveProvider(provider: ModelProvider | undefined): boolean {
+  return (
+    provider === ModelProviderEnum.OpenAI ||
+    provider === ModelProviderEnum.OpenAIResponses ||
+    provider === ModelProviderEnum.Azure
+  )
+}
+
+type LegacyOpenAICompatibleReasoning = NonNullable<ProviderOptions['openaiCompatible']>['reasoning']
+
+/**
+ * Interprets the legacy `openaiCompatible.reasoning` options (written by older
+ * versions) as a DeepSeek-style thinking toggle. Shared with the ChatboxAI
+ * gateway model so both read paths agree.
+ */
+export function getLegacyOpenAICompatibleThinkingType(
+  reasoning: LegacyOpenAICompatibleReasoning
+): 'enabled' | 'disabled' | undefined {
+  if (!reasoning) return undefined
+  if (reasoning.enabled === false || reasoning.exclude === true) return 'disabled'
+  return reasoning.enabled ? 'enabled' : undefined
 }
 
 function getEffectiveProvider(
@@ -124,18 +164,13 @@ export function getReasoningControlCapabilities(
     if (mode === 'budget') return { supported: true, kind: 'budget' }
     if (mode === 'level') return { supported: true, kind: 'level' }
   }
-  if (effectiveProvider === ModelProviderEnum.DeepSeek && isDeepSeekReasoningModel(model)) {
+  if (effectiveProvider === ModelProviderEnum.DeepSeek && isDeepSeekThinkingModel(model)) {
     return { supported: true, kind: 'toggle' }
   }
-  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekReasoningModel(model)) {
+  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
     return { supported: true, kind: 'toggle' }
   }
-  if (
-    (effectiveProvider === ModelProviderEnum.OpenAI ||
-      effectiveProvider === ModelProviderEnum.OpenAIResponses ||
-      effectiveProvider === ModelProviderEnum.Azure) &&
-    matchesAny(modelId, GPT_EFFORT_MODELS)
-  ) {
+  if (isOpenAIStyleEffectiveProvider(effectiveProvider) && matchesAny(modelId, GPT_EFFORT_MODELS)) {
     return { supported: true, kind: 'openai-effort' }
   }
   if (
@@ -158,7 +193,7 @@ function getApiStyleDisabledReason(
   provider: ModelProvider | undefined,
   effectiveProvider: ModelProvider | undefined,
   model: ProviderModelInfo
-): string | undefined {
+): ReasoningControlDisabledReason | undefined {
   if (effectiveProvider === ModelProviderEnum.OpenRouter) {
     return undefined
   }
@@ -166,32 +201,26 @@ function getApiStyleDisabledReason(
   const modelId = model.modelId
   if (matchesAny(modelId, [...CLAUDE_ADAPTIVE_EFFORT_MODELS, ...CLAUDE_EFFORT_MODELS, ...CLAUDE_BUDGET_MODELS])) {
     if (effectiveProvider !== ModelProviderEnum.Claude) {
-      return 'Thinking controls are disabled because this Claude model is not exposed through the Anthropic API style.'
+      return 'requires-anthropic-api-style'
     }
   }
 
   if (getGoogleThinkingMode(modelId) !== 'none') {
     if (effectiveProvider !== ModelProviderEnum.Gemini) {
-      return 'Thinking controls are disabled because this Gemini model is not exposed through the Google API style.'
+      return 'requires-google-api-style'
     }
   }
 
-  if (matchesAny(modelId, GPT_EFFORT_MODELS)) {
-    const isOpenAIStyle =
-      effectiveProvider === ModelProviderEnum.OpenAI ||
-      effectiveProvider === ModelProviderEnum.OpenAIResponses ||
-      effectiveProvider === ModelProviderEnum.Azure
-    if (!isOpenAIStyle) {
-      return 'Thinking controls are disabled because this GPT model is not exposed through an OpenAI API style.'
-    }
+  if (matchesAny(modelId, GPT_EFFORT_MODELS) && !isOpenAIStyleEffectiveProvider(effectiveProvider)) {
+    return 'requires-openai-api-style'
   }
 
   if (
-    matchesAny(modelId, DEEPSEEK_THINKING_MODELS) &&
+    isDeepSeekReasoningModel(modelId) &&
     effectiveProvider !== ModelProviderEnum.DeepSeek &&
     !isOpenAICompatibleApiStyle(provider, model)
   ) {
-    return 'Thinking controls are disabled because this DeepSeek model is not exposed through the DeepSeek API style.'
+    return 'requires-deepseek-api-style'
   }
 
   if (
@@ -199,11 +228,11 @@ function getApiStyleDisabledReason(
     effectiveProvider !== ModelProviderEnum.Qwen &&
     effectiveProvider !== ModelProviderEnum.QwenPortal
   ) {
-    return 'Thinking controls are disabled because this Qwen model is not exposed through the Qwen API style.'
+    return 'requires-qwen-api-style'
   }
 
   if (matchesAny(modelId, GROK_REASONING_EFFORT_MODELS) && effectiveProvider !== ModelProviderEnum.XAI) {
-    return 'Thinking controls are disabled because this Grok model is not exposed through the xAI API style.'
+    return 'requires-xai-api-style'
   }
 
   return undefined
@@ -218,13 +247,13 @@ export function getReasoningControlLevel(
   if (!capabilities.supported) return 'off'
 
   const effectiveProvider = getEffectiveProvider(provider, model)
-  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekReasoningModel(model)) {
+  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
     const deepseekThinking = providerOptions?.deepseek?.thinking
     if (deepseekThinking) {
       return deepseekThinking.type === 'enabled' ? 'high' : 'off'
     }
-    const thinking = providerOptions?.openaiCompatible?.reasoning
-    return thinking?.enabled === false || thinking?.exclude === true ? 'off' : thinking?.enabled ? 'high' : 'off'
+    const legacyType = getLegacyOpenAICompatibleThinkingType(providerOptions?.openaiCompatible?.reasoning)
+    return legacyType === 'enabled' ? 'high' : 'off'
   }
   if (effectiveProvider === ModelProviderEnum.Claude) {
     if (capabilities.kind === 'anthropic-adaptive-effort' || capabilities.kind === 'anthropic-effort') {
@@ -237,11 +266,7 @@ export function getReasoningControlLevel(
     if (budget >= CLAUDE_BUDGET_BY_LEVEL.medium) return 'medium'
     return 'low'
   }
-  if (
-    effectiveProvider === ModelProviderEnum.OpenAI ||
-    effectiveProvider === ModelProviderEnum.OpenAIResponses ||
-    effectiveProvider === ModelProviderEnum.Azure
-  ) {
+  if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
     const effort = providerOptions?.openai?.reasoningEffort
     return normalizeEffortToLevel(effort)
   }
@@ -318,13 +343,9 @@ export function getReasoningProviderOptions(
       } else {
         next.claude = { thinking: { type: 'disabled', budgetTokens: 0 } }
       }
-    } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekReasoningModel(model)) {
+    } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
       next.deepseek = { thinking: { type: 'disabled' } }
-    } else if (
-      effectiveProvider === ModelProviderEnum.OpenAI ||
-      effectiveProvider === ModelProviderEnum.OpenAIResponses ||
-      effectiveProvider === ModelProviderEnum.Azure
-    ) {
+    } else if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
       next.openai = {
         reasoningEffort: getOpenAIReasoningEffort(model?.modelId || '', level),
         forceReasoning: true,
@@ -349,13 +370,9 @@ export function getReasoningProviderOptions(
     } else {
       next.claude = { thinking: { type: 'enabled', budgetTokens: CLAUDE_BUDGET_BY_LEVEL[level] } }
     }
-  } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekReasoningModel(model)) {
+  } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
     next.deepseek = { thinking: { type: 'enabled' } }
-  } else if (
-    effectiveProvider === ModelProviderEnum.OpenAI ||
-    effectiveProvider === ModelProviderEnum.OpenAIResponses ||
-    effectiveProvider === ModelProviderEnum.Azure
-  ) {
+  } else if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
     next.openai = {
       reasoningEffort: getOpenAIReasoningEffort(model?.modelId || '', level),
       ...(effectiveProvider === ModelProviderEnum.OpenAIResponses
@@ -397,9 +414,9 @@ export function getReasoningProviderOptions(
   return compactProviderOptions(next)
 }
 
-function isDeepSeekReasoningModel(model: ProviderModelInfo | null | undefined): boolean {
+function isDeepSeekThinkingModel(model: ProviderModelInfo | null | undefined): boolean {
   if (!model?.modelId) return false
-  return matchesAny(model.modelId, DEEPSEEK_THINKING_MODELS)
+  return isDeepSeekReasoningModel(model.modelId)
 }
 
 function getGoogleOffThinkingConfig(modelId: string): NonNullable<ProviderOptions['google']>['thinkingConfig'] {
@@ -416,12 +433,12 @@ function getGoogleOffThinkingConfig(modelId: string): NonNullable<ProviderOption
 
 function isOpenRouterReasoningModel(model: ProviderModelInfo | null | undefined): boolean {
   if (!model?.modelId) return false
+  if (isDeepSeekReasoningModel(model.modelId)) return true
   return matchesAny(model.modelId, [
     ...CLAUDE_ADAPTIVE_EFFORT_MODELS,
     ...CLAUDE_EFFORT_MODELS,
     ...CLAUDE_BUDGET_MODELS,
     ...GPT_EFFORT_MODELS,
-    ...DEEPSEEK_THINKING_MODELS,
     ...QWEN_THINKING_MODELS,
     ...GROK_REASONING_EFFORT_MODELS,
     /(?:^|\/)o[1-9](?:[.-]|$)/i,

@@ -18,6 +18,12 @@ const GOOGLE_THINKING_LEVELS_BY_MODEL: Array<[RegExp, GoogleThinkingLevel[]]> = 
 
 export function getGoogleThinkingMode(modelId: string): GoogleThinkingMode {
   const id = modelId.toLowerCase().split('/').at(-1) || modelId.toLowerCase()
+  // Image generation models (e.g. gemini-2.5-flash-image, gemini-3-pro-image-preview)
+  // reject thinkingConfig with "Thinking is not enabled for this model".
+  if (id.includes('-image')) {
+    return 'none'
+  }
+
   if (id.startsWith('gemini-3')) {
     return 'level'
   }
@@ -89,5 +95,6 @@ export function normalizeGoogleThinkingConfig(
     }
   }
 
-  return thinkingConfig
+  // Mode 'none': the model does not support thinking, never send a thinkingConfig.
+  return undefined
 }

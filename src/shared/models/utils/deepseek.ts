@@ -20,6 +20,18 @@ const WEAK_MODEL_PATTERN = /deepseek[-_]?(chat|reasoner|r1|v(?:0|1|2|3)(?:[._]\d
 // Models with improved tool use — excluded from the weak list
 const STRONG_MODEL_PATTERN = /distill|vl\d/i
 
+// Matches DeepSeek models that support reasoning/thinking (reasoner, R1, V-series).
+const REASONING_MODEL_PATTERN = /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i
+
+/**
+ * Returns true if the given model ID is a DeepSeek reasoning/thinking model.
+ * Shared by capability detection (reasoning controls) and request construction
+ * (DeepSeek provider, ChatboxAI gateway) so the two can never drift apart.
+ */
+export function isDeepSeekReasoningModel(modelId: string): boolean {
+  return REASONING_MODEL_PATTERN.test(modelId)
+}
+
 /**
  * Returns true if the given DeepSeek model has weak scoped tool use
  * (agent, web-browsing, read-file) and should be disabled for that scope.

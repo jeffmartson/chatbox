@@ -23,7 +23,6 @@ import { KNOWLEDGE_BASE_MAX_FILE_SIZE, KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL } from
 import { isDeepSeekWeakToolUse } from '@shared/models/utils/deepseek'
 import { getModel } from '@shared/providers'
 import { formatNumber } from '@shared/utils'
-import { getReasoningProviderOptions, type ReasoningControlLevel } from '@shared/utils/reasoning-control'
 import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
@@ -85,7 +84,6 @@ import {
   type Message,
   ModelProviderEnum,
   type ProviderModelInfo,
-  type ProviderOptions,
   type SessionAttachment,
   type SessionAttachmentIndexingStage,
   type SessionSettings,
@@ -111,6 +109,7 @@ import { ImageUploadInput } from './ImageUploadInput'
 import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
 import ReasoningControlButton from './ReasoningControlButton'
 import TokenCountMenu from './TokenCountMenu'
+import { useReasoningControlState } from './useReasoningControlState'
 
 export type InputBoxPayload = {
   constructedMessage: Message
@@ -208,20 +207,6 @@ function getSessionAttachmentStageLabel(
     default:
       return t('Indexing')
   }
-}
-
-function inferModelApiStyleFromProviderType(providerType?: string): ProviderModelInfo['apiStyle'] | undefined {
-  if (providerType === 'claude') return 'anthropic'
-  if (providerType === 'gemini') return 'google'
-  if (providerType === 'openai-responses') return 'openai-responses'
-  if (providerType === 'openai') return 'openai'
-  return undefined
-}
-
-function withProviderApiStyleFallback(modelInfo: ProviderModelInfo, providerType?: string): ProviderModelInfo {
-  if (modelInfo.apiStyle) return modelInfo
-  const apiStyle = inferModelApiStyleFromProviderType(providerType)
-  return apiStyle ? { ...modelInfo, apiStyle } : modelInfo
 }
 
 const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
@@ -326,10 +311,23 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const { session: currentSession } = useSession(sessionId || null)
     const { sessionSettings: currentSessionMergedSettings } = useSessionSettings(sessionId || null)
-    const [reasoningProviderOptionsOverride, setReasoningProviderOptionsOverride] = useState<
-      ProviderOptions | undefined
-    >(undefined)
-    const [isReasoningProviderOptionsDirty, setIsReasoningProviderOptionsDirty] = useState(false)
+    const { providers } = useProviders()
+    const {
+      effectiveProviderOptions,
+      modelInfo,
+      reasoningModelInfo,
+      selectedProviderInfo,
+      settingsPatch: reasoningSettingsPatch,
+      handleReasoningLevelChange,
+      markSettingsCommitted: markReasoningSettingsCommitted,
+      waitForPendingPersist: waitForReasoningPersist,
+    } = useReasoningControlState({
+      currentSessionId,
+      isNewSession,
+      model,
+      providers,
+      sessionProviderOptions: currentSessionMergedSettings?.providerOptions,
+    })
 
     // Get current messages for token counting - will only recalculate when stable messages actually change
     // Uses getContextMessageIds to respect compaction points
@@ -438,7 +436,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       [hasTextContent, attachments, pictureKeys]
     )
 
-    const { providers } = useProviders()
     const preprocessedSessionAttachmentIds = useMemo(
       () =>
         Array.from(
@@ -503,11 +500,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         return result.changed ? { ...prev, preprocessedFiles: result.files } : prev
       })
     }, [preprocessedAttachmentStates, setPreConstructedMessage])
-    const selectedProviderInfo = useMemo(
-      () => (model ? providers.find((p) => p.id === model.provider) : undefined),
-      [providers, model]
-    )
-
     const modelSelectorDisplayText = useMemo(() => {
       if (!model) {
         return t('Select Model')
@@ -517,77 +509,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       )
       return `${modelInfo?.nickname || model.modelId}`
     }, [selectedProviderInfo, model, t])
-
-    // Get model info for context window
-    const modelInfo = useMemo(() => {
-      if (!model) return null
-      const foundModel = (selectedProviderInfo?.models || selectedProviderInfo?.defaultSettings?.models)?.find(
-        (m) => m.modelId === model.modelId
-      )
-      return foundModel ? withProviderApiStyleFallback(foundModel, selectedProviderInfo?.type) : undefined
-    }, [selectedProviderInfo, model])
-    const lastResolvedReasoningModelRef = useRef<{
-      key: string
-      modelInfo: ProviderModelInfo
-    } | null>(null)
-    const modelKey = model ? `${model.provider}:${model.modelId}` : ''
-    const reasoningResetKey = `${currentSessionId || 'new'}:${modelKey}`
-    const lastReasoningResetKeyRef = useRef(reasoningResetKey)
-    useEffect(() => {
-      if (lastReasoningResetKeyRef.current === reasoningResetKey) {
-        return
-      }
-      lastReasoningResetKeyRef.current = reasoningResetKey
-      setReasoningProviderOptionsOverride(undefined)
-      setIsReasoningProviderOptionsDirty(false)
-    }, [reasoningResetKey])
-    useEffect(() => {
-      if (modelKey && modelInfo) {
-        lastResolvedReasoningModelRef.current = {
-          key: modelKey,
-          modelInfo,
-        }
-      }
-    }, [modelKey, modelInfo])
-    const reasoningModelInfo = useMemo<ProviderModelInfo | null>(() => {
-      if (!model) return null
-      if (modelInfo) return modelInfo
-      if (lastResolvedReasoningModelRef.current?.key === modelKey) {
-        return lastResolvedReasoningModelRef.current.modelInfo
-      }
-      return withProviderApiStyleFallback({ modelId: model.modelId }, selectedProviderInfo?.type)
-    }, [model, modelInfo, modelKey, selectedProviderInfo?.type])
-    const effectiveProviderOptions = isReasoningProviderOptionsDirty
-      ? reasoningProviderOptionsOverride
-      : currentSessionMergedSettings?.providerOptions
-    const handleReasoningLevelChange = useCallback(
-      async (level: ReasoningControlLevel) => {
-        const nextProviderOptions = getReasoningProviderOptions(
-          model?.provider,
-          reasoningModelInfo,
-          level,
-          effectiveProviderOptions
-        )
-        setReasoningProviderOptionsOverride(nextProviderOptions)
-        setIsReasoningProviderOptionsDirty(true)
-        if (isNewSession || !currentSessionId) {
-          return
-        }
-        await chatStore.updateSession(currentSessionId, (session) => {
-          if (!session) {
-            throw new Error('Session not found')
-          }
-          return {
-            ...session,
-            settings: {
-              ...session.settings,
-              providerOptions: nextProviderOptions,
-            },
-          }
-        })
-      },
-      [currentSessionId, effectiveProviderOptions, isNewSession, model?.provider, reasoningModelInfo]
-    )
 
     // When agent mode is on, block models that don't support agent tools in the model selector.
     const agentModeDisabledMessage = t('This model does not support Agent Mode')
@@ -865,7 +786,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         const params = {
           constructedMessage: latestMessage,
           needGenerating,
-          settingsPatch: isReasoningProviderOptionsDirty ? { providerOptions: effectiveProviderOptions } : undefined,
+          settingsPatch: reasoningSettingsPatch,
           onUserMessageReady: () => {
             messageInputFieldRef.current?.clearDraft()
             draftMessageIdRef.current = undefined
@@ -888,12 +809,15 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               message: undefined,
             })
             setShowRollbackThreadButton(false)
-            setIsReasoningProviderOptionsDirty(false)
+            markReasoningSettingsCommitted()
             if (platform.type !== 'mobile' && messageTextForHistory) {
               addInputBoxHistory(messageTextForHistory)
             }
           },
         }
+
+        // Ensure an in-flight reasoning-level persist has landed before generation reads session settings
+        await waitForReasoningPersist()
 
         await onSubmit?.(params)
 

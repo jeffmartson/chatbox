@@ -17,10 +17,11 @@ import type {
   ModelInterface,
   ModelStreamPart,
 } from '../../../models/types'
-import { isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
 import type { ChatboxAILicenseDetail, ProviderModelInfo, StreamTextResult, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
+import { getLegacyOpenAICompatibleThinkingType } from '../../../utils/reasoning-control'
 import { buildGeminiImageConfig } from '../gemini-types'
 
 interface Options {
@@ -40,10 +41,6 @@ interface Options {
 
 interface Config {
   uuid: string
-}
-
-function isChatboxAIDeepSeekThinkingModel(modelId: string): boolean {
-  return /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i.test(modelId)
 }
 
 // 将chatboxAIFetch移到类内部作为私有方法
@@ -105,7 +102,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider
-    } else if (isChatboxAIDeepSeekThinkingModel(this.options.model.modelId)) {
+    } else if (isDeepSeekReasoningModel(this.options.model.modelId)) {
       const provider = createDeepSeek({
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/openai/v1`,
@@ -136,9 +133,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       let providerOptions = {} as { anthropic: AnthropicProviderOptions }
       if (options.providerOptions?.claude) {
         providerOptions = {
-          anthropic: {
-            ...(options.providerOptions?.claude || {}),
-          },
+          anthropic: { ...options.providerOptions.claude },
         }
       }
       // Anthropic API requires only one of temperature or topP
@@ -174,15 +169,10 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       }
     }
     const openAICompatibleOptions = options.providerOptions?.openaiCompatible || options.providerOptions?.openai
-    if (isChatboxAIDeepSeekThinkingModel(this.options.model.modelId)) {
-      const legacyReasoningOptions = options.providerOptions?.openaiCompatible?.reasoning
+    if (isDeepSeekReasoningModel(this.options.model.modelId)) {
       const thinkingType =
         options.providerOptions?.deepseek?.thinking?.type ??
-        (legacyReasoningOptions?.enabled === false || legacyReasoningOptions?.exclude === true
-          ? 'disabled'
-          : legacyReasoningOptions?.enabled
-            ? 'enabled'
-            : undefined)
+        getLegacyOpenAICompatibleThinkingType(options.providerOptions?.openaiCompatible?.reasoning)
 
       return {
         temperature: this.options.temperature,

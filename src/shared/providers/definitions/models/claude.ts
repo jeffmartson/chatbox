@@ -7,6 +7,7 @@ import type { CallChatCompletionOptions, ChatStreamOptions, ModelStreamPart } fr
 import type { ProviderModelInfo, StreamTextResult } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import { normalizeClaudeHost } from '../../../utils/llm_utils'
+import { isClaudeAdaptiveThinkingModel } from '../../../utils/reasoning-control'
 
 interface Options {
   claudeApiKey: string
@@ -61,7 +62,7 @@ export default class Claude extends AbstractAISDKModel {
 
       let nextBody = body
       if (
-        isAdaptiveThinkingModel(this.options.model.modelId) &&
+        isClaudeAdaptiveThinkingModel(this.options.model.modelId) &&
         isRecord(nextBody.output_config) &&
         typeof nextBody.output_config.effort === 'string'
       ) {
@@ -172,10 +173,6 @@ export default class Claude extends AbstractAISDKModel {
         type: 'chat',
       }))
   }
-}
-
-function isAdaptiveThinkingModel(modelId: string): boolean {
-  return /(?:^|\/)claude-opus-4-(?:7|8)/i.test(modelId)
 }
 
 function parseJsonObject(value: string): Record<string, unknown> | undefined {

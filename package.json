@@ -46,7 +46,7 @@
     "test:e2e": "npx playwright test --config test/e2e/playwright.config.ts",
     "test:integration": "vitest run test/integration --testTimeout=300000",
     "test:file-conversation": "vitest run test/integration/file-conversation --testTimeout=120000",
-    "test:model-provider": "vitest run test/integration/model-provider --testTimeout=120000",
+    "test:model-provider": "cross-env RUN_MODEL_PROVIDER_TESTS=1 vitest run test/integration/model-provider --testTimeout=120000",
     "eval:session-rag": "node scripts/session-rag-eval/run-session-rag-eval.mjs",
     "eval:session-rag:chatbox": "node scripts/session-rag-eval/run-chatbox-flow-eval.mjs",
     "lint": "biome lint .",

@@ -3,7 +3,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-ai-sdk'
 import { ApiError } from '../../../models/errors'
 import type { CallChatCompletionOptions } from '../../../models/types'
-import { isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import type { ProviderModelInfo, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 
@@ -69,7 +69,7 @@ export default class DeepSeek extends AbstractAISDKModel {
   }
 
   isSupportReasoning() {
-    return /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i.test(this.options.model.modelId)
+    return isDeepSeekReasoningModel(this.options.model.modelId)
   }
 
   async listModels(): Promise<ProviderModelInfo[]> {

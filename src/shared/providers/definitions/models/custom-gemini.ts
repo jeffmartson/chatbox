@@ -65,18 +65,13 @@ export default class CustomGemini extends AbstractAISDKModel {
       ],
     }
 
-    const thinkingConfig = options.providerOptions?.google?.thinkingConfig
+    const { thinkingConfig, ...googleOptions } = options.providerOptions?.google || {}
     if (isModelSupportThinking && thinkingConfig) {
-      const normalizedThinkingConfig =
-        thinkingConfig.includeThoughts === false
-          ? thinkingConfig
-          : normalizeGoogleThinkingConfig(this.options.model.modelId, thinkingConfig)
+      const normalizedThinkingConfig = normalizeGoogleThinkingConfig(this.options.model.modelId, thinkingConfig)
       providerParams = {
         ...providerParams,
-        ...(options.providerOptions?.google || {}),
-        thinkingConfig: {
-          ...(normalizedThinkingConfig || {}),
-        },
+        ...googleOptions,
+        ...(normalizedThinkingConfig ? { thinkingConfig: normalizedThinkingConfig } : {}),
       }
     }
 

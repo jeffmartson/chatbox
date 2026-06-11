@@ -129,22 +129,13 @@ function RouteComponent() {
   }, [currentSession])
 
   const onSubmit = useCallback(
-    async ({ constructedMessage, needGenerating = true, onUserMessageReady, settingsPatch }: InputBoxPayload) => {
+    async ({ constructedMessage, needGenerating = true, onUserMessageReady }: InputBoxPayload) => {
       messageListRef.current?.setIsNewMessage(true)
 
       if (!currentSession) {
         return
       }
       messageListRef.current?.scrollToBottom('instant')
-
-      if (settingsPatch && Object.keys(settingsPatch).length > 0) {
-        await updateSessionStore(currentSession.id, {
-          settings: {
-            ...(currentSession.settings || {}),
-            ...settingsPatch,
-          },
-        })
-      }
 
       if (currentSession.copilotId) {
         void remote

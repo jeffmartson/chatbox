@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { isDeepSeekReasoningModel } from '../models/utils/deepseek'
 import { ModelProviderEnum, type ProviderModelInfo } from '../types'
 import {
+  getLegacyOpenAICompatibleThinkingType,
   getReasoningControlCapabilities,
   getReasoningControlLevel,
   getReasoningControlOptions,
   getReasoningProviderOptions,
+  isClaudeAdaptiveThinkingModel,
 } from './reasoning-control'
 
 const model = (modelId: string, apiStyle?: ProviderModelInfo['apiStyle']): ProviderModelInfo => ({
@@ -38,6 +41,18 @@ describe('reasoning-control', () => {
 
     expect(budgetOptions?.google?.thinkingConfig).toEqual({ thinkingBudget: 1024, includeThoughts: true })
     expect(levelOptions?.google?.thinkingConfig).toEqual({ thinkingLevel: 'high', includeThoughts: true })
+  })
+
+  it('does not offer thinking controls for Gemini image generation models', () => {
+    expect(getReasoningControlCapabilities(ModelProviderEnum.Gemini, model('gemini-2.5-flash-image')).supported).toBe(
+      false
+    )
+    expect(
+      getReasoningControlCapabilities(ModelProviderEnum.Gemini, model('gemini-3-pro-image-preview')).supported
+    ).toBe(false)
+    expect(
+      getReasoningControlCapabilities(ModelProviderEnum.Gemini, model('gemini-2.5-flash-image')).disabledReason
+    ).toBeUndefined()
   })
 
   it('maps DeepSeek and Qwen toggle-style reasoning', () => {
@@ -233,9 +248,9 @@ describe('reasoning-control', () => {
 
     expect(thirdPartyAnthropic.supported).toBe(true)
     expect(chatboxClaudeAsOpenAI.supported).toBe(false)
-    expect(chatboxClaudeAsOpenAI.disabledReason).toContain('Anthropic API style')
+    expect(chatboxClaudeAsOpenAI.disabledReason).toBe('requires-anthropic-api-style')
     expect(chatboxGeminiAsAnthropic.supported).toBe(false)
-    expect(chatboxGeminiAsAnthropic.disabledReason).toContain('Google API style')
+    expect(chatboxGeminiAsAnthropic.disabledReason).toBe('requires-google-api-style')
     expect(chatboxDeepSeekAsOpenAI.supported).toBe(true)
   })
 
@@ -293,5 +308,39 @@ describe('reasoning-control', () => {
 
     expect(options?.claude).toBeUndefined()
     expect(getReasoningControlLevel(ModelProviderEnum.Claude, modelInfo, options)).toBe('off')
+  })
+
+  it('treats Azure like other OpenAI-style providers', () => {
+    const gptModel = model('gpt-5.1')
+    const onOptions = getReasoningProviderOptions(ModelProviderEnum.Azure, gptModel, 'medium')
+    const offOptions = getReasoningProviderOptions(ModelProviderEnum.Azure, gptModel, 'off')
+
+    expect(getReasoningControlCapabilities(ModelProviderEnum.Azure, gptModel)).toEqual({
+      supported: true,
+      kind: 'openai-effort',
+    })
+    expect(onOptions?.openai).toEqual({ reasoningEffort: 'medium' })
+    expect(offOptions?.openai).toEqual({ reasoningEffort: 'none', forceReasoning: true })
+    expect(getReasoningControlLevel(ModelProviderEnum.Azure, gptModel, onOptions)).toBe('medium')
+    expect(getReasoningControlLevel(ModelProviderEnum.Azure, gptModel, offOptions)).toBe('off')
+  })
+
+  it('interprets legacy openaiCompatible reasoning options as a thinking toggle', () => {
+    expect(getLegacyOpenAICompatibleThinkingType(undefined)).toBeUndefined()
+    expect(getLegacyOpenAICompatibleThinkingType({})).toBeUndefined()
+    expect(getLegacyOpenAICompatibleThinkingType({ enabled: true })).toBe('enabled')
+    expect(getLegacyOpenAICompatibleThinkingType({ enabled: false })).toBe('disabled')
+    expect(getLegacyOpenAICompatibleThinkingType({ exclude: true })).toBe('disabled')
+    expect(getLegacyOpenAICompatibleThinkingType({ enabled: true, exclude: true })).toBe('disabled')
+  })
+
+  it('shares model-id matchers between capability detection and providers', () => {
+    expect(isDeepSeekReasoningModel('deepseek-reasoner')).toBe(true)
+    expect(isDeepSeekReasoningModel('deepseek/deepseek-r1:free')).toBe(true)
+    expect(isDeepSeekReasoningModel('deepseek-v3.2-thinking')).toBe(true)
+    expect(isDeepSeekReasoningModel('deepseek-chat')).toBe(false)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-4-7')).toBe(true)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-4-8')).toBe(true)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-4-5')).toBe(false)
   })
 })

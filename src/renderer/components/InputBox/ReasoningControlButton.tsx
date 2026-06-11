@@ -4,6 +4,7 @@ import {
   getReasoningControlCapabilities,
   getReasoningControlLevel,
   getReasoningControlOptions,
+  type ReasoningControlDisabledReason,
   type ReasoningControlLevel,
   type ReasoningControlOption,
 } from '@shared/utils/reasoning-control'
@@ -47,7 +48,7 @@ export default function ReasoningControlButton({
 
   if (capabilities.disabledReason) {
     return (
-      <Tooltip label={capabilities.disabledReason} position="top" withArrow>
+      <Tooltip label={getDisabledReasonLabel(capabilities.disabledReason, t)} position="top" withArrow>
         <span>
           <UnstyledButton
             className="flex items-center gap-1 px-2 py-1 rounded-lg cursor-not-allowed opacity-60"
@@ -103,6 +104,28 @@ export default function ReasoningControlButton({
       </Menu.Dropdown>
     </Menu>
   )
+}
+
+// Literal t() calls so i18next-parser (which only scans src/renderer) can extract the keys
+function getDisabledReasonLabel(reason: ReasoningControlDisabledReason, t: (key: string) => string): string {
+  switch (reason) {
+    case 'requires-anthropic-api-style':
+      return t(
+        'Thinking controls are disabled because this Claude model is not exposed through the Anthropic API style.'
+      )
+    case 'requires-google-api-style':
+      return t('Thinking controls are disabled because this Gemini model is not exposed through the Google API style.')
+    case 'requires-openai-api-style':
+      return t('Thinking controls are disabled because this GPT model is not exposed through an OpenAI API style.')
+    case 'requires-deepseek-api-style':
+      return t(
+        'Thinking controls are disabled because this DeepSeek model is not exposed through the DeepSeek API style.'
+      )
+    case 'requires-qwen-api-style':
+      return t('Thinking controls are disabled because this Qwen model is not exposed through the Qwen API style.')
+    case 'requires-xai-api-style':
+      return t('Thinking controls are disabled because this Grok model is not exposed through the xAI API style.')
+  }
 }
 
 function getOptionLabel(option: ReasoningControlOption, t: (key: string) => string): string {
