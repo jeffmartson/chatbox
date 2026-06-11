@@ -1,20 +1,20 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { Stack, Box, Button } from '@mantine/core'
+import { Box, Button } from '@mantine/core'
 import type { Message, ModelProvider } from '@shared/types'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
 import { JK_PAGE_NAMES } from '@/analytics/jk-events'
-import { ChatboxWelcomeCard } from '@/components/common/ChatboxWelcomeCard'
 import MessageList, { type MessageListRef } from '@/components/chat/MessageList'
+import { ChatboxWelcomeCard } from '@/components/common/ChatboxWelcomeCard'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
-import InputBox from '@/components/InputBox/InputBox'
+import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
 import Header from '@/components/layout/Header'
 import Page from '@/components/layout/Page'
+import ThreadHistoryDrawer from '@/components/session/ThreadHistoryDrawer'
 import { useProviders } from '@/hooks/useProviders'
 import { defaultSessionsForCN, defaultSessionsForEN } from '@/packages/initial_data'
-import ThreadHistoryDrawer from '@/components/session/ThreadHistoryDrawer'
 import * as remote from '@/packages/remote'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
 import { updateSession as updateSessionStore, useSession } from '@/stores/chatStore'
@@ -129,21 +129,22 @@ function RouteComponent() {
   }, [currentSession])
 
   const onSubmit = useCallback(
-    async ({
-      constructedMessage,
-      needGenerating = true,
-      onUserMessageReady,
-    }: {
-      constructedMessage: Message
-      needGenerating?: boolean
-      onUserMessageReady?: () => void
-    }) => {
+    async ({ constructedMessage, needGenerating = true, onUserMessageReady, settingsPatch }: InputBoxPayload) => {
       messageListRef.current?.setIsNewMessage(true)
 
       if (!currentSession) {
         return
       }
       messageListRef.current?.scrollToBottom('instant')
+
+      if (settingsPatch && Object.keys(settingsPatch).length > 0) {
+        await updateSessionStore(currentSession.id, {
+          settings: {
+            ...(currentSession.settings || {}),
+            ...settingsPatch,
+          },
+        })
+      }
 
       if (currentSession.copilotId) {
         void remote

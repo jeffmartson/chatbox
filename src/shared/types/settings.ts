@@ -108,14 +108,21 @@ const ProviderBaseInfoSchema = z.discriminatedUnion('isCustom', [
 ])
 
 const ClaudeParamsSchema = z.object({
-  thinking: z.object({
-    type: z.enum(['enabled', 'disabled']).default('enabled'),
-    budgetTokens: z.number().catch(1024),
-  }),
+  thinking: z
+    .object({
+      type: z.enum(['enabled', 'disabled']).default('enabled'),
+      budgetTokens: z.number().catch(1024),
+    })
+    .optional()
+    .catch(undefined),
+  effort: z.enum(['low', 'medium', 'high']).optional().catch(undefined),
 })
 
 const OpenAIParamsSchema = z.object({
-  reasoningEffort: z.enum(['low', 'medium', 'high']).optional().catch(undefined),
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional().catch(undefined),
+  reasoningSummary: z.enum(['auto', 'concise', 'detailed']).optional().catch(undefined),
+  include: z.array(z.string()).optional().catch(undefined),
+  forceReasoning: z.boolean().optional().catch(undefined),
 })
 
 const GoogleParamsSchema = z.object({
@@ -126,10 +133,41 @@ const GoogleParamsSchema = z.object({
   }),
 })
 
+const DeepSeekParamsSchema = z.object({
+  thinking: z
+    .object({
+      type: z.enum(['enabled', 'disabled']).default('enabled'),
+    })
+    .optional()
+    .catch(undefined),
+})
+
+const ReasoningOptionsSchema = z.object({
+  effort: z.enum(['minimal', 'low', 'medium', 'high']).optional().catch(undefined),
+  max_tokens: z.number().optional().catch(undefined),
+  enabled: z.boolean().optional().catch(undefined),
+  exclude: z.boolean().optional().catch(undefined),
+})
+
+const OpenAICompatibleParamsSchema = z.object({
+  reasoningEffort: z.string().optional().catch(undefined),
+  reasoning: ReasoningOptionsSchema.optional().catch(undefined),
+  include: z.array(z.string()).optional().catch(undefined),
+  enable_thinking: z.boolean().optional().catch(undefined),
+  thinking_budget: z.number().optional().catch(undefined),
+})
+
+const OpenRouterParamsSchema = z.object({
+  reasoning: ReasoningOptionsSchema.optional().catch(undefined),
+})
+
 export const ProviderOptionsSchema = z.object({
   claude: ClaudeParamsSchema.optional(),
   openai: OpenAIParamsSchema.optional(),
   google: GoogleParamsSchema.optional(),
+  deepseek: DeepSeekParamsSchema.optional(),
+  openaiCompatible: OpenAICompatibleParamsSchema.optional(),
+  openrouter: OpenRouterParamsSchema.optional(),
 })
 
 // NOTICE: Global settings is for new session default settings, set to session when session created, changes will not affect existing sessions

@@ -60,7 +60,10 @@ const useChatboxAIModels = () => {
     staleTime: 3600 * 1000,
   })
 
-  const allChatboxAIModels = useMemo(() => data?.models || [], [data])
+  const allChatboxAIModels = useMemo(
+    () => data?.models || chatboxAISettings?.models || [],
+    [data, chatboxAISettings?.models]
+  )
 
   const chatboxAIImageModels = useMemo(
     () =>

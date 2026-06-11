@@ -74,6 +74,30 @@ describe('OpenAIResponses call settings', () => {
     })
   })
 
+  it('preserves explicit reasoning encrypted content include for Responses reasoning calls', () => {
+    const openaiResponses = createModel()
+
+    const settings = openaiResponses.exposeCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'high',
+          reasoningSummary: 'auto',
+          include: ['reasoning.encrypted_content'],
+          forceReasoning: true,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openai: {
+        reasoningEffort: 'high',
+        reasoningSummary: 'auto',
+        include: ['reasoning.encrypted_content'],
+        forceReasoning: true,
+      },
+    })
+  })
+
   it('does not inject OpenAI provider options when stateless mode is disabled', () => {
     const openaiResponses = createModel()
 

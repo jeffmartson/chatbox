@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { CallChatCompletionOptions } from '@shared/models/types'
-import { ProviderModelInfoSchema, type ChatboxAILicenseDetail, type ProviderModelInfo } from '@shared/types'
+import { type ChatboxAILicenseDetail, type ProviderModelInfo, ProviderModelInfoSchema } from '@shared/types'
 import type { ModelDependencies } from '@shared/types/adapters'
 import type { SentryScope } from '@shared/utils/sentry_adapter'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -39,6 +39,10 @@ class TestChatboxAI extends ChatboxAI {
 
   public exposeChatModel(options: CallChatCompletionOptions) {
     return this.getChatModel(options)
+  }
+
+  public exposeCallSettings(options: CallChatCompletionOptions) {
+    return this.getCallSettings(options)
   }
 }
 
@@ -134,5 +138,86 @@ describe('ChatboxAI openai-responses models', () => {
 
     expect(openAIMocks.responses).toHaveBeenCalledWith('gpt-5-mini')
     expect(chatModel.modelId).toBe('gpt-5-mini')
+  })
+
+  it('maps OpenAI-style reasoning options to OpenAI-compatible gateway extra body', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'low',
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: {
+        reasoningEffort: 'low',
+      },
+      ChatboxAI: {
+        reasoningEffort: 'low',
+      },
+    })
+  })
+
+  it('maps DeepSeek thinking through ChatboxAI gateway with native thinking options', () => {
+    const model = createModel({
+      modelId: 'deepseek-v4-pro',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        deepseek: {
+          thinking: {
+            type: 'enabled',
+          },
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      deepseek: {
+        thinking: {
+          type: 'enabled',
+        },
+      },
+    })
+  })
+
+  it('converts legacy ChatboxAI DeepSeek reasoning toggles to native thinking options', () => {
+    const model = createModel({
+      modelId: 'deepseek-v4-pro',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          reasoning: {
+            enabled: false,
+            exclude: true,
+          },
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      deepseek: {
+        thinking: {
+          type: 'disabled',
+        },
+      },
+    })
   })
 })

@@ -17,7 +17,7 @@ const GOOGLE_THINKING_LEVELS_BY_MODEL: Array<[RegExp, GoogleThinkingLevel[]]> = 
 ]
 
 export function getGoogleThinkingMode(modelId: string): GoogleThinkingMode {
-  const id = modelId.toLowerCase()
+  const id = modelId.toLowerCase().split('/').at(-1) || modelId.toLowerCase()
   if (id.startsWith('gemini-3')) {
     return 'level'
   }
@@ -34,7 +34,8 @@ export function getSupportedGoogleThinkingLevels(modelId: string): GoogleThinkin
     return []
   }
 
-  const match = GOOGLE_THINKING_LEVELS_BY_MODEL.find(([pattern]) => pattern.test(modelId))
+  const normalizedModelId = modelId.split('/').at(-1) || modelId
+  const match = GOOGLE_THINKING_LEVELS_BY_MODEL.find(([pattern]) => pattern.test(normalizedModelId))
 
   return match?.[1] || []
 }

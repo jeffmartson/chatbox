@@ -153,7 +153,7 @@ function Index() {
   }, [routerState.location.search])
 
   const handleSubmit = useCallback(
-    async ({ constructedMessage, needGenerating = true, onUserMessageReady }: InputBoxPayload) => {
+    async ({ constructedMessage, needGenerating = true, onUserMessageReady, settingsPatch }: InputBoxPayload) => {
       const newSession = await createSessionStore({
         name: session.name,
         type: 'chat',
@@ -162,7 +162,10 @@ function Index() {
         backgroundImage: session.backgroundImage,
         messages: session.messages,
         copilotId: session.copilotId,
-        settings: session.settings,
+        settings: {
+          ...session.settings,
+          ...settingsPatch,
+        },
       })
 
       if (session.copilotId) {

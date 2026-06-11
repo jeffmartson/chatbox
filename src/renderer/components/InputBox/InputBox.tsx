@@ -23,6 +23,7 @@ import { KNOWLEDGE_BASE_MAX_FILE_SIZE, KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL } from
 import { isDeepSeekWeakToolUse } from '@shared/models/utils/deepseek'
 import { getModel } from '@shared/providers'
 import { formatNumber } from '@shared/utils'
+import { getReasoningProviderOptions, type ReasoningControlLevel } from '@shared/utils/reasoning-control'
 import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
@@ -84,8 +85,10 @@ import {
   type Message,
   ModelProviderEnum,
   type ProviderModelInfo,
+  type ProviderOptions,
   type SessionAttachment,
   type SessionAttachmentIndexingStage,
+  type SessionSettings,
   type SessionType,
   type ShortcutSendValue,
 } from '../../../shared/types'
@@ -106,12 +109,14 @@ import { FileMiniCard, ImageMiniCard } from './Attachments'
 import { getAgentModeUIState } from './agentModeState'
 import { ImageUploadInput } from './ImageUploadInput'
 import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
+import ReasoningControlButton from './ReasoningControlButton'
 import TokenCountMenu from './TokenCountMenu'
 
 export type InputBoxPayload = {
   constructedMessage: Message
   needGenerating?: boolean
   onUserMessageReady?: () => void
+  settingsPatch?: Partial<SessionSettings>
 }
 
 export type InputBoxRef = {
@@ -203,6 +208,20 @@ function getSessionAttachmentStageLabel(
     default:
       return t('Indexing')
   }
+}
+
+function inferModelApiStyleFromProviderType(providerType?: string): ProviderModelInfo['apiStyle'] | undefined {
+  if (providerType === 'claude') return 'anthropic'
+  if (providerType === 'gemini') return 'google'
+  if (providerType === 'openai-responses') return 'openai-responses'
+  if (providerType === 'openai') return 'openai'
+  return undefined
+}
+
+function withProviderApiStyleFallback(modelInfo: ProviderModelInfo, providerType?: string): ProviderModelInfo {
+  if (modelInfo.apiStyle) return modelInfo
+  const apiStyle = inferModelApiStyleFromProviderType(providerType)
+  return apiStyle ? { ...modelInfo, apiStyle } : modelInfo
 }
 
 const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
@@ -307,6 +326,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const { session: currentSession } = useSession(sessionId || null)
     const { sessionSettings: currentSessionMergedSettings } = useSessionSettings(sessionId || null)
+    const [reasoningProviderOptionsOverride, setReasoningProviderOptionsOverride] = useState<
+      ProviderOptions | undefined
+    >(undefined)
+    const [isReasoningProviderOptionsDirty, setIsReasoningProviderOptionsDirty] = useState(false)
 
     // Get current messages for token counting - will only recalculate when stable messages actually change
     // Uses getContextMessageIds to respect compaction points
@@ -480,24 +503,91 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         return result.changed ? { ...prev, preprocessedFiles: result.files } : prev
       })
     }, [preprocessedAttachmentStates, setPreConstructedMessage])
+    const selectedProviderInfo = useMemo(
+      () => (model ? providers.find((p) => p.id === model.provider) : undefined),
+      [providers, model]
+    )
+
     const modelSelectorDisplayText = useMemo(() => {
       if (!model) {
         return t('Select Model')
       }
-      const providerInfo = providers.find((p) => p.id === model.provider)
-
-      const modelInfo = (providerInfo?.models || providerInfo?.defaultSettings?.models)?.find(
+      const modelInfo = (selectedProviderInfo?.models || selectedProviderInfo?.defaultSettings?.models)?.find(
         (m) => m.modelId === model.modelId
       )
       return `${modelInfo?.nickname || model.modelId}`
-    }, [providers, model, t])
+    }, [selectedProviderInfo, model, t])
 
     // Get model info for context window
     const modelInfo = useMemo(() => {
       if (!model) return null
-      const providerInfo = providers.find((p) => p.id === model.provider)
-      return (providerInfo?.models || providerInfo?.defaultSettings?.models)?.find((m) => m.modelId === model.modelId)
-    }, [providers, model])
+      const foundModel = (selectedProviderInfo?.models || selectedProviderInfo?.defaultSettings?.models)?.find(
+        (m) => m.modelId === model.modelId
+      )
+      return foundModel ? withProviderApiStyleFallback(foundModel, selectedProviderInfo?.type) : undefined
+    }, [selectedProviderInfo, model])
+    const lastResolvedReasoningModelRef = useRef<{
+      key: string
+      modelInfo: ProviderModelInfo
+    } | null>(null)
+    const modelKey = model ? `${model.provider}:${model.modelId}` : ''
+    const reasoningResetKey = `${currentSessionId || 'new'}:${modelKey}`
+    const lastReasoningResetKeyRef = useRef(reasoningResetKey)
+    useEffect(() => {
+      if (lastReasoningResetKeyRef.current === reasoningResetKey) {
+        return
+      }
+      lastReasoningResetKeyRef.current = reasoningResetKey
+      setReasoningProviderOptionsOverride(undefined)
+      setIsReasoningProviderOptionsDirty(false)
+    }, [reasoningResetKey])
+    useEffect(() => {
+      if (modelKey && modelInfo) {
+        lastResolvedReasoningModelRef.current = {
+          key: modelKey,
+          modelInfo,
+        }
+      }
+    }, [modelKey, modelInfo])
+    const reasoningModelInfo = useMemo<ProviderModelInfo | null>(() => {
+      if (!model) return null
+      if (modelInfo) return modelInfo
+      if (lastResolvedReasoningModelRef.current?.key === modelKey) {
+        return lastResolvedReasoningModelRef.current.modelInfo
+      }
+      return withProviderApiStyleFallback({ modelId: model.modelId }, selectedProviderInfo?.type)
+    }, [model, modelInfo, modelKey, selectedProviderInfo?.type])
+    const effectiveProviderOptions = isReasoningProviderOptionsDirty
+      ? reasoningProviderOptionsOverride
+      : currentSessionMergedSettings?.providerOptions
+    const handleReasoningLevelChange = useCallback(
+      async (level: ReasoningControlLevel) => {
+        const nextProviderOptions = getReasoningProviderOptions(
+          model?.provider,
+          reasoningModelInfo,
+          level,
+          effectiveProviderOptions
+        )
+        setReasoningProviderOptionsOverride(nextProviderOptions)
+        setIsReasoningProviderOptionsDirty(true)
+        if (isNewSession || !currentSessionId) {
+          return
+        }
+        await chatStore.updateSession(currentSessionId, (session) => {
+          if (!session) {
+            throw new Error('Session not found')
+          }
+          return {
+            ...session,
+            settings: {
+              ...session.settings,
+              providerOptions: nextProviderOptions,
+            },
+          }
+        })
+      },
+      [currentSessionId, effectiveProviderOptions, isNewSession, model?.provider, reasoningModelInfo]
+    )
 
     // When agent mode is on, block models that don't support agent tools in the model selector.
     const agentModeDisabledMessage = t('This model does not support Agent Mode')
@@ -775,6 +865,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         const params = {
           constructedMessage: latestMessage,
           needGenerating,
+          settingsPatch: isReasoningProviderOptionsDirty ? { providerOptions: effectiveProviderOptions } : undefined,
           onUserMessageReady: () => {
             messageInputFieldRef.current?.clearDraft()
             draftMessageIdRef.current = undefined
@@ -797,6 +888,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               message: undefined,
             })
             setShowRollbackThreadButton(false)
+            setIsReasoningProviderOptionsDirty(false)
             if (platform.type !== 'mobile' && messageTextForHistory) {
               addInputBoxHistory(messageTextForHistory)
             }
@@ -1514,6 +1606,14 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     </UnstyledButton>
                   </Tooltip>
                 )}
+
+                <ReasoningControlButton
+                  provider={model?.provider}
+                  model={reasoningModelInfo}
+                  providerOptions={effectiveProviderOptions}
+                  iconSize={toolbarIconSize}
+                  onChange={(level) => void handleReasoningLevelChange(level)}
+                />
 
                 {/* Agent Mode Panel - desktop only */}
                 {platform.type === 'desktop' && (

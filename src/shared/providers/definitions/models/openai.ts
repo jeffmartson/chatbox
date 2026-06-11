@@ -84,13 +84,11 @@ export default class OpenAI extends AbstractAISDKModel {
   }
 
   protected getCallSettings(options: CallChatCompletionOptions) {
-    const isModelSupportReasoning = this.isSupportReasoning()
-    let providerOptions = {}
-    if (isModelSupportReasoning) {
-      providerOptions = {
-        openai: options.providerOptions?.openai || {},
-      }
-    }
+    const providerOptions = options.providerOptions?.openai
+      ? {
+          openai: options.providerOptions.openai,
+        }
+      : undefined
 
     return {
       temperature: this.options.temperature,

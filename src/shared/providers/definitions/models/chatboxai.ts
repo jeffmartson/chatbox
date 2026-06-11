@@ -1,26 +1,27 @@
 import { type AnthropicProviderOptions, createAnthropic } from '@ai-sdk/anthropic'
+import { createDeepSeek } from '@ai-sdk/deepseek'
 import {
   createGoogleGenerativeAI,
   type GoogleGenerativeAIProvider,
   type GoogleGenerativeAIProviderOptions,
 } from '@ai-sdk/google'
-import { buildGeminiImageConfig } from '../gemini-types'
 import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { type ModelMessage, streamText, type ToolSet } from 'ai'
 import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-ai-sdk'
 import { addAnthropicCacheControl } from '../../../models/anthropic-cache'
-import type { StreamTextResult } from '../../../types'
+import { getOpenAICompatibleProviderOptionsKey } from '../../../models/openai-compatible'
 import type {
   CallChatCompletionOptions,
   ChatStreamOptions,
   ModelInterface,
   ModelStreamPart,
 } from '../../../models/types'
-import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
-import type { ChatboxAILicenseDetail, ProviderModelInfo, ToolUseScope } from '../../../types'
 import { isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
+import type { ChatboxAILicenseDetail, ProviderModelInfo, StreamTextResult, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
+import { buildGeminiImageConfig } from '../gemini-types'
 
 interface Options {
   licenseKey?: string
@@ -39,6 +40,10 @@ interface Options {
 
 interface Config {
   uuid: string
+}
+
+function isChatboxAIDeepSeekThinkingModel(modelId: string): boolean {
+  return /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i.test(modelId)
 }
 
 // 将chatboxAIFetch移到类内部作为私有方法
@@ -100,6 +105,17 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider
+    } else if (isChatboxAIDeepSeekThinkingModel(this.options.model.modelId)) {
+      const provider = createDeepSeek({
+        apiKey: this.options.licenseKey || '',
+        baseURL: `${getChatboxAPIOrigin()}/gateway/openai/v1`,
+        headers: {
+          'Instance-Id': instanceId,
+          'chatbox-session-id': options.sessionId || '',
+        },
+        fetch: this.chatboxAIFetch.bind(this),
+      })
+      return provider
     } else {
       const provider = createOpenAICompatible({
         name: 'ChatboxAI',
@@ -117,9 +133,8 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
 
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
     if (this.options.model.apiStyle === 'anthropic') {
-      const isModelSupportReasoning = this.isSupportReasoning()
       let providerOptions = {} as { anthropic: AnthropicProviderOptions }
-      if (isModelSupportReasoning) {
+      if (options.providerOptions?.claude) {
         providerOptions = {
           anthropic: {
             ...(options.providerOptions?.claude || {}),
@@ -138,10 +153,54 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       }
       return callSettings
     }
+    if (this.options.model.apiStyle === 'google') {
+      const providerOptions: GoogleGenerativeAIProviderOptions = {}
+      if (options.providerOptions?.google?.thinkingConfig) {
+        providerOptions.thinkingConfig = options.providerOptions.google.thinkingConfig
+      }
+      return {
+        temperature: this.options.temperature,
+        topP: this.options.topP,
+        maxOutputTokens: this.options.maxOutputTokens,
+        providerOptions: Object.keys(providerOptions).length > 0 ? { google: providerOptions } : undefined,
+      }
+    }
+    if (this.options.model.apiStyle === 'openai-responses') {
+      return {
+        temperature: this.options.temperature,
+        topP: this.options.topP,
+        maxOutputTokens: this.options.maxOutputTokens,
+        providerOptions: options.providerOptions?.openai ? { openai: options.providerOptions.openai } : undefined,
+      }
+    }
+    const openAICompatibleOptions = options.providerOptions?.openaiCompatible || options.providerOptions?.openai
+    if (isChatboxAIDeepSeekThinkingModel(this.options.model.modelId)) {
+      const legacyReasoningOptions = options.providerOptions?.openaiCompatible?.reasoning
+      const thinkingType =
+        options.providerOptions?.deepseek?.thinking?.type ??
+        (legacyReasoningOptions?.enabled === false || legacyReasoningOptions?.exclude === true
+          ? 'disabled'
+          : legacyReasoningOptions?.enabled
+            ? 'enabled'
+            : undefined)
+
+      return {
+        temperature: this.options.temperature,
+        topP: this.options.topP,
+        maxOutputTokens: this.options.maxOutputTokens,
+        providerOptions: thinkingType ? { deepseek: { thinking: { type: thinkingType } } } : undefined,
+      }
+    }
     return {
       temperature: this.options.temperature,
       topP: this.options.topP,
       maxOutputTokens: this.options.maxOutputTokens,
+      providerOptions: openAICompatibleOptions
+        ? {
+            openaiCompatible: openAICompatibleOptions,
+            [getOpenAICompatibleProviderOptionsKey('ChatboxAI')]: openAICompatibleOptions,
+          }
+        : undefined,
     }
   }
 
