@@ -525,11 +525,8 @@ describe('fork actions', () => {
     const copiedFork = newSession.messageForksHash?.[copiedPivotId]
     expect(copiedFork).toBeDefined()
     expect(copiedFork?.lists[1].messages[0].id).not.toBe(threadAlternative.id)
-    expect(updateSessionMock).toHaveBeenCalledWith(session.id, { threads: [] })
-    expect(routerNavigateMock).toHaveBeenCalledWith({
-      to: '/session/$sessionId',
-      params: { sessionId: 'new-session-thread' },
-    })
+    expect(updateSessionWithMessages).toHaveBeenCalledWith(session.id, { threads: [] })
+    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-thread' })
   })
 
   test('moveCurrentThreadToConversations preserves current thread forks', async () => {
@@ -583,17 +580,14 @@ describe('fork actions', () => {
     expect(copiedFork).toBeDefined()
     expect(copiedFork?.lists[1].messages[0].id).not.toBe(alternative.id)
 
-    expect(updateSessionMock).toHaveBeenCalledWith(
+    expect(updateSessionWithMessages).toHaveBeenCalledWith(
       session.id,
       expect.objectContaining({
         messages: [historyPivot, historyReply],
         threadName: 'History',
       })
     )
-    expect(routerNavigateMock).toHaveBeenCalledWith({
-      to: '/session/$sessionId',
-      params: { sessionId: 'new-session-current' },
-    })
+    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-current' })
   })
 
   test('copyAndSwitchSession preserves current and historical thread forks', async () => {
@@ -670,9 +664,6 @@ describe('fork actions', () => {
     const copiedThreadPivotId = newSession.threads?.[0].messages[0].id
     expect(copiedThreadPivotId).toBeDefined()
     expect(newSession.messageForksHash?.[copiedThreadPivotId!]).toBeDefined()
-    expect(routerNavigateMock).toHaveBeenCalledWith({
-      to: '/session/$sessionId',
-      params: { sessionId: 'new-session-copy' },
-    })
+    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-copy' })
   })
 })

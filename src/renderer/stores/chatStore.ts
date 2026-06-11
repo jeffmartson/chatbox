@@ -33,6 +33,12 @@ const log = getLogger('chat-store')
 
 import { clearScrollPositionCache } from '@/components/chat/MessageList'
 import { cleanupSessionAtomCache } from './atoms/throttleWriteSessionAtom'
+import {
+  assertNoMessageDataUpdate,
+  getSessionMetadataSnapshot,
+  mergeCachedGeneratingMessages,
+  type SessionMetadataUpdate,
+} from './chatStore-cache'
 import { lastUsedModelStore } from './lastUsedModelStore'
 import queryClient from './queryClient'
 import { getSessionMeta } from './sessionHelpers'
@@ -184,9 +190,19 @@ export function useSession(sessionId: string | null) {
   return { session, ...rest }
 }
 
-function _setSessionCache(sessionId: string, updated: Session | null) {
+function _setSessionCache(
+  sessionId: string,
+  updated: Session | null,
+  options?: { preserveCachedGeneratingMessages?: boolean }
+) {
   // 1. update session cache 2. session settings do not use cache now
-  queryClient.setQueryData(QueryKeys.ChatSession(sessionId), updated)
+  if (!options?.preserveCachedGeneratingMessages || !updated) {
+    queryClient.setQueryData(QueryKeys.ChatSession(sessionId), updated)
+    return
+  }
+  queryClient.setQueryData(QueryKeys.ChatSession(sessionId), (cached: Session | null | undefined) =>
+    mergeCachedGeneratingMessages(updated, cached)
+  )
 }
 
 async function runInChunks<T>(items: T[], chunkSize: number, worker: (item: T) => Promise<void>) {
@@ -236,7 +252,11 @@ export async function createSession(newSession: Omit<Session, 'id'>, previousId?
 
 const sessionUpdateQueues: Record<string, UpdateQueue<Session>> = {}
 
-export async function updateSessionWithMessages(sessionId: string, updater: Updater<Session>) {
+export async function updateSessionWithMessages(
+  sessionId: string,
+  updater: Updater<Session>,
+  options?: { preserveCachedGeneratingMessages?: boolean }
+) {
   if (!sessionUpdateQueues[sessionId]) {
     // do not use await here to avoid data race
     sessionUpdateQueues[sessionId] = new UpdateQueue<Session>(
@@ -271,22 +291,27 @@ export async function updateSessionWithMessages(sessionId: string, updater: Upda
       sortSessionRecords(items.map((s) => (s.id === sessionId ? { ...s, ...newMeta } : s)))
     )
   }
-  _setSessionCache(sessionId, updated)
+  _setSessionCache(sessionId, updated, options)
   return updated
 }
 
 // 这里只能修改messages之外的字段
-export async function updateSession(sessionId: string, updater: Updater<Omit<Session, 'messages'>>) {
-  return await updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error(`Session ${sessionId} not found`)
-    }
-    const updated = typeof updater === 'function' ? updater(session) : updater
-    return {
-      ...session,
-      ...updated,
-    }
-  })
+export async function updateSession(sessionId: string, updater: Updater<SessionMetadataUpdate>) {
+  return await updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error(`Session ${sessionId} not found`)
+      }
+      const updated = typeof updater === 'function' ? updater(getSessionMetadataSnapshot(session)) : updater
+      assertNoMessageDataUpdate(updated)
+      return {
+        ...session,
+        ...updated,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 // only update session cache without touching storage, for performance sensitive usage

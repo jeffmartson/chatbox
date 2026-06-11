@@ -15,6 +15,8 @@ interface SandboxEditInput {
 
 const sandboxEditInputSchema = jsonSchema({
   type: 'object',
+  description:
+    'Provide either edits for one or more replacements, or legacy old_text and new_text for a single replacement.',
   properties: {
     file_path: {
       type: 'string',
@@ -50,13 +52,18 @@ const sandboxEditInputSchema = jsonSchema({
     },
   },
   required: ['file_path'],
-  anyOf: [{ required: ['edits'] }, { required: ['old_text', 'new_text'] }],
   additionalProperties: false,
 })
 
 function normalizeSandboxEdits(input: SandboxEditInput): SandboxEditOperation[] {
   if (input.edits?.length) return input.edits
   return [{ old_text: input.old_text ?? '', new_text: input.new_text ?? '' }]
+}
+
+function validateSandboxEditInput(input: SandboxEditInput): { edits: SandboxEditOperation[] } | { error: string } {
+  if (input.edits?.length) return { edits: input.edits }
+  if (input.old_text !== undefined && input.new_text !== undefined) return { edits: normalizeSandboxEdits(input) }
+  return { error: 'Provide edits[] or both old_text and new_text.' }
 }
 
 const toolSetDescription = `
@@ -230,11 +237,13 @@ const sandbox_edit: ToolSet[string] = {
   inputSchema: sandboxEditInputSchema,
   execute: async (input) => {
     const editInput = input as SandboxEditInput
+    const validatedInput = validateSandboxEditInput(editInput)
+    if ('error' in validatedInput) return `Error editing file: ${validatedInput.error}`
     if (!platform.sandboxEdit) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const edits = normalizeSandboxEdits(editInput)
+      const { edits } = validatedInput
       const result = await platform.sandboxEdit({
         filePath: editInput.file_path,
         edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),

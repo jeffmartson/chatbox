@@ -23,6 +23,8 @@ interface EditFileInput {
 
 const editFileInputSchema = jsonSchema({
   type: 'object',
+  description:
+    'Provide either edits for one or more replacements, or legacy old_text and new_text for a single replacement.',
   properties: {
     file_path: {
       type: 'string',
@@ -58,7 +60,6 @@ const editFileInputSchema = jsonSchema({
     },
   },
   required: ['file_path'],
-  anyOf: [{ required: ['edits'] }, { required: ['old_text', 'new_text'] }],
   additionalProperties: false,
 })
 
@@ -73,6 +74,12 @@ function previewContent(content: string, maxLength = 2000): string {
 function normalizeEdits(input: EditFileInput): EditOperation[] {
   if (input.edits?.length) return input.edits
   return [{ old_text: input.old_text ?? '', new_text: input.new_text ?? '' }]
+}
+
+function validateEditInput(input: EditFileInput): { edits: EditOperation[] } | { error: string } {
+  if (input.edits?.length) return { edits: input.edits }
+  if (input.old_text !== undefined && input.new_text !== undefined) return { edits: normalizeEdits(input) }
+  return { error: 'Provide edits[] or both old_text and new_text.' }
 }
 
 function previewEdits(edits: EditOperation[]): string {
@@ -291,7 +298,9 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     execute: async (input, toolOptions) => {
       const editInput = input as EditFileInput
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
-      const edits = normalizeEdits(editInput)
+      const validatedInput = validateEditInput(editInput)
+      if ('error' in validatedInput) return { error: validatedInput.error }
+      const { edits } = validatedInput
       if (await shouldUseSandbox(context, editInput.file_path)) {
         const result = await editSandboxFile(context, editInput.file_path, edits)
         return result.success
