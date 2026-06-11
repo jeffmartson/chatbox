@@ -4,7 +4,7 @@ import { IconPhoto, IconPhotoOff, IconTrash } from '@tabler/icons-react'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useBlob } from '@/hooks/useBlob'
-import { blobToDataUrl } from './constants'
+import { blobToDataUrl, isDirectImageSource } from './constants'
 
 export interface HistoryItemProps {
   record: ImageGeneration
@@ -144,9 +144,9 @@ interface HistoryThumbnailProps {
 }
 
 function HistoryThumbnail({ storageKey }: HistoryThumbnailProps) {
-  const isHttpUrl = storageKey.startsWith('http://') || storageKey.startsWith('https://')
-  const { data: blob, isError } = useBlob(isHttpUrl ? undefined : storageKey)
-  const imageUrl = isHttpUrl ? storageKey : blob ? blobToDataUrl(blob) : null
+  const isDirectSource = isDirectImageSource(storageKey)
+  const { data: blob, isError } = useBlob(isDirectSource ? undefined : storageKey)
+  const imageUrl = isDirectSource ? storageKey : blob ? blobToDataUrl(blob) : null
 
   if (isError) {
     return (

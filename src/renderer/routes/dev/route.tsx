@@ -30,8 +30,8 @@ function DevLayout() {
   const getPageTitle = () => {
     const path = location.pathname
     if (path === '/dev' || path === '/dev/') return 'Dev Tools'
-    if (path.includes('model-selector')) return 'ModelSelector Preview'
     if (path.includes('context-generator')) return 'Context Generator'
+    if (path.includes('ui-inventory')) return 'UI Inventory'
     return 'Dev Tools'
   }
 

@@ -9,12 +9,6 @@ export const Route = createFileRoute('/dev/')({
 
 const devPages = [
   {
-    path: '/dev/model-selector',
-    name: 'ModelSelector',
-    description: 'Model selection component with desktop/mobile responsive views',
-    tags: ['Component', 'UI'],
-  },
-  {
     path: '/dev/storage',
     name: 'Storage Explorer',
     description: 'Inspect key-value and blob storage entries provided by the unified platform layer',
@@ -31,6 +25,12 @@ const devPages = [
     name: 'Context Generator',
     description: 'Generate fake conversation context for testing context management and token estimation',
     tags: ['Tool', 'Testing'],
+  },
+  {
+    path: '/dev/ui-inventory',
+    name: 'UI Inventory',
+    description: 'Complete generated catalog of UI pages, components, states, text, and preview links',
+    tags: ['Tool', 'UI'],
   },
 ]
 

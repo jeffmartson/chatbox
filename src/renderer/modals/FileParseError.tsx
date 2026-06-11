@@ -16,7 +16,7 @@ import {
   SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR,
   SESSION_ATTACHMENT_RAG_REQUIRES_KNOWLEDGE_BASE_ERROR,
   SESSION_ATTACHMENT_RAG_REQUIRES_TOOL_USE_MODEL_ERROR,
-} from '@/stores/sessionHelpers'
+} from '@/stores/sessionAttachmentRagErrors'
 import * as settingActions from '@/stores/settingActions'
 
 interface FileParseErrorProps {

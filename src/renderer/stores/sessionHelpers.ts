@@ -30,27 +30,26 @@ import { SESSION_ATTACHMENT_RAG_LOG_PREFIX } from '../../shared/session-attachme
 import { createMessage, type Message, SessionSettingsSchema, TOKEN_CACHE_KEYS } from '../../shared/types'
 import type { AttachmentPreparationResult, PreprocessedFile } from '../types/input-box'
 import { lastUsedModelStore } from './lastUsedModelStore'
+import {
+  SESSION_ATTACHMENT_RAG_LARGE_ATTACHMENT_WARNING,
+  SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR,
+} from './sessionAttachmentRagErrors'
 import * as settingActions from './settingActions'
 import { getPlatformDefaultDocumentParser, settingsStore } from './settingsStore'
+
+export {
+  isSessionAttachmentRagAuthError,
+  isSessionAttachmentRagIndexingError,
+  SESSION_ATTACHMENT_RAG_LARGE_ATTACHMENT_WARNING,
+  SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR,
+  SESSION_ATTACHMENT_RAG_REQUIRES_CHATBOX_AI_ERROR,
+  SESSION_ATTACHMENT_RAG_REQUIRES_KNOWLEDGE_BASE_ERROR,
+  SESSION_ATTACHMENT_RAG_REQUIRES_TOOL_USE_MODEL_ERROR,
+} from './sessionAttachmentRagErrors'
 
 const log = getLogger('session-helpers')
 const SESSION_ATTACHMENT_RAG_INLINE_BYTE_THRESHOLD = 256 * 1024
 export const SESSION_ATTACHMENT_RAG_MAX_PARSED_BYTE_LENGTH = 6 * 1024 * 1024
-export const SESSION_ATTACHMENT_RAG_REQUIRES_CHATBOX_AI_ERROR = 'session_attachment_rag_requires_chatbox_ai'
-export const SESSION_ATTACHMENT_RAG_REQUIRES_KNOWLEDGE_BASE_ERROR = 'session_attachment_rag_requires_knowledge_base'
-export const SESSION_ATTACHMENT_RAG_REQUIRES_TOOL_USE_MODEL_ERROR = 'session_attachment_rag_requires_tool_use_model'
-export const SESSION_ATTACHMENT_RAG_PARSED_CONTENT_TOO_LARGE_ERROR = 'session_attachment_rag_parsed_content_too_large'
-export const SESSION_ATTACHMENT_RAG_LARGE_ATTACHMENT_WARNING = 'session_attachment_rag_large_attachment_warning'
-const SESSION_ATTACHMENT_RAG_AUTH_ERROR_PATTERNS = [
-  'provider chatbox-ai not set',
-  'chatbox-ai not set',
-  'missing token for rerank provider: chatbox-ai',
-]
-const SESSION_ATTACHMENT_RAG_INDEXING_ERROR_PATTERNS = [
-  'chatbox_session_rag_vectors.db',
-  'connectionfailed("unable to open connection to local database',
-  'session attachment rag vector store not initialized',
-]
 let sessionRagCapabilityCache:
   | {
       key: string
@@ -169,25 +168,6 @@ function hasParsedText(content: string): boolean {
 
 function canFallbackToChatboxAI(): boolean {
   return Boolean(settingActions.getLicenseKey())
-}
-
-export function isSessionAttachmentRagAuthError(errorCode: string | undefined): boolean {
-  if (!errorCode) {
-    return false
-  }
-  if (errorCode === SESSION_ATTACHMENT_RAG_REQUIRES_CHATBOX_AI_ERROR) {
-    return true
-  }
-  const normalized = errorCode.toLowerCase()
-  return SESSION_ATTACHMENT_RAG_AUTH_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern))
-}
-
-export function isSessionAttachmentRagIndexingError(errorCode: string | undefined): boolean {
-  if (!errorCode) {
-    return false
-  }
-  const normalized = errorCode.toLowerCase()
-  return SESSION_ATTACHMENT_RAG_INDEXING_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern))
 }
 
 function hasUsableSessionAttachmentRagLicense(): boolean {

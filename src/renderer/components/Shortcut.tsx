@@ -1,4 +1,4 @@
-import { Box, Combobox, Flex, Input, InputBase, Kbd, Select, Table, Text, useCombobox } from '@mantine/core'
+import { Box, Combobox, Flex, InputBase, Kbd, Table, useCombobox } from '@mantine/core'
 import {
   type Settings,
   type ShortcutName,
@@ -73,8 +73,6 @@ export function Keys(props: {
   onEdit?: () => void
   className?: string
 }) {
-  // const sizeClass = props.size === 'small' ? 'text-[0.55rem]' : 'text-sm'
-  const sizeClass = 'text-xs'
   const opacityClass = props.opacity !== undefined ? `opacity-${props.opacity * 100}` : ''
   return (
     <span className={`inline-block px-1 ${opacityClass} ${props.className || ''}`}>
@@ -201,7 +199,7 @@ export function ShortcutConfig(props: {
 
         <Table.Tbody>
           {items.map(({ name, label, keys, options }) => (
-            <Table.Tr key={`${name}`}>
+            <Table.Tr key={name ?? label}>
               <Table.Td>{label}</Table.Td>
               <Table.Td>
                 {options ? (
