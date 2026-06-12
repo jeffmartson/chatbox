@@ -253,6 +253,8 @@ const ShortcutSettingSchema = z.object({
   sessionListNavNext: z.string(),
   sessionListNavPrev: z.string(),
   sessionListNavTargetIndex: z.string(),
+  // workaround: 去掉mod+r 快捷键，如果用户再回退版本，会导致崩溃。如果要完整修复，需要支持高版本到低版本的config migration，不值得
+  messageListRefreshContext: z.string().default('mod+r'),
   dialogOpenSearch: z.string(),
   optionNavUp: z.string(),
   optionNavDown: z.string(),
