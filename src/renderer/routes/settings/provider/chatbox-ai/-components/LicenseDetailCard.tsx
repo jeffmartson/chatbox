@@ -119,8 +119,9 @@ function QuotaCardDes({
   mutedValue,
   accent = 'default',
 }: Omit<QuotaCardProps, 'icon'>) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
+  const isCN = i18n.language.toLowerCase().startsWith('zh')
 
   return (
     <Stack gap={4}>
@@ -131,10 +132,10 @@ function QuotaCardDes({
       {typeof remaining === 'number' && typeof total === 'number' ? (
         <Flex align="center" gap={6} wrap="nowrap">
           <Text fw={700} fz="1.3rem" lh={1.05} c={accent === 'blue' ? 'chatbox-brand' : 'chatbox-primary'}>
-            {formatNumber(remaining, 2)}
+            {formatNumber(remaining, remaining === 0 ? 0 : 2, isCN)}
           </Text>
           <Text c="dimmed" fz="1.1rem" pb={3}>
-            /{formatNumber(total, 2)}
+            /{formatNumber(total, 2, isCN)}
           </Text>
         </Flex>
       ) : (
@@ -221,6 +222,7 @@ function InfoPanel({ title, value, valueColor }: InfoPanelProps) {
 export function LicenseDetailCard({ licenseDetail, language, utmContent }: LicenseDetailCardProps) {
   const { t, i18n } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
+  const isCN = i18n.language.toLowerCase().startsWith('zh')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const pendingActionRef = useRef(false)
 
@@ -365,7 +367,7 @@ export function LicenseDetailCard({ licenseDetail, language, utmContent }: Licen
         <InfoPanel title={t('License Plan Overview')} value={licenseDetail.name} />
         <InfoPanel
           title={t('Image Quota (Remaining/Total)')}
-          value={`${imageRemaining}/${licenseDetail.plan_image_limit || 0}`}
+          value={`${formatNumber(imageRemaining, 0, isCN)}/${formatNumber(licenseDetail.plan_image_limit || 0, 0, isCN)}`}
         />
       </SimpleGrid>
 

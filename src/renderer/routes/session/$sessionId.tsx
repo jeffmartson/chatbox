@@ -18,6 +18,7 @@ import { defaultSessionsForCN, defaultSessionsForEN } from '@/packages/initial_d
 import * as remote from '@/packages/remote'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
 import { updateSession as updateSessionStore, useSession } from '@/stores/chatStore'
+import { applyChatboxLicenseDefaultModelToSession } from '@/stores/defaultChatModel'
 import { lastUsedModelStore } from '@/stores/lastUsedModelStore'
 import * as scrollActions from '@/stores/scrollActions'
 import { modifyMessage, removeCurrentThread, startNewThread, submitNewUserMessage } from '@/stores/sessionActions'
@@ -40,7 +41,10 @@ function RouteComponent() {
   const navigate = useNavigate()
   const { session: currentSession, isFetching } = useSession(currentSessionId)
   const { providers } = useProviders()
-  const hasLicense = useSettingsStore((s) => Boolean(s.licenseKey))
+  const licenseKey = useSettingsStore((s) => s.licenseKey)
+  const hasLicense = Boolean(licenseKey)
+  const licenseDetail = useSettingsStore((s) => s.licenseDetail)
+  const licensePlanName = useSettingsStore((s) => s.licensePlanName)
   const hasExpiredLicense = useSettingsStore((s) => s.hasExpiredLicense)
   const isLoggedIn = useAuthInfoStore((s) => Boolean(s.accessToken && s.refreshToken))
   const widthFull = useUIStore((s) => s.widthFull)
@@ -56,6 +60,17 @@ function RouteComponent() {
     () => Boolean(currentSession && builtInTemplateSessionIds.has(currentSession.id) && welcomeCardMode !== 'none'),
     [currentSession, welcomeCardMode]
   )
+  const currentSessionWithDefaultModel = useMemo(() => {
+    if (!currentSession || !builtInTemplateSessionIds.has(currentSession.id)) {
+      return currentSession
+    }
+    return applyChatboxLicenseDefaultModelToSession(currentSession, {
+      licenseKey,
+      hasExpiredLicense,
+      licenseDetail,
+      licensePlanName,
+    })
+  }, [currentSession, hasExpiredLicense, licenseDetail, licenseKey, licensePlanName])
   const lastGeneratingMessage = useMemo(
     () => currentMessageList.find((m: Message) => m.generating),
     [currentMessageList]
@@ -90,6 +105,15 @@ function RouteComponent() {
       }
     }
   }, [currentSession?.settings, currentSession?.type, currentSession, setLastUsedChatModel, setLastUsedPictureModel])
+
+  useEffect(() => {
+    if (!currentSession || !currentSessionWithDefaultModel || currentSessionWithDefaultModel === currentSession) {
+      return
+    }
+    void updateSessionStore(currentSession.id, {
+      settings: currentSessionWithDefaultModel.settings,
+    })
+  }, [currentSession, currentSessionWithDefaultModel])
 
   const onSelectModel = useCallback(
     (provider: ModelProvider, modelId: string) => {
@@ -135,6 +159,11 @@ function RouteComponent() {
       if (!currentSession) {
         return
       }
+      if (currentSessionWithDefaultModel && currentSessionWithDefaultModel !== currentSession) {
+        await updateSessionStore(currentSession.id, {
+          settings: currentSessionWithDefaultModel.settings,
+        })
+      }
       messageListRef.current?.scrollToBottom('instant')
 
       if (currentSession.copilotId) {
@@ -149,7 +178,7 @@ function RouteComponent() {
         onUserMessageReady,
       })
     },
-    [currentSession]
+    [currentSession, currentSessionWithDefaultModel]
   )
 
   const onClickSessionSettings = useCallback(() => {
@@ -174,14 +203,14 @@ function RouteComponent() {
   }, [currentSession, lastGeneratingMessage])
 
   const model = useMemo(() => {
-    if (!currentSession?.settings?.modelId || !currentSession?.settings?.provider) {
+    if (!currentSessionWithDefaultModel?.settings?.modelId || !currentSessionWithDefaultModel?.settings?.provider) {
       return undefined
     }
     return {
-      provider: currentSession.settings.provider,
-      modelId: currentSession.settings.modelId,
+      provider: currentSessionWithDefaultModel.settings.provider,
+      modelId: currentSessionWithDefaultModel.settings.modelId,
     }
-  }, [currentSession?.settings?.provider, currentSession?.settings?.modelId])
+  }, [currentSessionWithDefaultModel?.settings?.provider, currentSessionWithDefaultModel?.settings?.modelId])
 
   return currentSession ? (
     <div className="flex flex-col h-full">

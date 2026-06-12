@@ -15,6 +15,7 @@ import * as chatboxaiAPI from '../../shared/request/chatboxai_pool'
 import { createAfetch, createAuthenticatedAfetch, uploadFile } from '../../shared/request/request'
 import {
   type ChatboxAILicenseDetail,
+  type ChatboxAIPlanType,
   type Config,
   type CopilotDetail,
   type ModelProvider,
@@ -694,6 +695,94 @@ export async function getModelManifest(params: { aiProvider: ModelProvider; lice
   return data.data
 }
 
+const ChatboxAIModelAccessSchema = z.object({
+  available: z.boolean().optional().default(true),
+})
+
+const ChatboxAIModelPriceTierSchema = z.object({
+  max_input_tokens: z.number().optional().default(0),
+  max_output_tokens: z.number().optional().default(0),
+  price_input: z.number(),
+  price_output: z.number(),
+})
+
+const ChatboxAIModelPricingSchema = z.object({
+  tokensPerComputePoint: z.number().optional().default(0),
+  officialInput: z.number().optional().default(0),
+  officialOutput: z.number().optional().default(0),
+  tieredPricing: z.array(ChatboxAIModelPriceTierSchema).optional().default([]),
+})
+
+const ChatboxAIModelInfoSchema = RemoteModelInfoSchema.extend({
+  costLevel: z.string().optional().default(''),
+  description: z.string().optional().default(''),
+  access: ChatboxAIModelAccessSchema.optional().default({ available: true }),
+  pricing: ChatboxAIModelPricingSchema.optional(),
+})
+
+const ChatboxAIModelListResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z
+    .object({
+      provider: z.object({
+        id: z.string(),
+        name: z.string(),
+      }),
+      license: z
+        .object({
+          plan: z.string().optional().default('unknown'),
+        })
+        .optional()
+        .default({ plan: 'unknown' }),
+      groups: z.array(
+        z.object({
+          id: z.string(),
+          modelIds: z.array(z.string()),
+          featuredModelIds: z.array(z.string()).optional(),
+        })
+      ),
+      models: z.record(z.string(), ChatboxAIModelInfoSchema),
+      imageModels: z.array(RemoteModelInfoSchema).optional().default([]),
+      links: z
+        .object({
+          modelPricing: z.string().optional(),
+          upgrade: z.string().optional(),
+        })
+        .optional(),
+    })
+    .passthrough(),
+})
+
+export type ChatboxAIModelList = z.infer<typeof ChatboxAIModelListResponseSchema>['data']
+
+export async function getChatboxAIModelList(params: { licenseKey?: string; language?: string }) {
+  const afetch = await getAfetch()
+  const res = await afetch(
+    `${getAPIOrigin()}/api/chatbox_ai/model_list`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getChatboxHeaders()),
+      },
+      body: JSON.stringify({
+        licenseKey: params.licenseKey,
+        language: params.language,
+      }),
+    },
+    {
+      parseChatboxRemoteError: true,
+      retry: 2,
+    }
+  )
+  const { success, data, error } = ChatboxAIModelListResponseSchema.safeParse(await res.json())
+  if (!success) {
+    log.error('getChatboxAIModelList error', error)
+    throw error
+  }
+  return data.data
+}
+
 export async function reportContent(params: { id: string; type: string; details: string }) {
   const afetch = await getAfetch()
   await afetch(`${getAPIOrigin()}/api/report_content`, {
@@ -982,6 +1071,7 @@ export interface UserLicense {
   status: string
   platform: string
   product_name: string
+  plan?: ChatboxAIPlanType
   payment_type: string
   image_usage: number
   unified_token_usage: number

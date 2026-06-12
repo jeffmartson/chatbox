@@ -1,5 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Avatar, Box, Button, Divider, Flex, ScrollArea, Space, Stack, Text } from '@mantine/core'
+import { ActionIcon, Avatar, Box, Divider, Flex, ScrollArea, Space, Stack, Text } from '@mantine/core'
 import type { CopilotDetail, ImageSource, Session } from '@shared/types'
 import { IconChevronLeft, IconChevronRight, IconMessageCircle2Filled, IconX } from '@tabler/icons-react'
 import { createFileRoute, useRouterState } from '@tanstack/react-router'
@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { JK_PAGE_NAMES } from '@/analytics/jk-events'
 import { ChatboxWelcomeCard } from '@/components/common/ChatboxWelcomeCard'
-import { MessageLayoutSelector } from '@/components/common/MessageLayoutPreview'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { ImageInStorage } from '@/components/Image'
 import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
@@ -20,11 +19,11 @@ import Page from '@/components/layout/Page'
 import { useMyCopilots, useRemoteCopilotsByCursor } from '@/hooks/useCopilots'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
-import { navigateToSettings } from '@/modals/Settings'
 import * as remote from '@/packages/remote'
 import { router } from '@/router'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
 import { createSession as createSessionStore } from '@/stores/chatStore'
+import { resolveChatboxLicenseDefaultModel } from '@/stores/defaultChatModel'
 import { submitNewUserMessage, switchCurrentSession } from '@/stores/sessionActions'
 import { initEmptyChatSession } from '@/stores/sessionHelpers'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -45,10 +44,7 @@ export const Route = createFileRoute('/')({
 function Index() {
   const { t } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
-  const messageLayout = useSettingsStore((s) => s.messageLayout)
-  const [tempMessageLayout, setTempMessageLayout] = useState<'left' | 'bubble' | undefined>(undefined)
 
-  const setSettings = useSettingsStore((s) => s.setSettings)
   const newSessionState = useUIStore((s) => s.newSessionState)
   const setNewSessionState = useUIStore((s) => s.setNewSessionState)
   const addSessionKnowledgeBase = useUIStore((s) => s.addSessionKnowledgeBase)
@@ -67,7 +63,11 @@ function Index() {
   })
 
   const { providers } = useProviders()
+  const defaultChatModel = useSettingsStore((s) => s.defaultChatModel)
   const hasLicense = useSettingsStore((s) => Boolean(s.licenseKey))
+  const licenseKey = useSettingsStore((s) => s.licenseKey)
+  const licenseDetail = useSettingsStore((s) => s.licenseDetail)
+  const licensePlanName = useSettingsStore((s) => s.licensePlanName)
   const hasExpiredLicense = useSettingsStore((s) => s.hasExpiredLicense)
   const isLoggedIn = useAuthInfoStore((s) => Boolean(s.accessToken && s.refreshToken))
   const welcomeCardMode = useMemo(
@@ -83,6 +83,35 @@ function Index() {
       }
     }
   }, [session.settings?.provider, session.settings?.modelId])
+
+  useEffect(() => {
+    setSession((old) => {
+      if (old.settings?.provider && old.settings?.modelId) {
+        return old
+      }
+      const defaultModel = defaultChatModel
+        ? {
+            provider: defaultChatModel.provider,
+            modelId: defaultChatModel.model,
+          }
+        : resolveChatboxLicenseDefaultModel({
+            licenseKey,
+            hasExpiredLicense,
+            licenseDetail,
+            licensePlanName,
+          })
+      if (!defaultModel) {
+        return old
+      }
+      return {
+        ...old,
+        settings: {
+          ...(old.settings || {}),
+          ...defaultModel,
+        },
+      }
+    })
+  }, [defaultChatModel, hasExpiredLicense, licenseDetail, licenseKey, licensePlanName])
 
   const { copilots: myCopilots } = useMyCopilots()
   const { copilots: remoteCopilots } = useRemoteCopilotsByCursor({ limit: 10 })
@@ -182,14 +211,14 @@ function Index() {
       }
 
       // Transfer web browsing setting from "new" session to the actual session
-      const newSessionWebBrowsing = sessionWebBrowsingMap['new']
+      const newSessionWebBrowsing = sessionWebBrowsingMap.new
       if (newSessionWebBrowsing !== undefined) {
         setSessionWebBrowsing(newSession.id, newSessionWebBrowsing)
         clearSessionWebBrowsing('new')
       }
 
       // Transfer agent mode setting from "new" session to the actual session
-      const newAgentMode = sessionAgentModeMap['new']
+      const newAgentMode = sessionAgentModeMap.new
       if (newAgentMode) {
         setSessionAgentMode(newSession.id, newAgentMode.value)
         if (newAgentMode.locked) {
@@ -250,64 +279,12 @@ function Index() {
   return (
     <Page title="">
       <div className="p-0 flex flex-col h-full">
-        {messageLayout || welcomeCardMode !== 'none' ? (
-          <Stack align="center" justify="center" gap="sm" flex={1}>
-            <HomepageIcon className="h-8" />
-            <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
-              {t('What can I help you with today?')}
-            </Text>
-          </Stack>
-        ) : (
-          <Stack align="center" justify="center" gap="sm" flex={1} p="sm">
-            <Stack
-              align="center"
-              justify="center"
-              gap="lg"
-              w={isSmallScreen ? '100%' : '80%'}
-              maw={386}
-              p="xl"
-              className="border border-solid border-chatbox-border-primary rounded-lg relative"
-            >
-              <div className="absolute top-0 right-0">
-                <ActionIcon
-                  variant="transparent"
-                  color="chatbox-tertiary"
-                  m={10}
-                  onClick={() => setSettings({ messageLayout: 'left' })}
-                >
-                  <ScalableIcon icon={IconX} size={20} className="text-chatbox-tint-tertiary" />
-                </ActionIcon>
-              </div>
-              <Text size="md" fw="600">
-                {t('Message Layout')}
-              </Text>
-              <Stack gap="sm">
-                <MessageLayoutSelector
-                  w="100%"
-                  size="sm"
-                  value={tempMessageLayout || 'left'}
-                  onValueChange={(val) => setTempMessageLayout(val)}
-                />
-
-                <Text size="xs" c="chatbox-secondary">
-                  {t('You can change this setting later in Settings → ')}
-                  <a className="cursor-pointer !text-chatbox-tint-brand" onClick={() => navigateToSettings('chat')}>
-                    {t('Conversation Settings')}
-                  </a>
-                </Text>
-              </Stack>
-
-              <Button
-                variant="filled"
-                size="md"
-                className="w-full"
-                onClick={() => setSettings({ messageLayout: tempMessageLayout || 'left' })}
-              >
-                {t('Save')}
-              </Button>
-            </Stack>
-          </Stack>
-        )}
+        <Stack align="center" justify="center" gap="sm" flex={1}>
+          <HomepageIcon className="h-8" />
+          <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
+            {t('What can I help you with today?')}
+          </Text>
+        </Stack>
 
         {welcomeCardMode !== 'none' && (
           <Box px="sm">

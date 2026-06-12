@@ -101,7 +101,7 @@ import { CompressionModal } from '../common/CompressionModal'
 import { ScalableIcon } from '../common/ScalableIcon'
 import Disclaimer from '../Disclaimer'
 import ProviderImageIcon from '../icons/ProviderImageIcon'
-import ModelSelector from '../ModelSelector'
+import ModelSelectorV2 from '../ModelSelectorV2'
 import AgentModeButton from './AgentModeButton'
 import { FileMiniCard, ImageMiniCard } from './Attachments'
 import { getAgentModeUIState } from './agentModeState'
@@ -1691,7 +1691,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     opened={showSelectModelErrorTip}
                     withArrow
                   >
-                    <ModelSelector
+                    <ModelSelectorV2
                       onSelect={onSelectModel}
                       selectedProviderId={model?.provider}
                       selectedModelId={model?.modelId}
@@ -1723,7 +1723,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                           className="text-[var(--chatbox-tint-tertiary)] rotate-90 flex-shrink-0"
                         />
                       </UnstyledButton>
-                    </ModelSelector>
+                    </ModelSelectorV2>
                   </Tooltip>
                 </Box>
               </Flex>

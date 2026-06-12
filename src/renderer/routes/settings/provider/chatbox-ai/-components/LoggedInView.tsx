@@ -17,6 +17,7 @@ import {
   type UserLicense,
 } from '@/packages/remote'
 import platform from '@/platform'
+import { isChatboxAIPlanFree } from '@/stores/licensePlan'
 import * as premiumActions from '@/stores/premiumActions'
 import { settingsStore, useSettingsStore } from '@/stores/settingsStore'
 import { LicenseDetailCard } from './LicenseDetailCard'
@@ -464,7 +465,8 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
                           return t('This license key has reached the activation limit.')
                         case 'quota_exceeded': {
                           const selectedLicense = licenses.find((l) => l.key === selectedLicenseKey)
-                          return selectedLicense?.product_name === 'Chatbox AI Free'
+                          return selectedLicense?.plan === 'free' ||
+                            (!selectedLicense?.plan && selectedLicense?.product_name === 'Chatbox AI Free')
                             ? t('You have no more Chatbox AI quota left today.')
                             : t('You have no more Chatbox AI quota left this month.')
                         }
@@ -549,7 +551,7 @@ export const LoggedInView = forwardRef<HTMLDivElement, LoggedInViewProps>(
                 <Flex gap="xs" align="center" c="chatbox-primary">
                   <ScalableIcon icon={IconExclamationCircle} className="flex-shrink-0" />
                   <Text>
-                    {licenseDetail.name === 'Chatbox AI Free'
+                    {isChatboxAIPlanFree(licenseDetail)
                       ? t('You have no more Chatbox AI quota left today.')
                       : t('You have no more Chatbox AI quota left this month.')}
                   </Text>

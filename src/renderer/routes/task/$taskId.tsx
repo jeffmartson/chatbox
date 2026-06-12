@@ -40,7 +40,7 @@ import TokenCountMenu from '@/components/InputBox/TokenCountMenu'
 import ProviderImageIcon from '@/components/icons/ProviderImageIcon'
 import WindowControls from '@/components/layout/WindowControls'
 import Markdown, { BlockCodeCollapsedStateProvider } from '@/components/Markdown'
-import ModelSelector from '@/components/ModelSelector'
+import ModelSelectorV2 from '@/components/ModelSelectorV2'
 import DirectoryMenu from '@/components/task/DirectoryMenu'
 import useNeedRoomForWinControls from '@/hooks/useNeedRoomForWinControls'
 import { useProviders } from '@/hooks/useProviders'
@@ -656,7 +656,7 @@ function TaskChat({ session }: { session: NonNullable<ReturnType<typeof useTaskS
                     </Text>
                   </Flex>
                 </TokenCountMenu>
-                <ModelSelector
+                <ModelSelectorV2
                   onSelect={handleSelectModel}
                   selectedProviderId={model?.provider}
                   selectedModelId={model?.modelId}
@@ -675,7 +675,7 @@ function TaskChat({ session }: { session: NonNullable<ReturnType<typeof useTaskS
                     </Text>
                     <IconChevronDown size={14} className="text-[var(--chatbox-tint-tertiary)] shrink-0" />
                   </UnstyledButton>
-                </ModelSelector>
+                </ModelSelectorV2>
               </Flex>
             </Flex>
           </Stack>

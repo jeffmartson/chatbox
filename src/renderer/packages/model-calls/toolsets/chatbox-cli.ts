@@ -47,6 +47,7 @@ function accountStatus() {
     plan: detail
       ? {
           name: detail.name,
+          plan: detail.plan,
           status: detail.status,
           type: detail.type,
           defaultModel: detail.defaultModel,

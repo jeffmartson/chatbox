@@ -195,9 +195,12 @@ const UnifiedTokenUsageDetailSchema = z.object({
   expires_at: z.string().nullish(),
 })
 
+const ChatboxAIPlanTypeSchema = z.enum(['free', 'lite', 'pro', 'pro_plus', 'quota_pack'])
+
 const ChatboxAILicenseDetailSchema = z.object({
   type: z.enum(['chatboxai-3.5', 'chatboxai-4']).optional(),
   name: z.string(),
+  plan: ChatboxAIPlanTypeSchema.optional().catch(undefined),
   status: z.string().optional(),
   defaultModel: z.enum(['chatboxai-3.5', 'chatboxai-4']).optional(),
   remaining_quota_35: z.number(),
@@ -484,6 +487,7 @@ export type GoogleParams = z.infer<typeof GoogleParamsSchema>
 export type ProviderOptions = z.infer<typeof ProviderOptionsSchema>
 export type GlobalSessionSettings = z.infer<typeof GlobalSessionSettingsSchema>
 export type ChatboxAILicenseDetail = z.infer<typeof ChatboxAILicenseDetailSchema>
+export type ChatboxAIPlanType = z.infer<typeof ChatboxAIPlanTypeSchema>
 export type UnifiedTokenUsageDetail = z.infer<typeof UnifiedTokenUsageDetailSchema>
 export type ShortcutSendValue = z.infer<typeof ShortcutSendValueSchema>
 export type ShortcutToggleWindowValue = z.infer<typeof ShortcutToggleWindowValueSchema>

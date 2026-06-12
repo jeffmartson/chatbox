@@ -13,6 +13,7 @@ import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { trackingEvent } from '@/packages/event'
 import { buildChatboxUrl } from '@/packages/remote'
 import platform from '@/platform'
+import { isChatboxAIPlanFree } from '@/stores/licensePlan'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { LicenseDetailCard } from './LicenseDetailCard'
 import { useLicenseActivation } from './useLicenseActivation'
@@ -185,7 +186,7 @@ export const LicenseKeyView = forwardRef<HTMLDivElement, LicenseKeyViewProps>(({
                           return t('This license key has reached the activation limit.')
                         case 'quota_exceeded':
                         case 'token_quota_exhausted':
-                          return licenseDetail?.name === 'Chatbox AI Free'
+                          return isChatboxAIPlanFree(licenseDetail)
                             ? t('You have no more Chatbox AI quota left today.')
                             : t('You have no more Chatbox AI quota left this month.')
                         default:
@@ -236,7 +237,7 @@ export const LicenseKeyView = forwardRef<HTMLDivElement, LicenseKeyViewProps>(({
                   <Flex gap="xs" align="center" c="chatbox-primary">
                     <ScalableIcon icon={IconExclamationCircle} className="flex-shrink-0" />
                     <Text>
-                      {licenseDetail.name === 'Chatbox AI Free'
+                      {isChatboxAIPlanFree(licenseDetail)
                         ? t('You have no more Chatbox AI quota left today.')
                         : t('You have no more Chatbox AI quota left this month.')}
                     </Text>
