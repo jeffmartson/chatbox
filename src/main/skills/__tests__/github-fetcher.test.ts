@@ -72,16 +72,18 @@ describe('github-fetcher', () => {
   })
 
   describe('detectSkillsInRepo', () => {
+    function makeTreeResponse(paths: string[], truncated = false) {
+      return {
+        tree: paths.map((p) => ({ path: p, type: 'blob' })),
+        truncated,
+      }
+    }
+
     it('should detect root SKILL.md', async () => {
-      const rootContents = [makeContentItem('SKILL.md', 'file', 'SKILL.md')]
       const skillMdContent = makeSkillMdContent('my-skill', 'A great skill')
 
-      // 1st call: fetchRepoContents for root
-      mockFetch.mockResolvedValueOnce(makeResponse(rootContents))
-      // 2nd call: fetchFileContent for SKILL.md
-      mockFetch.mockResolvedValueOnce(makeResponse(skillMdContent, 200, true))
-      // 3rd call: fetchRepoContents for skills/ dir → 404
-      mockFetch.mockResolvedValueOnce(makeResponse(null, 404, false))
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['SKILL.md', 'README.md']))) // git tree
+      mockFetch.mockResolvedValueOnce(makeResponse(skillMdContent, 200, true)) // SKILL.md content
 
       const detected = await detectSkillsInRepo('owner', 'repo')
       expect(detected).toHaveLength(1)
@@ -90,19 +92,10 @@ describe('github-fetcher', () => {
     })
 
     it('should detect skills in skills/ directory (flat structure)', async () => {
-      const rootContents = [makeContentItem('skills', 'dir', 'skills')]
-      const skillsDirContents = [makeContentItem('my-tool', 'dir', 'skills/my-tool')]
-      const subContents = [makeContentItem('SKILL.md', 'file', 'skills/my-tool/SKILL.md')]
       const skillMd = makeSkillMdContent('my-tool', 'Tool description')
 
-      // root contents (no root SKILL.md)
-      mockFetch.mockResolvedValueOnce(makeResponse(rootContents))
-      // skills/ directory listing
-      mockFetch.mockResolvedValueOnce(makeResponse(skillsDirContents))
-      // skills/my-tool/ subdir listing
-      mockFetch.mockResolvedValueOnce(makeResponse(subContents))
-      // SKILL.md content
-      mockFetch.mockResolvedValueOnce(makeResponse(skillMd, 200, true))
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['skills/my-tool/SKILL.md']))) // git tree
+      mockFetch.mockResolvedValueOnce(makeResponse(skillMd, 200, true)) // SKILL.md content
 
       const detected = await detectSkillsInRepo('owner', 'repo')
       expect(detected).toHaveLength(1)
@@ -110,18 +103,152 @@ describe('github-fetcher', () => {
       expect(detected[0].path).toBe('skills/my-tool')
     })
 
-    it('should detect nested skills (domain/skills/name pattern)', async () => {
+    // Content fetches run concurrently — key multi-skill mocks by URL, not call order
+    function mockByUrl(tree: ReturnType<typeof makeTreeResponse>, contents: Record<string, string>) {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/git/trees/')) return Promise.resolve(makeResponse(tree))
+        for (const [path, content] of Object.entries(contents)) {
+          if (url.endsWith(`/HEAD/${path}`)) return Promise.resolve(makeResponse(content, 200, true))
+        }
+        return Promise.resolve(makeResponse(null, 404, false))
+      })
+    }
+
+    it('should detect skills nested under category directories (skills/category/name pattern)', async () => {
+      mockByUrl(
+        makeTreeResponse([
+          'skills/engineering/README.md',
+          'skills/engineering/tdd/SKILL.md',
+          'skills/productivity/triage/SKILL.md',
+        ]),
+        {
+          'skills/engineering/tdd/SKILL.md': makeSkillMdContent('tdd', 'TDD workflow'),
+          'skills/productivity/triage/SKILL.md': makeSkillMdContent('triage', 'Triage issues'),
+        }
+      )
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(2)
+      expect(detected[0].name).toBe('tdd')
+      expect(detected[0].path).toBe('skills/engineering/tdd')
+      expect(detected[1].name).toBe('triage')
+      expect(detected[1].path).toBe('skills/productivity/triage')
+    })
+
+    it('should not treat files merely named with SKILL.md suffix as skills', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['docs/MY-SKILL.md', 'README.md'])))
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toEqual([])
+    })
+
+    it('should ignore SKILL.md under node_modules', async () => {
+      mockByUrl(makeTreeResponse(['node_modules/some-pkg/SKILL.md', 'skills/real/SKILL.md']), {
+        'skills/real/SKILL.md': makeSkillMdContent('real'),
+      })
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(1)
+      expect(detected[0].path).toBe('skills/real')
+    })
+
+    it('should detect category-nested skills via contents fallback when the tree is truncated', async () => {
+      const rootContents = [makeContentItem('skills', 'dir', 'skills')]
+      const skillsDirContents = [makeContentItem('engineering', 'dir', 'skills/engineering')]
+      const categoryContents = [
+        makeContentItem('README.md', 'file', 'skills/engineering/README.md'),
+        makeContentItem('tdd', 'dir', 'skills/engineering/tdd'),
+      ]
+      const skillDirContents = [makeContentItem('SKILL.md', 'file', 'skills/engineering/tdd/SKILL.md')]
+
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['unrelated.md'], true))) // truncated tree
+      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root contents
+      mockFetch.mockResolvedValueOnce(makeResponse(skillsDirContents)) // skills/
+      mockFetch.mockResolvedValueOnce(makeResponse(categoryContents)) // skills/engineering/ (no SKILL.md)
+      mockFetch.mockResolvedValueOnce(makeResponse(skillDirContents)) // skills/engineering/tdd/
+      mockFetch.mockResolvedValueOnce(makeResponse(makeSkillMdContent('tdd'), 200, true)) // SKILL.md
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(1)
+      expect(detected[0].name).toBe('tdd')
+      expect(detected[0].path).toBe('skills/engineering/tdd')
+    })
+
+    it('should ignore tree entries of type "tree" whose path ends in SKILL.md', async () => {
+      mockFetch.mockResolvedValueOnce(
+        makeResponse({ tree: [{ path: 'skills/weird/SKILL.md', type: 'tree' }], truncated: false })
+      )
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toEqual([])
+      expect(mockFetch).toHaveBeenCalledTimes(1) // no content fetch attempted
+    })
+
+    it('should cap detected skills at 100 when the tree has more', async () => {
+      const paths = Array.from({ length: 101 }, (_, i) => `skills/s${i}/SKILL.md`)
+      const contents: Record<string, string> = {}
+      for (const p of paths) {
+        contents[p] = makeSkillMdContent(p.split('/')[1])
+      }
+      mockByUrl(makeTreeResponse(paths), contents)
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(100)
+      expect(mockFetch).toHaveBeenCalledTimes(101) // 1 tree call + 100 content fetches (not 102)
+    })
+
+    it('should fall back to directory/repo name when SKILL.md has no name frontmatter', async () => {
+      const noName = '---\ndescription: d\n---\n# body'
+      mockByUrl(makeTreeResponse(['SKILL.md', 'skills/my-dir/SKILL.md']), {
+        'SKILL.md': noName,
+        'skills/my-dir/SKILL.md': noName,
+      })
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected.map((s) => s.name).sort()).toEqual(['my-dir', 'repo'])
+    })
+
+    it('should throw when skills are listed but every content fetch fails', async () => {
+      mockByUrl(makeTreeResponse(['skills/a/SKILL.md', 'skills/b/SKILL.md']), {}) // all raw fetches → 404
+
+      await expect(detectSkillsInRepo('owner', 'repo')).rejects.toThrow('failed to fetch their contents')
+    })
+
+    it('should return empty array for repo with no skills', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['README.md', 'src/index.ts'])))
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toEqual([])
+    })
+
+    it('should fall back to contents API when the tree is truncated', async () => {
+      const rootContents = [makeContentItem('skills', 'dir', 'skills')]
+      const skillsDirContents = [makeContentItem('my-tool', 'dir', 'skills/my-tool')]
+      const subContents = [makeContentItem('SKILL.md', 'file', 'skills/my-tool/SKILL.md')]
+      const skillMd = makeSkillMdContent('my-tool', 'Tool description')
+
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['unrelated.md'], true))) // truncated tree
+      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root contents
+      mockFetch.mockResolvedValueOnce(makeResponse(skillsDirContents)) // skills/
+      mockFetch.mockResolvedValueOnce(makeResponse(subContents)) // skills/my-tool/
+      mockFetch.mockResolvedValueOnce(makeResponse(skillMd, 200, true)) // SKILL.md content
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(1)
+      expect(detected[0].path).toBe('skills/my-tool')
+    })
+
+    it('should fall back to contents API ({dir}/skills/{name} pattern) when the tree is truncated', async () => {
       const rootContents = [makeContentItem('domain', 'dir', 'domain')]
       const nestedSkillsDir = [makeContentItem('nested-skill', 'dir', 'domain/skills/nested-skill')]
       const subContents = [makeContentItem('SKILL.md', 'file', 'domain/skills/nested-skill/SKILL.md')]
-      const skillMd = makeSkillMdContent('nested-skill', 'Nested description')
 
-      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root (cached for strategy 3 re-use)
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeResponse(['unrelated.md'], true))) // truncated tree
+      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root contents (cached for strategy 3)
       mockFetch.mockResolvedValueOnce(makeResponse(null, 404, false)) // skills/ → 404
-      // strategy 3 re-fetches root but it's cached — no mock needed
       mockFetch.mockResolvedValueOnce(makeResponse(nestedSkillsDir)) // domain/skills/
       mockFetch.mockResolvedValueOnce(makeResponse(subContents)) // domain/skills/nested-skill/
-      mockFetch.mockResolvedValueOnce(makeResponse(skillMd, 200, true)) // SKILL.md content
+      mockFetch.mockResolvedValueOnce(makeResponse(makeSkillMdContent('nested-skill'), 200, true)) // SKILL.md
 
       const detected = await detectSkillsInRepo('owner', 'repo')
       expect(detected).toHaveLength(1)
@@ -129,15 +256,38 @@ describe('github-fetcher', () => {
       expect(detected[0].path).toBe('domain/skills/nested-skill')
     })
 
-    it('should return empty array for repo with no skills', async () => {
-      const rootContents = [makeContentItem('README.md', 'file', 'README.md')]
+    it('should fall back to contents API when the tree API fails', async () => {
+      const rootContents = [makeContentItem('SKILL.md', 'file', 'SKILL.md')]
+      const skillMdContent = makeSkillMdContent('my-skill')
 
-      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root (cached)
+      mockFetch.mockResolvedValueOnce(makeResponse(null, 404, false)) // git tree → 404 (tree API unavailable)
+      mockFetch.mockResolvedValueOnce(makeResponse(rootContents)) // root contents
+      mockFetch.mockResolvedValueOnce(makeResponse(skillMdContent, 200, true)) // SKILL.md content
       mockFetch.mockResolvedValueOnce(makeResponse(null, 404, false)) // skills/ → 404
-      // strategy 3 re-fetches root from cache; rootContents has no dirs → no further calls
 
       const detected = await detectSkillsInRepo('owner', 'repo')
-      expect(detected).toEqual([])
+      expect(detected).toHaveLength(1)
+      expect(detected[0].name).toBe('my-skill')
+      expect(detected[0].path).toBe('')
+    })
+
+    it('should propagate rate limit errors instead of falling back', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(null, 403, false)) // git tree → 403
+
+      await expect(detectSkillsInRepo('owner', 'repo')).rejects.toThrow('rate limit')
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('should skip skills whose SKILL.md cannot be fetched', async () => {
+      mockFetch.mockResolvedValueOnce(
+        makeResponse(makeTreeResponse(['skills/good/SKILL.md', 'skills/broken/SKILL.md']))
+      )
+      mockFetch.mockResolvedValueOnce(makeResponse(makeSkillMdContent('good'), 200, true))
+      mockFetch.mockResolvedValueOnce(makeResponse(null, 404, false))
+
+      const detected = await detectSkillsInRepo('owner', 'repo')
+      expect(detected).toHaveLength(1)
+      expect(detected[0].name).toBe('good')
     })
   })
 

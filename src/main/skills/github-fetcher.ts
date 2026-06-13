@@ -18,6 +18,16 @@ interface GitHubCommitItem {
   sha: string
 }
 
+interface GitHubTreeItem {
+  path: string
+  type: 'blob' | 'tree'
+}
+
+interface GitHubTreeResponse {
+  tree: GitHubTreeItem[]
+  truncated: boolean
+}
+
 export interface DetectedSkill {
   name: string
   path: string
@@ -98,8 +108,96 @@ export async function fetchRepoContents(owner: string, repo: string, repoPath = 
   }
 }
 
-// Strategy 1: root SKILL.md | 2: skills/{name}/SKILL.md | 3: {dir}/skills/{name}/SKILL.md (fallback)
+const MAX_DETECTED_SKILLS = 100
+const SKILL_CONTENT_FETCH_BATCH = 8
+const MAX_FALLBACK_CATEGORY_DIRS = 10
+
+// raw.githubusercontent.com can be unreachable while api.github.com works (common
+// behind some firewalls). In that case the tree listing succeeds but every content
+// fetch fails — surface the network error instead of reporting "no skills in repo".
+class SkillContentUnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SkillContentUnavailableError'
+  }
+}
+
 export async function detectSkillsInRepo(owner: string, repo: string): Promise<DetectedSkill[]> {
+  try {
+    const detected = await detectSkillsViaTree(owner, repo)
+    if (detected !== null) return detected
+  } catch (error) {
+    if (error instanceof GitHubApiError && (error.statusCode === 403 || error.statusCode === 429)) {
+      throw error
+    }
+    if (error instanceof SkillContentUnavailableError) {
+      throw error
+    }
+    log.warn(`Tree-based skill detection failed for ${owner}/${repo}, falling back to contents API`, error)
+  }
+  return detectSkillsViaContents(owner, repo)
+}
+
+// Lists the full repo tree in one API call, so SKILL.md files are found at any
+// depth (e.g. skills/{category}/{name}/SKILL.md). Returns null when the tree is
+// truncated by GitHub or malformed, so the caller can fall back to the contents API.
+async function detectSkillsViaTree(owner: string, repo: string): Promise<DetectedSkill[] | null> {
+  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`
+  const result = await githubFetch<GitHubTreeResponse>(url)
+  if (!Array.isArray(result?.tree)) {
+    log.warn(`Unexpected tree response shape for ${owner}/${repo}, falling back to contents API`)
+    return null
+  }
+  if (result.truncated) {
+    log.warn(`Tree listing truncated for ${owner}/${repo}, falling back to contents API`)
+    return null
+  }
+
+  const skillMdPaths = result.tree
+    .filter((item) => item.type === 'blob' && (item.path === 'SKILL.md' || item.path.endsWith('/SKILL.md')))
+    .filter((item) => !item.path.split('/').includes('node_modules'))
+    .map((item) => item.path)
+
+  if (skillMdPaths.length > MAX_DETECTED_SKILLS) {
+    log.warn(
+      `Repo ${owner}/${repo} has ${skillMdPaths.length} skills, only the first ${MAX_DETECTED_SKILLS} are listed`
+    )
+  }
+
+  const limitedPaths = skillMdPaths.slice(0, MAX_DETECTED_SKILLS)
+  const detected: DetectedSkill[] = []
+  let fetchFailures = 0
+  for (let i = 0; i < limitedPaths.length; i += SKILL_CONTENT_FETCH_BATCH) {
+    const batch = await Promise.all(
+      limitedPaths.slice(i, i + SKILL_CONTENT_FETCH_BATCH).map(async (skillMdPath): Promise<DetectedSkill | null> => {
+        const skillPath = skillMdPath === 'SKILL.md' ? '' : skillMdPath.slice(0, -'/SKILL.md'.length)
+        try {
+          const content = await fetchFileContent(owner, repo, skillMdPath)
+          return {
+            name: extractSkillName(content) || skillPath.split('/').pop() || repo,
+            path: skillPath,
+            description: extractSkillDescription(content),
+          }
+        } catch (error) {
+          log.warn(`Failed to fetch ${skillMdPath} from ${owner}/${repo}`, error)
+          fetchFailures++
+          return null
+        }
+      })
+    )
+    detected.push(...batch.filter((skill): skill is DetectedSkill => skill !== null))
+  }
+
+  if (limitedPaths.length > 0 && fetchFailures === limitedPaths.length) {
+    throw new SkillContentUnavailableError(
+      `Found ${limitedPaths.length} skill(s) in ${owner}/${repo} but failed to fetch their contents`
+    )
+  }
+  return detected
+}
+
+// Strategy 1: root SKILL.md | 2: skills/{name}/SKILL.md | 3: {dir}/skills/{name}/SKILL.md (fallback)
+async function detectSkillsViaContents(owner: string, repo: string): Promise<DetectedSkill[]> {
   const detected: DetectedSkill[] = []
 
   try {
@@ -120,6 +218,7 @@ export async function detectSkillsInRepo(owner: string, repo: string): Promise<D
 
   try {
     const skillsDirContents = await fetchRepoContents(owner, repo, 'skills')
+    let drilledCategories = 0
     for (const item of skillsDirContents) {
       if (item.type !== 'dir') continue
       try {
@@ -132,6 +231,28 @@ export async function detectSkillsInRepo(owner: string, repo: string): Promise<D
             path: `skills/${item.name}`,
             description: extractSkillDescription(content),
           })
+          continue
+        }
+        // skills/{category}/{name}/SKILL.md — drill one level into category dirs,
+        // capped to bound contents API calls against the unauthenticated rate limit
+        if (drilledCategories >= MAX_FALLBACK_CATEGORY_DIRS) continue
+        drilledCategories++
+        for (const sub of subContents) {
+          if (sub.type !== 'dir') continue
+          try {
+            const nestedContents = await fetchRepoContents(owner, repo, `skills/${item.name}/${sub.name}`)
+            const hasNestedSkillMd = nestedContents.some((f) => f.name === 'SKILL.md' && f.type === 'file')
+            if (hasNestedSkillMd) {
+              const content = await fetchFileContent(owner, repo, `skills/${item.name}/${sub.name}/SKILL.md`)
+              detected.push({
+                name: extractSkillName(content) || sub.name,
+                path: `skills/${item.name}/${sub.name}`,
+                description: extractSkillDescription(content),
+              })
+            }
+          } catch {
+            // Inaccessible nested skill dir
+          }
         }
       } catch {
         // Inaccessible skill dir
@@ -179,7 +300,9 @@ export async function detectSkillsInRepo(owner: string, repo: string): Promise<D
 }
 
 export async function fetchFileContent(owner: string, repo: string, filePath: string): Promise<string> {
-  const url = `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${filePath}`
+  // Git allows `#`/`?` in filenames — encode per segment so they don't truncate the URL
+  const encodedPath = filePath.split('/').map(encodeURIComponent).join('/')
+  const url = `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${encodedPath}`
 
   const cached = getCached<string>(url)
   if (cached !== undefined) return cached
@@ -203,8 +326,8 @@ export async function downloadSkillFiles(
   skillPath: string,
   targetDir: string
 ): Promise<void> {
-  const fs = await import('fs')
-  const pathModule = await import('path')
+  const fs = await import('node:fs')
+  const pathModule = await import('node:path')
 
   fs.mkdirSync(targetDir, { recursive: true })
 
