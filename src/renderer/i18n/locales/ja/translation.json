@@ -924,6 +924,8 @@
   "This large file needs Chatbox AI to finish indexing. Sign in to Chatbox AI, then retry this file. If you do not want to use Chatbox AI, remove the file and upload a smaller attachment instead.": "この大きなファイルは、インデックス作成を完了するためにChatbox AIが必要です。Chatbox AIにサインインしてから、このファイルを再度お試しください。Chatbox AIを使用したくない場合は、そのファイルを削除し、代わりに小さいサイズのファイルを添付してください。",
   "This license key has reached the activation limit.": "このライセンスキーはアクティベーションの上限に達しました。",
   "This model does not support Agent Mode": "このモデルはエージェントモードに対応していません。",
+  "This PDF is password-protected, so its content cannot be read. Remove the password and upload it again.": "この PDF はパスワードで保護されているため、内容を読み取れません。パスワードを解除してから再度アップロードしてください。",
+  "This PDF is too large to process (max {{size}}). Please upload a smaller file.": "この PDF は大きすぎて処理できません（最大 {{size}}）。より小さいファイルをアップロードしてください。",
   "This model does not support tool use": "このモデルはツール利用に対応していません",
   "This model does not support vision": "このモデルは視覚に対応していません",
   "This model may not be able to read the uploaded document. Try another model if you want to ask about the file.": "このモデルはアップロードされたドキュメントを読み取れない可能性があります。ファイルについて質問したい場合は、別のモデルを試してください。",

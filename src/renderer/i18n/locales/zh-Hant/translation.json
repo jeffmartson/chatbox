@@ -924,6 +924,8 @@
   "This large file needs Chatbox AI to finish indexing. Sign in to Chatbox AI, then retry this file. If you do not want to use Chatbox AI, remove the file and upload a smaller attachment instead.": "此大檔案需要 Chatbox AI 才能完成索引。請登入 Chatbox AI，然後重新嘗試上傳此檔案。如果您不想使用 Chatbox AI，請移除該檔案並改為上傳較小的附件。",
   "This license key has reached the activation limit.": "此授權金鑰已達啟用上限。",
   "This model does not support Agent Mode": "此模型不支援代理模式",
+  "This PDF is password-protected, so its content cannot be read. Remove the password and upload it again.": "此 PDF 已加密，無法讀取其內容。請移除密碼後重新上傳。",
+  "This PDF is too large to process (max {{size}}). Please upload a smaller file.": "此 PDF 太大，無法處理（上限 {{size}}）。請上傳較小的檔案。",
   "This model does not support tool use": "該模型不支援工具調用",
   "This model does not support vision": "該模型不支援視覺能力",
   "This model may not be able to read the uploaded document. Try another model if you want to ask about the file.": "此模型可能無法讀取已上傳的文檔。如果您想針對該檔案進行提問，請嘗試更換其他模型。",

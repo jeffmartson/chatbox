@@ -79,7 +79,7 @@ export interface Platform extends Storage {
 
   ensureAutoLaunch(enable: boolean): Promise<void>
 
-  parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean }>
+  parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean; errorCode?: string }>
   getLocalFilePath(file: File): string
   readLocalFileContent?(filePath: string): Promise<string | null>
   fsRead?(params: { filePath: string; offset?: number; limit?: number }): Promise<{

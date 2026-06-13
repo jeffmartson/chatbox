@@ -3,7 +3,7 @@
   "productName": "xyz.chatboxapp.app",
   "version": "0.0.1",
   "engines": {
-    "node": ">=22.12.0 <25.0.0",
+    "node": ">=22.13.0 <25.0.0",
     "pnpm": ">=10.17.0"
   },
   "private": true,
@@ -242,6 +242,7 @@
     "optics-ts": "^2.4.0",
     "p-map": "^7.0.3",
     "p-timeout": "^6.1.4",
+    "pdfjs-dist": "^6.0.227",
     "photoswipe": "^5.4.4",
     "playwright": "^1.58.2",
     "postcss": "^8.5.3",

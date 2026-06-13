@@ -26,6 +26,7 @@ import * as analystic from './analystic-node'
 import { AppUpdater } from './app-updater'
 import * as autoLauncher from './autoLauncher'
 import { handleDeepLink } from './deeplinks'
+import { KNOWN_LOCAL_PARSER_ERROR_CODES } from '../shared/file-parse-errors'
 import { parseFile } from './file-parser'
 import Locale from './locales'
 import * as mcpIpc from './mcp/ipc-stdio-transport'
@@ -770,7 +771,10 @@ ipcMain.handle('parseFileLocally', async (event, dataJSON: string) => {
     return JSON.stringify({ text: data, isSupported: true })
   } catch (e) {
     log.error(`parseFileLocally failed: "${params.filePath}"`, e)
-    return JSON.stringify({ isSupported: false })
+    // Forward a known parser error code (e.g. password-protected / too large) so
+    // the renderer can show an accurate message; keep other errors generic.
+    const errorCode = e instanceof Error && KNOWN_LOCAL_PARSER_ERROR_CODES.has(e.message) ? e.message : undefined
+    return JSON.stringify({ isSupported: false, errorCode })
   }
 })
 

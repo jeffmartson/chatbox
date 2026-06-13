@@ -928,6 +928,8 @@
   "This large file needs Chatbox AI to finish indexing. Sign in to Chatbox AI, then retry this file. If you do not want to use Chatbox AI, remove the file and upload a smaller attachment instead.": "يحتاج هذا الملف الكبير إلى Chatbox AI لإتمام الفهرسة. يرجى تسجيل الدخول إلى Chatbox AI، ثم إعادة محاولة رفع هذا الملف. إذا كنت لا ترغب في استخدام Chatbox AI، فيرجى إزالة الملف ورفع مرفق أصغر حجماً بدلاً منه.",
   "This license key has reached the activation limit.": "وصل مفتاح الترخيص هذا إلى حد التنشيط.",
   "This model does not support Agent Mode": "هذا النموذج لا يدعم وضع الوكيل",
+  "This PDF is password-protected, so its content cannot be read. Remove the password and upload it again.": "ملف PDF هذا محمي بكلمة مرور، لذا لا يمكن قراءة محتواه. أزل كلمة المرور ثم أعد رفعه.",
+  "This PDF is too large to process (max {{size}}). Please upload a smaller file.": "ملف PDF هذا كبير جدًا بحيث لا يمكن معالجته (الحد الأقصى {{size}}). يرجى رفع ملف أصغر.",
   "This model does not support tool use": "هذا النموذج لا يدعم استخدام الأدوات",
   "This model does not support vision": "هذا النموذج لا يدعم الرؤية",
   "This model may not be able to read the uploaded document. Try another model if you want to ask about the file.": "قد لا يتمكن هذا النموذج من قراءة المستند الذي تم تحميله. جرب نموذجاً آخر إذا كنت ترغب في طرح أسئلة حول الملف.",

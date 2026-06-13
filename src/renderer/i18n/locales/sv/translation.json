@@ -924,6 +924,8 @@
   "This large file needs Chatbox AI to finish indexing. Sign in to Chatbox AI, then retry this file. If you do not want to use Chatbox AI, remove the file and upload a smaller attachment instead.": "Den här stora filen kräver Chatbox AI för att slutföra indexeringen. Logga in på Chatbox AI och försök sedan med filen igen. Om du inte vill använda Chatbox AI, ta bort filen och ladda upp en mindre bilaga istället.",
   "This license key has reached the activation limit.": "Denna licensnyckel har nått aktiveringsgränsen.",
   "This model does not support Agent Mode": "Denna modell stöder inte agentläge",
+  "This PDF is password-protected, so its content cannot be read. Remove the password and upload it again.": "Den här PDF-filen är lösenordsskyddad, så innehållet kan inte läsas. Ta bort lösenordet och ladda upp den igen.",
+  "This PDF is too large to process (max {{size}}). Please upload a smaller file.": "Den här PDF-filen är för stor för att bearbetas (max {{size}}). Ladda upp en mindre fil.",
   "This model does not support tool use": "Denna modell stöder inte verktygsanvändning",
   "This model does not support vision": "Denna modell stöder inte bildförståelse",
   "This model may not be able to read the uploaded document. Try another model if you want to ask about the file.": "Denna modell kanske inte kan läsa det uppladdade dokumentet. Prova en annan modell om du vill ställa frågor om filen.",

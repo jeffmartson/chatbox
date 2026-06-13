@@ -1,3 +1,4 @@
+import { NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES } from '@shared/file-parse-errors'
 import { isSessionAttachmentRagSupportedFilePath, isSupportedFile, isTextFilePath } from '@shared/file-extensions'
 import type {
   ExportChatFormat,
@@ -243,7 +244,9 @@ async function parseFileWithLocalParser(
   const result = await platform.parseFileLocally(file)
 
   if (!result.isSupported || !result.key) {
-    throw new Error('local_parser_failed')
+    // Preserve a specific parser error code (password-protected / too large) so the
+    // UI can explain it; otherwise fall back to the generic failure.
+    throw new Error(result.errorCode || 'local_parser_failed')
   }
 
   // Get content from temporary storage
@@ -284,6 +287,13 @@ async function parseFileWithLocalFallback(
     return result
   } catch (error) {
     log.error(`Local parsing failed for "${file.name}":`, error)
+
+    // Encrypted or oversized PDFs cannot be recovered by the cloud parser either,
+    // so surface the specific error directly instead of wasting a fallback upload.
+    const errorCode = error instanceof Error ? error.message : ''
+    if (NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES.has(errorCode)) {
+      throw error
+    }
 
     if (canFallbackToChatboxAI()) {
       return await fallbackToChatboxAIParser(file, uniqKey, 'local_parser_failed')

@@ -237,8 +237,8 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('ensureAutoLaunch', enable)
   }
 
-  async parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean }> {
-    let result: { text: string; isSupported: boolean }
+  async parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean; errorCode?: string }> {
+    let result: { text: string; isSupported: boolean; errorCode?: string }
     const filePath = this.getLocalFilePath(file)
     if (!filePath) {
       // 复制长文本粘贴的文件是没有 path 的
@@ -248,8 +248,10 @@ export default class DesktopPlatform implements Platform {
       result = JSON.parse(resultJSON)
     }
     if (!result.isSupported) {
-      log.error(`parseFileLocally: unsupported file "${file.name}" (path=${filePath || 'none'})`)
-      return { isSupported: false }
+      log.error(
+        `parseFileLocally: unsupported file "${file.name}" (path=${filePath || 'none'}, errorCode=${result.errorCode || 'none'})`
+      )
+      return { isSupported: false, errorCode: result.errorCode }
     }
     const key = `parseFile-` + uuidv4()
     await this.setStoreBlob(key, result.text)
