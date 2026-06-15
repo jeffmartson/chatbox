@@ -9,7 +9,6 @@ export type ProcessingStatus = 'processing' | 'completed' | 'error' | undefined
 
 export type AttachmentPreparationResult = {
   file: File
-  inputFileKey?: string
   content: string
   storageKey: string
   rawStorageKey?: string

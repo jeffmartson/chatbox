@@ -303,7 +303,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const preConstructedMessageRef = useRef(preConstructedMessage)
     preConstructedMessageRef.current = preConstructedMessage
     const activeFilePreprocessingKeysRef = useRef(new Set<string>())
-    const inputFileKeyByFileRef = useRef(new WeakMap<File, string>())
     useEffect(() => {
       draftMessageIdRef.current = preConstructedMessage.draftMessageId
     }, [preConstructedMessage.draftMessageId])
@@ -915,7 +914,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const startFilePreprocessing = (file: File) => {
       const fileKey = StorageKeyGenerator.fileUniqKey(file)
-      inputFileKeyByFileRef.current.set(file, fileKey)
       activeFilePreprocessingKeysRef.current.add(fileKey)
 
       // 异步预处理文件，失败时标记为 error，并吞掉异常避免 Promise.all reject
@@ -930,7 +928,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
             return
           }
 
-          let nextPreprocessedFile: PreprocessedFile = { ...preprocessedFile, inputFileKey: fileKey }
+          let nextPreprocessedFile: PreprocessedFile = preprocessedFile
           if (platform.type === 'desktop') {
             const draftMessageId = draftMessageIdRef.current || uuidv4()
             const indexedFile = await startPreparedSessionAttachmentIndexing({
@@ -963,7 +961,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               file,
               {
                 file,
-                inputFileKey: fileKey,
                 content: '',
                 storageKey: '',
                 error: (error as Error)?.message || 'Failed to preprocess the file.',
@@ -1389,10 +1386,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                   <ImageMiniCard key={picKey} storageKey={picKey} onDelete={() => onImageDeleteClick(picKey)} />
                 ))}
                 {attachments?.map((file) => {
-                  const fileKey = inputFileKeyByFileRef.current.get(file) ?? StorageKeyGenerator.fileUniqKey(file)
+                  const fileKey = StorageKeyGenerator.fileUniqKey(file)
                   const status = preConstructedMessage.preprocessingStatus.files[fileKey]
                   const preprocessedFile = preConstructedMessage.preprocessedFiles.find(
-                    (f) => f.inputFileKey === fileKey || StorageKeyGenerator.fileUniqKey(f.file) === fileKey
+                    (f) => StorageKeyGenerator.fileUniqKey(f.file) === fileKey
                   )
                   const effectiveIndexStatus = preprocessedFile?.sessionAttachmentId
                     ? (preprocessedAttachmentIndexStatusMap.get(preprocessedFile.sessionAttachmentId) ??
