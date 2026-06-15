@@ -19,6 +19,7 @@ import Page from '@/components/layout/Page'
 import { useMyCopilots, useRemoteCopilotsByCursor } from '@/hooks/useCopilots'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import useVersion from '@/hooks/useVersion'
 import * as remote from '@/packages/remote'
 import { router } from '@/router'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
@@ -70,9 +71,17 @@ function Index() {
   const licensePlanName = useSettingsStore((s) => s.licensePlanName)
   const hasExpiredLicense = useSettingsStore((s) => s.hasExpiredLicense)
   const isLoggedIn = useAuthInfoStore((s) => Boolean(s.accessToken && s.refreshToken))
+  const { isExceeded, isExceededResolved } = useVersion()
   const welcomeCardMode = useMemo(
-    () => getHomeWelcomeCardMode({ providerCount: providers.length, isLoggedIn, hasLicense, hasExpiredLicense }),
-    [providers.length, isLoggedIn, hasLicense, hasExpiredLicense]
+    () =>
+      getHomeWelcomeCardMode({
+        providerCount: providers.length,
+        isLoggedIn,
+        hasLicense,
+        hasExpiredLicense,
+        hideForStoreReview: isExceeded || !isExceededResolved,
+      }),
+    [providers.length, isLoggedIn, hasLicense, hasExpiredLicense, isExceeded, isExceededResolved]
   )
 
   const selectedModel = useMemo(() => {
