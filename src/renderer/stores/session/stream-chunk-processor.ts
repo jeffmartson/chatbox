@@ -203,34 +203,6 @@ export async function processStreamChunk(
       contentParts.push(toolCallPart)
       break
     }
-    case 'tool-input-error': {
-      finalizeReasoningDuration(currentReasoningPart)
-      currentTextPart = undefined
-      currentReasoningPart = undefined
-      preparingToolInput = undefined
-      const existing = contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId) as
-        | MessageToolCallPart
-        | undefined
-      const toolCallPart: MessageToolCallPart =
-        existing ??
-        ({
-          type: 'tool-call',
-          state: 'call',
-          toolCallId: chunk.toolCallId,
-          toolName: chunk.toolName,
-          args: chunk.input,
-        } satisfies MessageToolCallPart)
-      toolCallPart.state = 'error'
-      toolCallPart.result = {
-        error: chunk.errorText,
-        input: chunk.input,
-        toolName: chunk.toolName,
-      }
-      if (!existing) {
-        contentParts.push(toolCallPart)
-      }
-      break
-    }
     case 'tool-result': {
       const existing = contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId) as
         | MessageToolCallPart
@@ -274,14 +246,28 @@ export async function processStreamChunk(
       const existing = contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId) as
         | MessageToolCallPart
         | undefined
-      if (existing) {
-        existing.state = 'error'
-        existing.result = {
-          error: chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
-          errorCode: chunk.error instanceof BaseError ? chunk.error.code : undefined,
-          input: chunk.input,
+      // Input-parse failures (formerly the dedicated `tool-input-error` chunk, removed in AI SDK v6)
+      // now arrive here without a preceding `tool-call`, so create the part if it's missing.
+      const toolCallPart: MessageToolCallPart =
+        existing ??
+        ({
+          type: 'tool-call',
+          state: 'call',
+          toolCallId: chunk.toolCallId,
           toolName: chunk.toolName,
-        }
+          args: chunk.input,
+        } satisfies MessageToolCallPart)
+      toolCallPart.state = 'error'
+      toolCallPart.result = {
+        error: chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
+        errorCode: chunk.error instanceof BaseError ? chunk.error.code : undefined,
+        input: chunk.input,
+        toolName: chunk.toolName,
+      }
+      if (!existing) {
+        currentTextPart = undefined
+        currentReasoningPart = undefined
+        contentParts.push(toolCallPart)
       }
       break
     }

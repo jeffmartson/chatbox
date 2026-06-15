@@ -345,14 +345,16 @@ describe('processStreamChunk', () => {
     }
   )
 
-  it('handles tool-input-error by creating an error tool-call part', async () => {
+  // AI SDK v6 dropped the dedicated `tool-input-error` chunk; input-parse failures now
+  // arrive as `tool-error` without a preceding `tool-call`, so the part is created here.
+  it('handles tool-error by creating an error tool-call part when none exists', async () => {
     const state = createInitialState()
     const result = await processStreamChunk(
-      chunk('tool-input-error', {
+      chunk('tool-error', {
         toolCallId: 'tc1',
         toolName: 'code_execution',
         input: '{"code":"console.log(1)",',
-        errorText: 'Invalid JSON',
+        error: 'Invalid JSON',
       }),
       state,
       callbacks

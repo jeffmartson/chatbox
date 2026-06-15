@@ -562,7 +562,8 @@ export async function webBrowsing(params: { licenseKey: string; query: string })
         'Content-Type': 'application/json',
         ...(await getChatboxHeaders()),
       },
-      body: JSON.stringify(params),
+      // licenseKey is already carried in the Authorization header; no need to duplicate it.
+      body: JSON.stringify({ query: params.query }),
     },
     {
       parseChatboxRemoteError: true,
@@ -609,6 +610,8 @@ export async function deactivateLicense(params: { licenseKey: string; instanceId
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // Send the Chatbox platform headers, consistent with activate/validate.
+        ...(await getChatboxHeaders()),
       },
       body: JSON.stringify(params),
     },

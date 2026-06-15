@@ -86,9 +86,13 @@ export function estimateDeepSeekTokens(text: string): number {
   let prevSpace = false
 
   for (const char of text) {
-    // Check if character is Chinese (CJK Unified Ideographs)
+    // Check if character is Chinese (CJK Unified Ideographs).
+    // Astral CJK ranges must use \u{...} with the `u` flag. Written as bare
+    // \u20000 (no `u` flag) they parse as \u2000 + "0", producing a 0x30-0x2A6D
+    // range that wrongly matches ASCII letters/digits \u2014 which made English text
+    // count as Chinese (~2x over-estimate) for DeepSeek models.
     if (
-      /[\u4e00-\u9fff\u3400-\u4dbf\u20000-\u2a6df\u2a700-\u2b73f\u2b740-\u2b81f\u2b820-\u2ceaf\uf900-\ufaff\u2f800-\u2fa1f]/.test(
+      /[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\uf900-\ufaff\u{2f800}-\u{2fa1f}]/u.test(
         char
       )
     ) {
