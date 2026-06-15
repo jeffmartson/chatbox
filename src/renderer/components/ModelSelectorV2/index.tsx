@@ -17,6 +17,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Drawer } from 'vaul'
+import { trackListModelClick, trackSelectModelClick, trackUpgradeModelClick } from '@/analytics/model-selection'
 import useChatboxAIModels from '@/hooks/useChatboxAIModels'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
@@ -53,6 +54,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
       selectedProviderId,
       selectedModelId,
       searchPosition = 'bottom',
+      pageName,
       ...comboboxProps
     },
     ref
@@ -76,8 +78,15 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
     const desktopDropdownRef = useRef<HTMLDivElement>(null)
     const desktopDetailCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+    const handleDropdownOpen = useCallback(() => {
+      onDropdownOpen?.()
+      if (pageName) {
+        trackListModelClick(pageName, selectedModelId)
+      }
+    }, [onDropdownOpen, pageName, selectedModelId])
+
     const combobox = useCombobox({
-      onDropdownOpen,
+      onDropdownOpen: handleDropdownOpen,
       onDropdownClose: () => {
         combobox.resetSelectedOption()
         setSearch('')
@@ -205,7 +214,16 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
       combobox.closeDropdown()
       setMobileOpen(false)
       setMobileDetail(null)
+      if (pageName && providerId && modelId) {
+        trackSelectModelClick(pageName, modelId, 'success')
+      }
       onSelect?.(providerId, modelId)
+    }
+
+    const handleDisabledSelect = (modelId: string) => {
+      if (pageName) {
+        trackSelectModelClick(pageName, modelId, 'failed')
+      }
     }
 
     const blurActiveElement = () => {
@@ -218,6 +236,9 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
 
     const handleMobileOpenChange = (open: boolean) => {
       setMobileOpen(open)
+      if (open && pageName) {
+        trackListModelClick(pageName, selectedModelId)
+      }
       blurActiveElement()
     }
 
@@ -436,6 +457,8 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                   onShowMobileDetail={setMobileDetail}
                   onDesktopDetailOpen={openDesktopDetail}
                   onDesktopDetailClose={scheduleDesktopDetailClose}
+                  onDisabledSelect={handleDisabledSelect}
+                  pageName={pageName}
                 />
               )}
               <GenericProviderRows
@@ -456,6 +479,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 onShowMobileDetail={setMobileDetail}
                 onDesktopDetailOpen={openDesktopDetail}
                 onDesktopDetailClose={scheduleDesktopDetailClose}
+                onDisabledSelect={handleDisabledSelect}
               />
             </>
           ) : (
@@ -485,6 +509,8 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                   onShowMobileDetail={setMobileDetail}
                   onDesktopDetailOpen={openDesktopDetail}
                   onDesktopDetailClose={scheduleDesktopDetailClose}
+                  onDisabledSelect={handleDisabledSelect}
+                  pageName={pageName}
                 />
               )}
               <GenericProviderRows
@@ -505,6 +531,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 onShowMobileDetail={setMobileDetail}
                 onDesktopDetailOpen={openDesktopDetail}
                 onDesktopDetailClose={scheduleDesktopDetailClose}
+                onDisabledSelect={handleDisabledSelect}
               />
             </>
           )}
@@ -559,6 +586,9 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                       upgradeLink={chatboxAIModelList?.links?.upgrade}
                       onSelect={() => handleSelect(mobileDetail.providerId, mobileDetail.modelId)}
                       onClose={() => setMobileDetail(null)}
+                      onUpgradeClick={() =>
+                        pageName && trackUpgradeModelClick(pageName, 'upgrade_modal', mobileDetail.modelId)
+                      }
                       mobile
                     />
                   )}
@@ -617,6 +647,9 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 pricingLink={desktopDetail.pricingLink}
                 upgradeLink={desktopDetail.upgradeLink}
                 onSelect={() => handleSelect(desktopDetail.model.providerId, desktopDetail.model.modelId)}
+                onUpgradeClick={() =>
+                  pageName && trackUpgradeModelClick(pageName, 'upgrade_modal', desktopDetail.model.modelId)
+                }
               />
             </div>
           )}

@@ -8,6 +8,9 @@ export const JK_EVENTS = {
   PAGE_VIEW: 'page_view',
   PREVIEW_WEBPAGE_CLICK: 'preview_webpage_click',
   COPY_CODE_CLICK: 'copy_code_click',
+  LIST_MODEL_CLICK: 'list_model_click',
+  SELECT_MODEL_CLICK: 'select_model_click',
+  UPGRADE_MODEL_CLICK: 'upgrade_model_click',
 } as const
 
 export const JK_PAGE_NAMES = {

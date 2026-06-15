@@ -1,8 +1,10 @@
 import { Button, Flex, Text } from '@mantine/core'
 import type { ProviderModelInfo } from '@shared/types'
 import { IconChevronDown } from '@tabler/icons-react'
+import clsx from 'clsx'
 import type { Dispatch, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
+import { trackUpgradeModelClick } from '@/analytics/model-selection'
 import type { ChatboxAIModelList } from '@/packages/remote'
 import platform from '@/platform'
 import { ScalableIcon } from '../common/ScalableIcon'
@@ -48,6 +50,8 @@ export function ChatboxProviderRows({
   onShowMobileDetail,
   onDesktopDetailOpen,
   onDesktopDetailClose,
+  onDisabledSelect,
+  pageName,
 }: {
   catalog: ChatboxAIModelList
   provider: { id: string; name: string }
@@ -78,6 +82,8 @@ export function ChatboxProviderRows({
     upgradeLink?: string
   ) => void
   onDesktopDetailClose: () => void
+  onDisabledSelect: (modelId: string) => void
+  pageName?: string
 }) {
   const { t } = useTranslation()
   const favoriteSet = new Set(
@@ -142,6 +148,7 @@ export function ChatboxProviderRows({
             favorited={isFavorited(provider.id, modelId)}
             locked={locked}
             mobile={isMobile}
+            brandedInset
             pricingLink={catalog.links?.modelPricing}
             onSelect={() => onSelect(provider.id, modelId)}
             onFavorite={() => onToggleFavorite(provider.id, modelId)}
@@ -150,6 +157,7 @@ export function ChatboxProviderRows({
               onDesktopDetailOpen(detailKey, detail, catalog.links?.modelPricing, anchor, catalog.links?.upgrade)
             }
             onDesktopDetailClose={onDesktopDetailClose}
+            onDisabledSelect={() => onDisabledSelect(detail.modelId)}
           />
         )
       })
@@ -166,7 +174,7 @@ export function ChatboxProviderRows({
             type="button"
             align="center"
             gap="xs"
-            className="w-full min-h-10 px-2.5 py-2 border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-primary-hover text-chatbox-tint-primary cursor-pointer focus:outline-none focus-visible:outline-none active:bg-chatbox-background-primary-hover"
+            className="w-full min-h-9 pl-4 pr-2.5 py-2 border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-brand-secondary text-chatbox-tint-primary cursor-pointer focus:outline-none focus-visible:outline-none active:bg-chatbox-background-brand-secondary-hover"
             style={isMobile ? MOBILE_TAP_RESET_STYLE : undefined}
             onClick={() => onToggleGroup(group.id)}
           >
@@ -180,6 +188,9 @@ export function ChatboxProviderRows({
                 c="chatbox-brand"
                 onClick={(event) => {
                   event.stopPropagation()
+                  if (pageName) {
+                    trackUpgradeModelClick(pageName, 'list_model', null)
+                  }
                   platform.openLink(catalog.links?.upgrade || FALLBACK_UPGRADE_URL)
                 }}
               >
@@ -220,14 +231,21 @@ export function ChatboxProviderRows({
   })
 
   return (
-    <div>
+    <section
+      className={clsx(
+        'relative border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-primary',
+        isMobile ? 'mb-2' : 'mb-1'
+      )}
+    >
+      <div aria-hidden className="absolute bottom-0 left-0 top-0 w-[3px] bg-chatbox-tint-brand" />
       <ProviderRowHeader
         provider={provider}
         modelCount={modelCount}
         collapsed={collapsed}
+        variant="chatbox"
         onToggle={onToggleProvider}
       />
       {!collapsed && rows}
-    </div>
+    </section>
   )
 }

@@ -48,6 +48,7 @@ import { useDropzone } from 'react-dropzone'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuidv4 } from 'uuid'
 import { createModelDependencies } from '@/adapters'
+import { JK_PAGE_NAMES } from '@/analytics/jk-events'
 import useInputBoxHistory from '@/hooks/useInputBoxHistory'
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase'
 import { useMessageInput } from '@/hooks/useMessageInput'
@@ -1696,6 +1697,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                       selectedProviderId={model?.provider}
                       selectedModelId={model?.modelId}
                       modelDisabledCheck={modelDisabledCheck}
+                      pageName={JK_PAGE_NAMES.CHAT_PAGE}
                       position="top-end"
                       transitionProps={{
                         transition: 'fade-up',

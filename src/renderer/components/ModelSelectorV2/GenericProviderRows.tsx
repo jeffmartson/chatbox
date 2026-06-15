@@ -1,10 +1,29 @@
 import type { ProviderModelInfo } from '@shared/types'
 import { ModelProviderEnum } from '@shared/types'
+import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
 import { modelMatchesSearch } from './chatboxCatalog'
 import { groupFavorites } from './helpers'
 import { ModelRow } from './ModelRow'
 import { ProviderRowHeader } from './ProviderRowHeader'
 import type { DetailModel, FavoriteModel, FilteredProvider } from './types'
+
+function ByokSectionDivider({ mobile }: { mobile: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className={clsx(
+        'sticky top-0 z-20 flex h-9 items-center gap-2 border-0 border-y border-solid border-chatbox-border-primary bg-chatbox-background-secondary px-2.5',
+        mobile ? 'mt-1 px-3' : 'mt-1'
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-chatbox-tint-secondary">
+        {t('More Providers')}
+      </span>
+      <span className="text-[11px] font-semibold text-chatbox-tint-tertiary">BYOK</span>
+    </div>
+  )
+}
 
 export function GenericProviderRows({
   favoriteOnly,
@@ -24,6 +43,7 @@ export function GenericProviderRows({
   onShowMobileDetail,
   onDesktopDetailOpen,
   onDesktopDetailClose,
+  onDisabledSelect,
 }: {
   favoriteOnly: boolean
   favoritedModels?: FavoriteModel[]
@@ -42,11 +62,12 @@ export function GenericProviderRows({
   onShowMobileDetail: (detail: DetailModel) => void
   onDesktopDetailOpen: (key: string, detail: DetailModel, pricingLink: string | undefined, anchor: HTMLElement) => void
   onDesktopDetailClose: () => void
+  onDisabledSelect: (modelId: string) => void
 }) {
   const source = favoriteOnly
     ? Object.entries(groupFavorites(favoritedModels))
     : genericProviders.map((p) => [p.id, { provider: p, models: [] }] as const)
-  return source.map(([_providerId, group]) => {
+  const rows = source.map(([_providerId, group]) => {
     const provider = favoriteOnly ? group.provider : (group.provider as FilteredProvider)
     if (!provider || provider.id === ModelProviderEnum.ChatboxAI) return null
     const collapsed = collapsedProviders[provider.id] || false
@@ -95,10 +116,20 @@ export function GenericProviderRows({
                 onShowDetail={() => onShowMobileDetail(detail)}
                 onDesktopDetailOpen={(anchor) => onDesktopDetailOpen(detailKey, detail, undefined, anchor)}
                 onDesktopDetailClose={onDesktopDetailClose}
+                onDisabledSelect={() => onDisabledSelect(detail.modelId)}
               />
             )
           })}
       </div>
     )
   })
+
+  if (!rows.some(Boolean)) return null
+
+  return (
+    <>
+      {!favoriteOnly && <ByokSectionDivider mobile={isMobile} />}
+      {rows}
+    </>
+  )
 }

@@ -665,6 +665,7 @@ function TaskChat({ session }: { session: NonNullable<ReturnType<typeof useTaskS
                     if (providerId === 'chatbox-ai' && DEEPSEEK_EXCLUDED_RE.test(m.modelId)) return false
                     return true
                   }}
+                  pageName={JK_PAGE_NAMES.TASK_PAGE}
                   position="top-end"
                   transitionProps={{ transition: 'fade-up', duration: 200 }}
                 >

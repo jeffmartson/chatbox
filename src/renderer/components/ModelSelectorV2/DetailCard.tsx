@@ -242,6 +242,7 @@ export function DetailCard({
   upgradeLink,
   onSelect,
   onClose,
+  onUpgradeClick,
   mobile,
 }: {
   model: DetailModel
@@ -249,11 +250,13 @@ export function DetailCard({
   upgradeLink?: string
   onSelect: () => void
   onClose?: () => void
+  onUpgradeClick?: () => void
   mobile?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const costLabel = getCostLabel(model.costLevel, t)
   const isCN = i18n.language.toLowerCase().startsWith('zh')
+  const showPricing = false
   return (
     <Stack
       gap={mobile ? 'md' : 'md'}
@@ -285,7 +288,8 @@ export function DetailCard({
           </Text>
         </UnstyledButton>
       )}
-      <PricingBlock model={model} mobile={mobile} t={t} isCN={isCN} />
+      {/* Temporarily hide model pricing information. */}
+      {showPricing && <PricingBlock model={model} mobile={mobile} t={t} isCN={isCN} />}
       <Stack gap="xs" mt="sm">
         <Text size="xs" fw={750} c="chatbox-primary" className="uppercase tracking-[0.08em]">
           {t('Capabilities')}
@@ -309,40 +313,43 @@ export function DetailCard({
             {t('Close')}
           </Button>
         )}
-        <Button
-          fullWidth
-          size={mobile ? 'md' : 'sm'}
-          leftSection={model.locked ? <ScalableIcon icon={IconSparkles} size={16} /> : undefined}
-          disabled={!model.locked && !!model.disabledReason}
-          className={model.locked ? 'font-semibold' : undefined}
-          style={
-            model.locked
-              ? {
-                  minHeight: mobile ? 46 : 42,
-                  border: 0,
-                  background: 'linear-gradient(90deg, #f59f00 0%, #f06b2f 52%, #e8592c 100%)',
-                  boxShadow: '0 10px 24px rgb(232 89 44 / 0.24)',
-                }
-              : model.disabledReason
+        {(mobile || model.locked || model.disabledReason) && (
+          <Button
+            fullWidth
+            size={mobile ? 'md' : 'sm'}
+            leftSection={model.locked ? <ScalableIcon icon={IconSparkles} size={16} /> : undefined}
+            disabled={!model.locked && !!model.disabledReason}
+            className={model.locked ? 'font-semibold' : undefined}
+            style={
+              model.locked
                 ? {
                     minHeight: mobile ? 46 : 42,
-                  }
-                : {
-                    minHeight: mobile ? 46 : 42,
                     border: 0,
-                    background: 'linear-gradient(105deg, #74c0fc 0%, #228be6 46%, #1864ab 100%)',
+                    background: 'linear-gradient(90deg, #f59f00 0%, #f06b2f 52%, #e8592c 100%)',
+                    boxShadow: '0 10px 24px rgb(232 89 44 / 0.24)',
                   }
-          }
-          onClick={() => {
-            if (model.locked) {
-              platform.openLink(upgradeLink || FALLBACK_UPGRADE_URL)
-            } else if (!model.disabledReason) {
-              onSelect()
+                : model.disabledReason
+                  ? {
+                      minHeight: mobile ? 46 : 42,
+                    }
+                  : {
+                      minHeight: mobile ? 46 : 42,
+                      border: 0,
+                      background: 'linear-gradient(105deg, #74c0fc 0%, #228be6 46%, #1864ab 100%)',
+                    }
             }
-          }}
-        >
-          {model.locked ? t('Upgrade to Pro') : t('Use this model')}
-        </Button>
+            onClick={() => {
+              if (model.locked) {
+                onUpgradeClick?.()
+                platform.openLink(upgradeLink || FALLBACK_UPGRADE_URL)
+              } else if (!model.disabledReason) {
+                onSelect()
+              }
+            }}
+          >
+            {model.locked ? t('Upgrade to Pro') : t('Use this model')}
+          </Button>
+        )}
       </Flex>
     </Stack>
   )

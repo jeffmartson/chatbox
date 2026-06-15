@@ -54,12 +54,14 @@ export function ModelRow({
   locked,
   mobile,
   hideFavorite,
+  brandedInset,
   pricingLink,
   onSelect,
   onFavorite,
   onShowDetail,
   onDesktopDetailOpen,
   onDesktopDetailClose,
+  onDisabledSelect,
 }: {
   detail: DetailModel
   providerModel: ProviderModelInfo
@@ -68,20 +70,26 @@ export function ModelRow({
   locked?: boolean
   mobile?: boolean
   hideFavorite?: boolean
+  brandedInset?: boolean
   pricingLink?: string
   onSelect: () => void
   onFavorite: () => void
   onShowDetail?: () => void
   onDesktopDetailOpen?: (anchor: HTMLElement) => void
   onDesktopDetailClose?: () => void
+  onDisabledSelect?: () => void
 }) {
   const { t } = useTranslation()
   const handleRowAction = () => {
+    if (detail.disabledReason && !locked) {
+      onDisabledSelect?.()
+      return
+    }
     if (locked) {
       onShowDetail?.()
       return
     }
-    if (!detail.disabledReason) onSelect()
+    onSelect()
   }
   const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
@@ -98,7 +106,9 @@ export function ModelRow({
       aria-disabled={!!detail.disabledReason && !locked}
       className={clsx(
         'w-full flex items-center border-0 bg-transparent text-left cursor-pointer text-chatbox-tint-primary focus:outline-none focus-visible:outline-none',
-        mobile ? 'min-h-11 px-3 gap-2.5' : 'h-9 px-2.5 gap-1.5',
+        mobile
+          ? clsx('min-h-11 pr-3 gap-2.5', brandedInset ? 'pl-4' : 'pl-3')
+          : clsx('h-9 pr-2.5 gap-1.5', brandedInset ? 'pl-4' : 'pl-2.5'),
         !mobile && (selected ? SELECTED_CLASS : HOVER_CLASS),
         detail.disabledReason && !locked && 'opacity-50 cursor-not-allowed'
       )}
