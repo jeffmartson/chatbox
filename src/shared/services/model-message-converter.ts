@@ -33,6 +33,36 @@ async function resolveImageData(
   }
 }
 
+/**
+ * Coerce an arbitrary tool result into a value the AI SDK accepts as a `json` tool output.
+ * Tool results may carry non-serializable values (Error instances, circular refs, functions,
+ * `undefined`) — e.g. when an MCP/tool execution fails and the raw error leaks into history.
+ * Feeding those into `{ type: 'json', value }` makes the AI SDK's `ModelMessage[]` schema
+ * validation throw `AI_InvalidPromptError`, blocking the whole request. This defensive net
+ * guarantees the value is plain JSON before it reaches the SDK.
+ */
+function toSafeJSONValue(result: unknown): JSONValue {
+  if (result == null) return null
+  if (result instanceof Error) {
+    return { error: result.message || String(result) }
+  }
+  try {
+    // Round-trip through JSON to strip anything non-serializable. The replacer coerces the
+    // values JSON.stringify would otherwise lose silently (nested Errors → `{}`) or throw on
+    // (BigInt); JSON.stringify still drops `undefined`/functions and throws on circular refs
+    // (caught below).
+    return JSON.parse(
+      JSON.stringify(result, (_key, value) => {
+        if (value instanceof Error) return { error: value.message || String(value) }
+        if (typeof value === 'bigint') return value.toString()
+        return value
+      })
+    ) as JSONValue
+  } catch {
+    return stringifyErrorResult(result)
+  }
+}
+
 function stringifyErrorResult(result: unknown): string {
   if (result == null) return 'Tool call failed'
   if (typeof result === 'string') return result
@@ -172,7 +202,7 @@ async function emitAssistantMessages(
         } as JSONValue,
       }
     } else {
-      toolOutput = { type: 'json' as const, value: (tc.result ?? null) as JSONValue }
+      toolOutput = { type: 'json' as const, value: toSafeJSONValue(tc.result) }
     }
     output.push({
       role: 'tool' as const,
