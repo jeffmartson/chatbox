@@ -729,7 +729,9 @@ export async function recoverSessionList() {
   for (const key of sessionKeys) {
     try {
       const session = await storage.getItem<Session | null>(key, null)
-      if (session) {
+      // Skip junk session entries (e.g. empty `{}` objects or `session:undefined`)
+      // that have no id — they cannot become valid meta records.
+      if (session && session.id) {
         const migratedSession = migrateSession(session)
         const firstMessageTimestamp = migratedSession.messages[0]?.timestamp || 0
         sessionsWithTimestamp.push({

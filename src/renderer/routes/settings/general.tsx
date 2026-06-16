@@ -475,6 +475,12 @@ const ImportExportDataSection = () => {
                 })
               }
             }
+          } else if (entriesToImport.some(([key]) => key.startsWith('session:'))) {
+            // Older backups (configVersion < 15, before #692) contain `session:*` data
+            // but no `chat-sessions-list` meta. Without it the new DB-backed session list
+            // stays empty and imported conversations don't show up. Rebuild the meta list
+            // from the imported `session:*` entries.
+            await recoverSessionList()
           }
 
           // 由于即将重启应用，这里不需要清理loading状态
