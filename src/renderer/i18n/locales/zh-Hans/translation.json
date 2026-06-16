@@ -1063,5 +1063,7 @@
   "Your license has expired.": "您的许可证已过期。",
   "Your license has expired. Please check your subscription or purchase a new one.": "您的 license 已过期。请检查您的订阅或重新购买。",
   "Your license has expired. You can continue using your expansion pack.": "您的许可证已过期。您可以继续使用您的扩展包。",
-  "Your rating on the App Store would help make Chatbox even better!": "您的 App Store 评分将帮助 Chatbox 变得更好！"
+  "Your rating on the App Store would help make Chatbox even better!": "您的 App Store 评分将帮助 Chatbox 变得更好！",
+  "Worked for {{time}}": "工作了 {{time}}",
+  "{{count}} steps": "{{count}} 个步骤"
 }

@@ -1,10 +1,11 @@
 import type { ModelStreamPart } from '@shared/models/types'
-import type { MessageReasoningPart } from '@shared/types/session'
+import type { MessageReasoningPart, MessageToolCallPart } from '@shared/types/session'
 import type { ToolSet } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createInitialState,
   finalizeReasoningDuration,
+  finalizeToolCallDuration,
   processStreamChunk,
   type StreamProcessorCallbacks,
   TOOL_RESULT_PREVIEW_LENGTH,
@@ -55,6 +56,39 @@ describe('finalizeReasoningDuration', () => {
   it('does nothing when duration already set', () => {
     const part = { type: 'reasoning' as const, text: 'thinking', startTime: Date.now() - 1000, duration: 500 }
     finalizeReasoningDuration(part)
+    expect(part.duration).toBe(500)
+  })
+})
+
+describe('finalizeToolCallDuration', () => {
+  it('sets duration when startTime exists and duration is missing', () => {
+    const part: MessageToolCallPart = {
+      type: 'tool-call',
+      state: 'result',
+      toolCallId: 'tc1',
+      toolName: 'search',
+      args: {},
+      startTime: Date.now() - 1000,
+    }
+    finalizeToolCallDuration(part)
+    expect(part.duration).toBeGreaterThan(0)
+  })
+
+  it('does nothing when part is undefined', () => {
+    expect(() => finalizeToolCallDuration(undefined)).not.toThrow()
+  })
+
+  it('does nothing when duration already set', () => {
+    const part: MessageToolCallPart = {
+      type: 'tool-call',
+      state: 'result',
+      toolCallId: 'tc1',
+      toolName: 'search',
+      args: {},
+      startTime: Date.now() - 1000,
+      duration: 500,
+    }
+    finalizeToolCallDuration(part)
     expect(part.duration).toBe(500)
   })
 })
@@ -266,6 +300,42 @@ describe('processStreamChunk', () => {
       toolCallId: 'tc1',
       toolName: 'search',
     })
+  })
+
+  it('records startTime on tool-call and duration on tool-result', async () => {
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: {} }),
+      state,
+      callbacks
+    )
+    const created = r1.state.contentParts[0] as { startTime?: number; duration?: number }
+    expect(created.startTime).toBeGreaterThan(0)
+    expect(created.duration).toBeUndefined()
+
+    const r2 = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: { data: 'found' } }),
+      r1.state,
+      callbacks
+    )
+    const finished = r2.state.contentParts[0] as { duration?: number }
+    expect(finished.duration).toBeGreaterThanOrEqual(0)
+  })
+
+  it('records duration on tool-error', async () => {
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: {} }),
+      state,
+      callbacks
+    )
+    const r2 = await processStreamChunk(
+      chunk('tool-error', { toolCallId: 'tc1', error: new Error('failed'), input: {}, toolName: 'search' }),
+      r1.state,
+      callbacks
+    )
+    const part = r2.state.contentParts[0] as { duration?: number }
+    expect(part.duration).toBeGreaterThanOrEqual(0)
   })
 
   it('handles tool-result by updating existing tool-call', async () => {

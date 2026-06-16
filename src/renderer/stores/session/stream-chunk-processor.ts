@@ -66,6 +66,12 @@ export function finalizeReasoningDuration(part: MessageReasoningPart | undefined
   }
 }
 
+export function finalizeToolCallDuration(part: MessageToolCallPart | undefined): void {
+  if (part?.startTime && !part.duration) {
+    part.duration = Date.now() - part.startTime
+  }
+}
+
 export async function processStreamChunk(
   chunk: ModelStreamPart<ToolSet>,
   state: StreamProcessorState,
@@ -199,6 +205,7 @@ export async function processStreamChunk(
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
         args,
+        startTime: Date.now(),
       }
       contentParts.push(toolCallPart)
       break
@@ -210,6 +217,7 @@ export async function processStreamChunk(
       if (existing) {
         preparingToolInput = undefined
         existing.state = 'result'
+        finalizeToolCallDuration(existing)
         const rawResult = 'result' in chunk ? chunk.result : chunk.output
 
         // Check if the result is too large and should be offloaded to blob storage
@@ -258,6 +266,7 @@ export async function processStreamChunk(
           args: chunk.input,
         } satisfies MessageToolCallPart)
       toolCallPart.state = 'error'
+      finalizeToolCallDuration(toolCallPart)
       toolCallPart.result = {
         error: chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
         errorCode: chunk.error instanceof BaseError ? chunk.error.code : undefined,

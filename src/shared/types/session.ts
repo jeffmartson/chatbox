@@ -133,6 +133,10 @@ export const MessageToolCallPartSchema = z.object({
   toolName: z.string(),
   args: z.unknown(),
   result: z.unknown().optional(),
+  /** Timestamp (ms) when this tool call started executing. */
+  startTime: z.number().optional(),
+  /** How long (ms) this tool call took from start to result/error. */
+  duration: z.number().optional(),
   pauseReason: z
     .discriminatedUnion('type', [
       z.object({
@@ -260,6 +264,8 @@ export const MessageSchema = z.object({
   usage: MessageUsageSchema.optional().catch(undefined),
   timestamp: z.number().optional(),
   firstTokenLatency: z.number().optional(),
+  /** Total wall-clock time (ms) spent generating this message (thinking + tools + text). */
+  generationDuration: z.number().optional(),
   finishReason: z.string().optional(),
   tokenCountMap: TokenCountMapSchema.optional(), // estimate token count as input
   tokenCalculatedAt: TokenCalculatedAtSchema,

@@ -12,11 +12,20 @@ import {
   Tooltip as Tooltip1,
 } from '@mantine/core'
 import { Box, Grid, useTheme } from '@mui/material'
-import type { Message, MessagePicture, MessageToolCallPart, SessionType } from '@shared/types'
+import type {
+  Message,
+  MessagePicture,
+  MessageReasoningPart,
+  MessageTextPart,
+  MessageToolCallPart,
+  SessionType,
+} from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
 import {
   IconArrowDown,
   IconBug,
+  IconChevronDown,
+  IconClockHour3,
   IconCode,
   IconCopy,
   IconDotsVertical,
@@ -36,7 +45,17 @@ import * as dateFns from 'date-fns'
 import { concat } from 'lodash'
 import type { UIElementData } from 'photoswipe'
 import type React from 'react'
-import { type FC, forwardRef, type MouseEventHandler, memo, useCallback, useMemo, useRef, useState } from 'react'
+import {
+  type FC,
+  Fragment,
+  forwardRef,
+  type MouseEventHandler,
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gallery, Item as GalleryItem } from 'react-photoswipe-gallery'
 import { trackJkClickEvent } from '@/analytics/jk'
@@ -44,6 +63,7 @@ import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import Markdown from '@/components/Markdown'
 import { useFetchBlob } from '@/hooks/useBlob'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import { formatElapsedTime } from '@/hooks/useThinkingTimer'
 import { cn } from '@/lib/utils'
 import { navigateToSettings } from '@/modals/Settings'
 import { copyToClipboard } from '@/packages/navigator'
@@ -70,9 +90,9 @@ import Loading from '../icons/Loading'
 import {
   DownloadArtifactsUI,
   ReasoningContentUI,
-  ToolCallGroupUI,
+  type StepTimelinePart,
+  StepTimelineUI,
   ToolCallPartUI,
-  WebSearchGroupUI,
 } from '../message-parts/ToolCallPartUI'
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
@@ -368,33 +388,124 @@ const _Message: FC<Props> = (props) => {
     [contentParts]
   )
 
+  // Index of the last reasoning/tool-call part. Text before it is "intermediate"
+  // narration (part of the process); text after it is the final answer.
+  const lastStepIndex = useMemo(() => {
+    let last = -1
+    for (let i = 0; i < contentParts.length; i++) {
+      const p = contentParts[i]
+      if (p.type === 'reasoning' || p.type === 'tool-call') last = i
+    }
+    return last
+  }, [contentParts])
+
+  // Group consecutive reasoning + tool-call + intermediate-text parts into a
+  // single "step group" so they render on one connected, collapsible timeline.
+  // All tool calls (including web_search) share the same timeline-step style;
+  // the final answer text stays outside.
   const groupedContentParts = useMemo(() => {
-    const groups: Array<
-      | { type: 'web_search_group'; parts: MessageToolCallPart[] }
-      | { type: 'tool_call_group'; parts: MessageToolCallPart[] }
-      | (typeof contentParts)[number]
-    > = []
-    for (const item of contentParts) {
-      if (item.type === 'tool-call' && (item as MessageToolCallPart).toolName === 'web_search') {
-        const last = groups[groups.length - 1]
-        if (last && 'parts' in last && last.type === 'web_search_group') {
-          last.parts.push(item as MessageToolCallPart)
-        } else {
-          groups.push({ type: 'web_search_group', parts: [item as MessageToolCallPart] })
-        }
-      } else if (item.type === 'tool-call') {
-        const last = groups[groups.length - 1]
-        if (last && 'parts' in last && last.type === 'tool_call_group') {
-          last.parts.push(item as MessageToolCallPart)
-        } else {
-          groups.push({ type: 'tool_call_group', parts: [item as MessageToolCallPart] })
-        }
+    const groups: Array<{ type: 'step_group'; parts: StepTimelinePart[] } | (typeof contentParts)[number]> = []
+    const pushToStepGroup = (item: StepTimelinePart) => {
+      const last = groups[groups.length - 1]
+      if (last && 'parts' in last && last.type === 'step_group') {
+        last.parts.push(item)
+      } else {
+        groups.push({ type: 'step_group', parts: [item] })
+      }
+    }
+    for (let i = 0; i < contentParts.length; i++) {
+      const item = contentParts[i]
+      if (item.type === 'tool-call' || item.type === 'reasoning') {
+        pushToStepGroup(item)
+      } else if (item.type === 'text' && i < lastStepIndex) {
+        // Intermediate narration between steps — thread it into the timeline.
+        pushToStepGroup(item)
       } else {
         groups.push(item)
       }
     }
     return groups
-  }, [contentParts])
+  }, [contentParts, lastStepIndex])
+
+  // Total time the assistant spent "working" on this message (thinking + tools).
+  // Prefer the wall-clock generation time, but never report less than the sum of
+  // the individual step durations (covers resumed/appended runs).
+  const workDurationMs = useMemo(() => {
+    let sum = 0
+    for (const part of contentParts) {
+      if ((part.type === 'reasoning' || part.type === 'tool-call') && part.duration) {
+        sum += part.duration
+      }
+    }
+    return Math.max(msg.generationDuration ?? 0, sum)
+  }, [contentParts, msg.generationDuration])
+
+  const workStepCount = useMemo(
+    () => contentParts.filter((p) => p.type === 'reasoning' || p.type === 'tool-call').length,
+    [contentParts]
+  )
+
+  // There is something to fold when a thinking/tool step exists before the last
+  // content part (so collapsing hides the process and keeps the final answer).
+  const hasFoldableProcess = useMemo(
+    () =>
+      contentParts.some((p, i) => (p.type === 'reasoning' || p.type === 'tool-call') && i < contentParts.length - 1),
+    [contentParts]
+  )
+
+  // Offer the collapsible process summary on any finished assistant run that has
+  // a multi-step process worth hiding.
+  const showWorkSummary = msg.role === 'assistant' && !msg.generating && hasFoldableProcess
+  const workSummaryLabel =
+    workDurationMs >= 1000
+      ? t('Worked for {{time}}', { time: formatElapsedTime(workDurationMs) })
+      : t('{{count}} steps', { count: workStepCount })
+  const [processCollapsed, setProcessCollapsed] = useState(false)
+
+  // When collapsed, hide the process and show the final answer. The answer can
+  // span multiple parts after the last step (e.g. text + image), so show the
+  // whole answer region rather than only the last part.
+  const displayGroups = useMemo<typeof groupedContentParts>(() => {
+    if (!(showWorkSummary && processCollapsed)) return groupedContentParts
+    const answerParts = contentParts.slice(lastStepIndex + 1)
+    if (answerParts.length > 0) return answerParts
+    // The message ended on a process step — fall back to showing that last step.
+    const lastPart = contentParts[contentParts.length - 1]
+    if (!lastPart) return []
+    if (lastPart.type === 'tool-call' || lastPart.type === 'reasoning') {
+      return [{ type: 'step_group' as const, parts: [lastPart] }]
+    }
+    return [lastPart]
+  }, [showWorkSummary, processCollapsed, groupedContentParts, contentParts, lastStepIndex])
+
+  // Renders an intermediate text block inside the step timeline, reusing the same
+  // markdown settings as the main answer text.
+  const renderTimelineText = useCallback(
+    (part: MessageTextPart, index: number): React.ReactNode =>
+      enableMarkdownRendering ? (
+        <Markdown
+          uniqueId={`${msg.id}-step-${index}`}
+          enableLaTeXRendering={enableLaTeXRendering}
+          enableMermaidRendering={enableMermaidRendering}
+          generating={msg.generating}
+          onCodeCopy={onCodeCopy}
+          onPreviewWebpage={onPreviewWebpage}
+        >
+          {part.text || ''}
+        </Markdown>
+      ) : (
+        <div className="break-words [overflow-wrap:anywhere] whitespace-pre-line">{part.text}</div>
+      ),
+    [
+      enableMarkdownRendering,
+      enableLaTeXRendering,
+      enableMermaidRendering,
+      msg.generating,
+      msg.id,
+      onCodeCopy,
+      onPreviewWebpage,
+    ]
+  )
 
   const CollapseButton = (
     <span
@@ -539,14 +650,35 @@ const _Message: FC<Props> = (props) => {
           className={cn('msg-content', { 'msg-content-small': small })}
           sx={small ? { fontSize: theme.typography.body2.fontSize } : {}}
         >
-          {msg.reasoningContent && <ReasoningContentUI message={msg} onCopyReasoningContent={onCopyReasoningContent} />}
+          {showWorkSummary && (
+            <Flex
+              align="center"
+              gap={4}
+              className="cursor-pointer w-fit mb-1 select-none opacity-80 hover:opacity-100 transition-opacity"
+              onClick={() => setProcessCollapsed((v) => !v)}
+            >
+              <ScalableIcon icon={IconClockHour3} size={13} className="flex-none text-chatbox-tint-tertiary" />
+              <Text size="xs" c="chatbox-tertiary">
+                {workSummaryLabel}
+              </Text>
+              <ScalableIcon
+                icon={IconChevronDown}
+                size={13}
+                className={cn(
+                  'flex-none text-chatbox-tint-tertiary transition-transform',
+                  processCollapsed ? '' : 'rotate-180'
+                )}
+              />
+            </Flex>
+          )}
+          {msg.reasoningContent && !(showWorkSummary && processCollapsed) && (
+            <ReasoningContentUI message={msg} onCopyReasoningContent={onCopyReasoningContent} />
+          )}
           {getMessageText(msg, true, true).trim() === '' && <p></p>}
-          {groupedContentParts.length > 0 && (
+          {displayGroups.length > 0 && (
             <div>
-              {groupedContentParts.map((item, index) =>
-                'parts' in item && item.type === 'web_search_group' ? (
-                  <WebSearchGroupUI key={`web-search-group-${msg.id}-${index}`} parts={item.parts} />
-                ) : item.type === 'reasoning' ? (
+              {displayGroups.map((item, index) =>
+                item.type === 'reasoning' ? (
                   <div key={`reasoning-${msg.id}-${index}`}>
                     <ReasoningContentUI message={msg} part={item} onCopyReasoningContent={onCopyReasoningContent} />
                   </div>
@@ -682,13 +814,29 @@ const _Message: FC<Props> = (props) => {
                       )}
                     </div>
                   )
-                ) : 'parts' in item && item.type === 'tool_call_group' ? (
-                  <ToolCallGroupUI
-                    key={`tool-call-group-${msg.id}-${index}`}
-                    parts={item.parts}
-                    sessionId={sessionId}
-                    messageId={msg.id}
-                  />
+                ) : 'parts' in item && item.type === 'step_group' ? (
+                  item.parts.some((p) => p.type !== 'reasoning') ? (
+                    <StepTimelineUI
+                      key={`step-group-${msg.id}-${index}`}
+                      parts={item.parts}
+                      message={msg}
+                      sessionId={sessionId}
+                      messageId={msg.id}
+                      onCopyReasoningContent={onCopyReasoningContent}
+                      renderText={renderTimelineText}
+                    />
+                  ) : (
+                    <Fragment key={`reasoning-group-${msg.id}-${index}`}>
+                      {item.parts.map((p, pIdx) => (
+                        <ReasoningContentUI
+                          key={`reasoning-${msg.id}-${index}-${pIdx}`}
+                          message={msg}
+                          part={p as MessageReasoningPart}
+                          onCopyReasoningContent={onCopyReasoningContent}
+                        />
+                      ))}
+                    </Fragment>
+                  )
                 ) : item.type === 'tool-call' ? (
                   <ToolCallPartUI
                     key={item.toolCallId}

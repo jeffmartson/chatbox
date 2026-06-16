@@ -1063,5 +1063,7 @@
   "Your license has expired.": "Su licencia ha caducado.",
   "Your license has expired. Please check your subscription or purchase a new one.": "Su licencia ha expirado. Por favor, verifique su suscripción o adquiera una nueva.",
   "Your license has expired. You can continue using your expansion pack.": "Tu licencia ha caducado. Puedes seguir utilizando tu paquete de expansión.",
-  "Your rating on the App Store would help make Chatbox even better!": "Tu calificación en la App Store ayudará a hacer que Chatbox sea aún mejor!"
+  "Your rating on the App Store would help make Chatbox even better!": "Tu calificación en la App Store ayudará a hacer que Chatbox sea aún mejor!",
+  "Worked for {{time}}": "Trabajó durante {{time}}",
+  "{{count}} steps": "{{count}} pasos"
 }

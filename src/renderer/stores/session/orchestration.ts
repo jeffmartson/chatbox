@@ -523,6 +523,14 @@ export async function orchestrateGeneration(
       if (part.type === 'reasoning' && part.startTime && !part.duration) {
         part.duration = Date.now() - part.startTime
       }
+      if (
+        part.type === 'tool-call' &&
+        part.startTime &&
+        !part.duration &&
+        (part.state === 'result' || part.state === 'error')
+      ) {
+        part.duration = Date.now() - part.startTime
+      }
     }
 
     targetMsg = {
@@ -534,6 +542,7 @@ export async function orchestrateGeneration(
       status: [],
       finishReason: processorState.finishReason,
       usage: processorState.usage,
+      generationDuration: Date.now() - startTime,
     }
 
     await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
@@ -664,6 +673,9 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
       state: 'result',
       pauseReason: undefined,
       result: deniedResult,
+      // Denied without executing — no meaningful duration to report.
+      startTime: undefined,
+      duration: undefined,
     }))
     await modifyMessage(sessionId, nextMessage, true)
     await orchestrateGeneration(
@@ -703,6 +715,10 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
     pauseReason: undefined,
     result: undefined,
     resultStorageKey: undefined,
+    // Restart the timer at continuation so the reported duration excludes the
+    // time spent waiting for user approval / manual continuation.
+    startTime: Date.now(),
+    duration: undefined,
   }))
   await modifyMessage(sessionId, message, false)
 
@@ -719,6 +735,7 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
       ...toolPart,
       state: 'result',
       result,
+      duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
     }))
     await modifyMessage(sessionId, message, true)
 

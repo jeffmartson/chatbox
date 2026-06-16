@@ -1063,5 +1063,7 @@
   "Your license has expired.": "라이선스가 만료되었습니다.",
   "Your license has expired. Please check your subscription or purchase a new one.": "라이선스가 만료되었습니다. 구독을 확인하거나 새로운 라이선스를 구매하세요.",
   "Your license has expired. You can continue using your expansion pack.": "라이선스가 만료되었습니다. 확장팩은 계속 사용하실 수 있습니다.",
-  "Your rating on the App Store would help make Chatbox even better!": "App Store에서 평점을 주시면 Chatbox을 더 나은 것으로 만들 수 있습니다!"
+  "Your rating on the App Store would help make Chatbox even better!": "App Store에서 평점을 주시면 Chatbox을 더 나은 것으로 만들 수 있습니다!",
+  "Worked for {{time}}": "작업 시간 {{time}}",
+  "{{count}} steps": "{{count}}단계"
 }
