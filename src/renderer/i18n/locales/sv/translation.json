@@ -662,6 +662,8 @@
   "Parser": "Parser",
   "Parser Type": "Parsertyp",
   "Parser used to process uploaded documents": "Parser som används för att bearbeta uppladdade dokument",
+  "Parser: {{parser}}": "Parser: {{parser}}",
+  "Parser: Local": "Parser: Lokal",
   "Paste code here": "Klistra in kod här",
   "Paste long text as a file": "Klistra in lång text som en fil",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Klistra in lång text som en fil för att hålla chattlistan ren och minska tokenanvändningen med prompt-cache.",

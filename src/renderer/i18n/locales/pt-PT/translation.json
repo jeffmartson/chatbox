@@ -662,6 +662,8 @@
   "Parser": "Analisador",
   "Parser Type": "Tipo de Analisador",
   "Parser used to process uploaded documents": "Analisador usado para processar documentos carregados",
+  "Parser: {{parser}}": "Analisador: {{parser}}",
+  "Parser: Local": "Analisador: Local",
   "Paste code here": "Cole o código aqui",
   "Paste long text as a file": "Colar texto longo como um ficheiro",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Colar texto longo como um ficheiro para manter as conversas limpas e reduzir o uso de tokens com cache de prompt.",

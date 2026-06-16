@@ -662,6 +662,8 @@
   "Parser": "パーサー",
   "Parser Type": "パーサータイプ",
   "Parser used to process uploaded documents": "アップロードされたドキュメントを処理するパーサー",
+  "Parser: {{parser}}": "パーサー: {{parser}}",
+  "Parser: Local": "パーサー: ローカル",
   "Paste code here": "ここにコードを貼り付けてください",
   "Paste long text as a file": "長文をファイルとして貼り付け",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "長文をファイルとして貼り付けると、チャットをクリーンに保ち、プロンプトキャッシュを使用してトークン使用量を削減できます。",

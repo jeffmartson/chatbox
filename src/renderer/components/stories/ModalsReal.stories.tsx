@@ -275,19 +275,20 @@ export const ArtifactPreviewStates: StoryObj = {
 }
 
 export const ContentViewerStates: StoryObj = {
-  name: 'Content viewer modal direct content copy state',
+  name: 'Content viewer modal parser index metadata content copy state',
   parameters: {
     uiInventoryTargets: ['src/renderer/modals/ContentViewer'],
   },
   render: () => (
     <ModalPreview
       title="ContentViewer"
-      description="Actual content viewer modal with monospaced content body, copy action, and close action."
+      description="Actual content viewer modal with parser/index metadata rows, monospaced content body, copy action, and close action. For indexed attachments the parser is hidden in the attachment subtitle and shown here instead."
     >
       <OpenModal
         loadModal={() => import('@/modals/ContentViewer').then((module) => module.default)}
         props={{
           title: 'Parsed attachment content',
+          metadata: [{ value: 'Parser: MinerU' }, { label: 'Status', value: 'Indexed · 36 chunks' }],
           content: [
             '# Launch Notes',
             '',

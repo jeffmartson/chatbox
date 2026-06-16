@@ -662,6 +662,8 @@
   "Parser": "Парсер",
   "Parser Type": "Тип парсера",
   "Parser used to process uploaded documents": "Парсер используется для обработки загруженных документов",
+  "Parser: {{parser}}": "Парсер: {{parser}}",
+  "Parser: Local": "Парсер: Локальный",
   "Paste code here": "Вставьте код сюда",
   "Paste long text as a file": "Вставить длинный текст как файл",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Вставление длинного текста в виде файла поможет сохранить чистоту в чат-списке и уменьшить использование токенов с помощью кэширования промптов.",

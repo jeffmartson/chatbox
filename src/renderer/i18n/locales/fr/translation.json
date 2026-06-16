@@ -662,6 +662,8 @@
   "Parser": "THOUGHT: The user wants to translate the word \"Parser\" from English to French. This is a technical term used in the context of software and data processing.\n\nThe most direct and commonly used translation for \"parser\" in French, especially in a technical context, is \"analyseur\".Analyseur",
   "Parser Type": "Type d'analyseur",
   "Parser used to process uploaded documents": "Parseur utilisé pour traiter les documents téléchargés",
+  "Parser: {{parser}}": "Analyseur : {{parser}}",
+  "Parser: Local": "Analyseur : Local",
   "Paste code here": "Coller le code ici",
   "Paste long text as a file": "Coller un long texte comme un fichier",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Coller un long texte comme un fichier pour maintenir les conversations propres et réduire l'utilisation des tokens avec le cache de prompt.",

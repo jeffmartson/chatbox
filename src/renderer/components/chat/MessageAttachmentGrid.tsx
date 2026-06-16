@@ -120,6 +120,7 @@ export function MessageAttachmentGrid({ files, links, align = 'start' }: Message
               filename={file.name}
               fileType={file.fileType}
               byteLength={file.byteLength}
+              parserType={file.parserType}
               storageKey={file.storageKey}
               ragMode={file.ragMode}
               sessionAttachmentAvailability={

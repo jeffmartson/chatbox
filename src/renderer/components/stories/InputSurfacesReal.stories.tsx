@@ -113,7 +113,23 @@ export const AttachmentMiniCardStates: StoryObj = {
           name="meeting-notes.docx"
           fileType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           status="completed"
-          statusText="Ready"
+          parserType="local"
+          onDelete={() => undefined}
+          onPreviewClick={() => undefined}
+        />
+        <FileMiniCard
+          name="scanned-contract.pdf"
+          fileType="application/pdf"
+          status="completed"
+          parserType="mineru"
+          onDelete={() => undefined}
+          onPreviewClick={() => undefined}
+        />
+        <FileMiniCard
+          name="annual-report.pdf"
+          fileType="application/pdf"
+          status="completed"
+          parserType="chatbox-ai"
           onDelete={() => undefined}
           onPreviewClick={() => undefined}
         />
@@ -148,7 +164,24 @@ export const MessageAttachmentStates: StoryObj = {
             filename="roadmap.md"
             fileType="text/markdown"
             byteLength={18_432}
+            parserType="local"
             storageKey="storybook-roadmap"
+          />
+          <MessageAttachment
+            label="Scanned contract"
+            filename="contract.pdf"
+            fileType="application/pdf"
+            byteLength={2_400_000}
+            parserType="mineru"
+            storageKey="storybook-contract"
+          />
+          <MessageAttachment
+            label="Quarterly deck"
+            filename="q3-deck.pptx"
+            fileType="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            byteLength={5_600_000}
+            parserType="chatbox-ai"
+            storageKey="storybook-deck"
           />
           <MessageAttachment
             label="Reference URL"
@@ -172,6 +205,7 @@ export const MessageAttachmentStates: StoryObj = {
             filename="handbook.pdf"
             fileType="application/pdf"
             byteLength={1_320_000}
+            parserType="mineru"
             ragMode="session-retrieval"
             sessionAttachmentIndexStatus="ready"
             sessionAttachmentChunkCount={36}
@@ -197,6 +231,102 @@ export const MessageAttachmentStates: StoryObj = {
           />
         </Stack>
       </Paper>
+    </Stack>
+  ),
+}
+
+export const AttachmentParserTypeStates: StoryObj = {
+  name: 'Attachment parser type label local chatbox-ai mineru inline and indexed',
+  parameters: {
+    uiInventoryTargets: ['src/renderer/components/InputBox/Attachments'],
+  },
+  render: () => (
+    <Stack gap="lg">
+      <SurfaceLabel
+        title="Document parser label"
+        description="Shows which parser produced each attachment (Local / Chatbox AI / MinerU). Inline attachments show the parser in the subtitle; session-retrieval (indexed) attachments hide it to make room for index status — the full parser + index info is shown in the click preview window instead."
+      />
+      <Box>
+        <Text size="xs" c="dimmed" mb={6}>
+          Upload preview card (FileMiniCard) — parser shown on completed
+        </Text>
+        <Group align="flex-start">
+          <FileMiniCard
+            name="notes.docx"
+            fileType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            status="completed"
+            parserType="local"
+            onDelete={() => undefined}
+            onPreviewClick={() => undefined}
+          />
+          <FileMiniCard
+            name="scan.pdf"
+            fileType="application/pdf"
+            status="completed"
+            parserType="mineru"
+            onDelete={() => undefined}
+            onPreviewClick={() => undefined}
+          />
+          <FileMiniCard
+            name="report.pdf"
+            fileType="application/pdf"
+            status="completed"
+            parserType="chatbox-ai"
+            onDelete={() => undefined}
+            onPreviewClick={() => undefined}
+          />
+        </Group>
+      </Box>
+      <Box>
+        <Text size="xs" c="dimmed" mb={6}>
+          Inline message attachment — parser in subtitle
+        </Text>
+        <Paper withBorder radius="md" p="md" maw={520}>
+          <Stack gap="xs">
+            <MessageAttachment
+              label="Local parsed"
+              filename="roadmap.md"
+              fileType="text/markdown"
+              byteLength={18_432}
+              parserType="local"
+              storageKey="storybook-parser-local"
+            />
+            <MessageAttachment
+              label="MinerU parsed"
+              filename="contract.pdf"
+              fileType="application/pdf"
+              byteLength={2_400_000}
+              parserType="mineru"
+              storageKey="storybook-parser-mineru"
+            />
+            <MessageAttachment
+              label="Chatbox AI parsed"
+              filename="deck.pptx"
+              fileType="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              byteLength={5_600_000}
+              parserType="chatbox-ai"
+              storageKey="storybook-parser-chatboxai"
+            />
+          </Stack>
+        </Paper>
+      </Box>
+      <Box>
+        <Text size="xs" c="dimmed" mb={6}>
+          Indexed attachment — parser hidden in subtitle (index status takes priority)
+        </Text>
+        <Paper withBorder radius="md" p="md" maw={520}>
+          <MessageAttachment
+            label="Indexed handbook"
+            filename="handbook.pdf"
+            fileType="application/pdf"
+            byteLength={1_320_000}
+            parserType="mineru"
+            ragMode="session-retrieval"
+            sessionAttachmentIndexStatus="ready"
+            sessionAttachmentChunkCount={36}
+          />
+        </Paper>
+      </Box>
     </Stack>
   ),
 }

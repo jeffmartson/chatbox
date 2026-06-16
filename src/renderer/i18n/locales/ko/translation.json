@@ -662,6 +662,8 @@
   "Parser": "파서",
   "Parser Type": "파서 유형",
   "Parser used to process uploaded documents": "업로드된 문서를 처리하는 데 사용되는 파서",
+  "Parser: {{parser}}": "파서: {{parser}}",
+  "Parser: Local": "파서: 로컬",
   "Paste code here": "여기에 코드를 붙여넣으세요",
   "Paste long text as a file": "긴 텍스트를 파일로 붙여넣기",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "긴 텍스트를 붙여넣으면 파일로 삽입되어 대화를 깨끗하게 유지하고 프롬프트 캐싱을 사용하여 토큰 사용량을 줄입니다.",

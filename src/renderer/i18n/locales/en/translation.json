@@ -662,6 +662,8 @@
   "Parser": "Parser",
   "Parser Type": "Parser Type",
   "Parser used to process uploaded documents": "Parser used to process uploaded documents",
+  "Parser: {{parser}}": "Parser: {{parser}}",
+  "Parser: Local": "Parser: Local",
   "Paste code here": "Paste code here",
   "Paste long text as a file": "Paste long text as a file",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.",

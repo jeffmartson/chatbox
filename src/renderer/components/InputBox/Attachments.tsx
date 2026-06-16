@@ -100,6 +100,7 @@ export function FileMiniCard(props: {
   onDelete: () => void
   status?: 'processing' | 'completed' | 'error'
   statusText?: string
+  parserType?: string
   progressValue?: number
   isTakingLong?: boolean
   errorMessage?: string
@@ -111,6 +112,7 @@ export function FileMiniCard(props: {
     onDelete,
     status,
     statusText,
+    parserType,
     progressValue,
     isTakingLong,
     errorMessage,
@@ -132,7 +134,12 @@ export function FileMiniCard(props: {
 
   // 获取翻译后的错误消息
   const translatedError = getTranslatedErrorMessage(errorMessage, t)
-  const displayedStatusText = status === 'error' ? getErrorStatusLabel(errorMessage, t) : statusText
+  // 解析完成后展示使用的解析器（local/chatbox-ai/mineru）；处理中/错误时优先展示状态文案
+  const parserLabel = getParserTypeLabel(parserType, t)
+  const displayedStatusText =
+    status === 'error'
+      ? getErrorStatusLabel(errorMessage, t)
+      : (statusText ?? (status === 'completed' ? parserLabel : undefined))
   const clampedProgressValue =
     typeof progressValue === 'number' ? Math.max(0, Math.min(100, Math.round(progressValue))) : undefined
 
@@ -223,6 +230,24 @@ function getFileTypeLabel(filename: string, fileType?: string): string {
   return ''
 }
 
+// 展示文档使用了哪个解析器解析（local/chatbox-ai/mineru），带“解析器:”前缀以表意清晰。
+// 'sandbox-raw'（Agent 模式原文件）、'none' 及未知值不展示。
+export function getParserTypeLabel(
+  parserType: string | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string | undefined {
+  switch (parserType) {
+    case 'local':
+      return t('Parser: Local')
+    case 'chatbox-ai':
+      return t('Parser: {{parser}}', { parser: 'Chatbox AI' })
+    case 'mineru':
+      return t('Parser: {{parser}}', { parser: 'MinerU' })
+    default:
+      return undefined
+  }
+}
+
 function getIndexingStageLabel(stage: SessionAttachmentIndexingStage | undefined, t: (key: string) => string) {
   switch (stage) {
     case 'queued':
@@ -256,6 +281,7 @@ export function MessageAttachment(props: {
   storageKey?: string
   fileType?: string
   byteLength?: number
+  parserType?: string
   ragMode?: 'inline' | 'session-retrieval'
   sessionAttachmentAvailability?: 'allowed' | 'blocked'
   sessionAttachmentIndexStatus?: 'pending' | 'indexing' | 'ready' | 'failed'
@@ -277,6 +303,7 @@ export function MessageAttachment(props: {
     storageKey,
     fileType,
     byteLength,
+    parserType,
     ragMode,
     sessionAttachmentAvailability,
     sessionAttachmentIndexStatus,
@@ -304,13 +331,22 @@ export function MessageAttachment(props: {
       } else {
         title = t('Content')
       }
-      await NiceModal.show('content-viewer', { title, storageKey })
+      // 预览窗口展示完整的解析器与索引状态信息
+      const metadata: Array<{ label?: string; value: string }> = []
+      if (parserLabel) metadata.push({ value: parserLabel })
+      if (ragStatusLabel) metadata.push({ label: String(t('Status')), value: String(ragStatusLabel) })
+      await NiceModal.show('content-viewer', {
+        title,
+        storageKey,
+        metadata: metadata.length ? metadata : undefined,
+      })
     }
   }
 
   const isClickable = !!storageKey
   const typeLabel = filename ? getFileTypeLabel(filename, fileType) : ''
   const sizeLabel = formatFileSize(byteLength)
+  const parserLabel = filename ? getParserTypeLabel(parserType, t) : undefined
   const effectiveAvailability = sessionAttachmentAvailability ?? 'allowed'
   const effectiveIndexStatus = sessionAttachmentIndexStatus ?? sessionAttachmentStatus
   const progressValue = getProgressValue(sessionAttachmentEmbeddedChunks, sessionAttachmentTotalChunks)
@@ -338,8 +374,12 @@ export function MessageAttachment(props: {
             ? t('Indexing failed')
             : activeProgressLabel
       : ''
-  const subtitle = [typeLabel, sizeLabel, ragStatusLabel].filter(Boolean).join(' · ')
   const showStatus = ragMode === 'session-retrieval'
+  // 有索引标识（session-retrieval）时，副标题让位给索引状态，避免拥挤/截断；
+  // 完整的解析器与索引信息改在点击后的预览窗口展示。
+  const subtitle = [typeLabel, sizeLabel, showStatus ? undefined : parserLabel, ragStatusLabel]
+    .filter(Boolean)
+    .join(' · ')
   const tooltipTitle =
     showStatus && effectiveAvailability === 'blocked' && sessionAttachmentBlockedReason
       ? `${label}\n${sessionAttachmentBlockedReason}`

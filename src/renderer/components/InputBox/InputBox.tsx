@@ -104,7 +104,7 @@ import Disclaimer from '../Disclaimer'
 import ProviderImageIcon from '../icons/ProviderImageIcon'
 import ModelSelectorV2 from '../ModelSelectorV2'
 import AgentModeButton from './AgentModeButton'
-import { FileMiniCard, ImageMiniCard } from './Attachments'
+import { FileMiniCard, getParserTypeLabel, ImageMiniCard } from './Attachments'
 import { getAgentModeUIState } from './agentModeState'
 import { ImageUploadInput } from './ImageUploadInput'
 import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
@@ -1439,6 +1439,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                             : status
                       }
                       statusText={statusText}
+                      parserType={preprocessedFile?.parserType}
                       progressValue={progressValue}
                       isTakingLong={isSessionAttachmentTakingLong}
                       errorMessage={effectiveAttachmentError}
@@ -1454,9 +1455,11 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                       onPreviewClick={
                         preprocessedFile?.storageKey
                           ? () => {
+                              const parserLabel = getParserTypeLabel(preprocessedFile?.parserType, t)
                               void NiceModal.show('content-viewer', {
                                 title: `${t('File Content')}: ${file.name}`,
                                 storageKey: preprocessedFile.storageKey,
+                                metadata: parserLabel ? [{ value: parserLabel }] : undefined,
                               })
                             }
                           : undefined

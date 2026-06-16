@@ -662,6 +662,8 @@
   "Parser": "Parser",
   "Parser Type": "Tipo di Parser",
   "Parser used to process uploaded documents": "Parser utilizzato per elaborare i documenti caricati",
+  "Parser: {{parser}}": "Parser: {{parser}}",
+  "Parser: Local": "Parser: Locale",
   "Paste code here": "Incolla il codice qui",
   "Paste long text as a file": "Incolla testo lungo come file",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "Incolla testo lungo come file per mantenere le conversazioni pulite e ridurre l'utilizzo dei token con il caching dei prompt.",

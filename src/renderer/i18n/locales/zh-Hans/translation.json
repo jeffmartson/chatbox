@@ -662,6 +662,8 @@
   "Parser": "解析器",
   "Parser Type": "解析器类型",
   "Parser used to process uploaded documents": "用于处理上传文档的解析器",
+  "Parser: {{parser}}": "解析器: {{parser}}",
+  "Parser: Local": "解析器: 本地",
   "Paste code here": "在此粘贴代码",
   "Paste long text as a file": "粘贴长文本为文件",
   "Pasting long text will automatically insert it as a file, keeping chats clean and reducing token usage with prompt caching.": "粘贴长文本时将以文件形式插入，有助于保持聊天列表简洁，并减少在 prompt caching 可用时大幅减少 token 使用量。",
