@@ -34,6 +34,7 @@ vi.mock('./github-fetcher', () => ({
   detectSkillsInRepo: vi.fn(),
   downloadSkillFiles: vi.fn(),
   getLatestCommitHash: vi.fn(),
+  getSkillTreeSha: vi.fn(),
 }))
 
 vi.mock('./parser', () => ({
@@ -47,7 +48,7 @@ vi.mock('../sandbox/manager', () => ({
 
 import fs from 'fs'
 import { getStatus, validateWritePath } from '../sandbox/manager'
-import { detectSkillsInRepo, downloadSkillFiles, getLatestCommitHash } from './github-fetcher'
+import { detectSkillsInRepo, downloadSkillFiles, getLatestCommitHash, getSkillTreeSha } from './github-fetcher'
 import {
   checkForUpdates,
   deleteSkill,
@@ -61,6 +62,7 @@ const mockedFs = vi.mocked(fs)
 const mockedDetect = vi.mocked(detectSkillsInRepo)
 const mockedDownload = vi.mocked(downloadSkillFiles)
 const mockedGetHash = vi.mocked(getLatestCommitHash)
+const mockedGetTreeSha = vi.mocked(getSkillTreeSha)
 const mockedParse = vi.mocked(parseSkillFile)
 const mockedGetStatus = vi.mocked(getStatus)
 const mockedValidateWritePath = vi.mocked(validateWritePath)
@@ -89,9 +91,35 @@ describe('installer', () => {
       expect(result.success).toBe(true)
       expect(result.skillName).toBe('my-new-skill')
       expect(mockedDownload).toHaveBeenCalled()
+      expect(mockedGetHash).toHaveBeenCalledWith('owner', 'repo', '')
       expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
         expect.stringContaining('source.json'),
         expect.stringContaining('"commit-hash-123"'),
+        'utf-8'
+      )
+    })
+
+    it('should record the per-skill tree sha and skip the commit API when available', async () => {
+      mockedDownload.mockResolvedValue(undefined)
+      mockedFs.existsSync.mockImplementation((p) => {
+        if (String(p).includes('SKILL.md')) return true
+        if (String(p).includes('.tmp-')) return false
+        return false
+      })
+      mockedParse.mockReturnValue({
+        metadata: { name: 'my-new-skill', description: 'A new skill' },
+        body: '# Instructions',
+      })
+      mockedGetTreeSha.mockResolvedValue('tree-sha-abc')
+
+      const result = await installSkillFromGitHub('owner', 'repo', 'skills/my-new-skill')
+
+      expect(result.success).toBe(true)
+      expect(mockedGetTreeSha).toHaveBeenCalledWith('owner', 'repo', 'skills/my-new-skill')
+      expect(mockedGetHash).not.toHaveBeenCalled()
+      expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('source.json'),
+        expect.stringContaining('"tree-sha-abc"'),
         'utf-8'
       )
     })
@@ -461,6 +489,46 @@ describe('installer', () => {
       const result = await checkForUpdates('test-skill')
 
       expect(result.hasUpdate).toBe(false)
+    })
+
+    it('should compare the per-skill tree sha and ignore unrelated repo commits', async () => {
+      mockedFs.existsSync.mockReturnValue(true)
+      mockedFs.readFileSync.mockReturnValue(
+        JSON.stringify({
+          type: 'github',
+          repo: 'owner/repo',
+          skillPath: 'skills/test',
+          treeSha: 'tree-old',
+        })
+      )
+      mockedGetTreeSha.mockResolvedValue('tree-new')
+
+      const result = await checkForUpdates('test-skill')
+
+      expect(mockedGetTreeSha).toHaveBeenCalledWith('owner', 'repo', 'skills/test')
+      // The commit API (which would false-positive on unrelated commits) is not used.
+      expect(mockedGetHash).not.toHaveBeenCalled()
+      expect(result.hasUpdate).toBe(true)
+      expect(result.currentHash).toBe('tree-old')
+      expect(result.latestHash).toBe('tree-new')
+    })
+
+    it('should report no update when the tree sha matches', async () => {
+      mockedFs.existsSync.mockReturnValue(true)
+      mockedFs.readFileSync.mockReturnValue(
+        JSON.stringify({
+          type: 'github',
+          repo: 'owner/repo',
+          skillPath: 'skills/test',
+          treeSha: 'tree-same',
+        })
+      )
+      mockedGetTreeSha.mockResolvedValue('tree-same')
+
+      const result = await checkForUpdates('test-skill')
+
+      expect(result.hasUpdate).toBe(false)
+      expect(mockedGetHash).not.toHaveBeenCalled()
     })
 
     it('should return error when source.json is missing', async () => {

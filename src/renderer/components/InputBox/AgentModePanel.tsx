@@ -215,13 +215,13 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
 
   // --- Mode button ---
   const ModeButton: FC<{ value: AgentModeValue; label: string }> = ({ value, label }) => {
-    const isActive = agentModeUIState.effectiveValue === value
+    const isActive = agentModeUIState.displayValue === value
     const isLockedDisabled = entry.locked && value !== 'on'
     const isModelDisabled = !modelSupportsAgentMode && value !== 'off'
     const isDisabled = isLockedDisabled || isModelDisabled
     const tooltipLabel = isModelDisabled
       ? t('This model does not support Agent Mode')
-      : t('Cannot change after activation')
+      : t('Locked after the chat starts to keep tools and context consistent — start a new chat to change')
     return (
       <Tooltip label={tooltipLabel} disabled={!isDisabled} withArrow>
         <Button
@@ -592,7 +592,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             {t('Agent Mode')}
           </Text>
           <Flex gap={4} className="shrink-0">
-            <ModeButton value="auto" label={t('Auto')} />
+            <ModeButton value="auto" label="AUTO" />
             <ModeButton value="on" label="ON" />
             <ModeButton value="off" label="OFF" />
           </Flex>
@@ -632,9 +632,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               <IconCode size={16} className="text-[var(--chatbox-tint-secondary)]" />
               <Text size="sm">{t('Code Execution')}</Text>
             </Flex>
-            {agentModeUIState.effectiveValue !== 'off' && (
-              <IconCheck size={14} className="text-[var(--chatbox-tint-brand)]" />
-            )}
+            {agentModeUIState.isActive && <IconCheck size={14} className="text-[var(--chatbox-tint-brand)]" />}
           </Flex>
 
           {/* Extensions */}

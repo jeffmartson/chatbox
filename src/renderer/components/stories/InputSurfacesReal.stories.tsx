@@ -48,12 +48,12 @@ export const AgentModePanelStates: StoryObj = {
     <Stack gap="lg">
       <SurfaceLabel
         title="AgentModePanel"
-        description="Actual agent mode capability panel with Auto/ON/OFF modes, web search, code execution, skills, MCP, and knowledge base rows."
+        description="Actual agent mode capability panel with AUTO/ON/OFF modes, web search, code execution, skills, MCP, and knowledge base rows."
       />
       <Group align="flex-start">
         <Paper withBorder radius="md" p={0} style={{ overflow: 'visible' }}>
           <AgentModePanel
-            sessionId="storybook-agent-on"
+            sessionId="storybook-agent-auto"
             modelSupportsAgentMode
             webBrowsingMode
             currentKnowledgeBaseId={1}
@@ -270,7 +270,7 @@ function AgentModeButtonFixture() {
           </Text>
           <div ref={autoRef}>
             <AgentModeButton
-              sessionId="storybook-agent-on"
+              sessionId="storybook-agent-auto"
               webBrowsingMode={webBrowsing}
               onWebBrowsingChange={setWebBrowsing}
               currentKnowledgeBaseId={1}
@@ -375,7 +375,7 @@ function SeedInputSettings() {
       ...state,
       sessionAgentModeMap: {
         ...state.sessionAgentModeMap,
-        'storybook-agent-on': { value: 'auto', locked: false, lockReason: null },
+        'storybook-agent-auto': { value: 'auto', locked: false, lockReason: null },
         'storybook-agent-unsupported': { value: 'auto', locked: false, lockReason: null },
       },
     }))

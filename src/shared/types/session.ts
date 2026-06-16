@@ -114,6 +114,11 @@ export const MessageInfoPartSchema = z.object({
   values: z.record(z.string(), z.unknown()).optional(),
 })
 
+export const MessageAgentModeSuggestionPartSchema = z.object({
+  type: z.literal('agent-mode-suggestion'),
+  reason: z.string().optional(),
+})
+
 export const MessageReasoningPartSchema = z.object({
   type: z.literal('reasoning'),
   text: z.string(),
@@ -155,6 +160,7 @@ export const MessageContentPartSchema = z.discriminatedUnion('type', [
   MessageTextPartSchema,
   MessageImagePartSchema,
   MessageInfoPartSchema,
+  MessageAgentModeSuggestionPartSchema,
   MessageReasoningPartSchema,
   MessageToolCallPartSchema,
 ])
@@ -354,6 +360,7 @@ export type MessagePicture = z.infer<typeof MessagePictureSchema>
 export type MessageTextPart = z.infer<typeof MessageTextPartSchema>
 export type MessageImagePart = z.infer<typeof MessageImagePartSchema>
 export type MessageInfoPart = z.infer<typeof MessageInfoPartSchema>
+export type MessageAgentModeSuggestionPart = z.infer<typeof MessageAgentModeSuggestionPartSchema>
 export type MessageReasoningPart = z.infer<typeof MessageReasoningPartSchema>
 export type MessageToolCallPart<Args = unknown, Result = unknown> = z.infer<typeof MessageToolCallPartSchema> & {
   args: Args

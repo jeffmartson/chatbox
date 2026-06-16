@@ -9,7 +9,6 @@ import type {
   KnowledgeBase,
   Message,
   MessageContentParts,
-  MessageFile,
   Session,
   SessionSettings,
   Settings,
@@ -74,30 +73,9 @@ export interface PreparedAgentGenerationHarness {
   }
 }
 
-export function computeEffectiveAgentMode(
-  agentModeValue: AgentModeValue,
-  shouldAutoEnableAgent: boolean,
-  agentModeSupported: boolean
-): AgentModeValue {
+export function computeEffectiveAgentMode(agentModeValue: AgentModeValue, agentModeSupported: boolean): AgentModeValue {
   if (!agentModeSupported || agentModeValue === 'off') return 'off'
-  return shouldAutoEnableAgent || agentModeValue === 'on' ? 'on' : 'auto'
-}
-
-function isSimpleAutoModeFile(file: MessageFile): boolean {
-  const fileName = file.name.toLowerCase()
-  const fileType = file.fileType?.toLowerCase() ?? ''
-  return (
-    fileName.endsWith('.txt') ||
-    fileName.endsWith('.doc') ||
-    fileName.endsWith('.docx') ||
-    fileType === 'text/plain' ||
-    fileType === 'application/msword' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  )
-}
-
-export function shouldAutoEnableAgentForFiles(files: readonly MessageFile[]): boolean {
-  return files.length > 1 || files.some((file) => !isSimpleAutoModeFile(file))
+  return agentModeValue === 'on' ? 'on' : 'off'
 }
 
 function getToolCallPreserveMessageIds(
@@ -210,18 +188,12 @@ export async function prepareAgentGenerationHarness(
   } = options
 
   const allMessages = messages.slice(0, targetMsgIx)
-  const files = allMessages.flatMap((message) => message.files ?? [])
-  const shouldAutoEnableAgent = shouldAutoEnableAgentForFiles(files)
 
   if (agentModeSupported && agentModeValue === 'on' && !agentModeLocked) {
     sideEffects?.lockAgentMode?.('message_sent')
   }
 
-  if (agentModeSupported && shouldAutoEnableAgent && agentModeValue !== 'off') {
-    sideEffects?.lockAgentMode?.('file_upload')
-  }
-
-  const effectiveAgentMode = computeEffectiveAgentMode(agentModeValue, shouldAutoEnableAgent, agentModeSupported)
+  const effectiveAgentMode = computeEffectiveAgentMode(agentModeValue, agentModeSupported)
   const sandboxProvider = effectiveAgentMode !== 'off' ? sandboxProviderFactory() : null
   let canExecuteCode = Boolean(sandboxProvider && model.isSupportToolUse('agent'))
 

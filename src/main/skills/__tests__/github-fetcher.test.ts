@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../util', () => ({
@@ -14,9 +17,11 @@ vi.stubGlobal('fetch', mockFetch)
 import {
   clearCache,
   detectSkillsInRepo,
+  downloadSkillFiles,
   fetchFileContent,
   fetchRepoContents,
   getLatestCommitHash,
+  getSkillTreeSha,
 } from '../github-fetcher'
 
 function makeResponse(body: unknown, status = 200, ok = true) {
@@ -74,7 +79,8 @@ describe('github-fetcher', () => {
   describe('detectSkillsInRepo', () => {
     function makeTreeResponse(paths: string[], truncated = false) {
       return {
-        tree: paths.map((p) => ({ path: p, type: 'blob' })),
+        sha: 'root-tree-sha',
+        tree: paths.map((p) => ({ path: p, type: 'blob', sha: `blob-${p}` })),
         truncated,
       }
     }
@@ -311,6 +317,46 @@ describe('github-fetcher', () => {
     })
   })
 
+  describe('downloadSkillFiles', () => {
+    it('downloads a skill directory using one tree API request instead of recursive contents requests', async () => {
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chatbox-skill-test-'))
+
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/git/trees/')) {
+          return Promise.resolve(
+            makeResponse({
+              tree: [
+                { path: 'skills/demo/SKILL.md', type: 'blob' },
+                { path: 'skills/demo/scripts/run.sh', type: 'blob' },
+                { path: 'skills/other/SKILL.md', type: 'blob' },
+              ],
+              truncated: false,
+            })
+          )
+        }
+        if (url.endsWith('/HEAD/skills/demo/SKILL.md')) {
+          return Promise.resolve(makeResponse(makeSkillMdContent('demo'), 200, true))
+        }
+        if (url.endsWith('/HEAD/skills/demo/scripts/run.sh')) {
+          return Promise.resolve(makeResponse('#!/bin/sh\necho demo', 200, true))
+        }
+        return Promise.resolve(makeResponse(null, 404, false))
+      })
+
+      try {
+        await downloadSkillFiles('owner', 'repo', 'skills/demo', targetDir)
+
+        expect(fs.readFileSync(path.join(targetDir, 'SKILL.md'), 'utf-8')).toContain('name: demo')
+        expect(fs.readFileSync(path.join(targetDir, 'scripts/run.sh'), 'utf-8')).toContain('echo demo')
+        expect(mockFetch).toHaveBeenCalledTimes(3)
+        expect(mockFetch.mock.calls[0][0]).toContain('/git/trees/HEAD?recursive=1')
+        expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/contents/'))).toBe(false)
+      } finally {
+        fs.rmSync(targetDir, { recursive: true, force: true })
+      }
+    })
+  })
+
   describe('getLatestCommitHash', () => {
     it('should return latest commit sha', async () => {
       const commits = [{ sha: 'abc123def456' }]
@@ -332,6 +378,56 @@ describe('github-fetcher', () => {
 
       const hash = await getLatestCommitHash('owner', 'repo', 'path')
       expect(hash).toBeNull()
+    })
+  })
+
+  describe('getSkillTreeSha', () => {
+    function makeTreeWithDirs() {
+      return {
+        sha: 'root-tree-sha',
+        truncated: false,
+        tree: [
+          { path: 'skills', type: 'tree', sha: 'skills-dir-sha' },
+          { path: 'skills/my-skill', type: 'tree', sha: 'my-skill-tree-sha' },
+          { path: 'skills/my-skill/SKILL.md', type: 'blob', sha: 'skillmd-blob-sha' },
+          { path: 'skills/other', type: 'tree', sha: 'other-tree-sha' },
+        ],
+      }
+    }
+
+    it('should return the subtree sha for a nested skill path', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeWithDirs()))
+
+      const sha = await getSkillTreeSha('owner', 'repo', 'skills/my-skill')
+      expect(sha).toBe('my-skill-tree-sha')
+    })
+
+    it('should tolerate leading/trailing slashes in the skill path', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeWithDirs()))
+
+      const sha = await getSkillTreeSha('owner', 'repo', '/skills/my-skill/')
+      expect(sha).toBe('my-skill-tree-sha')
+    })
+
+    it('should return the root tree sha for a repo-root skill', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeWithDirs()))
+
+      const sha = await getSkillTreeSha('owner', 'repo', '')
+      expect(sha).toBe('root-tree-sha')
+    })
+
+    it('should return null when the path has no matching tree entry', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse(makeTreeWithDirs()))
+
+      const sha = await getSkillTreeSha('owner', 'repo', 'skills/missing')
+      expect(sha).toBeNull()
+    })
+
+    it('should return null when the tree is truncated', async () => {
+      mockFetch.mockResolvedValueOnce(makeResponse({ sha: 'x', tree: [], truncated: true }))
+
+      const sha = await getSkillTreeSha('owner', 'repo', 'skills/my-skill')
+      expect(sha).toBeNull()
     })
   })
 

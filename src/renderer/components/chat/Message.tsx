@@ -27,6 +27,7 @@ import {
   type IconProps,
   IconQuoteFilled,
   IconReload,
+  IconRobot,
   IconTrash,
 } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
@@ -53,6 +54,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import '../../static/Block.css'
 import {
+  generate,
   generateMore,
   modifyMessage,
   regenerateInNewFork,
@@ -75,6 +77,22 @@ import {
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
+
+// Reset an assistant message back to a clean generating state, reusing the same
+// message slot (e.g. when acting on an agent-mode suggestion callout).
+function resetMessageForAgentModeResponse(msg: Message): Message {
+  return {
+    ...msg,
+    generating: true,
+    cancel: undefined,
+    contentParts: [],
+    errorCode: undefined,
+    error: undefined,
+    errorExtra: undefined,
+    status: [],
+    finishReason: undefined,
+  }
+}
 
 interface Props {
   id?: string
@@ -139,6 +157,7 @@ const _Message: FC<Props> = (props) => {
   const ref = useRef<HTMLDivElement>(null)
 
   const setQuote = useUIStore((state) => state.setQuote)
+  const lockSessionAgentMode = useUIStore((state) => state.lockSessionAgentMode)
 
   const quoteMsg = useCallback(() => {
     let input = getMessageText(msg)
@@ -157,6 +176,19 @@ const _Message: FC<Props> = (props) => {
     handleStop()
     regenerateInNewFork(sessionId, msg)
   }, [handleStop, sessionId, msg])
+
+  const handleStartAgentModeResponse = useCallback(async () => {
+    lockSessionAgentMode(sessionId, 'message_sent')
+    const nextMsg = resetMessageForAgentModeResponse(msg)
+    await modifyMessage(sessionId, nextMsg, true)
+    await generate(sessionId, nextMsg, { operationType: 'send_message' })
+  }, [lockSessionAgentMode, msg, sessionId])
+
+  const handleContinueNormalResponse = useCallback(async () => {
+    const nextMsg = resetMessageForAgentModeResponse(msg)
+    await modifyMessage(sessionId, nextMsg, true)
+    await generate(sessionId, nextMsg, { operationType: 'send_message', skipAgentModeSuggestion: true })
+  }, [msg, sessionId])
 
   const lastStepForRetry = useMemo(() => {
     if (!msg.error) return undefined
@@ -550,6 +582,58 @@ const _Message: FC<Props> = (props) => {
                       <Text size="xs" c="chatbox-brand">
                         {item.text}
                       </Text>
+                    </Flex>
+                  </Flex>
+                ) : item.type === 'agent-mode-suggestion' ? (
+                  <Flex key={`agent-mode-suggestion-${msg.id}-${index}`} className="mb-2 w-full">
+                    <Flex
+                      className="w-full max-w-[760px] bg-chatbox-background-secondary border border-solid border-chatbox-border-primary rounded-lg shadow-sm overflow-hidden"
+                      align="stretch"
+                    >
+                      <div className="w-1 bg-chatbox-tint-brand" />
+                      <Flex
+                        align="center"
+                        gap="sm"
+                        px="sm"
+                        py="sm"
+                        className="min-w-0 flex-1"
+                        wrap={{ base: 'wrap', sm: 'nowrap' }}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-chatbox-background-brand-secondary text-chatbox-tint-brand">
+                          <ScalableIcon icon={IconRobot} size={18} />
+                        </div>
+                        <Stack gap={2} className="min-w-0 flex-1">
+                          <Text size="sm" fw={600} c="chatbox-primary">
+                            {t('Agent Mode suggested')}
+                          </Text>
+                          {item.reason && (
+                            <Text size="xs" c="chatbox-secondary" className="break-words [overflow-wrap:anywhere]">
+                              {item.reason}
+                            </Text>
+                          )}
+                        </Stack>
+                        <Flex gap="xs" className="shrink-0" wrap="nowrap">
+                          <Button
+                            size="xs"
+                            variant="subtle"
+                            color="gray"
+                            className="shrink-0"
+                            onClick={handleContinueNormalResponse}
+                          >
+                            {t('Continue normally')}
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="chatbox-brand"
+                            className="shrink-0"
+                            leftSection={<IconRobot size={14} />}
+                            onClick={handleStartAgentModeResponse}
+                          >
+                            {t('Use Agent Mode')}
+                          </Button>
+                        </Flex>
+                      </Flex>
                     </Flex>
                   </Flex>
                 ) : item.type === 'image' ? (

@@ -39,12 +39,18 @@ describe('setSessionAgentMode', () => {
     expect(entry.value).toBe('on')
   })
 
-  test('default entry for unknown session is { value: "auto", locked: false, lockReason: null }', () => {
+  test('writing a value defaults locked/lockReason to false/null', () => {
     // Before any explicit set, the map has no entry; getSessionAgentMode returns the default
     const entry = uiStore.getState().sessionAgentModeMap['unknown-session']
     expect(entry).toBeUndefined()
 
     // After setting a value, locked/lockReason default to false/null
+    uiStore.getState().setSessionAgentMode('new-session', 'off')
+    const created = uiStore.getState().sessionAgentModeMap['new-session']
+    expect(created).toEqual({ value: 'off', locked: false, lockReason: null })
+  })
+
+  test('stores "auto" as-is (auto runs the suggestion classifier)', () => {
     uiStore.getState().setSessionAgentMode('new-session', 'auto')
     const created = uiStore.getState().sessionAgentModeMap['new-session']
     expect(created).toEqual({ value: 'auto', locked: false, lockReason: null })

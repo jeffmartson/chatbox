@@ -1,3 +1,8 @@
+// Polyfill browser canvas globals (DOMMatrix/Path2D/ImageData) that pdfjs-dist
+// references at top level. Must run before any module that loads pdfjs, so keep
+// this as the very first import. See pdfjs-globals.ts for details.
+import './pdfjs-globals'
+
 // solve electron breaking changes, see https://www.electronjs.org/docs/latest/breaking-changes#behavior-changed-directory-databases-in-userdata-will-be-deleted
 // since 1.21.0, and this NEEDS to be imported before any other module, specifically before `app` inited.
 import './legacy-database-migration'
@@ -22,11 +27,11 @@ import path from 'path'
 // @ts-expect-error - source-map-support doesn't have type definitions
 import * as sourceMapSupport from 'source-map-support'
 import type { ShortcutSetting } from 'src/shared/types'
+import { KNOWN_LOCAL_PARSER_ERROR_CODES } from '../shared/file-parse-errors'
 import * as analystic from './analystic-node'
 import { AppUpdater } from './app-updater'
 import * as autoLauncher from './autoLauncher'
 import { handleDeepLink } from './deeplinks'
-import { KNOWN_LOCAL_PARSER_ERROR_CODES } from '../shared/file-parse-errors'
 import { parseFile } from './file-parser'
 import Locale from './locales'
 import * as mcpIpc from './mcp/ipc-stdio-transport'

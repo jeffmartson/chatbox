@@ -2,7 +2,6 @@ import { Popover, UnstyledButton } from '@mantine/core'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import { IconRobot } from '@tabler/icons-react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { getSessionAgentMode } from '@/stores/session/utils'
 import { useUIStore } from '@/stores/uiStore'
 import AgentModePanel from './AgentModePanel'
@@ -38,7 +37,6 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   onKnowledgeBaseSelect,
   onSkillSelect,
 }) => {
-  const { t } = useTranslation()
   const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
   const [opened, setOpened] = useState(false)
   const openTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -55,19 +53,19 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   const disabled = agentModeUIState.modelUnsupported
 
   const color = useMemo(() => {
-    return MODE_COLORS[agentModeUIState.effectiveValue]
-  }, [agentModeUIState.effectiveValue])
+    return MODE_COLORS[agentModeUIState.displayValue]
+  }, [agentModeUIState.displayValue])
 
   const modeLabel = useMemo(() => {
-    switch (agentModeUIState.effectiveValue) {
+    switch (agentModeUIState.displayValue) {
       case 'on':
         return 'ON'
-      case 'off':
-        return 'OFF'
+      case 'auto':
+        return 'AUTO'
       default:
-        return t('Auto')
+        return 'OFF'
     }
-  }, [agentModeUIState.effectiveValue, t])
+  }, [agentModeUIState.displayValue])
 
   // Hover open/close with delays, matching Menu trigger="hover" behavior
   const handleMouseEnter = useCallback(() => {

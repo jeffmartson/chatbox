@@ -1,8 +1,15 @@
 import { buildContext } from '@shared/context'
-import type { ModelStreamPart } from '@shared/models/types'
-import type { Message, MessageContentParts, MessageToolCallPart, Session, SessionSettings } from '@shared/types'
+import type { ModelInterface, ModelStreamPart } from '@shared/models/types'
+import type {
+  Message,
+  MessageContentParts,
+  MessageToolCallPart,
+  ModelProvider,
+  Session,
+  SessionSettings,
+} from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
-import type { ToolSet } from 'ai'
+import type { ModelMessage, ToolSet } from 'ai'
 import { createModel, createModelDependencies } from '@/adapters'
 import * as appleAppStore from '@/packages/apple_app_store'
 import { estimateTokensFromMessages } from '@/packages/token'
@@ -20,6 +27,14 @@ import * as settingActions from '../settingActions'
 import { settingsStore } from '../settingsStore'
 import { uiStore } from '../uiStore'
 import { prepareAgentGenerationHarness, refreshSessionAttachmentStatuses } from './agent-harness'
+import {
+  AGENT_MODE_SUGGESTION_PROMPT,
+  type AgentModeSuggestionDecision,
+  describeUserMessageForAgentModeDecision,
+  getLastUserMessage,
+  isFirstUserTurn,
+  parseAgentModeSuggestionDecision,
+} from './agent-mode-suggestion'
 import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
@@ -131,6 +146,65 @@ function getToolCallPause(error: unknown): {
   return null
 }
 
+async function shouldSuggestAgentMode(options: {
+  sessionId: string
+  model: ModelInterface
+  userMessage: Message
+  signal: AbortSignal
+  providerOptions?: SessionSettings['providerOptions']
+}): Promise<AgentModeSuggestionDecision> {
+  const { sessionId, model, userMessage, signal, providerOptions } = options
+  const userPrompt = describeUserMessageForAgentModeDecision(userMessage)
+  const promptMessages: ModelMessage[] = model.isSupportSystemMessage()
+    ? [
+        { role: 'system', content: AGENT_MODE_SUGGESTION_PROMPT },
+        { role: 'user', content: userPrompt },
+      ]
+    : [
+        {
+          role: 'user',
+          content: `${AGENT_MODE_SUGGESTION_PROMPT}\n\n${userPrompt}`,
+        },
+      ]
+
+  try {
+    const result = await model.chat(promptMessages, {
+      sessionId,
+      signal,
+      providerOptions,
+    })
+    const text = getMessageText({ id: 'agent-mode-decision', role: 'assistant', contentParts: result.contentParts })
+    return parseAgentModeSuggestionDecision(text) ?? { suggest: false }
+  } catch (error) {
+    console.warn('Agent mode suggestion decision failed:', error)
+    return { suggest: false }
+  }
+}
+
+/**
+ * Resolve the model used to classify whether Agent Mode should be suggested.
+ * Prefer the user-configured fast model (threadNamingModel) to keep this
+ * pre-flight classification cheap; fall back to the conversation model when it
+ * is not configured or cannot be created.
+ */
+async function createAgentModeSuggestionModel(
+  settings: SessionSettings,
+  namingModel: { provider: string; model: string } | undefined | null,
+  dependencies: Awaited<ReturnType<typeof createModelDependencies>>,
+  fallbackModel: ModelInterface
+): Promise<ModelInterface> {
+  if (!namingModel) return fallbackModel
+  try {
+    return await createModel(
+      { ...settings, provider: namingModel.provider as ModelProvider, modelId: namingModel.model },
+      dependencies
+    )
+  } catch (error) {
+    console.warn('Failed to create fast model for agent mode suggestion, falling back to current model:', error)
+    return fallbackModel
+  }
+}
+
 function withToolCallLimitPause(tools: ToolSet, maxToolCalls: number): ToolSet {
   let toolCallsSinceConfirmation = 0
   const wrappedTools: Record<string, unknown> = {}
@@ -239,7 +313,11 @@ export function shouldPersistStreamingChunk(
 export async function orchestrateGeneration(
   sessionId: string,
   targetMsg: Message,
-  options?: { operationType?: 'send_message' | 'regenerate'; appendToMessage?: boolean }
+  options?: {
+    operationType?: 'send_message' | 'regenerate'
+    appendToMessage?: boolean
+    skipAgentModeSuggestion?: boolean
+  }
 ) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)
@@ -267,6 +345,12 @@ export async function orchestrateGeneration(
   const promptTargetMsgIx = options?.appendToMessage ? targetMsgIx + 1 : targetMsgIx
 
   const controller = new AbortController()
+  // Wire the stop button to this controller before any pre-stream network work
+  // runs (agent-mode suggestion classifier, MCP/tool harness setup). Those steps
+  // issue real requests that can hang; without a cancel handler in the message
+  // cache the stop button would be a no-op until the main stream starts.
+  targetMsg = { ...targetMsg, cancel: () => controller.abort() }
+  updateStreamingCache(sessionId, targetMsg)
   let processorState = createInitialState()
   const infoParts: MessageContentParts = []
   let promptMsgs: Message[] = []
@@ -281,6 +365,62 @@ export async function orchestrateGeneration(
     const { value: storedAgentModeValue } = getSessionAgentMode(sessionId)
     const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
     const agentModeEntry = uiStore.getState().sessionAgentModeMap[sessionId]
+    const lastUserMessage = getLastUserMessage(messages, promptTargetMsgIx)
+
+    if (
+      options?.operationType === 'send_message' &&
+      !options?.appendToMessage &&
+      !options.skipAgentModeSuggestion &&
+      agentModeSupported &&
+      // Only 'auto' runs the suggestion classifier; 'on' is already enabled and
+      // 'off' opts out of suggestions entirely.
+      agentModeValue === 'auto' &&
+      model.isSupportToolUse('agent') &&
+      lastUserMessage &&
+      isFirstUserTurn(messages, promptTargetMsgIx)
+    ) {
+      const suggestionModel = await createAgentModeSuggestionModel(
+        settings,
+        globalSettings.threadNamingModel,
+        dependencies,
+        model
+      )
+      const decision = await shouldSuggestAgentMode({
+        sessionId,
+        model: suggestionModel,
+        userMessage: lastUserMessage,
+        signal: controller.signal,
+        providerOptions: settings.providerOptions,
+      })
+
+      // If the user cancelled while the classifier was running, finalize the
+      // message as stopped instead of falling through into a generation with an
+      // already-aborted controller. shouldSuggestAgentMode() swallows the abort
+      // and returns normally, so this won't reach the catch block below.
+      if (controller.signal.aborted) {
+        targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [] }
+        await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+        return
+      }
+
+      if (decision.suggest) {
+        targetMsg = {
+          ...targetMsg,
+          generating: false,
+          cancel: undefined,
+          contentParts: [
+            {
+              type: 'agent-mode-suggestion',
+              reason: decision.reason,
+            },
+          ],
+          status: [],
+          finishReason: 'agent-mode-suggested',
+        }
+        await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+        return
+      }
+    }
 
     const prepared = await prepareAgentGenerationHarness({
       session,
@@ -311,12 +451,6 @@ export async function orchestrateGeneration(
       infoParts.push(...prepared.infoParts)
     }
     const { coreMessages, tools, fallbackToolCallPart } = prepared
-
-    targetMsg = {
-      ...targetMsg,
-      cancel: () => controller.abort(),
-    }
-    updateStreamingCache(sessionId, targetMsg)
 
     const chatOptions = { ...prepared.chatOptions }
 
@@ -450,17 +584,10 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   const model = await createModel(settings, dependencies)
   const location = findTargetMessageIndex(session, targetMsg.id)
   const messagesBeforeTarget = location ? location.messages.slice(0, location.index) : session.messages
-  const hasFiles = messagesBeforeTarget.some((message) => message.files?.length)
   const agentModeSupported = platform.type === 'desktop'
   const { value: storedAgentModeValue } = getSessionAgentMode(session.id)
   const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
-  const effectiveAgentMode = !agentModeSupported
-    ? 'off'
-    : agentModeValue === 'off'
-      ? 'off'
-      : hasFiles || agentModeValue === 'on'
-        ? 'on'
-        : 'auto'
+  const effectiveAgentMode = agentModeSupported && agentModeValue === 'on' ? 'on' : 'off'
 
   const sandboxProvider = effectiveAgentMode !== 'off' ? createSandboxProvider() : null
   let canExecuteCode = Boolean(sandboxProvider && model.isSupportToolUse('agent'))
@@ -623,12 +750,7 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
   if (!message) return
   const part = findToolCallPart(message, toolCallId)
   const lastRetryableToolCall = findLastRetryableToolCallPart(message)
-  if (
-    !part ||
-    !isRetryableToolCallStep(part) ||
-    !message.error ||
-    lastRetryableToolCall?.toolCallId !== toolCallId
-  ) {
+  if (!part || !isRetryableToolCallStep(part) || !message.error || lastRetryableToolCall?.toolCallId !== toolCallId) {
     return
   }
 

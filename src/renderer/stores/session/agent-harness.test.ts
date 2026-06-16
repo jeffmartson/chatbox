@@ -96,7 +96,6 @@ import type { SandboxProvider } from '@shared/sandbox-provider'
 import {
   type Config,
   type Message,
-  type MessageFile,
   MessageRoleEnum,
   ModelProviderEnum,
   type Session,
@@ -104,11 +103,7 @@ import {
   type Settings,
 } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
-import {
-  computeEffectiveAgentMode,
-  prepareAgentGenerationHarness,
-  shouldAutoEnableAgentForFiles,
-} from './agent-harness'
+import { computeEffectiveAgentMode, prepareAgentGenerationHarness } from './agent-harness'
 
 function createMockModel(overrides?: Partial<ModelInterface>): ModelInterface {
   return {
@@ -153,47 +148,19 @@ beforeEach(() => {
 })
 
 describe('computeEffectiveAgentMode', () => {
-  test('keeps unsupported platforms out of agent mode even with files', () => {
-    expect(computeEffectiveAgentMode('on', true, false)).toBe('off')
-    expect(computeEffectiveAgentMode('auto', true, false)).toBe('off')
-  })
-})
-
-describe('shouldAutoEnableAgentForFiles', () => {
-  test('keeps a single txt/doc/docx file in auto mode', () => {
-    expect(shouldAutoEnableAgentForFiles([{ id: '1', name: 'notes.txt', fileType: 'text/plain' } as MessageFile])).toBe(
-      false
-    )
-    expect(
-      shouldAutoEnableAgentForFiles([{ id: '1', name: 'brief.doc', fileType: 'application/msword' } as MessageFile])
-    ).toBe(false)
-    expect(
-      shouldAutoEnableAgentForFiles([
-        {
-          id: '1',
-          name: 'brief.docx',
-          fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        } as MessageFile,
-      ])
-    ).toBe(false)
+  test('off when the platform does not support agent mode', () => {
+    expect(computeEffectiveAgentMode('on', false)).toBe('off')
+    expect(computeEffectiveAgentMode('auto', false)).toBe('off')
+    expect(computeEffectiveAgentMode('off', false)).toBe('off')
   })
 
-  test('auto-enables agent mode for multiple files or non txt/doc/docx files', () => {
-    expect(
-      shouldAutoEnableAgentForFiles([
-        { id: '1', name: 'a.txt', fileType: 'text/plain' } as MessageFile,
-        { id: '2', name: 'b.txt', fileType: 'text/plain' } as MessageFile,
-      ])
-    ).toBe(true)
-    expect(
-      shouldAutoEnableAgentForFiles([
-        {
-          id: '1',
-          name: 'sales.xlsx',
-          fileType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        } as MessageFile,
-      ])
-    ).toBe(true)
+  test('on only when explicitly on and supported', () => {
+    expect(computeEffectiveAgentMode('on', true)).toBe('on')
+  })
+
+  test('treats auto and off as off when supported (auto only triggers the suggestion)', () => {
+    expect(computeEffectiveAgentMode('auto', true)).toBe('off')
+    expect(computeEffectiveAgentMode('off', true)).toBe('off')
   })
 })
 
@@ -230,7 +197,7 @@ describe('prepareAgentGenerationHarness', () => {
       model: createMockModel(),
       dependencies: {},
       webBrowsing: false,
-      agentModeValue: 'auto',
+      agentModeValue: 'on',
       agentModeLocked: false,
       agentModeSupported: true,
       signal: new AbortController().signal,
@@ -241,7 +208,7 @@ describe('prepareAgentGenerationHarness', () => {
       },
     })
 
-    expect(lockAgentMode).toHaveBeenCalledWith('file_upload')
+    expect(lockAgentMode).toHaveBeenCalledWith('message_sent')
     expect(sandboxProviderMock.checkAvailability).toHaveBeenCalled()
     expect(prepared.debug.effectiveAgentMode).toBe('on')
     expect(prepared.debug.canExecuteCode).toBe(true)
@@ -269,7 +236,7 @@ describe('prepareAgentGenerationHarness', () => {
     expect(prepared.chatOptions.prepareStep).toBeUndefined()
   })
 
-  test('keeps code execution gated behind load_skill in auto mode when there are no files', async () => {
+  test('keeps legacy auto mode on the plain chat path when there are no files', async () => {
     const userMessage: Message = {
       id: 'msg-1',
       role: MessageRoleEnum.User,
@@ -298,25 +265,13 @@ describe('prepareAgentGenerationHarness', () => {
       isPro: () => true,
     })
 
-    expect(prepared.debug.effectiveAgentMode).toBe('auto')
-    expect(prepared.tools.code_execution).toBeDefined()
-    expect(prepared.chatOptions.prepareStep).toBeDefined()
-
-    const beforeSkillLoad = prepared.chatOptions.prepareStep?.({ steps: [] })
-    expect(beforeSkillLoad?.activeTools).toContain('load_skill')
-    expect(beforeSkillLoad?.activeTools).not.toContain('code_execution')
-    expect(beforeSkillLoad?.activeTools).not.toContain('write_file')
-    expect(beforeSkillLoad?.activeTools).not.toContain('user_exec')
-
-    const afterSkillLoad = prepared.chatOptions.prepareStep?.({
-      steps: [{ stepType: 'tool-result', toolCalls: [{ type: 'tool-call', toolCallId: '1', toolName: 'load_skill' }] }],
-    })
-    expect(afterSkillLoad?.activeTools).toContain('code_execution')
-    expect(afterSkillLoad?.activeTools).toContain('write_file')
-    expect(afterSkillLoad?.activeTools).toContain('user_exec')
+    expect(prepared.debug.effectiveAgentMode).toBe('off')
+    expect(prepared.tools.code_execution).toBeUndefined()
+    expect(prepared.tools.load_skill).toBeUndefined()
+    expect(prepared.chatOptions.prepareStep).toBeUndefined()
   })
 
-  test('keeps code execution gated behind load_skill in auto mode for a single simple file', async () => {
+  test('keeps legacy auto mode on the plain chat path for a single simple file', async () => {
     const userMessage: Message = {
       id: 'msg-1',
       role: MessageRoleEnum.User,
@@ -358,11 +313,9 @@ describe('prepareAgentGenerationHarness', () => {
     })
 
     expect(lockAgentMode).not.toHaveBeenCalled()
-    expect(prepared.debug.effectiveAgentMode).toBe('auto')
-    expect(prepared.tools.code_execution).toBeDefined()
-
-    const beforeSkillLoad = prepared.chatOptions.prepareStep?.({ steps: [] })
-    expect(beforeSkillLoad?.activeTools).not.toContain('code_execution')
+    expect(prepared.debug.effectiveAgentMode).toBe('off')
+    expect(prepared.tools.code_execution).toBeUndefined()
+    expect(prepared.chatOptions.prepareStep).toBeUndefined()
   })
 
   test('keeps the toolset and context clean when agent mode is manually off', async () => {

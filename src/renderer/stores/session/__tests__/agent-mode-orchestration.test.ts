@@ -19,44 +19,33 @@ vi.hoisted(() => {
 import type { AgentModeValue } from '@shared/types'
 
 // ── Effective mode computation ─────────────────────────────────────────────
-// Extracted from orchestration.ts:
-//   const effectiveAgentMode =
-//     !agentModeSupported ? 'off' :
-//     agentModeValue === 'off' ? 'off' : hasFiles || agentModeValue === 'on' ? 'on' : 'auto'
+// Mirrors computeEffectiveAgentMode() in agent-harness.ts. 'auto' no longer
+// enables agent mode on its own — it only triggers the first-turn suggestion —
+// so agent mode resolves to 'on' only for an explicit 'on' on a supported
+// platform. (Files no longer auto-enable agent mode.)
 
-function computeEffectiveMode(
-  agentModeValue: AgentModeValue,
-  hasFiles: boolean,
-  agentModeSupported = true
-): AgentModeValue {
-  if (!agentModeSupported) return 'off'
-  return agentModeValue === 'off' ? 'off' : hasFiles || agentModeValue === 'on' ? 'on' : 'auto'
+function computeEffectiveMode(agentModeValue: AgentModeValue, agentModeSupported = true): AgentModeValue {
+  if (!agentModeSupported || agentModeValue === 'off') return 'off'
+  return agentModeValue === 'on' ? 'on' : 'off'
 }
 
 describe('effective agent mode computation', () => {
-  test('agentModeValue="off" results in "off" regardless of files', () => {
+  test('agentModeValue="off" resolves to "off"', () => {
+    expect(computeEffectiveMode('off')).toBe('off')
+  })
+
+  test('agentModeValue="auto" resolves to "off" (auto only triggers the suggestion)', () => {
+    expect(computeEffectiveMode('auto')).toBe('off')
+  })
+
+  test('agentModeValue="on" resolves to "on" on a supported platform', () => {
+    expect(computeEffectiveMode('on')).toBe('on')
+  })
+
+  test('unsupported platforms force agent mode off regardless of stored mode', () => {
+    expect(computeEffectiveMode('auto', false)).toBe('off')
+    expect(computeEffectiveMode('on', false)).toBe('off')
     expect(computeEffectiveMode('off', false)).toBe('off')
-    expect(computeEffectiveMode('off', true)).toBe('off')
-  })
-
-  test('agentModeValue="auto" + no files results in "auto"', () => {
-    expect(computeEffectiveMode('auto', false)).toBe('auto')
-  })
-
-  test('agentModeValue="auto" + has files results in "on"', () => {
-    expect(computeEffectiveMode('auto', true)).toBe('on')
-  })
-
-  test('agentModeValue="on" results in "on" regardless of files', () => {
-    expect(computeEffectiveMode('on', false)).toBe('on')
-    expect(computeEffectiveMode('on', true)).toBe('on')
-  })
-
-  test('unsupported platforms force agent mode off regardless of stored mode or files', () => {
-    expect(computeEffectiveMode('auto', false, false)).toBe('off')
-    expect(computeEffectiveMode('auto', true, false)).toBe('off')
-    expect(computeEffectiveMode('on', false, false)).toBe('off')
-    expect(computeEffectiveMode('on', true, false)).toBe('off')
   })
 })
 
@@ -154,21 +143,21 @@ describe('prepareStep callback', () => {
 
 // ── sandboxMode computation ───────────────────────────────────────────────
 // Regression: sandboxMode must be based on canExecuteCode, not agent mode.
-// When agent mode is 'auto' but sandbox is unavailable, files should still
+// When agent mode is on but the sandbox is unavailable, files should still
 // get full content injection (not metadata-only).
 
 describe('sandboxMode computation', () => {
-  // Extracted from orchestration.ts:
+  // Extracted from agent-harness.ts:
   //   sandboxMode: canExecuteCode
   // (Previously was: effectiveAgentMode !== 'off' — which was wrong)
 
-  test('sandboxMode is false when canExecuteCode is false, even if agent mode is auto', () => {
-    const effectiveAgentMode = 'auto'
+  test('sandboxMode is false when canExecuteCode is false, even with agent mode on', () => {
+    const effectiveAgentMode = computeEffectiveMode('on')
     const canExecuteCode = false
     // sandboxMode should follow canExecuteCode, NOT effectiveAgentMode
     const sandboxMode = canExecuteCode
     expect(sandboxMode).toBe(false)
-    // Verify old (wrong) logic would have been true
+    // The old logic keyed sandboxMode off agent mode, which would wrongly be true here.
     expect(effectiveAgentMode !== 'off').toBe(true)
   })
 
@@ -179,7 +168,7 @@ describe('sandboxMode computation', () => {
   })
 
   test('sandboxMode is false when agent mode is off', () => {
-    const effectiveAgentMode = 'off'
+    const effectiveAgentMode = computeEffectiveMode('off')
     const canExecuteCode = false
     const sandboxMode = canExecuteCode
     expect(sandboxMode).toBe(false)

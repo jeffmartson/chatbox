@@ -11,7 +11,7 @@ import { orchestratePictureGeneration } from './pictures'
 export async function generate(
   sessionId: string,
   targetMsg: Message,
-  options?: { operationType?: 'send_message' | 'regenerate' }
+  options?: { operationType?: 'send_message' | 'regenerate'; skipAgentModeSuggestion?: boolean }
 ) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)

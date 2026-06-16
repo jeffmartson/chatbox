@@ -21,9 +21,11 @@ interface GitHubCommitItem {
 interface GitHubTreeItem {
   path: string
   type: 'blob' | 'tree'
+  sha: string
 }
 
 interface GitHubTreeResponse {
+  sha: string
   tree: GitHubTreeItem[]
   truncated: boolean
 }
@@ -95,6 +97,20 @@ async function githubFetch<T>(url: string): Promise<T> {
   return data
 }
 
+async function fetchRepoTree(owner: string, repo: string): Promise<GitHubTreeResponse | null> {
+  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`
+  const result = await githubFetch<GitHubTreeResponse>(url)
+  if (!Array.isArray(result?.tree)) {
+    log.warn(`Unexpected tree response shape for ${owner}/${repo}`)
+    return null
+  }
+  if (result.truncated) {
+    log.warn(`Tree listing truncated for ${owner}/${repo}`)
+    return null
+  }
+  return result
+}
+
 export async function fetchRepoContents(owner: string, repo: string, repoPath = ''): Promise<GitHubContentItem[]> {
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${repoPath}`
   try {
@@ -110,6 +126,7 @@ export async function fetchRepoContents(owner: string, repo: string, repoPath = 
 
 const MAX_DETECTED_SKILLS = 100
 const SKILL_CONTENT_FETCH_BATCH = 8
+const SKILL_FILE_DOWNLOAD_BATCH = 8
 const MAX_FALLBACK_CATEGORY_DIRS = 10
 
 // raw.githubusercontent.com can be unreachable while api.github.com works (common
@@ -142,16 +159,8 @@ export async function detectSkillsInRepo(owner: string, repo: string): Promise<D
 // depth (e.g. skills/{category}/{name}/SKILL.md). Returns null when the tree is
 // truncated by GitHub or malformed, so the caller can fall back to the contents API.
 async function detectSkillsViaTree(owner: string, repo: string): Promise<DetectedSkill[] | null> {
-  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`
-  const result = await githubFetch<GitHubTreeResponse>(url)
-  if (!Array.isArray(result?.tree)) {
-    log.warn(`Unexpected tree response shape for ${owner}/${repo}, falling back to contents API`)
-    return null
-  }
-  if (result.truncated) {
-    log.warn(`Tree listing truncated for ${owner}/${repo}, falling back to contents API`)
-    return null
-  }
+  const result = await fetchRepoTree(owner, repo)
+  if (!result) return null
 
   const skillMdPaths = result.tree
     .filter((item) => item.type === 'blob' && (item.path === 'SKILL.md' || item.path.endsWith('/SKILL.md')))
@@ -326,6 +335,66 @@ export async function downloadSkillFiles(
   skillPath: string,
   targetDir: string
 ): Promise<void> {
+  try {
+    const downloaded = await downloadSkillFilesViaTree(owner, repo, skillPath, targetDir)
+    if (downloaded) return
+  } catch (error) {
+    if (error instanceof GitHubApiError && (error.statusCode === 403 || error.statusCode === 429)) {
+      throw error
+    }
+    log.warn(`Tree-based skill download failed for ${owner}/${repo}/${skillPath}, falling back to contents API`, error)
+  }
+  await downloadSkillFilesViaContents(owner, repo, skillPath, targetDir)
+}
+
+async function downloadSkillFilesViaTree(
+  owner: string,
+  repo: string,
+  skillPath: string,
+  targetDir: string
+): Promise<boolean> {
+  const fs = await import('node:fs')
+  const pathModule = await import('node:path')
+
+  fs.mkdirSync(targetDir, { recursive: true })
+  const normalizedSkillPath = skillPath.replace(/^\/+|\/+$/g, '')
+  const result = await fetchRepoTree(owner, repo)
+  if (!result) return false
+
+  const prefix = normalizedSkillPath ? `${normalizedSkillPath}/` : ''
+  const files = result.tree.filter((item) => {
+    if (item.type !== 'blob') return false
+    if (normalizedSkillPath) return item.path.startsWith(prefix)
+    return !item.path.split('/').includes('node_modules')
+  })
+
+  if (files.length === 0) {
+    return false
+  }
+
+  for (let i = 0; i < files.length; i += SKILL_FILE_DOWNLOAD_BATCH) {
+    await Promise.all(
+      files.slice(i, i + SKILL_FILE_DOWNLOAD_BATCH).map(async (item) => {
+        const relativePath = normalizedSkillPath ? item.path.slice(prefix.length) : item.path
+        if (!relativePath) return
+        const localPath = pathModule.join(targetDir, relativePath)
+        const content = await fetchFileContent(owner, repo, item.path)
+        const dir = pathModule.dirname(localPath)
+        fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(localPath, content, 'utf-8')
+      })
+    )
+  }
+
+  return true
+}
+
+async function downloadSkillFilesViaContents(
+  owner: string,
+  repo: string,
+  skillPath: string,
+  targetDir: string
+): Promise<void> {
   const fs = await import('node:fs')
   const pathModule = await import('node:path')
 
@@ -344,8 +413,28 @@ export async function downloadSkillFiles(
       fs.mkdirSync(dir, { recursive: true })
       fs.writeFileSync(localPath, content, 'utf-8')
     } else if (item.type === 'dir') {
-      await downloadSkillFiles(owner, repo, item.path, pathModule.join(targetDir, relativePath))
+      await downloadSkillFilesViaContents(owner, repo, item.path, pathModule.join(targetDir, relativePath))
     }
+  }
+}
+
+// Returns a content identifier for the skill at `skillPath` derived from the git
+// tree: the subtree SHA of that directory (or the root tree SHA for a repo-root
+// skill). Unlike the commits API, this changes only when files under the skill
+// path actually change, so unrelated commits elsewhere in the repo (or to sibling
+// skills) don't produce false "update available" reports. Returns null when the
+// tree is truncated/unavailable so the caller can fall back to commit comparison.
+export async function getSkillTreeSha(owner: string, repo: string, skillPath: string): Promise<string | null> {
+  try {
+    const result = await fetchRepoTree(owner, repo)
+    if (!result) return null
+    const normalized = skillPath.replace(/^\/+|\/+$/g, '')
+    if (!normalized) return result.sha ?? null
+    const match = result.tree.find((item) => item.type === 'tree' && item.path === normalized)
+    return match?.sha ?? null
+  } catch (error) {
+    log.error(`Failed to get skill tree sha for ${owner}/${repo}/${skillPath}`, error)
+    return null
   }
 }
 

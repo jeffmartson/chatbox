@@ -4,7 +4,13 @@ import fs from 'fs'
 import path from 'path'
 import { getStatus, validateWritePath } from '../sandbox/manager'
 import { getLogger } from '../util'
-import { type DetectedSkill, detectSkillsInRepo, downloadSkillFiles, getLatestCommitHash } from './github-fetcher'
+import {
+  type DetectedSkill,
+  detectSkillsInRepo,
+  downloadSkillFiles,
+  getLatestCommitHash,
+  getSkillTreeSha,
+} from './github-fetcher'
 import { parseSkillFile } from './parser'
 import { isValidSkillName } from './validation'
 
@@ -105,11 +111,16 @@ export async function installSkillFromGitHub(owner: string, repo: string, skillP
       }
       fs.renameSync(tempDir, targetDir)
 
-      const commitHash = await getLatestCommitHash(owner, repo, skillPath)
+      // Prefer a per-skill subtree SHA so update checks ignore unrelated commits
+      // (other skills / files) in the same repo. Fall back to the repo HEAD commit
+      // only when the tree is truncated or unavailable.
+      const treeSha = await getSkillTreeSha(owner, repo, skillPath)
+      const commitHash = treeSha ? null : await getLatestCommitHash(owner, repo, '')
       const source: SkillSource = {
         type: 'github',
         repo: `${owner}/${repo}`,
         skillPath: skillPath || undefined,
+        treeSha: treeSha || undefined,
         commitHash: commitHash || undefined,
         installedAt: new Date().toISOString(),
       }
@@ -298,7 +309,25 @@ export async function checkForUpdates(skillName: string): Promise<UpdateCheckRes
       return { hasUpdate: false, error: `Invalid repo format: ${source.repo}` }
     }
 
-    const latestHash = await getLatestCommitHash(parsed.owner, parsed.repo, source.skillPath || '')
+    // Preferred path: compare the per-skill subtree SHA recorded at install time.
+    // This only changes when files under the skill path change, so unrelated
+    // commits to the repo (or to sibling skills) don't trigger false updates.
+    if (source.treeSha) {
+      const latestTreeSha = await getSkillTreeSha(parsed.owner, parsed.repo, source.skillPath || '')
+      if (!latestTreeSha) {
+        return { hasUpdate: false, error: 'Could not fetch latest skill tree' }
+      }
+      return {
+        hasUpdate: source.treeSha !== latestTreeSha,
+        currentHash: source.treeSha,
+        latestHash: latestTreeSha,
+      }
+    }
+
+    // Legacy fallback: skills installed before per-skill tree tracking recorded the
+    // repository HEAD commit, so compare against that (still avoids the per-path
+    // commits API, at the cost of false positives from unrelated repo commits).
+    const latestHash = await getLatestCommitHash(parsed.owner, parsed.repo, '')
     if (!latestHash) {
       return { hasUpdate: false, error: 'Could not fetch latest commit hash' }
     }

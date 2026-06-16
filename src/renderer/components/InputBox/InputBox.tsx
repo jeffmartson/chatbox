@@ -976,8 +976,9 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     }
 
     // In agent mode, allow all file types (sandbox can handle archives, binaries, etc.)
-    // On mobile/web, effectiveValue is always 'off' (set by getAgentModeUIState)
-    const isAgentModeActive = agentModeUIState.effectiveValue !== 'off'
+    // isActive is true only for 'on' — 'auto' and mobile/web behave like normal mode,
+    // so they keep the standard file-type validation and accept filter.
+    const isAgentModeActive = agentModeUIState.isActive
 
     const insertFiles = async (files: File[]) => {
       const MAX_IMAGES = 8
@@ -1508,8 +1509,9 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               <Flex align="center" gap={0}>
                 <AttachmentMenu onImageUploadClick={onImageUploadClick} onFileUploadClick={onFileUploadClick} t={t} />
 
-                {/* Web Search - only visible when agent mode is off or on non-desktop */}
-                {(platform.type !== 'desktop' || agentModeUIState.effectiveValue === 'off') && (
+                {/* Web Search - hidden only when agent mode is actually active (its own
+                    panel owns web search then); shown for off/auto and on mobile/web. */}
+                {!agentModeUIState.isActive && (
                   <Tooltip label={t('Web Search')} position="top" withArrow disabled={isSmallScreen}>
                     <UnstyledButton
                       onClick={() => {

@@ -11,55 +11,71 @@ function createEntry(value: AgentModeEntry['value']): AgentModeEntry {
 }
 
 describe('getAgentModeUIState', () => {
-  test('keeps auto when the model supports agent mode on desktop', () => {
+  test('keeps auto mode visible but inactive (capabilities disabled) on desktop', () => {
     platformMock.type = 'desktop'
     expect(getAgentModeUIState(createEntry('auto'), true)).toEqual({
-      effectiveValue: 'auto',
+      displayValue: 'auto',
+      isActive: false,
+      capabilitiesDisabled: true,
+      modelUnsupported: false,
+    })
+  })
+
+  test('treats on mode as active and fully enabled on desktop', () => {
+    platformMock.type = 'desktop'
+    expect(getAgentModeUIState(createEntry('on'), true)).toEqual({
+      displayValue: 'on',
+      isActive: true,
       capabilitiesDisabled: false,
       modelUnsupported: false,
     })
   })
 
-  test('treats unsupported auto mode as effectively off', () => {
+  test('treats unsupported auto mode as effectively off and inactive', () => {
     platformMock.type = 'desktop'
     expect(getAgentModeUIState(createEntry('auto'), false)).toEqual({
-      effectiveValue: 'off',
+      displayValue: 'off',
+      isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: true,
     })
   })
 
-  test('treats unsupported on mode as effectively off', () => {
+  test('treats unsupported on mode as effectively off and inactive', () => {
     platformMock.type = 'desktop'
     expect(getAgentModeUIState(createEntry('on'), false)).toEqual({
-      effectiveValue: 'off',
+      displayValue: 'off',
+      isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: true,
     })
   })
 
-  test('keeps explicit off disabled', () => {
+  test('keeps explicit off inactive', () => {
     platformMock.type = 'desktop'
     expect(getAgentModeUIState(createEntry('off'), true)).toEqual({
-      effectiveValue: 'off',
+      displayValue: 'off',
+      isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: false,
     })
   })
 
-  test('forces off on mobile even when model supports agent mode', () => {
+  test('forces off and inactive on mobile even when model supports agent mode', () => {
     platformMock.type = 'mobile'
     expect(getAgentModeUIState(createEntry('auto'), true)).toEqual({
-      effectiveValue: 'off',
+      displayValue: 'off',
+      isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: false,
     })
   })
 
-  test('forces off on web even when agent mode is on', () => {
+  test('forces off and inactive on web even when agent mode is on', () => {
     platformMock.type = 'web'
     expect(getAgentModeUIState(createEntry('on'), true)).toEqual({
-      effectiveValue: 'off',
+      displayValue: 'off',
+      isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: false,
     })

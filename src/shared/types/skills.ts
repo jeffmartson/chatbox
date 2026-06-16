@@ -6,7 +6,8 @@ import { z } from 'zod'
  * SkillSource: Metadata about where a skill comes from
  * - type: Source type (builtin, local, marketplace, github, chat, claude-code)
  * - repo: Optional repository URL or identifier
- * - commitHash: Optional commit hash for version tracking
+ * - commitHash: Optional repo HEAD commit hash (legacy version tracking)
+ * - treeSha: Optional git subtree SHA scoped to skillPath (preferred for update checks)
  * - installedAt: Optional ISO timestamp of installation
  * - skillPath: Optional file system path to skill
  */
@@ -14,6 +15,7 @@ export interface SkillSource {
   type: 'builtin' | 'local' | 'marketplace' | 'github' | 'chat' | 'claude-code'
   repo?: string
   commitHash?: string
+  treeSha?: string
   installedAt?: string
   skillPath?: string
 }

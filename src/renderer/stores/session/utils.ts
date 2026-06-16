@@ -28,6 +28,8 @@ export function getSessionWebBrowsing(sessionId: string, provider: string | unde
   return provider === ModelProviderEnum.ChatboxAI
 }
 
+// Default to 'auto': new sessions run the suggestion classifier on the first turn.
+// 'off' opts out of suggestions entirely; 'on' forces agent mode.
 const defaultAgentModeEntry: AgentModeEntry = { value: 'auto', locked: false, lockReason: null }
 
 /**
