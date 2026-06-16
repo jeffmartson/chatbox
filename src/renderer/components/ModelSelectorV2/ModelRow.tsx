@@ -80,9 +80,12 @@ export function ModelRow({
   onDisabledSelect?: () => void
 }) {
   const { t } = useTranslation()
+  const isDisabled = !!detail.disabledReason && !locked
   const handleRowAction = () => {
-    if (detail.disabledReason && !locked) {
+    if (isDisabled) {
       onDisabledSelect?.()
+      // Desktop reveals the reason via the hover detail card; on mobile, open it on tap.
+      if (mobile) onShowDetail?.()
       return
     }
     if (locked) {
@@ -103,14 +106,14 @@ export function ModelRow({
     <div
       role="button"
       tabIndex={0}
-      aria-disabled={!!detail.disabledReason && !locked}
+      aria-disabled={isDisabled}
       className={clsx(
         'w-full flex items-center border-0 bg-transparent text-left cursor-pointer text-chatbox-tint-primary focus:outline-none focus-visible:outline-none',
         mobile
           ? clsx('min-h-11 pr-3 gap-2.5', brandedInset ? 'pl-4' : 'pl-3')
           : clsx('h-9 pr-2.5 gap-1.5', brandedInset ? 'pl-4' : 'pl-2.5'),
         !mobile && (selected ? SELECTED_CLASS : HOVER_CLASS),
-        detail.disabledReason && !locked && 'opacity-50 cursor-not-allowed'
+        isDisabled && 'opacity-50 cursor-not-allowed'
       )}
       style={mobile ? MOBILE_TAP_RESET_STYLE : undefined}
       onClick={handleRowAction}

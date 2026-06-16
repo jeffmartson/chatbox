@@ -301,6 +301,11 @@ export function DetailCard({
           {t('Available on Pro and above')}
         </Text>
       )}
+      {!model.locked && model.disabledReason && (
+        <Text size="sm" c="chatbox-tertiary" ta="center" mt={mobile ? 'xs' : 0}>
+          {model.disabledReason}
+        </Text>
+      )}
       <Flex gap="sm" mt={mobile ? 'md' : 'sm'}>
         {onClose && (
           <Button
