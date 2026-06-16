@@ -16,6 +16,7 @@ import { pick } from 'lodash'
 import i18n from '@/i18n'
 import { formatChatAsHtml, formatChatAsMarkdown, formatChatAsTxt } from '@/lib/format-chat'
 import { getLogger } from '@/lib/utils'
+import { searchSessionMessages } from '@shared/services/native-session-search'
 import { PREVIEW_LINES } from '@/packages/context-management/attachment-payload'
 import * as localParser from '@/packages/local-parser'
 import * as remote from '@/packages/remote'
@@ -861,36 +862,16 @@ export function getSessionMeta(session: SessionMeta) {
   return pick(session, ['id', 'name', 'starred', 'hidden', 'assistantAvatarKey', 'picUrl', 'backgroundImage', 'type'])
 }
 
-function _searchSessions(regexp: RegExp, s: Session) {
+function _searchSessions(query: string, s: Session) {
+  // Shared matcher, also used by the native mobile shell.
   const session = migrateSession(s)
-  const matchedMessages: Message[] = []
-  for (let i = session.messages.length - 1; i >= 0; i--) {
-    const message = session.messages[i]
-    if (regexp.test(getMessageText(message))) {
-      matchedMessages.push(message)
-    }
-  }
-  // 搜索会话的历史主题
-  if (session.threads) {
-    for (let i = session.threads.length - 1; i >= 0; i--) {
-      const thread = session.threads[i]
-      for (let j = thread.messages.length - 1; j >= 0; j--) {
-        const message = thread.messages[j]
-        if (regexp.test(getMessageText(message))) {
-          matchedMessages.push(message)
-        }
-      }
-    }
-  }
-  return matchedMessages.map((m) => migrateMessage(m))
+  return searchSessionMessages(session, query).map((m) => migrateMessage(m))
 }
 
 const SEARCH_PAGE_SIZE = 30
 const SEARCH_RESULT_LIMIT = 50
 
 export async function searchSessions(searchInput: string, sessionId?: string, onResult?: (result: Session[]) => void) {
-  const safeInput = searchInput.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
-  const regexp = new RegExp(safeInput, 'i')
   let matchedMessageTotal = 0
 
   const emitBatch = (batch: Session[]) => {
@@ -903,7 +884,7 @@ export async function searchSessions(searchInput: string, sessionId?: string, on
   if (sessionId) {
     const session = await storage.getItem<Session | null>(StorageKeyGenerator.session(sessionId), null)
     if (session) {
-      const matchedMessages = _searchSessions(regexp, session)
+      const matchedMessages = _searchSessions(searchInput, session)
       matchedMessageTotal += matchedMessages.length
       emitBatch([{ ...session, messages: matchedMessages }])
     }
@@ -924,7 +905,7 @@ export async function searchSessions(searchInput: string, sessionId?: string, on
     const batch: Session[] = []
     for (const session of sessions) {
       if (!session) continue
-      const messages = _searchSessions(regexp, session)
+      const messages = _searchSessions(searchInput, session)
       if (messages.length === 0) continue
       matchedMessageTotal += messages.length
       batch.push({ ...session, messages })

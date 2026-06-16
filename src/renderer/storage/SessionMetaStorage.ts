@@ -1,10 +1,12 @@
+import type { SessionMetaRepositoryPort } from '@shared/ports'
 import type { SessionMetaPage, SessionMetaRecord } from '@shared/types'
+import { sortSessionRecords } from '@shared/utils/session-sort'
 
 const DB_NAME = 'chatbox-session-meta'
 const STORE_NAME = 'records'
 const DEFAULT_PAGE_SIZE = 50
 
-export interface SessionMetaStorage {
+export interface SessionMetaStorage extends SessionMetaRepositoryPort {
   initialize(): Promise<void>
   create(record: SessionMetaRecord): Promise<void>
   createMany(records: SessionMetaRecord[]): Promise<void>
@@ -18,19 +20,8 @@ export interface SessionMetaStorage {
   clear(): Promise<void>
 }
 
-/**
- * Sort session meta records: starred first (by sortOrder desc), then non-starred (by sortOrder desc).
- * Filters out hidden sessions.
- */
-export function sortSessionRecords(sessions: SessionMetaRecord[]): SessionMetaRecord[] {
-  return sessions
-    .filter((s) => !s.hidden)
-    .sort((a, b) => {
-      if (a.starred && !b.starred) return -1
-      if (!a.starred && b.starred) return 1
-      return b.sortOrder - a.sortOrder
-    })
-}
+// Sort logic shared with the native mobile shell.
+export { sortSessionRecords }
 
 export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
   private db: IDBDatabase | null = null

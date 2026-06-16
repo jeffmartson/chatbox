@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import { Image } from '@mantine/core'
+import { PROVIDER_ICON_ALIASES } from '@shared/constants/provider-icons'
 import { ModelProviderEnum } from '@shared/types'
 import ProviderIcon from '@/components/icons/ProviderIcon'
 
@@ -16,11 +17,6 @@ const providerIconMap = new Map<string, string>(
     return [name, module.default]
   })
 )
-
-const PROVIDER_ICON_ALIASES: Record<string, string> = {
-  [ModelProviderEnum.QwenPortal]: ModelProviderEnum.Qwen,
-  [ModelProviderEnum.MiniMaxCN]: ModelProviderEnum.MiniMax,
-}
 
 export const FEATURED_PROVIDER_IDS: string[] = [
   ModelProviderEnum.OpenAI,

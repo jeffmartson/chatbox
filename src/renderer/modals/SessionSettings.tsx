@@ -28,6 +28,7 @@ import {
   getGoogleThinkingMode,
   getSupportedGoogleThinkingLevels,
 } from '@shared/utils/google-thinking'
+import { THINKING_BUDGET_PRESETS } from '@shared/utils/thinking-budget'
 import { IconInfoCircle, IconTrash, IconUpload } from '@tabler/icons-react'
 import { pick } from 'lodash'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -387,8 +388,8 @@ function ThinkingBudgetConfig({
 }: ThinkingBudgetConfigProps) {
   const { t } = useTranslation()
 
-  // Define preset values in one place
-  const PRESET_VALUES = useMemo(() => [2048, 5120, 10240], [])
+  // Define preset values in one place (shared with the native mobile shell)
+  const PRESET_VALUES = THINKING_BUDGET_PRESETS
 
   const thinkingBudgetOptions = useMemo(
     () => [

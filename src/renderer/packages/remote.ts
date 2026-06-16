@@ -14,6 +14,13 @@ import {
 import * as chatboxaiAPI from '../../shared/request/chatboxai_pool'
 import { createAfetch, createAuthenticatedAfetch, uploadFile } from '../../shared/request/request'
 import {
+  activateNativeLicense,
+  deactivateNativeLicense,
+  type NativeLicenseRequestOptions,
+  validateNativeLicense,
+} from '../../shared/services/native-license'
+import { reportNativeContent } from '../../shared/services/native-report'
+import {
   type ChatboxAILicenseDetail,
   type ChatboxAIPlanType,
   type Config,
@@ -540,112 +547,44 @@ export async function parseUserLinkFree(params: { url: string }) {
   return json
 }
 
-export async function webBrowsing(params: { licenseKey: string; query: string }) {
-  type Response = {
-    data: {
-      uuid?: string
-      query: string
-      links: {
-        title: string
-        url: string
-        content: string
-      }[]
-    }
-  }
+/**
+ * Request seam for the Chatbox `build-in` web search provider. Mirrors
+ * `getLicenseRequestOptions`: injects an afetch `fetchFn` (Chatbox error parsing + retry),
+ * the API origin, and the Chatbox platform headers into the shared `searchNativeWeb` call.
+ */
+export async function getChatboxWebSearchRequestOptions(): Promise<{
+  chatboxApiOrigin: string
+  fetchFn: typeof fetch
+  headers: Record<string, string>
+}> {
   const afetch = await getAfetch()
-  const res = await afetch(
-    `${getAPIOrigin()}/api/tool/web-search`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: params.licenseKey,
-        'Content-Type': 'application/json',
-        ...(await getChatboxHeaders()),
-      },
-      // licenseKey is already carried in the Authorization header; no need to duplicate it.
-      body: JSON.stringify({ query: params.query }),
-    },
-    {
-      parseChatboxRemoteError: true,
-      retry: 2,
-    }
-  )
-  const json: Response = await res.json()
-  return json['data']
+  return {
+    chatboxApiOrigin: getAPIOrigin(),
+    fetchFn: (input, init) => afetch(input, init, { parseChatboxRemoteError: true, retry: 2 }),
+    headers: await getChatboxHeaders(),
+  }
+}
+
+async function getLicenseRequestOptions(): Promise<NativeLicenseRequestOptions> {
+  const afetch = await getAfetch()
+  return {
+    apiOrigin: getAPIOrigin(),
+    fetchFn: (input, init) => afetch(input, init, { parseChatboxRemoteError: true, retry: 5 }),
+    headers: await getChatboxHeaders(),
+  }
 }
 
 export async function activateLicense(params: { licenseKey: string; instanceName: string }) {
-  type Response = {
-    data: {
-      valid: boolean
-      instanceId: string
-      error: string
-    }
-  }
-  const afetch = await getAfetch()
-  const res = await afetch(
-    `${getAPIOrigin()}/api/license/activate`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(await getChatboxHeaders()),
-      },
-      body: JSON.stringify(params),
-    },
-    {
-      parseChatboxRemoteError: true,
-      retry: 5,
-    }
-  )
-  const json: Response = await res.json()
-  return json['data']
+  const result = await activateNativeLicense(params.licenseKey, params.instanceName, await getLicenseRequestOptions())
+  return { ...result, error: result.error ?? '' }
 }
 
 export async function deactivateLicense(params: { licenseKey: string; instanceId: string }) {
-  const afetch = await getAfetch()
-  await afetch(
-    `${getAPIOrigin()}/api/license/deactivate`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Send the Chatbox platform headers, consistent with activate/validate.
-        ...(await getChatboxHeaders()),
-      },
-      body: JSON.stringify(params),
-    },
-    {
-      parseChatboxRemoteError: true,
-      retry: 5,
-    }
-  )
+  await deactivateNativeLicense(params.licenseKey, params.instanceId, await getLicenseRequestOptions())
 }
 
 export async function validateLicense(params: { licenseKey: string; instanceId: string }) {
-  type Response = {
-    data: {
-      valid: boolean
-    }
-  }
-  const afetch = await getAfetch()
-  const res = await afetch(
-    `${getAPIOrigin()}/api/license/validate`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(await getChatboxHeaders()),
-      },
-      body: JSON.stringify(params),
-    },
-    {
-      parseChatboxRemoteError: true,
-      retry: 5,
-    }
-  )
-  const json: Response = await res.json()
-  return json['data']
+  return { valid: await validateNativeLicense(params.licenseKey, params.instanceId, await getLicenseRequestOptions()) }
 }
 
 const RemoteModelInfoSchema = z.object({
@@ -788,13 +727,11 @@ export async function getChatboxAIModelList(params: { licenseKey?: string; langu
 
 export async function reportContent(params: { id: string; type: string; details: string }) {
   const afetch = await getAfetch()
-  await afetch(`${getAPIOrigin()}/api/report_content`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(await getChatboxHeaders()),
-    },
-    body: JSON.stringify(params),
+  await reportNativeContent({
+    ...params,
+    apiOrigin: getAPIOrigin(),
+    fetchFn: (input, init) => afetch(input, init),
+    headers: await getChatboxHeaders(),
   })
 }
 

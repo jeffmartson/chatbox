@@ -1,16 +1,10 @@
 import { ChatboxAIAPIError } from '@shared/models/errors'
+import { createWebSearchTool, WEB_SEARCH_TOOLSET_INSTRUCTION } from '@shared/web-search-tool'
 import { jsonSchema, type ToolSet } from 'ai'
 import * as remote from '@/packages/remote'
 import { getParseLinkProvider, webSearchExecutor } from '@/packages/web-search'
 import platform from '@/platform'
 import * as settingActions from '@/stores/settingActions'
-
-const webSearchDescription = `
-Use web_search to search the web when doing so would genuinely improve your answer.
-
-## web_search
-Search the web when the question benefits from fresh, real-time, or source-specific information — e.g. current events, recent releases, live data, or facts you aren't confident about. For questions you can already answer well from your own knowledge, answer directly. Use short, concise queries (English preferred).
-`
 
 const parseLinkDescription = `
 ## parse_link
@@ -18,25 +12,15 @@ Extract readable content from a specific URL — typically one the user shared o
 `
 
 export function getToolSetDescription(options: { includeParseLink: boolean }) {
-  return options.includeParseLink ? `${webSearchDescription}${parseLinkDescription}` : webSearchDescription
+  return options.includeParseLink
+    ? `${WEB_SEARCH_TOOLSET_INSTRUCTION}${parseLinkDescription}`
+    : WEB_SEARCH_TOOLSET_INSTRUCTION
 }
 
-export const webSearchTool: ToolSet[string] = {
-  description:
-    'Search the web for information. Use it when fresh, real-time, or source-specific data would improve the answer (current events, recent releases, live data, facts you are unsure about). For questions you can answer confidently from your own knowledge, answer directly instead. Use short, concise queries (English preferred).',
-  inputSchema: jsonSchema({
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'the search query' },
-    },
-    required: ['query'],
-    additionalProperties: false,
-  }),
-  execute: async (input, { abortSignal }) => {
-    const searchInput = input as { query: string }
-    return await webSearchExecutor({ query: searchInput.query }, { abortSignal })
-  },
-}
+// Tool definition shared with the native app; only the executor is renderer-specific.
+export const webSearchTool: ToolSet[string] = createWebSearchTool(async (query, abortSignal) => {
+  return await webSearchExecutor({ query }, { abortSignal })
+})
 
 const DEFAULT_PARSE_LINK_MAX_CHARS = 12_000
 

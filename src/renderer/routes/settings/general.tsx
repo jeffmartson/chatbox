@@ -13,12 +13,13 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
-import { type Language, type ProviderInfo, type Settings, Theme } from '@shared/types'
+import { type Language, type Settings, Theme } from '@shared/types'
 import { formatFileSize } from '@shared/utils'
+import { cleanSettingsForBackup, getBackupFilename } from '@shared/utils/backup'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
 import dayjs from 'dayjs'
-import { mapValues, uniqBy } from 'lodash'
+import { uniqBy } from 'lodash'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AdaptiveSelect } from '@/components/AdaptiveSelect'
@@ -315,7 +316,6 @@ const ImportExportDataSection = () => {
     setIsExporting(true)
     try {
       const date = new Date()
-      const dateStr = dayjs(date).format('YYYY-M-D')
 
       const streamingDataGenerator = async function* () {
         yield '{'
@@ -369,23 +369,10 @@ const ImportExportDataSection = () => {
                 if (value !== null) {
                   // 对settings进行特殊处理，清理敏感数据
                   if (key === StorageKey.Settings) {
-                    const cleanedSettings = { ...(value as Settings) }
-                    cleanedSettings.licenseDetail = undefined
-                    cleanedSettings.licenseInstances = undefined
-
-                    if (!exportItems.includes(ExportDataItem.Key)) {
-                      delete cleanedSettings.licenseKey
-                      if (cleanedSettings.providers) {
-                        cleanedSettings.providers = mapValues(cleanedSettings.providers, (provider: ProviderInfo) => {
-                          const cleanedProvider = { ...provider }
-                          delete cleanedProvider.apiKey
-                          delete cleanedProvider.accessKey
-                          delete cleanedProvider.secretKey
-                          delete cleanedProvider.sessionToken
-                          return cleanedProvider
-                        }) as unknown as { [key: string]: ProviderInfo }
-                      }
-                    }
+                    const cleanedSettings = cleanSettingsForBackup(
+                      value as Settings,
+                      exportItems.includes(ExportDataItem.Key)
+                    )
 
                     yield ','
                     yield `"${key}":${JSON.stringify(cleanedSettings)}`
@@ -420,7 +407,7 @@ const ImportExportDataSection = () => {
         yield '}'
       }
 
-      await platform.exporter.exportStreamingJson(`chatbox-exported-data-${dateStr}.json`, streamingDataGenerator)
+      await platform.exporter.exportStreamingJson(getBackupFilename(date), streamingDataGenerator)
     } catch (error) {
       console.error('Export failed:', error)
     } finally {

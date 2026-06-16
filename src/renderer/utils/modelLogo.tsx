@@ -1,3 +1,4 @@
+import { matchModelBrand, type ModelBrand } from '@shared/utils/model-logo-patterns'
 import type { ComponentType, ReactElement } from 'react'
 
 // Import only Mono and Color components to avoid @lobehub/ui dependency
@@ -31,75 +32,36 @@ interface IconProps {
 type IconComponent = ComponentType<IconProps>
 
 interface ModelLogoConfig {
-  pattern: RegExp
   icon: IconComponent
   darkModeColor?: string // Color to use in dark mode for mono icons
 }
 
 /**
- * Mapping of regex patterns to model logo components.
- * Patterns are matched case-insensitively against model IDs.
- * Order matters - more specific patterns should come first.
+ * Brand detection lives in @shared/utils/model-logo-patterns (shared with the
+ * native app); this map only binds each brand to its lobehub icon component.
  */
-const modelLogoConfigs: ModelLogoConfig[] = [
-  // OpenAI models - black icon, needs white in dark mode
-  { pattern: /\b(o1|o3|o4|gpt|chatgpt)/i, icon: OpenAIMono, darkModeColor: '#fff' },
-
-  // Anthropic
-  { pattern: /claude/i, icon: ClaudeColor },
-
-  // Google
-  { pattern: /gemini/i, icon: GeminiColor },
-
-  // DeepSeek
-  { pattern: /deepseek/i, icon: DeepSeekColor },
-
-  // Alibaba
-  { pattern: /qwen|qwq|qvq/i, icon: QwenColor },
-
-  // Meta/Llama
-  { pattern: /llama/i, icon: MetaColor },
-
-  // Mistral
-  { pattern: /mistral|mixtral|codestral|ministral|magistral/i, icon: MistralColor },
-
-  // Moonshot - black icon, needs white in dark mode
-  { pattern: /moonshot/i, icon: MoonshotMono, darkModeColor: '#fff' },
-
-  // Kimi
-  { pattern: /kimi/i, icon: KimiColor },
-
-  // Zhipu/GLM
-  { pattern: /glm/i, icon: ChatGLMColor },
-  { pattern: /zhipu/i, icon: ZhipuColor },
-
-  // ByteDance/Doubao
-  { pattern: /doubao|ep-202/i, icon: DoubaoColor },
-
-  // Baichuan
-  { pattern: /baichuan/i, icon: BaichuanColor },
-
-  // 01.AI/Yi
-  { pattern: /yi-/i, icon: YiColor },
-
-  // Tencent/Hunyuan
-  { pattern: /hunyuan/i, icon: HunyuanColor },
-
-  // MiniMax
-  { pattern: /minimax|abab/i, icon: MinimaxColor },
-
-  // StepFun
-  { pattern: /step-/i, icon: StepfunColor },
-
-  // Cohere
-  { pattern: /cohere|command-r/i, icon: CohereColor },
-
-  // xAI Grok - black icon, needs white in dark mode
-  { pattern: /grok/i, icon: GrokMono, darkModeColor: '#fff' },
-
-  // Perplexity
-  { pattern: /perplexity|sonar/i, icon: PerplexityColor },
-]
+const BRAND_ICONS: Record<ModelBrand, ModelLogoConfig> = {
+  openai: { icon: OpenAIMono, darkModeColor: '#fff' },
+  claude: { icon: ClaudeColor },
+  gemini: { icon: GeminiColor },
+  deepseek: { icon: DeepSeekColor },
+  qwen: { icon: QwenColor },
+  meta: { icon: MetaColor },
+  mistral: { icon: MistralColor },
+  moonshot: { icon: MoonshotMono, darkModeColor: '#fff' },
+  kimi: { icon: KimiColor },
+  chatglm: { icon: ChatGLMColor },
+  zhipu: { icon: ZhipuColor },
+  doubao: { icon: DoubaoColor },
+  baichuan: { icon: BaichuanColor },
+  yi: { icon: YiColor },
+  hunyuan: { icon: HunyuanColor },
+  minimax: { icon: MinimaxColor },
+  stepfun: { icon: StepfunColor },
+  cohere: { icon: CohereColor },
+  grok: { icon: GrokMono, darkModeColor: '#fff' },
+  perplexity: { icon: PerplexityColor },
+}
 
 /**
  * Get the model logo configuration for a model based on its ID.
@@ -108,15 +70,8 @@ const modelLogoConfigs: ModelLogoConfig[] = [
  * @returns The config if found, undefined otherwise
  */
 export function getModelLogoConfig(modelId: string): ModelLogoConfig | undefined {
-  if (!modelId) return undefined
-
-  for (const config of modelLogoConfigs) {
-    if (config.pattern.test(modelId)) {
-      return config
-    }
-  }
-
-  return undefined
+  const brand = matchModelBrand(modelId)
+  return brand ? BRAND_ICONS[brand] : undefined
 }
 
 /**
