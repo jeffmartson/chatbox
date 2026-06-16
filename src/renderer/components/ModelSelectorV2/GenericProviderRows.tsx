@@ -9,7 +9,10 @@ import { ProviderRowHeader } from './ProviderRowHeader'
 import type { DetailModel, FavoriteModel, FilteredProvider } from './types'
 
 function ByokSectionDivider({ mobile }: { mobile: boolean }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const language = i18n.language.toLowerCase()
+  const byokLabel = language === 'zh-hans' || language.startsWith('zh-cn') ? '自带API KEY' : 'BYOK'
+
   return (
     <div
       className={clsx(
@@ -20,7 +23,7 @@ function ByokSectionDivider({ mobile }: { mobile: boolean }) {
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-chatbox-tint-secondary">
         {t('More Providers')}
       </span>
-      <span className="text-[11px] font-semibold text-chatbox-tint-tertiary">BYOK</span>
+      <span className="text-[11px] font-semibold text-chatbox-tint-tertiary">{byokLabel}</span>
     </div>
   )
 }
