@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { useIsLargeScreen, useIsSmallScreen } from '@/hooks/useScreenChange'
 import { router } from '@/router'
 import * as atoms from '@/stores/atoms'
-import { deleteSession, getSession } from '@/stores/chatStore'
+import { confirmSessionDeletion, deleteSession, getSession } from '@/stores/chatStore'
 import { clear as clearSession } from '@/stores/sessionActions'
 import { useUIStore } from '@/stores/uiStore'
 import ActionMenu from '../ActionMenu'
@@ -45,6 +45,9 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
     void clearSession(sessionId)
   }
   const handleSessionDelete = async () => {
+    if (!(await confirmSessionDeletion(sessionId))) {
+      return
+    }
     try {
       await deleteSession(sessionId)
       router.navigate({ to: '/', replace: true })

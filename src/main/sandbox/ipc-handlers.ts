@@ -1,5 +1,4 @@
 import { lstat as fsLstat, readFile as fsReadFile, realpath as fsRealpath } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { shellQuote } from '../../shared/utils/shell'
@@ -12,13 +11,17 @@ import {
   execCommand,
   exportFileFromSandbox,
   findFiles,
+  getSandboxAllowedRoots,
   getStatus,
   grepFiles,
+  hasSessionArtifacts,
   initSandbox,
   initSandboxWithTempDir,
   killRunningCommand,
   listDir,
+  persistSandboxArtifact,
   readFile,
+  removeSessionArtifacts,
   resetSandbox,
   writeFile,
 } from './manager'
@@ -231,18 +234,52 @@ export function registerSandboxIPCHandlers() {
     return process.versions.electron ? `ELECTRON_RUN_AS_NODE=1 ${executable}` : executable
   })
 
+  // Persist a generated file to durable storage (userData) so it stays downloadable
+  // even after the transient temp working directory is evicted or cleaned up.
+  ipcMain.handle(
+    'sandbox:persist-artifact',
+    async (_event, params: { sandboxPath: string; sessionId: string; displayName?: string }) => {
+      try {
+        log.debug(`sandbox:persist-artifact path=${params.sandboxPath}`)
+        return await persistSandboxArtifact(params.sandboxPath, params.sessionId, params.displayName)
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        log.error('sandbox:persist-artifact failed', msg)
+        return { success: false, error: msg }
+      }
+    }
+  )
+
+  ipcMain.handle('sandbox:has-artifacts', (_event, params: { sessionId: string }) => {
+    return { has: hasSessionArtifacts(params.sessionId) }
+  })
+
+  ipcMain.handle('sandbox:remove-artifacts', (_event, params: { sessionId: string }) => {
+    try {
+      log.debug(`sandbox:remove-artifacts session=${params.sessionId}`)
+      return removeSessionArtifacts(params.sessionId)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      log.error('sandbox:remove-artifacts failed', msg)
+      return { success: false, error: msg }
+    }
+  })
+
   // Read a file as base64 directly from disk (no sandbox init required).
-  // Restricted to files within the sandbox temp directory for security.
+  // Restricted to files within a known sandbox root (temp working dirs or persisted artifacts).
   ipcMain.handle('sandbox:read-file-base64', async (_event, params: { filePath: string }) => {
     try {
-      const sandboxRoot = await fsRealpath(path.join(tmpdir(), 'chatbox-sandbox'))
+      const sandboxRoots = getSandboxAllowedRoots()
       // Check for symlinks before resolving — defense-in-depth
       const stat = await fsLstat(params.filePath)
       if (stat.isSymbolicLink()) {
         return { success: false, error: 'Access denied: symlinks not allowed' }
       }
       const resolved = await fsRealpath(params.filePath)
-      if (!resolved.startsWith(sandboxRoot + path.sep)) {
+      const isInsideSandbox = sandboxRoots.some(
+        (root) => resolved === root || resolved.startsWith(root + path.sep)
+      )
+      if (!isInsideSandbox) {
         return { success: false, error: 'Access denied: path outside sandbox directory' }
       }
       const buffer = await fsReadFile(resolved)

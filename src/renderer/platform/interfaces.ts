@@ -191,6 +191,13 @@ export interface Platform extends Storage {
     sandboxPath: string
     suggestedName?: string
   }): Promise<{ success: boolean; localPath?: string; error?: string }>
+  sandboxPersistArtifact?(params: {
+    sandboxPath: string
+    sessionId: string
+    displayName?: string
+  }): Promise<{ success: boolean; artifactPath?: string; error?: string }>
+  sandboxHasArtifacts?(params: { sessionId: string }): Promise<{ has: boolean }>
+  sandboxRemoveArtifacts?(params: { sessionId: string }): Promise<{ success: boolean; error?: string }>
   sandboxReadFileBase64?(params: { filePath: string }): Promise<{ success: boolean; base64?: string; error?: string }>
   sandboxCreateHtmlPreview?(params: { filePath: string }): Promise<{ success: boolean; url?: string; error?: string }>
   sandboxNodeCommand?(): Promise<string>

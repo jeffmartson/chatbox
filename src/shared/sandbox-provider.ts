@@ -38,6 +38,17 @@ export interface SandboxProvider {
     suggestedName?: string
   ): Promise<{ success: boolean; localPath?: string; error?: string }>
 
+  /**
+   * Persist a generated file to durable storage so it stays downloadable indefinitely,
+   * even after the transient sandbox working directory is evicted or cleaned up.
+   * Returns the persisted absolute path; callers should fall back to the original path
+   * if persistence is unsupported or fails.
+   */
+  persistArtifact(
+    sandboxPath: string,
+    displayName?: string
+  ): Promise<{ success: boolean; artifactPath?: string; error?: string }>
+
   /** Execute code in the sandbox */
   exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult>
 

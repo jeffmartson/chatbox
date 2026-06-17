@@ -444,6 +444,18 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:export-file', params)
   }
 
+  public async sandboxPersistArtifact(params: { sandboxPath: string; sessionId: string; displayName?: string }) {
+    return this.ipc.invoke('sandbox:persist-artifact', params)
+  }
+
+  public async sandboxHasArtifacts(params: { sessionId: string }) {
+    return this.ipc.invoke('sandbox:has-artifacts', params)
+  }
+
+  public async sandboxRemoveArtifacts(params: { sessionId: string }) {
+    return this.ipc.invoke('sandbox:remove-artifacts', params)
+  }
+
   public async sandboxNodeCommand() {
     return this.ipc.invoke('sandbox:node-command')
   }

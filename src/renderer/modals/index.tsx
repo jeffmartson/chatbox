@@ -3,6 +3,7 @@ import CopilotSettingsModal from '../routes/copilots/-components/CopilotSettings
 import AppStoreRating from './AppStoreRating'
 import ArtifactPreview from './ArtifactPreview'
 import ClearSessionList from './ClearSessionList'
+import ConfirmModal from './ConfirmModal'
 import ContentViewer from './ContentViewer'
 import EdgeOneDeploySuccess from './EdgeOneDeploySuccess'
 import ExportChat from './ExportChat'
@@ -22,6 +23,7 @@ NiceModal.register('session-settings', SessionSettings)
 NiceModal.register('app-store-rating', AppStoreRating)
 NiceModal.register('artifact-preview', ArtifactPreview)
 NiceModal.register('clear-session-list', ClearSessionList)
+NiceModal.register('confirm', ConfirmModal)
 NiceModal.register('export-chat', ExportChat)
 NiceModal.register('message-edit', MessageEdit)
 NiceModal.register('json-viewer', JsonViewer)

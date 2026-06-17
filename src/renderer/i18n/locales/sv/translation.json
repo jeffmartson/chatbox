@@ -1065,5 +1065,7 @@
   "Your license has expired. You can continue using your expansion pack.": "Din licens har gått ut. Du kan fortsätta använda ditt expansionspaket.",
   "Your rating on the App Store would help make Chatbox even better!": "Din betyg på App Store hjälper till att göra Chatbox ännu bättre!",
   "Worked for {{time}}": "Arbetade i {{time}}",
-  "{{count}} steps": "{{count}} steg"
+  "{{count}} steps": "{{count}} steg",
+  "Delete this chat?": "Radera den här chatten?",
+  "This chat has downloadable files generated in the sandbox. Deleting it will permanently remove those files.": "Den här chatten har nedladdningsbara filer som genererats i sandlådan. Om du raderar den tas dessa filer bort permanent."
 }

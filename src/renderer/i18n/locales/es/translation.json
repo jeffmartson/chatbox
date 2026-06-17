@@ -1065,5 +1065,7 @@
   "Your license has expired. You can continue using your expansion pack.": "Tu licencia ha caducado. Puedes seguir utilizando tu paquete de expansión.",
   "Your rating on the App Store would help make Chatbox even better!": "Tu calificación en la App Store ayudará a hacer que Chatbox sea aún mejor!",
   "Worked for {{time}}": "Trabajó durante {{time}}",
-  "{{count}} steps": "{{count}} pasos"
+  "{{count}} steps": "{{count}} pasos",
+  "Delete this chat?": "¿Eliminar este chat?",
+  "This chat has downloadable files generated in the sandbox. Deleting it will permanently remove those files.": "Este chat tiene archivos descargables generados en el sandbox. Si lo eliminas, esos archivos se eliminarán de forma permanente."
 }

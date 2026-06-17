@@ -40,6 +40,13 @@ export class CloudSandboxProvider implements SandboxProvider {
     return { success: false, error: 'Cloud sandbox not yet implemented' }
   }
 
+  async persistArtifact(
+    _sandboxPath: string,
+    _displayName?: string
+  ): Promise<{ success: boolean; artifactPath?: string; error?: string }> {
+    return { success: false, error: 'Cloud sandbox not yet implemented' }
+  }
+
   async exec(_params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
     return { stdout: '', stderr: 'Cloud sandbox not yet implemented', exitCode: 1 }
   }

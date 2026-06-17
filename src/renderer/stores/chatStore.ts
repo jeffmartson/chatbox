@@ -3,6 +3,7 @@
  * It uses react-query for caching.
  * */
 
+import NiceModal from '@ebay/nice-modal-react'
 import {
   type Message,
   type Session,
@@ -19,6 +20,7 @@ import compact from 'lodash/compact'
 import isEmpty from 'lodash/isEmpty'
 import { useMemo } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import i18n from '@/i18n'
 import platform from '@/platform'
 import storage, { StorageKey } from '@/storage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
@@ -332,6 +334,30 @@ export async function updateSessionCache(sessionId: string, updater: Updater<Ses
   })
 }
 
+/**
+ * If a session has persisted download artifacts, ask the user to confirm deletion, since
+ * those downloadable files will be permanently removed along with the session. Returns
+ * false if the user cancels; true otherwise (including when there are no artifacts).
+ */
+export async function confirmSessionDeletion(id: string): Promise<boolean> {
+  if (platform.type !== 'desktop' || !platform.sandboxHasArtifacts) return true
+  try {
+    const { has } = await platform.sandboxHasArtifacts({ sessionId: id })
+    if (!has) return true
+    const confirmed = await NiceModal.show('confirm', {
+      title: i18n.t('Delete this chat?'),
+      message: i18n.t(
+        'This chat has downloadable files generated in the sandbox. Deleting it will permanently remove those files.'
+      ),
+      confirmText: i18n.t('Delete'),
+      danger: true,
+    })
+    return confirmed === true
+  } catch {
+    return true
+  }
+}
+
 export async function deleteSession(id: string) {
   console.debug('chatStore', 'deleteSession', id)
   if (platform.type === 'desktop') {
@@ -353,8 +379,12 @@ export async function deleteSession(id: string) {
   cleanupSessionAtomCache(id)
   clearScrollPositionCache(id)
   delete sessionUpdateQueues[id]
-  // Clean up sandbox temp directory (best-effort, non-blocking)
+  // Stop running sandbox processes and clear in-memory session state (best-effort, non-blocking).
+  // The transient temp dir is reaped by the 7-day startup cleanup; persisted download artifacts
+  // live under userData and would otherwise leak forever once the session is gone, so remove them
+  // here (the session — and its download UI — no longer exists).
   platform.sandboxReset?.({ sessionId: id }).catch(() => {})
+  platform.sandboxRemoveArtifacts?.({ sessionId: id }).catch(() => {})
 }
 
 export async function deleteSessions(ids: string[]) {
@@ -389,6 +419,9 @@ export async function deleteSessions(ids: string[]) {
     cleanupSessionAtomCache(id)
     clearScrollPositionCache(id)
     delete sessionUpdateQueues[id]
+    // Remove persisted download artifacts so deleted sessions don't leak files on disk.
+    platform.sandboxReset?.({ sessionId: id }).catch(() => {})
+    platform.sandboxRemoveArtifacts?.({ sessionId: id }).catch(() => {})
   }
 }
 

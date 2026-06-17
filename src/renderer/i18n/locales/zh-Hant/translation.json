@@ -1065,5 +1065,7 @@
   "Your license has expired. You can continue using your expansion pack.": "您的授權已過期。您可以繼續使用您的擴充包。",
   "Your rating on the App Store would help make Chatbox even better!": "您的 App Store 評分將幫助 Chatbox 變得更好！",
   "Worked for {{time}}": "工作了 {{time}}",
-  "{{count}} steps": "{{count}} 個步驟"
+  "{{count}} steps": "{{count}} 個步驟",
+  "Delete this chat?": "刪除此對話？",
+  "This chat has downloadable files generated in the sandbox. Deleting it will permanently remove those files.": "此對話包含沙箱產生的可下載檔案，刪除後這些檔案將被永久移除。"
 }

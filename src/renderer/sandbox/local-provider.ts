@@ -79,6 +79,16 @@ export class LocalSandboxProvider implements SandboxProvider {
     return platform.sandboxExportFile({ sandboxPath, suggestedName })
   }
 
+  async persistArtifact(
+    sandboxPath: string,
+    displayName?: string
+  ): Promise<{ success: boolean; artifactPath?: string; error?: string }> {
+    if (!platform.sandboxPersistArtifact || !this.sessionId) {
+      return { success: false, error: 'Sandbox persist not available' }
+    }
+    return platform.sandboxPersistArtifact({ sandboxPath, sessionId: this.sessionId, displayName })
+  }
+
   async exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
     if (!platform.sandboxExec) {
       return { stdout: '', stderr: 'Sandbox not available on this platform', exitCode: 1 }

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { router } from '@/router'
 import {
+  confirmSessionDeletion,
   deleteSession as deleteSessionStore,
   getSession,
   updateSession as updateSessionStore,
@@ -73,6 +74,9 @@ function SessionItem(props: Props) {
         disabled: deleting,
         onClick: async () => {
           if (deletingRef.current) {
+            return
+          }
+          if (!(await confirmSessionDeletion(session.id))) {
             return
           }
           deletingRef.current = true

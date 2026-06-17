@@ -1,5 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import {
   copyFile as fsCopyFile,
@@ -644,7 +645,7 @@ export async function initSandboxWithTempDir(
     return { success: false, error: 'Invalid session ID' }
   }
 
-  const tempBase = path.join(tmpdir(), 'chatbox-sandbox', sessionId)
+  const tempBase = path.join(getSandboxTmpRoot(), sessionId)
   try {
     mkdirSync(tempBase, { recursive: true })
     const result = await initSandbox(tempBase, sessionId)
@@ -743,6 +744,137 @@ export async function copyBlobToSandbox(
 }
 
 /**
+ * Transient sandbox working directories live in the OS temp dir and are reaped by
+ * cleanupStaleSandboxDirs(). Persisted download artifacts live under userData so they
+ * survive OS temp eviction and the 7-day cleanup, keeping create_download outputs
+ * downloadable indefinitely. The path intentionally contains `chatbox-sandbox` so the
+ * renderer's sandbox-path detection (preview gating) keeps working.
+ */
+export function getSandboxTmpRoot(): string {
+  return path.join(tmpdir(), 'chatbox-sandbox')
+}
+
+export function getSandboxArtifactsRoot(): string {
+  return path.join(app.getPath('userData'), 'chatbox-sandbox', 'artifacts')
+}
+
+/**
+ * All directory roots that may legitimately contain sandbox files, with symlinks
+ * resolved (macOS: /var → /private/var). Used by export/read/preview security checks.
+ * The artifacts root is listed first so previews of persisted files resolve to the
+ * durable copy rather than a same-named transient temp file.
+ */
+export function getSandboxAllowedRoots(): string[] {
+  const roots = new Set<string>()
+  // Persisted artifacts are always accessible (listed first so previews resolve to the
+  // durable copy rather than a same-named transient temp file).
+  roots.add(safeRealpathSync(getSandboxArtifactsRoot()))
+  // Live sessions: scope to each session's own working directory (per-session isolation).
+  let hasLiveSession = false
+  for (const session of sessions.values()) {
+    if (session.workingDirectory) {
+      roots.add(safeRealpathSync(session.workingDirectory))
+      hasLiveSession = true
+    }
+  }
+  // Post-restart fallback only: the sessions Map is empty but temp dirs still exist on
+  // disk. Add the shared temp root solely to recover those — never alongside live
+  // sessions, so one active session can't read another's working directory.
+  if (!hasLiveSession) {
+    roots.add(safeRealpathSync(getSandboxTmpRoot()))
+  }
+  return [...roots]
+}
+
+/** Remove all persisted download artifacts for a session (called on session deletion). */
+export function removeSessionArtifacts(sessionId: string): { success: boolean; error?: string } {
+  if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
+    return { success: false, error: 'Invalid session ID' }
+  }
+  try {
+    const dir = path.join(getSandboxArtifactsRoot(), sessionId)
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    return { success: true }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    log.error('removeSessionArtifacts failed:', msg)
+    return { success: false, error: msg }
+  }
+}
+
+/** Whether a session has any persisted download artifacts on disk. */
+export function hasSessionArtifacts(sessionId: string): boolean {
+  if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
+    return false
+  }
+  try {
+    const dir = path.join(getSandboxArtifactsRoot(), sessionId)
+    return existsSync(dir) && readdirSync(dir).length > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Persist a sandbox file to durable storage under userData so it stays downloadable
+ * even after the transient temp working directory is evicted or cleaned up.
+ * Idempotent: a path that is already inside the artifacts root is returned as-is.
+ * Returns the absolute path of the persisted copy.
+ */
+export async function persistSandboxArtifact(
+  sandboxPath: string,
+  sessionId: string,
+  _displayName?: string
+): Promise<{ success: boolean; artifactPath?: string; error?: string }> {
+  // Validate sessionId to prevent path traversal
+  if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
+    return { success: false, error: 'Invalid session ID' }
+  }
+  if (!path.isAbsolute(sandboxPath)) {
+    return { success: false, error: 'Artifact path must be absolute' }
+  }
+  try {
+    // Security: the source must live inside a known sandbox root.
+    const resolvedSource = safeRealpathSync(sandboxPath)
+    const allowedRoots = getSandboxAllowedRoots()
+    const insideSandbox = allowedRoots.some(
+      (root) => resolvedSource === root || resolvedSource.startsWith(root + path.sep)
+    )
+    if (!insideSandbox) {
+      return { success: false, error: 'Access denied: path is outside the sandbox' }
+    }
+    if (!existsSync(resolvedSource)) {
+      return { success: false, error: `File not found: ${sandboxPath}` }
+    }
+
+    // Already persisted — nothing to copy.
+    const artifactsRoot = safeRealpathSync(getSandboxArtifactsRoot())
+    if (resolvedSource === artifactsRoot || resolvedSource.startsWith(artifactsRoot + path.sep)) {
+      return { success: true, artifactPath: resolvedSource }
+    }
+
+    // Group by a stable hash of the source path so distinct files that share a basename
+    // (e.g. charts/report.html vs tables/report.html) don't overwrite each other, while
+    // re-persisting the same source path updates the copy in place.
+    const sourceKey = createHash('sha1').update(resolvedSource).digest('hex').slice(0, 12)
+    const destDir = path.join(getSandboxArtifactsRoot(), sessionId, sourceKey)
+    mkdirSync(destDir, { recursive: true })
+    // Keep the original basename for the on-disk name. NOTE: _displayName is LLM-controlled
+    // and intentionally NOT used here — do not wire it into the path without sanitizing
+    // (path traversal). The download dialog uses display_name only as a save-as suggestion.
+    const destPath = path.join(destDir, path.basename(resolvedSource))
+    await fsCopyFile(resolvedSource, destPath)
+    return { success: true, artifactPath: safeRealpathSync(destPath) }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    log.error('persistSandboxArtifact failed:', msg)
+    return { success: false, error: msg }
+  }
+}
+
+/**
  * Export a file from the sandbox to a user-chosen location.
  * Opens a save dialog and copies the file.
  */
@@ -754,20 +886,9 @@ export async function exportFileFromSandbox(
     const { dialog } = await import('electron')
 
     // Resolve path relative to a sandbox session's working directory.
-    // Security: only files inside a sandbox working directory are allowed.
+    // Security: only files inside a known sandbox root are allowed.
     let resolvedPath: string | null = null
-
-    // Collect sandbox roots with symlinks resolved (macOS: /var → /private/var)
-    const sandboxRoots: string[] = []
-    for (const session of sessions.values()) {
-      if (session.workingDirectory) {
-        sandboxRoots.push(safeRealpathSync(session.workingDirectory))
-      }
-    }
-    // Fallback: after app restart sessions Map is empty but sandbox temp dirs still exist on disk.
-    if (sandboxRoots.length === 0) {
-      sandboxRoots.push(safeRealpathSync(path.join(tmpdir(), 'chatbox-sandbox')))
-    }
+    const sandboxRoots = getSandboxAllowedRoots()
 
     if (path.isAbsolute(sandboxPath)) {
       resolvedPath = safeRealpathSync(sandboxPath)
@@ -820,12 +941,13 @@ export async function exportFileFromSandbox(
 
 // ─── Temp directory cleanup ──────────────────────────────────────────
 
-const SANDBOX_ROOT = path.join(tmpdir(), 'chatbox-sandbox')
+const SANDBOX_ROOT = getSandboxTmpRoot()
 const STALE_DIR_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 /**
  * Clean up stale sandbox temp directories older than 7 days.
- * Called on app startup.
+ * Called on app startup. Only touches the transient temp root — persisted download
+ * artifacts under userData (getSandboxArtifactsRoot) are intentionally never cleaned.
  */
 export function cleanupStaleSandboxDirs(): void {
   try {

@@ -1,7 +1,19 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+// preview-server pulls in manager (for sandbox-root resolution), which imports electron + the logger.
+const { USER_DATA } = vi.hoisted(() => {
+  const os = require('node:os') as typeof import('node:os')
+  const p = require('node:path') as typeof import('node:path')
+  return { USER_DATA: p.join(os.tmpdir(), `chatbox-test-preview-userdata-${process.pid}`) }
+})
+vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => USER_DATA } }))
+vi.mock('../util', () => ({
+  getLogger: () => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+}))
+
 import { createSandboxHtmlPreviewUrl, stopSandboxHtmlPreviewServer } from './preview-server'
 
 const testDirs: string[] = []

@@ -1,14 +1,15 @@
 import { createReadStream } from 'node:fs'
 import { lstat, readFile, realpath, stat } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { getSandboxAllowedRoots } from './manager'
 
 let server: Server | null = null
 let port: number | null = null
 
-function getSandboxRoot(): Promise<string> {
-  return realpath(path.join(tmpdir(), 'chatbox-sandbox'))
+// All roots a preview may serve from (transient temp working dirs + persisted artifacts).
+function getSandboxRoots(): string[] {
+  return getSandboxAllowedRoots()
 }
 
 function isInside(parent: string, child: string): boolean {
@@ -92,7 +93,7 @@ function getRefererRelativeDir(req: IncomingMessage): string | null {
 
 async function resolveRequestPath(
   req: IncomingMessage,
-  sandboxRoot: string
+  sandboxRoots: string[]
 ): Promise<{
   relativePath: string
   resolvedPath: string
@@ -108,18 +109,26 @@ async function resolveRequestPath(
     relativePath = path.join(refererDir, decodeUrlPath(url.pathname))
   }
 
-  const targetPath = path.resolve(sandboxRoot, relativePath)
-  const resolvedPath = await realpath(targetPath)
-  if (!isInside(sandboxRoot, resolvedPath)) {
-    throw new Error('Access denied')
+  // The relative path is resolved against each root; the first match that stays inside
+  // its root and exists wins. Single self-contained artifacts resolve unambiguously.
+  for (const sandboxRoot of sandboxRoots) {
+    const targetPath = path.resolve(sandboxRoot, relativePath)
+    try {
+      const resolvedPath = await realpath(targetPath)
+      if (isInside(sandboxRoot, resolvedPath)) {
+        return { relativePath: path.relative(sandboxRoot, resolvedPath), resolvedPath }
+      }
+    } catch {
+      // Not in this root — try the next.
+    }
   }
-  return { relativePath: path.relative(sandboxRoot, resolvedPath), resolvedPath }
+  throw new Error('Not found')
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    const sandboxRoot = await getSandboxRoot()
-    const { relativePath, resolvedPath } = await resolveRequestPath(req, sandboxRoot)
+    const sandboxRoots = getSandboxRoots()
+    const { relativePath, resolvedPath } = await resolveRequestPath(req, sandboxRoots)
     const fileStat = await stat(resolvedPath)
     if (!fileStat.isFile()) {
       res.writeHead(404).end('Not found')
@@ -168,13 +177,14 @@ export async function createSandboxHtmlPreviewUrl(
   filePath: string
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    const sandboxRoot = await getSandboxRoot()
+    const sandboxRoots = getSandboxRoots()
     const fileStat = await lstat(filePath)
     if (fileStat.isSymbolicLink()) {
       return { success: false, error: 'Access denied: symlinks not allowed' }
     }
     const resolvedPath = await realpath(filePath)
-    if (!isInside(sandboxRoot, resolvedPath)) {
+    const sandboxRoot = sandboxRoots.find((root) => isInside(root, resolvedPath))
+    if (!sandboxRoot) {
       return { success: false, error: 'Access denied: path outside sandbox directory' }
     }
     if (!['.html', '.htm'].includes(path.extname(resolvedPath).toLowerCase())) {

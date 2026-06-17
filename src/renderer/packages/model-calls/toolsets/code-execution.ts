@@ -312,9 +312,22 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         return { error: `File not found: ${downloadInput.file_path}` }
       }
 
+      // Persist the file to durable storage so it stays downloadable even after the
+      // transient sandbox temp dir is evicted/cleaned. Fall back to the temp path if
+      // persistence is unsupported (e.g. cloud sandbox) or fails.
+      let downloadPath = resolved
+      try {
+        const persisted = await provider.persistArtifact(resolved, downloadInput.display_name)
+        if (persisted.success && persisted.artifactPath) {
+          downloadPath = persisted.artifactPath
+        }
+      } catch {
+        // Keep the temp path as a best-effort fallback.
+      }
+
       return {
         downloadable: true,
-        file_path: resolved,
+        file_path: downloadPath,
         display_name: downloadInput.display_name,
         provider_type: provider.type,
       }
