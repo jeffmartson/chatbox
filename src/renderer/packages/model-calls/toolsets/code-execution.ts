@@ -281,14 +281,19 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
 
   const create_download: ToolSet[string] = {
     description:
-      'Mark a file in the sandbox as downloadable. Returns metadata for rendering a download button. ' +
-      'Use after generating files (PDFs, charts, spreadsheets, etc.) with code_execution.',
+      'Persist a sandbox-generated file to durable storage and mark it downloadable. Returns metadata for ' +
+      'rendering a download button. Use after generating files (PDFs, charts, spreadsheets, etc.) with ' +
+      'code_execution. The file must be one the sandbox produced — write it to the working directory (relative ' +
+      'paths) or a sandbox-writable temp dir (e.g. /tmp). If the file cannot be persisted, this returns an ' +
+      'error instead of a download; write the file inside the sandbox and try again.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
         file_path: {
           type: 'string',
-          description: 'Path to the file in the sandbox working directory',
+          description:
+            'Path to the file the sandbox generated, in the working directory (relative paths preferred) or a ' +
+            'sandbox-writable temp dir such as /tmp',
         },
         display_name: {
           type: 'string',
@@ -313,17 +318,24 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       }
 
       // Persist the file to durable storage so it stays downloadable even after the
-      // transient sandbox temp dir is evicted/cleaned. Fall back to the temp path if
-      // persistence is unsupported (e.g. cloud sandbox) or fails.
+      // transient sandbox temp dir is evicted/cleaned.
       let downloadPath = resolved
-      try {
-        const persisted = await provider.persistArtifact(resolved, downloadInput.display_name)
-        if (persisted.success && persisted.artifactPath) {
-          downloadPath = persisted.artifactPath
+      const persisted = await provider
+        .persistArtifact(resolved, downloadInput.display_name)
+        .catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }))
+      if (persisted.success && persisted.artifactPath) {
+        downloadPath = persisted.artifactPath
+      } else if (provider.type === 'local') {
+        // On desktop, persisting is required: a failure means the path is not a valid
+        // sandbox output (e.g. outside the sandbox-writable area). Report it so the model
+        // can retry with a file in the working directory instead of silently "succeeding".
+        return {
+          error:
+            persisted.error ||
+            'Failed to prepare file for download. Make sure the file was written inside the sandbox working directory.',
         }
-      } catch {
-        // Keep the temp path as a best-effort fallback.
       }
+      // Cloud/unsupported providers: fall back to the resolved sandbox path.
 
       return {
         downloadable: true,
@@ -374,8 +386,10 @@ Execute focused Node.js or Bash snippets. Keep scripts small and task-oriented:
 - Avoid long-running services, project scaffolding, dependency installation, and broad environment exploration.
 
 ### create_download
-After generating a file with code_execution, use this to make it downloadable.
-The user will see a download button in the chat.
+After generating a file with code_execution, use this to make it downloadable. The user will see a download button in the chat.
+- Write downloadable outputs into the working directory (use relative paths, which resolve to the sandbox working directory). A sandbox-writable temp dir such as \`/tmp\` also works.
+- create_download copies the file into durable storage, so it stays downloadable after the session's temporary files are cleaned up.
+- If it returns an error (e.g. the file is not inside the sandbox-writable area), re-create the file in the working directory and call create_download again — do not assume the download succeeded.
 `
 
   return {

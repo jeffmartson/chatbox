@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpathSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -126,16 +126,31 @@ describe('persistSandboxArtifact', () => {
     expect(second.artifactPath).toBe(first.artifactPath)
   })
 
-  test('rejects a path outside any sandbox root', async () => {
-    const outside = path.join(tmpdir(), `not-a-sandbox-${process.pid}.txt`)
-    writeFileSync(outside, 'secret', 'utf-8')
+  test('persists a file from a sandbox-writable temp dir (e.g. /tmp)', async () => {
+    // The sandbox can legitimately write to the OS temp dir / /tmp, so create_download
+    // must be able to persist files produced there even though they live outside the
+    // per-session working directory.
+    const tempFile = path.join(tmpdir(), `persist-tmp-${process.pid}.txt`)
+    writeFileSync(tempFile, 'from-tmp', 'utf-8')
     try {
-      const result = await persistSandboxArtifact(realpathSync(outside), SESSION_ID)
-      expect(result.success).toBe(false)
-      expect(result.error).toMatch(/outside the sandbox/i)
+      const result = await persistSandboxArtifact(realpathSync(tempFile), SESSION_ID)
+      expect(result.success).toBe(true)
+      const artifactsRoot = realpathSync(getSandboxArtifactsRoot())
+      expect(result.artifactPath?.startsWith(artifactsRoot + path.sep)).toBe(true)
+      expect(readFileSync(result.artifactPath!, 'utf-8')).toBe('from-tmp')
     } finally {
-      rmSync(outside, { force: true })
+      rmSync(tempFile, { force: true })
     }
+  })
+
+  test('rejects a path outside the sandbox-writable area', async () => {
+    // A path under the user's home dir is neither a sandbox root nor a sandbox-writable
+    // temp location, so it must not be persistable as a download. The allowlist check runs
+    // before the existence check, so no real file needs to be created here.
+    const outside = path.join(homedir(), `not-a-sandbox-${process.pid}.txt`)
+    const result = await persistSandboxArtifact(outside, SESSION_ID)
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/outside the sandbox/i)
   })
 
   test('rejects a relative path', async () => {

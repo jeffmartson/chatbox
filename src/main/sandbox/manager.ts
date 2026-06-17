@@ -786,6 +786,22 @@ export function getSandboxAllowedRoots(): string[] {
   return [...roots]
 }
 
+/**
+ * Extra roots the sandbox is allowed to write to beyond per-session working dirs
+ * (e.g. /tmp and the OS temp dir). create_download may persist files produced here
+ * too, since the sandbox can legitimately write outputs to them. Kept in sync with the
+ * allowWrite list built in initSandbox() (TASK_SANDBOX_EXTRA_WRITE_PATHS + temp dirs).
+ */
+function getSandboxExtraWriteRoots(): string[] {
+  if (process.platform === 'win32') return []
+  const roots = new Set<string>()
+  for (const p of [tmpdir(), '/tmp', ...TASK_SANDBOX_EXTRA_WRITE_PATHS]) {
+    roots.add(p)
+    roots.add(safeRealpathSync(p))
+  }
+  return [...roots]
+}
+
 /** Remove all persisted download artifacts for a session (called on session deletion). */
 export function removeSessionArtifacts(sessionId: string): { success: boolean; error?: string } {
   if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
@@ -836,9 +852,11 @@ export async function persistSandboxArtifact(
     return { success: false, error: 'Artifact path must be absolute' }
   }
   try {
-    // Security: the source must live inside a known sandbox root.
+    // Security: the source must live inside a sandbox root (per-session working dir or
+    // persisted artifacts) or a sandbox-writable temp location (/tmp, OS temp dir) — i.e.
+    // somewhere the sandbox can legitimately produce files.
     const resolvedSource = safeRealpathSync(sandboxPath)
-    const allowedRoots = getSandboxAllowedRoots()
+    const allowedRoots = [...getSandboxAllowedRoots(), ...getSandboxExtraWriteRoots()]
     const insideSandbox = allowedRoots.some(
       (root) => resolvedSource === root || resolvedSource.startsWith(root + path.sep)
     )

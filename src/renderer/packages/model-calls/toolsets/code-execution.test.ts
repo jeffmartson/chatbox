@@ -16,6 +16,7 @@ const createMockProvider = () => ({
   copyBlobIn: vi.fn().mockResolvedValue({ success: true }),
   readFileOut: vi.fn().mockResolvedValue({ success: true, content: 'test content' }),
   exportFile: vi.fn().mockResolvedValue({ success: true }),
+  persistArtifact: vi.fn().mockResolvedValue({ success: true, artifactPath: '/durable/artifact' }),
   exec: vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 }),
   checkAvailability: vi.fn().mockResolvedValue({ available: true }),
 })
@@ -165,5 +166,57 @@ describe('buildCodeExecutionTools', () => {
 
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain('Sandbox')
+  })
+
+  describe('create_download', () => {
+    const getTool = (provider: ReturnType<typeof createMockProvider>) => {
+      const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider })
+      return tools.create_download as {
+        execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+      }
+    }
+
+    test('persists the file and returns a download (local provider)', async () => {
+      mockProvider.exec.mockResolvedValue({ stdout: '/tmp/report.pdf\n', stderr: '', exitCode: 0 })
+      mockProvider.persistArtifact.mockResolvedValue({ success: true, artifactPath: '/durable/report.pdf' })
+
+      const result = await getTool(mockProvider).execute({ file_path: '/tmp/report.pdf', display_name: 'Report' }, {})
+
+      expect(mockProvider.persistArtifact).toHaveBeenCalledWith('/tmp/report.pdf', 'Report')
+      expect(result).toMatchObject({ downloadable: true, file_path: '/durable/report.pdf', display_name: 'Report' })
+    })
+
+    test('reports an error to the model when persisting fails (local provider)', async () => {
+      mockProvider.exec.mockResolvedValue({ stdout: '/tmp/report.pdf\n', stderr: '', exitCode: 0 })
+      mockProvider.persistArtifact.mockResolvedValue({
+        success: false,
+        error: 'Access denied: path is outside the sandbox',
+      })
+
+      const result = await getTool(mockProvider).execute({ file_path: '/tmp/report.pdf', display_name: 'Report' }, {})
+
+      expect(result.downloadable).toBeUndefined()
+      expect(result.error).toMatch(/outside the sandbox/i)
+    })
+
+    test('falls back to the sandbox path when persistence is unsupported (cloud provider)', async () => {
+      const cloud = createMockProvider()
+      cloud.type = 'cloud' as const
+      cloud.exec.mockResolvedValue({ stdout: '/work/report.pdf\n', stderr: '', exitCode: 0 })
+      cloud.persistArtifact.mockResolvedValue({ success: false, error: 'Cloud sandbox not yet implemented' })
+
+      const result = await getTool(cloud).execute({ file_path: 'report.pdf', display_name: 'Report' }, {})
+
+      expect(result).toMatchObject({ downloadable: true, file_path: '/work/report.pdf', provider_type: 'cloud' })
+    })
+
+    test('returns file-not-found without persisting when the file is missing', async () => {
+      mockProvider.exec.mockResolvedValue({ stdout: 'not_found\n', stderr: '', exitCode: 0 })
+
+      const result = await getTool(mockProvider).execute({ file_path: '/tmp/missing.pdf', display_name: 'X' }, {})
+
+      expect(result.error).toMatch(/file not found/i)
+      expect(mockProvider.persistArtifact).not.toHaveBeenCalled()
+    })
   })
 })

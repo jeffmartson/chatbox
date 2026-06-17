@@ -1,4 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
+import { TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
 import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
@@ -113,9 +114,49 @@ function requireAbsoluteRealPath(filePath: string) {
   return isAbsolutePath(filePath) ? null : { error: 'Relative paths require an active session sandbox' }
 }
 
+// Lexically collapse '.'/'..' segments the same way the main process does (path.resolve)
+// before writing, so the exemption is decided on the actual write target. Without this,
+// a crafted path like `/tmp/../Users/alice/.zshrc` would textually pass the /tmp prefix
+// check while resolving to a file outside the exempt root.
+function normalizeAbsolutePosixPath(filePath: string): string {
+  const out: string[] = []
+  for (const segment of filePath.split('/')) {
+    if (segment === '' || segment === '.') continue
+    if (segment === '..') {
+      out.pop()
+      continue
+    }
+    out.push(segment)
+  }
+  return `/${out.join('/')}`
+}
+
+// Mirrors getOS() === 'Windows' without pulling navigator.ts (and its Sentry dep) into
+// this hot path. Read at call time so tests can stub navigator.
+function isWindowsRenderer(): boolean {
+  return typeof navigator !== 'undefined' && (navigator.userAgent ?? '').includes('Windows')
+}
+
+// Absolute paths under these roots (e.g. /tmp) are writable by the sandbox runtime, so
+// writes/edits are routed through the sandbox (see shouldUseSandbox) rather than the real
+// filesystem — that way the sandbox's own confinement/symlink checks apply and no user
+// approval is needed. Kept in sync with TASK_SANDBOX_EXTRA_WRITE_PATHS as the single
+// source of truth. The roots are POSIX-only and are NOT sandbox-writable on Windows
+// (getSandboxExtraWriteRoots() returns [] there, and path.resolve('/tmp/x') maps to
+// C:\tmp\x), so this is disabled on Windows. The candidate is normalized first so '..'
+// traversal can't make an out-of-root path match.
+function isSandboxWritableTempPath(filePath: string): boolean {
+  if (isWindowsRenderer()) return false
+  if (!filePath.startsWith('/')) return false
+  const normalized = normalizeAbsolutePosixPath(filePath)
+  return TASK_SANDBOX_EXTRA_WRITE_PATHS.some((root) => isInsideRoot(root, normalized))
+}
+
 async function shouldUseSandbox(context: FilesystemContext, filePath: string): Promise<boolean> {
   if (!context.provider) return false
   if (!isAbsolutePath(filePath)) return true
+  // /tmp and other sandbox-writable temp roots are handled by the sandbox itself.
+  if (isSandboxWritableTempPath(filePath)) return true
   const root = await getSandboxRoot(context)
   return root ? isInsideRoot(root, filePath) : false
 }
