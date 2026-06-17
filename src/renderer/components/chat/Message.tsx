@@ -454,8 +454,9 @@ const _Message: FC<Props> = (props) => {
   )
 
   // Offer the collapsible process summary on any finished assistant run that has
-  // a multi-step process worth hiding.
-  const showWorkSummary = msg.role === 'assistant' && !msg.generating && hasFoldableProcess
+  // a multi-step process worth hiding. With a single step there is nothing to fold —
+  // the step renders its own duration inline — so skip the collapse header entirely.
+  const showWorkSummary = msg.role === 'assistant' && !msg.generating && hasFoldableProcess && workStepCount > 1
   const workSummaryLabel =
     workDurationMs >= 1000
       ? t('Worked for {{time}}', { time: formatElapsedTime(workDurationMs) })
