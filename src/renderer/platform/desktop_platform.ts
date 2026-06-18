@@ -279,7 +279,7 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('fs:list', params)
   }
 
-  async fsSearch(params: { pattern: string; dirPath: string; include?: string }) {
+  async fsSearch(params: { pattern: string; dirPath: string; regex?: boolean; include?: string }) {
     return this.ipc.invoke('fs:search', params)
   }
 

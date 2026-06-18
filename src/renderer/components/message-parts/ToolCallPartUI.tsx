@@ -108,10 +108,20 @@ const ToolCallErrorDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   )
 }
 
+// Auto-expand a step when it needs attention (paused / waiting for approval) and
+// auto-collapse once that resolves — e.g. after the user clicks Continue/Approve/Stop/Deny.
+// Only the transition edges drive expansion; a stable signal leaves the user's manual
+// toggle untouched.
 function useAutoExpandOnSignal(signal: boolean): [boolean, (next: boolean | ((prev: boolean) => boolean)) => void] {
   const [expanded, setExpanded] = useState(signal)
+  const prevSignal = useRef(signal)
   useEffect(() => {
-    if (signal) setExpanded(true)
+    if (signal && !prevSignal.current) {
+      setExpanded(true) // became active → reveal the action buttons
+    } else if (!signal && prevSignal.current) {
+      setExpanded(false) // resolved → collapse the tool call
+    }
+    prevSignal.current = signal
   }, [signal])
   return [expanded, setExpanded]
 }

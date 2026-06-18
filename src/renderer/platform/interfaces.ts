@@ -94,6 +94,7 @@ export interface Platform extends Storage {
   fsSearch?(params: {
     pattern: string
     dirPath: string
+    regex?: boolean
     include?: string
   }): Promise<{ success: boolean; content?: string; error?: string }>
   fsWrite?(params: { filePath: string; content: string }): Promise<{ success: boolean; error?: string }>

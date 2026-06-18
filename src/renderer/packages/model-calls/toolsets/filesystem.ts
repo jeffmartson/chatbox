@@ -1,5 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
-import { TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
+import { SEARCH_EXCLUDE_DIRS, TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
 import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
@@ -64,6 +64,11 @@ const editFileInputSchema = jsonSchema({
   required: ['file_path'],
   additionalProperties: false,
 })
+
+// Cap matches per file so one large/minified file can't crowd out the rest.
+const SEARCH_MAX_MATCHES_PER_FILE = 50
+// Cap total result lines returned to the model.
+const SEARCH_MAX_TOTAL_LINES = 100
 
 function isAbsolutePath(filePath: string): boolean {
   return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
@@ -245,7 +250,9 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
 
   const search_files: ToolSet[string] = {
     description:
-      'Search text in files. Relative paths search the session sandbox. Absolute paths search the user filesystem.',
+      'Search file contents. Relative paths search the session sandbox; absolute paths search the user filesystem. ' +
+      'By default the query is matched literally; set regex=true to match an extended regular expression (ERE). ' +
+      'Heavy directories (node_modules, .git, build output) are skipped and results are capped for speed.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -255,7 +262,11 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         },
         query: {
           type: 'string',
-          description: 'Literal text to search for',
+          description: 'Text or pattern to search for',
+        },
+        regex: {
+          type: 'boolean',
+          description: 'Treat query as an extended regular expression (ERE) instead of literal text. Defaults to false.',
         },
         include: {
           type: 'string',
@@ -266,19 +277,26 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       additionalProperties: false,
     }),
     execute: async (input) => {
-      const searchInput = input as { path: string; query: string; include?: string }
+      const searchInput = input as { path: string; query: string; regex?: boolean; include?: string }
       searchInput.path = remapPhantomHomePath(searchInput.path)
       if (await shouldUseSandbox(context, searchInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
-        const include = searchInput.include ? ` --include=${shellQuote(searchInput.include)}` : ''
         if (!context.provider) return { error: 'Sandbox is not available' }
+        // -F = fixed string (literal), -E = extended regex (linear, avoids PCRE backtracking).
+        const flags = `-RIn${searchInput.regex ? 'E' : 'F'}`
+        const include = searchInput.include ? ` --include=${shellQuote(searchInput.include)}` : ''
+        const excludes = SEARCH_EXCLUDE_DIRS.map((dir) => `--exclude-dir=${shellQuote(dir)}`).join(' ')
         const result = await context.provider.exec({
           language: 'bash',
-          code: `grep -RInF${include} -- ${shellQuote(searchInput.query)} ${shellQuote(searchInput.path)} | head -100`,
+          code: `grep ${flags} -m ${SEARCH_MAX_MATCHES_PER_FILE}${include} ${excludes} -e ${shellQuote(searchInput.query)} -- ${shellQuote(searchInput.path)} | head -${SEARCH_MAX_TOTAL_LINES}`,
           timeout: 10_000,
         })
-        return result.exitCode === 0 || result.exitCode === 1
+        // exit 0 = matches, 1 = no matches. If `head` closes the pipe early (many matches),
+        // grep can exit with SIGPIPE (141) under pipefail; treat any non-empty stdout as a
+        // (possibly truncated) success rather than an error. Invalid regex exits 2 with empty
+        // stdout, so it still falls through to the error branch.
+        return result.exitCode === 0 || result.exitCode === 1 || result.stdout
           ? { content: result.stdout }
           : { error: result.stderr || result.stdout }
       }
@@ -288,6 +306,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       const result = await platform.fsSearch({
         dirPath: searchInput.path,
         pattern: searchInput.query,
+        regex: searchInput.regex,
         include: searchInput.include,
       })
       return result.success ? { content: result.content ?? '' } : { error: result.error }

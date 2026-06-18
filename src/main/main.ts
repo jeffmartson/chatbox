@@ -28,6 +28,7 @@ import path from 'path'
 import * as sourceMapSupport from 'source-map-support'
 import type { ShortcutSetting } from 'src/shared/types'
 import { KNOWN_LOCAL_PARSER_ERROR_CODES } from '../shared/file-parse-errors'
+import { SEARCH_EXCLUDE_DIRS } from '../shared/task-sandbox'
 import * as analystic from './analystic-node'
 import { AppUpdater } from './app-updater'
 import * as autoLauncher from './autoLauncher'
@@ -788,6 +789,17 @@ const FS_READ_MAX_LINES = 2000
 const FS_MAX_LINE_LENGTH = 2000
 const FS_LIST_MAX_ENTRIES = 200
 const FS_SEARCH_MAX_RESULTS = 100
+// Per-file match cap (parity with the sandbox grep `-m` flag) so one large/minified file
+// can't crowd out the rest of the results.
+const FS_SEARCH_MAX_MATCHES_PER_FILE = 50
+// Skip files larger than this — they are almost never the search target and reading +
+// scanning them line by line is expensive.
+const FS_SEARCH_MAX_FILE_BYTES = 5 * 1024 * 1024
+// Wall-clock budget for a whole search. Bounds the cost of broad patterns over large trees
+// and of regex backtracking spread across many lines, so a search can't wedge the main
+// process indefinitely. (A single deliberately-catastrophic regex on one line is not fully
+// interruptible in synchronous JS; the line-length cap below limits its input size.)
+const FS_SEARCH_TIME_BUDGET_MS = 5000
 
 function truncateFsLine(line: string) {
   return line.length > FS_MAX_LINE_LENGTH ? `${line.slice(0, FS_MAX_LINE_LENGTH - 3)}...` : line
@@ -855,41 +867,75 @@ ipcMain.handle('fs:list', async (_event, params: { dirPath: string }) => {
   }
 })
 
-ipcMain.handle('fs:search', async (_event, params: { pattern: string; dirPath: string; include?: string }) => {
-  try {
-    const root = path.resolve(params.dirPath)
-    const results: string[] = []
-    const visit = async (dir: string) => {
-      if (results.length >= FS_SEARCH_MAX_RESULTS) return
-      const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => [])
-      for (const entry of entries) {
-        if (results.length >= FS_SEARCH_MAX_RESULTS) break
-        const entryPath = path.join(dir, entry.name)
-        if (!isSubPath(root, entryPath)) continue
-        if (entry.isDirectory()) {
-          if (!['node_modules', '.git', 'dist', 'out', 'build'].includes(entry.name)) {
-            await visit(entryPath)
-          }
-          continue
+ipcMain.handle(
+  'fs:search',
+  async (_event, params: { pattern: string; dirPath: string; regex?: boolean; include?: string }) => {
+    try {
+      const root = path.resolve(params.dirPath)
+      // Compile the regex once when requested; an invalid pattern is reported rather than
+      // silently matching nothing. Literal search uses String.includes (no backtracking).
+      // Regex is tested against a length-capped slice to bound per-line backtracking cost.
+      let matcher: (line: string) => boolean
+      if (params.regex) {
+        let compiled: RegExp
+        try {
+          compiled = new RegExp(params.pattern)
+        } catch (err) {
+          return { success: false, error: `Invalid regex: ${err instanceof Error ? err.message : String(err)}` }
         }
-        if (!entry.isFile() || !matchesInclude(entryPath, params.include)) continue
-        const text = await fs.promises.readFile(entryPath, 'utf8').catch(() => '')
-        if (!text) continue
-        const lines = text.split('\n')
-        for (let index = 0; index < lines.length; index++) {
-          if (lines[index].includes(params.pattern)) {
-            results.push(`${path.relative(root, entryPath)}:${index + 1}: ${truncateFsLine(lines[index])}`)
-            if (results.length >= FS_SEARCH_MAX_RESULTS) break
+        matcher = (line) => compiled.test(line.length > FS_MAX_LINE_LENGTH ? line.slice(0, FS_MAX_LINE_LENGTH) : line)
+      } else {
+        matcher = (line) => line.includes(params.pattern)
+      }
+      const deadline = Date.now() + FS_SEARCH_TIME_BUDGET_MS
+      let timedOut = false
+      const results: string[] = []
+      const visit = async (dir: string) => {
+        if (results.length >= FS_SEARCH_MAX_RESULTS || timedOut) return
+        const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => [])
+        for (const entry of entries) {
+          if (results.length >= FS_SEARCH_MAX_RESULTS) break
+          if (Date.now() > deadline) {
+            timedOut = true
+            break
+          }
+          const entryPath = path.join(dir, entry.name)
+          if (!isSubPath(root, entryPath)) continue
+          if (entry.isDirectory()) {
+            if (!SEARCH_EXCLUDE_DIRS.includes(entry.name)) {
+              await visit(entryPath)
+            }
+            continue
+          }
+          if (!entry.isFile() || !matchesInclude(entryPath, params.include)) continue
+          const stat = await fs.promises.stat(entryPath).catch(() => null)
+          if (!stat || stat.size > FS_SEARCH_MAX_FILE_BYTES) continue
+          const text = await fs.promises.readFile(entryPath, 'utf8').catch(() => '')
+          if (!text) continue
+          const lines = text.split('\n')
+          let fileMatches = 0
+          for (let index = 0; index < lines.length; index++) {
+            // Re-check the deadline periodically so a huge file can't blow the budget.
+            if ((index & 0x3ff) === 0 && Date.now() > deadline) {
+              timedOut = true
+              break
+            }
+            if (matcher(lines[index])) {
+              results.push(`${path.relative(root, entryPath)}:${index + 1}: ${truncateFsLine(lines[index])}`)
+              fileMatches++
+              if (results.length >= FS_SEARCH_MAX_RESULTS || fileMatches >= FS_SEARCH_MAX_MATCHES_PER_FILE) break
+            }
           }
         }
       }
+      await visit(root)
+      const content = results.join('\n')
+      return { success: true, content: timedOut ? `${content}\n... [search stopped after time limit]` : content }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
-    await visit(root)
-    return { success: true, content: results.join('\n') }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
-})
+)
 
 ipcMain.handle('fs:write', async (_event, params: { filePath: string; content: string }) => {
   try {

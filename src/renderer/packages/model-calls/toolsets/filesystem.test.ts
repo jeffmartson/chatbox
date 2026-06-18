@@ -105,3 +105,39 @@ describe('filesystem write to sandbox-writable temp (/tmp)', () => {
     expect(fsWrite).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('search_files sandbox grep command', () => {
+  beforeEach(() => {
+    exec.mockClear()
+  })
+
+  function lastGrepCode(): string {
+    const call = exec.mock.calls.at(-1)?.[0] as { code: string } | undefined
+    return call?.code ?? ''
+  }
+
+  test('literal search uses fixed-string (-F) flag and excludes heavy dirs', async () => {
+    await execute(getTools().search_files, { path: '/tmp/project', query: 'foo(bar)' })
+    const code = lastGrepCode()
+    expect(code).toContain('grep -RInF')
+    expect(code).not.toContain('-RInE')
+    expect(code).toContain("--exclude-dir='node_modules'")
+    expect(code).toContain("--exclude-dir='.git'")
+    expect(code).toContain('-m 50')
+    expect(code).toContain('head -100')
+    // pattern passed via -e and shell-quoted
+    expect(code).toContain("-e 'foo(bar)'")
+  })
+
+  test('regex search uses extended-regex (-E) flag', async () => {
+    await execute(getTools().search_files, { path: '/tmp/project', query: 'foo.*bar', regex: true })
+    const code = lastGrepCode()
+    expect(code).toContain('grep -RInE')
+    expect(code).not.toContain('-RInF')
+  })
+
+  test('include filter is forwarded as --include', async () => {
+    await execute(getTools().search_files, { path: '/tmp/project', query: 'x', include: '*.ts' })
+    expect(lastGrepCode()).toContain("--include='*.ts'")
+  })
+})
