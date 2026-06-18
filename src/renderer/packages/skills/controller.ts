@@ -99,4 +99,16 @@ export const skillsController = {
   checkForUpdatesBatch(): Promise<Record<string, { hasUpdate: boolean; error?: string }>> {
     return window.electronAPI.invoke('skills:check-updates-batch')
   },
+
+  /** 触发后端内置 skill 同步（main 进程拉取 manifest 并按内容 hash 更新本地快照）。 */
+  async syncBuiltinSkills(lang?: string): Promise<{ changed: boolean }> {
+    const result = await window.electronAPI.invoke('skills:sync-builtin', lang)
+    if (result?.changed) notifySkillsChanged()
+    return result ?? { changed: false }
+  },
+}
+
+// 监听 main 进程后台同步内置 skill 完成（有更新）的推送，刷新 renderer 侧 skill 列表与工具缓存
+if (typeof window !== 'undefined' && window.electronAPI?.onSkillsBuiltinUpdated) {
+  window.electronAPI.onSkillsBuiltinUpdated(() => notifySkillsChanged())
 }

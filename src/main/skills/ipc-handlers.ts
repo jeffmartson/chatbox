@@ -1,11 +1,11 @@
 import type { MarketplaceSkill } from '@shared/types/skills'
 import { spawn } from 'child_process'
-import { app, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { getLogger } from '../util'
-import { builtinSkills } from './builtin'
+import { discoverBuiltinSkills, ensureBuiltinSeeded, syncBuiltinSkills } from './builtin-sync'
 import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from './discovery'
 import { detectSkillsInRepo } from './github-fetcher'
 import {
@@ -34,26 +34,18 @@ function getAgentSkillsDir(): string {
 // Module-level name→path cache for fast skill loading
 let skillPathCache: Map<string, string> | null = null
 
-function getBuiltinSkillInfos() {
-  return builtinSkills.map((skill) => ({
-    ...skill.metadata,
-    path: `builtin:${skill.metadata.name}`,
-    isBuiltin: true,
-    source: { type: 'builtin' as const },
-  }))
-}
-
-function loadBuiltinSkill(name: string) {
-  const skill = builtinSkills.find((item) => item.metadata.name === name)
-  return skill ? { body: skill.body.trim(), metadata: skill.metadata } : null
-}
-
 function invalidateSkillCache(): void {
   skillPathCache = null
 }
 
+function broadcastBuiltinUpdated(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('skills:builtin-updated')
+  }
+}
+
 function buildSkillCache(): Map<string, string> {
-  const builtinSkillInfos = getBuiltinSkillInfos()
+  const builtinSkillInfos = discoverBuiltinSkills()
   const chatboxSkills = discoverSkills(getSkillsDir())
   const claimedNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
   const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), claimedNames)
@@ -69,9 +61,32 @@ function getOrBuildSkillCache(): Map<string, string> {
 }
 
 export function registerSkillsHandlers() {
+  // 确保打包种子已落地，保证内置 skill 立即可用（含离线）
+  ensureBuiltinSeeded()
+  // 后台静默从后端同步内置 skill，有更新则覆盖快照并通知 renderer 刷新
+  syncBuiltinSkills()
+    .then((changed) => {
+      if (changed) {
+        invalidateSkillCache()
+        broadcastBuiltinUpdated()
+      }
+    })
+    .catch((error) => log.warn('initial builtin skills sync failed', error))
+
+  ipcMain.handle('skills:sync-builtin', async (_event, lang?: string) => {
+    try {
+      const changed = await syncBuiltinSkills(lang)
+      if (changed) invalidateSkillCache()
+      return { changed }
+    } catch (error) {
+      log.error('skills:sync-builtin failed', error)
+      return { changed: false }
+    }
+  })
+
   ipcMain.handle('skills:discover', async () => {
     try {
-      const builtinSkillInfos = getBuiltinSkillInfos()
+      const builtinSkillInfos = discoverBuiltinSkills()
       const chatboxSkills = discoverSkills(getSkillsDir())
       const claimedNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
       const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), claimedNames)
@@ -102,7 +117,6 @@ export function registerSkillsHandlers() {
       const cache = getOrBuildSkillCache()
       const skillPath = cache.get(name)
       if (!skillPath) return null
-      if (skillPath.startsWith('builtin:')) return loadBuiltinSkill(name)
 
       const result = loadFromPath(skillPath)
       if (result) return result
