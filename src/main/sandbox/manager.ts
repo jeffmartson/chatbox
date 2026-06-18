@@ -9,7 +9,7 @@ import {
   realpath as fsRealpath,
   writeFile as fsWriteFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { SandboxRuntimeConfig } from '@anthropic-ai/sandbox-runtime'
@@ -158,13 +158,72 @@ export function killProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKIL
   }
 }
 
-function buildConfig(workDir: string): Omit<SandboxRuntimeConfig, 'network'> & {
+// True when a resolved absolute path is the filesystem root, the user's home, an ancestor
+// of home, or a system dir — granting no-approval sandbox write to any of these would
+// defeat the agent-mode approval model.
+function isUnsafeResolvedPath(resolved: string): boolean {
+  if (!resolved || resolved === path.parse(resolved).root) return true
+  const home = homedir()
+  // candidate is home itself or an ancestor of home (e.g. /Users, /home)
+  if (home && (resolved === home || pathContains(resolved, home))) return true
+  const systemRoots = ['/etc', '/usr', '/bin', '/sbin', '/var', '/System', '/Library', '/private', '/boot', '/dev', '/proc', '/opt', '/root']
+  return systemRoots.some((sys) => resolved === sys || pathContains(sys, resolved))
+}
+
+// Reject overly-broad or sensitive roots from being granted no-approval sandbox write.
+// Checks BOTH the lexical path and its symlink-resolved real target, so a safe-looking
+// symlink (e.g. /tmp/project -> $HOME) cannot smuggle a sensitive root into allowWrite
+// (buildConfig adds the realpath variant to allowWrite).
+function isUnsafeUserWriteDir(dir: string): boolean {
+  let resolved: string
+  try {
+    resolved = path.resolve(dir)
+  } catch {
+    return true
+  }
+  if (isUnsafeResolvedPath(resolved)) return true
+  const real = safeRealpathSync(resolved)
+  return real !== resolved && isUnsafeResolvedPath(real)
+}
+
+// True when `child` is `parent` or lives under it (lexical, after resolution).
+function pathContains(parent: string, child: string): boolean {
+  const rel = path.relative(parent, child)
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+}
+
+function buildConfig(
+  workDir: string,
+  // Extra real directories the user granted write access to (sandbox working-directory
+  // feature). buildConfig is macOS/Linux-only (Windows skips SRT), so these are POSIX paths.
+  userWritePaths: string[] = []
+): Omit<SandboxRuntimeConfig, 'network'> & {
   network: Omit<SandboxRuntimeConfig['network'], 'allowedDomains'>
 } {
   // buildConfig is only used by the macOS/Linux SRT path; Windows skips SRT (see initSandbox).
   const isMacOS = process.platform === 'darwin'
   const tempWritePaths = [tmpdir(), '/tmp'].flatMap((p) => [p, safeRealpathSync(p)])
-  const allowWrite = [...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths])]
+  const safeUserPaths = userWritePaths.filter((p) => {
+    if (isUnsafeUserWriteDir(p)) {
+      log.warn(`Refusing to grant sandbox write access to unsafe directory: ${p}`)
+      return false
+    }
+    return true
+  })
+  // Both the lexical and symlink-resolved forms of each granted dir.
+  const userWriteVariants = safeUserPaths.flatMap((p) => [p, safeRealpathSync(p)])
+  const allowWrite = [
+    ...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths, ...userWriteVariants]),
+  ]
+
+  // Protect sensitive files (.env, etc.) inside granted dirs with ABSOLUTE deny paths.
+  // The bare relative patterns in TASK_SANDBOX_DENY_WRITE_PATHS are resolved by
+  // sandbox-runtime against the main-process cwd, so they do NOT cover the granted dirs;
+  // we must anchor them explicitly (top-level + nested via glob).
+  const userDenyWrite = userWriteVariants.flatMap((base) =>
+    TASK_SANDBOX_DENY_WRITE_PATHS.flatMap((name) => [`${base}/${name}`, `${base}/**/${name}`])
+  )
+  const denyWrite = [...new Set([...TASK_SANDBOX_DENY_WRITE_PATHS, ...userDenyWrite])]
 
   // WARN: `allowedDomains: ['*']` is NOT a wildcard — it's a literal match.
   // Omit `allowedDomains` so wrapWithSandbox generates `(allow network*)`.
@@ -176,7 +235,7 @@ function buildConfig(workDir: string): Omit<SandboxRuntimeConfig, 'network'> & {
     filesystem: {
       denyRead: [...TASK_SANDBOX_DENY_READ_PATHS],
       allowWrite,
-      denyWrite: [...TASK_SANDBOX_DENY_WRITE_PATHS],
+      denyWrite,
     },
   }
 }
@@ -272,7 +331,11 @@ async function writeContentToFile(targetPath: string, content: string): Promise<
 
 // ─── Sandbox lifecycle ───────────────────────────────────────────────
 
-export async function initSandbox(workDir: string, sessionId?: string): Promise<{ success: boolean; error?: string }> {
+export async function initSandbox(
+  workDir: string,
+  sessionId?: string,
+  userWritePaths: string[] = []
+): Promise<{ success: boolean; error?: string }> {
   let session = getOrCreateSession(sessionId)
 
   if (session.state === 'initialized') {
@@ -300,9 +363,9 @@ export async function initSandbox(workDir: string, sessionId?: string): Promise<
       globalSandboxManager = SandboxManager
     }
 
-    const config = buildConfig(workDir)
+    const config = buildConfig(workDir, userWritePaths)
     log.info(
-      `Initializing sandbox session=${sessionId || DEFAULT_SESSION} workDir=${workDir} platform=${process.platform}`
+      `Initializing sandbox session=${sessionId || DEFAULT_SESSION} workDir=${workDir} platform=${process.platform} extraWritePaths=${userWritePaths.length}`
     )
 
     if (!globalInitialized && globalSandboxManager) {
@@ -787,7 +850,8 @@ export async function checkAvailability(): Promise<{ available: boolean; reason?
  * Creates os.tmpdir()/chatbox-sandbox/<sessionId>/ as the working directory.
  */
 export async function initSandboxWithTempDir(
-  sessionId: string
+  sessionId: string,
+  userWritePaths: string[] = []
 ): Promise<{ success: boolean; workingDirectory?: string; error?: string }> {
   // Validate sessionId to prevent path traversal
   if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
@@ -797,7 +861,7 @@ export async function initSandboxWithTempDir(
   const tempBase = path.join(getSandboxTmpRoot(), sessionId)
   try {
     mkdirSync(tempBase, { recursive: true })
-    const result = await initSandbox(tempBase, sessionId)
+    const result = await initSandbox(tempBase, sessionId, userWritePaths)
     if (result.success) {
       return { success: true, workingDirectory: tempBase }
     }

@@ -599,6 +599,12 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   const effectiveAgentMode = agentModeSupported && agentModeValue === 'on' ? 'on' : 'off'
 
   const sandboxProvider = effectiveAgentMode !== 'off' ? createSandboxProvider() : null
+  // Mirror the main generation path: grant the sandbox the user's bound working directories
+  // so a resumed write into them succeeds (allowWrite) instead of failing under confinement.
+  const userWorkingDirectories = settings.workingDirectories?.filter((dir) => dir.trim().length > 0) ?? []
+  if (sandboxProvider && userWorkingDirectories.length > 0) {
+    sandboxProvider.setExtraWritableDirs(userWorkingDirectories)
+  }
   let canExecuteCode = Boolean(sandboxProvider && model.isSupportToolUse('agent'))
   if (canExecuteCode && sandboxProvider?.type === 'cloud' && !settingActions.isPro()) {
     canExecuteCode = false

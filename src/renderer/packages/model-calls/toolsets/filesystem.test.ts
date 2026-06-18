@@ -106,6 +106,52 @@ describe('filesystem write to sandbox-writable temp (/tmp)', () => {
   })
 })
 
+describe('user-granted working directories (like /tmp)', () => {
+  beforeEach(() => {
+    fsWrite.mockClear()
+    exec.mockClear()
+    requestFileMutationApproval.mockClear()
+  })
+
+  function toolsWithWorkingDir() {
+    return buildFilesystemTools({
+      sessionId: 'session-id',
+      provider,
+      userWorkingDirectories: ['/Users/me/project'],
+    }).tools
+  }
+
+  test('writing inside a granted dir goes through the sandbox without approval', async () => {
+    const result = await execute(toolsWithWorkingDir().write_file, {
+      file_path: '/Users/me/project/out.txt',
+      content: 'hi',
+    })
+    expect(requestFileMutationApproval).not.toHaveBeenCalled()
+    expect(fsWrite).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ success: true, file_path: '/Users/me/project/out.txt' })
+  })
+
+  test('a sibling path outside the granted dir still requires approval', async () => {
+    await execute(toolsWithWorkingDir().write_file, { file_path: '/Users/me/project-evil/out.txt', content: 'x' })
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+
+  test('.. traversal out of the granted dir cannot spoof a match', async () => {
+    await execute(toolsWithWorkingDir().write_file, { file_path: '/Users/me/project/../secret.txt', content: 'x' })
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+
+  test('binding the filesystem root does not exempt every absolute path from approval', async () => {
+    const tools = buildFilesystemTools({ sessionId: 'session-id', provider, userWorkingDirectories: ['/'] }).tools
+    await execute(tools.write_file, { file_path: '/etc/passwd', content: 'x' })
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('search_files sandbox grep command', () => {
   beforeEach(() => {
     exec.mockClear()

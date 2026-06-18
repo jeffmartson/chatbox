@@ -25,6 +25,10 @@ export class CloudSandboxProvider implements SandboxProvider {
     return null
   }
 
+  setExtraWritableDirs(_dirs: string[]): void {
+    // Cloud sandbox has no access to the user's real filesystem.
+  }
+
   async copyFileIn(_content: string, _targetFilename: string): Promise<{ success: boolean; error?: string }> {
     return { success: false, error: 'Cloud sandbox not yet implemented' }
   }

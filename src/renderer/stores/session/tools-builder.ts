@@ -70,10 +70,15 @@ export interface BuildToolsResult {
  * artifact from cloud sandboxes) that do not exist on the desktop host, wasting tool calls
  * on failed writes. workingDir may be null when the path is not yet known (e.g. cloud).
  */
-function buildWorkingDirectoryInstruction(workingDir: string | null): string {
+function buildWorkingDirectoryInstruction(workingDir: string | null, userWorkingDirectories?: string[]): string {
   const dirLine = workingDir
     ? `Your sandbox working directory is: ${workingDir}`
     : 'You have a sandbox working directory.'
+  // Directories the user explicitly granted access to (the working-directory feature).
+  // These are real paths on the user's machine, readable and writable without approval.
+  const grantedDirsBlock = userWorkingDirectories?.length
+    ? `\nThe user has granted you read/write access to these real directories (use their absolute paths; no approval needed):\n${userWorkingDirectories.map((dir) => `- ${dir}`).join('\n')}\n`
+    : ''
   return `
 ## Working Directory & File Paths
 ${dirLine}
@@ -81,7 +86,7 @@ ${dirLine}
 - \`~\` and \`$HOME\` also point to the working directory.
 - Do NOT use absolute paths like /home/user or /root — they do not exist here. Write to the working directory instead.
 - To create or modify files, prefer the write_file and edit_file tools over writing through code_execution (echo, heredoc, fs.writeFileSync). The structured tools are more reliable and let the user see what changed.
-`
+${grantedDirsBlock}`
 }
 
 function buildSkillToolsInstruction(enabledSkills: Array<{ name: string; description: string }>): string {
@@ -212,7 +217,8 @@ In long conversations, earlier tool call results may be automatically compressed
     const workingDir = await codeExecution.provider
       .resolveWorkingDirectory(codeExecution.sessionId)
       .catch(() => null)
-    instructions += buildWorkingDirectoryInstruction(workingDir)
+    const userWorkingDirectories = options.sessionSettings?.workingDirectories?.filter((dir) => dir.trim().length > 0)
+    instructions += buildWorkingDirectoryInstruction(workingDir, userWorkingDirectories)
     instructions += codeExecToolSet.description
   }
 
@@ -253,6 +259,7 @@ In long conversations, earlier tool call results may be automatically compressed
     const filesystemToolSet = buildFilesystemTools({
       sessionId: codeExecution?.sessionId,
       provider: codeExecution?.provider,
+      userWorkingDirectories: options.sessionSettings?.workingDirectories?.filter((dir) => dir.trim().length > 0),
     })
     instructions += filesystemToolSet.description
     tools = { ...tools, ...filesystemToolSet.tools }

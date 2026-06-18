@@ -17,6 +17,13 @@ export interface SandboxProvider {
   /** Initialize sandbox for a session, creating a temp working directory */
   init(sessionId: string): Promise<{ success: boolean; error?: string }>
 
+  /**
+   * Grant the sandbox read/write access to extra real directories (the working-directory
+   * feature). Must be called before init() takes effect. No-op on providers that don't
+   * support real filesystem access (e.g. cloud).
+   */
+  setExtraWritableDirs(dirs: string[]): void
+
   /** Reset/destroy the sandbox */
   reset(): Promise<void>
 

@@ -186,6 +186,7 @@ export interface Platform extends Storage {
   // Sandbox temp dir operations (Desktop only, for code execution)
   sandboxInitTemp?(params: {
     sessionId: string
+    workingDirectories?: string[]
   }): Promise<{ success: boolean; workingDirectory?: string; error?: string }>
   sandboxCopyFile?(params: {
     content: string

@@ -186,6 +186,10 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
   imageGenerateNum: z.number().optional().catch(1),
   providerOptions: ProviderOptionsSchema.optional().catch(undefined),
   autoCompaction: z.boolean().optional().catch(undefined),
+  // Real local directories the user grants the agent sandbox read/write access to
+  // (like /tmp): files under these paths are read/written without per-action approval.
+  // Desktop only.
+  workingDirectories: z.array(z.string()).optional().catch(undefined),
 })
 
 const UnifiedTokenUsageDetailSchema = z.object({

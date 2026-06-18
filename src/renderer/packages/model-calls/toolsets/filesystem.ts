@@ -9,6 +9,9 @@ import { remapPhantomHomePath } from './sandbox-paths'
 interface FilesystemContext {
   sessionId?: string
   provider?: SandboxProvider
+  // Real directories the user granted the sandbox (working-directory feature). Paths under
+  // these are routed through the sandbox and written without approval, like /tmp.
+  userWorkingDirectories?: string[]
 }
 
 interface EditOperation {
@@ -158,11 +161,28 @@ function isSandboxWritableTempPath(filePath: string): boolean {
   return TASK_SANDBOX_EXTRA_WRITE_PATHS.some((root) => isInsideRoot(root, normalized))
 }
 
+// Absolute paths under a user-granted working directory are routed through the sandbox
+// (no approval), like /tmp. The directory is in the sandbox's allowWrite set, so writes
+// succeed under confinement. Normalized first so '..' traversal can't spoof a match.
+function isInsideUserWorkingDir(context: FilesystemContext, filePath: string): boolean {
+  if (!context.userWorkingDirectories?.length || !filePath.startsWith('/')) return false
+  const normalized = normalizeAbsolutePosixPath(filePath)
+  return context.userWorkingDirectories.some((dir) => {
+    const normDir = normalizeAbsolutePosixPath(dir)
+    // Never treat the whole filesystem as a granted dir — isInsideRoot('/', x) is always
+    // true, which would route every absolute path through the sandbox and skip approval.
+    if (normDir === '/' || normDir === '') return false
+    return isInsideRoot(normDir, normalized)
+  })
+}
+
 async function shouldUseSandbox(context: FilesystemContext, filePath: string): Promise<boolean> {
   if (!context.provider) return false
   if (!isAbsolutePath(filePath)) return true
   // /tmp and other sandbox-writable temp roots are handled by the sandbox itself.
   if (isSandboxWritableTempPath(filePath)) return true
+  // User-granted working directories behave like /tmp: sandbox-routed, no approval.
+  if (isInsideUserWorkingDir(context, filePath)) return true
   const root = await getSandboxRoot(context)
   return root ? isInsideRoot(root, filePath) : false
 }

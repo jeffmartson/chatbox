@@ -195,6 +195,12 @@ export async function prepareAgentGenerationHarness(
 
   const effectiveAgentMode = computeEffectiveAgentMode(agentModeValue, agentModeSupported)
   const sandboxProvider = effectiveAgentMode !== 'off' ? sandboxProviderFactory() : null
+  // Grant the sandbox read/write access to any user-bound working directories before it
+  // initializes lazily on the first tool call (desktop only; cloud provider no-ops).
+  const userWorkingDirectories = settings.workingDirectories?.filter((dir) => dir.trim().length > 0) ?? []
+  if (sandboxProvider && userWorkingDirectories.length > 0) {
+    sandboxProvider.setExtraWritableDirs(userWorkingDirectories)
+  }
   let canExecuteCode = Boolean(sandboxProvider && model.isSupportToolUse('agent'))
 
   if (canExecuteCode && sandboxProvider?.type === 'cloud' && !isPro()) {

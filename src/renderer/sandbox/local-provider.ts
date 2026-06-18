@@ -12,13 +12,18 @@ export class LocalSandboxProvider implements SandboxProvider {
 
   private sessionId: string | null = null
   private initialized = false
+  private extraWritableDirs: string[] = []
+
+  setExtraWritableDirs(dirs: string[]): void {
+    this.extraWritableDirs = dirs
+  }
 
   async init(sessionId: string): Promise<{ success: boolean; error?: string }> {
     if (!platform.sandboxInitTemp) {
       return { success: false, error: 'Sandbox not available on this platform' }
     }
 
-    const result = await platform.sandboxInitTemp({ sessionId })
+    const result = await platform.sandboxInitTemp({ sessionId, workingDirectories: this.extraWritableDirs })
     if (result.success) {
       this.sessionId = sessionId
       this.initialized = true

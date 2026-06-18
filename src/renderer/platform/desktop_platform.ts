@@ -441,7 +441,7 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:check-availability')
   }
 
-  public async sandboxInitTemp(params: { sessionId: string }) {
+  public async sandboxInitTemp(params: { sessionId: string; workingDirectories?: string[] }) {
     return this.ipc.invoke('sandbox:init-temp', params)
   }
 

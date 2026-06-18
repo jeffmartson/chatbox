@@ -200,16 +200,19 @@ export function registerSandboxIPCHandlers() {
     }
   })
 
-  ipcMain.handle('sandbox:init-temp', async (_event, params: { sessionId: string }) => {
-    try {
-      log.info(`sandbox:init-temp sessionId=${params.sessionId}`)
-      return await initSandboxWithTempDir(params.sessionId)
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error)
-      log.error('sandbox:init-temp failed', msg)
-      return { success: false, error: msg }
+  ipcMain.handle(
+    'sandbox:init-temp',
+    async (_event, params: { sessionId: string; workingDirectories?: string[] }) => {
+      try {
+        log.info(`sandbox:init-temp sessionId=${params.sessionId}`)
+        return await initSandboxWithTempDir(params.sessionId, params.workingDirectories ?? [])
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        log.error('sandbox:init-temp failed', msg)
+        return { success: false, error: msg }
+      }
     }
-  })
+  )
 
   ipcMain.handle(
     'sandbox:copy-file',

@@ -5,8 +5,10 @@ import {
   IconChevronRight,
   IconCode,
   IconFile,
+  IconFolderCog,
   IconHammer,
   IconSettings2,
+  IconTrash,
   IconVocabulary,
   IconWand,
   IconWorldWww,
@@ -15,6 +17,10 @@ import { Link } from '@tanstack/react-router'
 import { PlusIcon } from 'lucide-react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getOS } from '@/packages/navigator'
+import platform from '@/platform'
+import * as chatStore from '@/stores/chatStore'
+import { useSessionSettings } from '@/stores/chatStore'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
@@ -29,7 +35,15 @@ import { ScalableIcon } from '../common/ScalableIcon'
 import MCPStatus from '../mcp/MCPStatus'
 import { getAgentModeUIState } from './agentModeState'
 
-type PanelPage = 'main' | 'web-search' | 'skills' | 'mcp' | 'knowledge-base'
+type PanelPage = 'main' | 'web-search' | 'skills' | 'mcp' | 'knowledge-base' | 'working-directory'
+
+// The working-directory feature binds real local directories to the sandbox; only the
+// desktop build has a local sandbox and a real filesystem to grant access to. Windows is
+// excluded for now: the sandbox runs under WSL and the renderer-side path routing does not
+// yet map Windows paths (C:\...) to their WSL form, so writes would silently still require
+// approval. Tracked as a follow-up.
+const supportsWorkingDirectories =
+  platform.type === 'desktop' && !!platform.openDirectoryDialog && getOS() !== 'Windows'
 
 export interface AgentModePanelProps {
   sessionId: string
@@ -174,6 +188,40 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       setSessionAgentMode(sessionId, value)
     },
     [sessionId, setSessionAgentMode]
+  )
+
+  // Working directories (desktop only): real local dirs the sandbox may read/write freely.
+  const { sessionSettings } = useSessionSettings(sessionId)
+  const workingDirectories = useMemo(() => sessionSettings.workingDirectories ?? [], [sessionSettings])
+
+  const updateWorkingDirectories = useCallback(
+    async (next: string[]) => {
+      try {
+        await chatStore.updateSession(sessionId, (session) => {
+          if (!session) {
+            throw new Error('Session not found')
+          }
+          return { ...session, settings: { ...session.settings, workingDirectories: next.length ? next : undefined } }
+        })
+      } catch (err) {
+        console.error('Failed to update working directories:', err)
+      }
+    },
+    [sessionId]
+  )
+
+  const handleAddWorkingDirectory = useCallback(async () => {
+    if (!platform.openDirectoryDialog) return
+    const result = await platform.openDirectoryDialog()
+    if (result.canceled || !result.path || workingDirectories.includes(result.path)) return
+    await updateWorkingDirectories([...workingDirectories, result.path])
+  }, [workingDirectories, updateWorkingDirectories])
+
+  const handleRemoveWorkingDirectory = useCallback(
+    async (dir: string) => {
+      await updateWorkingDirectories(workingDirectories.filter((item) => item !== dir))
+    },
+    [workingDirectories, updateWorkingDirectories]
   )
 
   const selectedKB = useMemo(
@@ -569,6 +617,57 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       )
     }
 
+    if (page === 'working-directory') {
+      return (
+        <>
+          <SubPanelHeader title={t('Working Directory')} disabled={capabilitiesDisabled} />
+          <Divider my={4} />
+          <Text size="xs" c="dimmed" px="sm" pb={4}>
+            {t('Grant the agent read/write access to local folders without per-action approval.')}
+          </Text>
+          {workingDirectories.map((dir) => (
+            <Flex key={dir} justify="space-between" align="center" px="sm" py={6} gap="xs">
+              <Flex gap="xs" align="center" className="min-w-0">
+                <IconFile size={14} className="text-[var(--chatbox-tint-tertiary)] shrink-0" />
+                <Tooltip label={dir} withArrow position="right" openDelay={400}>
+                  <Text size="sm" truncate className="min-w-0">
+                    {dir.split('/').filter(Boolean).pop() || dir}
+                  </Text>
+                </Tooltip>
+              </Flex>
+              <ActionIcon
+                variant="subtle"
+                size={20}
+                color="red"
+                disabled={capabilitiesDisabled}
+                aria-label={t('Remove')}
+                onClick={() => {
+                  if (capabilitiesDisabled) return
+                  handleRemoveWorkingDirectory(dir)
+                }}
+              >
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Flex>
+          ))}
+          <Group justify="center" py="md">
+            <Button
+              size="xs"
+              variant="light"
+              disabled={capabilitiesDisabled}
+              onClick={() => {
+                if (capabilitiesDisabled) return
+                handleAddWorkingDirectory()
+              }}
+            >
+              <PlusIcon size={14} className="mr-1" />
+              {t('Add Folder')}
+            </Button>
+          </Group>
+        </>
+      )
+    }
+
     return null
   }
 
@@ -664,6 +763,17 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             page="knowledge-base"
             disabled={capabilitiesDisabled}
           />
+
+          {supportsWorkingDirectories && (
+            <ExtensionRow
+              icon={<IconFolderCog size={16} className="text-[var(--chatbox-tint-secondary)]" />}
+              label={t('Working Directory')}
+              badge={workingDirectories.length > 0 ? workingDirectories.length : undefined}
+              active={page === 'working-directory'}
+              page="working-directory"
+              disabled={capabilitiesDisabled}
+            />
+          )}
         </div>
       </Stack>
 
