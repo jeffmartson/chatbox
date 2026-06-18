@@ -13,7 +13,7 @@ function buildExplanationMessages(command: string, userContext: string, language
       contentParts: [
         {
           type: 'text',
-          text: `A shell command is about to be executed on the user's machine. Explain what it does and any consequences (file changes, network access, system modifications, data loss risks).
+          text: `A shell command is about to run on the user's machine. The user needs a quick, scannable summary to decide whether to approve it.
 
 Recent user messages for context:
 ${userContext}
@@ -23,7 +23,10 @@ Command:
 ${command}
 \`\`\`
 
-Provide a brief, clear explanation in 1-3 sentences. Focus on what the command does and any risks. At the end, give a clear recommendation: whether the user should approve or reject this command, and why. Respond in ${language}. Do not suggest alternative commands.`,
+Reply in ${language}, as concisely as possible, in exactly two short lines and nothing else:
+Line 1 — what it does, plus any real risk (file changes, network, data loss). One sentence, no preamble.
+Line 2 — start with "✅" to approve or "⚠️" to be cautious, then a few words why.
+Do not restate the command, add headings, or suggest alternatives.`,
         },
       ],
     },

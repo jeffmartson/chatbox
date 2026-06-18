@@ -6,7 +6,7 @@ import os from 'os'
 import path from 'path'
 import { getLogger } from '../util'
 import { builtinSkills } from './builtin'
-import { discoverClaudeSkills, discoverSkills } from './discovery'
+import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from './discovery'
 import { detectSkillsInRepo } from './github-fetcher'
 import {
   checkForUpdates,
@@ -25,6 +25,10 @@ function getSkillsDir(): string {
 
 function getClaudeSkillsDir(): string {
   return path.join(os.homedir(), '.claude', 'skills')
+}
+
+function getAgentSkillsDir(): string {
+  return path.join(os.homedir(), '.agents', 'skills')
 }
 
 // Module-level name→path cache for fast skill loading
@@ -51,9 +55,11 @@ function invalidateSkillCache(): void {
 function buildSkillCache(): Map<string, string> {
   const builtinSkillInfos = getBuiltinSkillInfos()
   const chatboxSkills = discoverSkills(getSkillsDir())
-  const chatboxNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
-  const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), chatboxNames)
-  const allSkills = [...builtinSkillInfos, ...chatboxSkills, ...claudeSkills]
+  const claimedNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
+  const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), claimedNames)
+  for (const s of claudeSkills) claimedNames.add(s.name)
+  const agentSkills = discoverAgentSkills(getAgentSkillsDir(), claimedNames)
+  const allSkills = [...builtinSkillInfos, ...chatboxSkills, ...claudeSkills, ...agentSkills]
   skillPathCache = new Map(allSkills.map((s) => [s.name, s.path]))
   return skillPathCache
 }
@@ -67,9 +73,11 @@ export function registerSkillsHandlers() {
     try {
       const builtinSkillInfos = getBuiltinSkillInfos()
       const chatboxSkills = discoverSkills(getSkillsDir())
-      const chatboxNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
-      const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), chatboxNames)
-      const allSkills = [...builtinSkillInfos, ...chatboxSkills, ...claudeSkills]
+      const claimedNames = new Set([...builtinSkillInfos.map((s) => s.name), ...chatboxSkills.map((s) => s.name)])
+      const claudeSkills = discoverClaudeSkills(getClaudeSkillsDir(), claimedNames)
+      for (const s of claudeSkills) claimedNames.add(s.name)
+      const agentSkills = discoverAgentSkills(getAgentSkillsDir(), claimedNames)
+      const allSkills = [...builtinSkillInfos, ...chatboxSkills, ...claudeSkills, ...agentSkills]
       // Rebuild cache as a side effect of discovery
       skillPathCache = new Map(allSkills.map((s) => [s.name, s.path]))
       return allSkills

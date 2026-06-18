@@ -62,23 +62,29 @@ export function discoverSkills(skillsDir: string): SkillInfo[] {
 }
 
 /**
- * Discover skills from a Claude Code skills directory (~/.claude/skills/).
+ * Discover skills from an external agent skills directory that follows the
+ * "<dir>/<skill-name>/SKILL.md" layout (e.g. ~/.claude/skills or ~/.agents/skills).
  * Follows symlinks, deduplicates by realpath, normalizes names to kebab-case.
- * @param claudeSkillsDir Path to the Claude Code skills directory
- * @param excludeNames Names already claimed by Chatbox skills (Chatbox wins collisions)
+ * @param skillsDir Path to the external agent skills directory
+ * @param excludeNames Names already claimed by earlier sources (earlier sources win collisions)
+ * @param sourceType Source type to tag discovered skills with
  */
-export function discoverClaudeSkills(claudeSkillsDir: string, excludeNames: Set<string>): SkillInfo[] {
-  if (!fs.existsSync(claudeSkillsDir)) {
+export function discoverExternalAgentSkills(
+  skillsDir: string,
+  excludeNames: Set<string>,
+  sourceType: 'claude-code' | 'agents'
+): SkillInfo[] {
+  if (!fs.existsSync(skillsDir)) {
     return []
   }
 
-  const claudeSkills: SkillInfo[] = []
+  const agentSkills: SkillInfo[] = []
   const seenRealPaths = new Set<string>()
 
   try {
-    const entries = fs.readdirSync(claudeSkillsDir, { withFileTypes: true })
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
     for (const entry of entries) {
-      const entryPath = path.join(claudeSkillsDir, entry.name)
+      const entryPath = path.join(skillsDir, entry.name)
 
       // Use statSync to follow symlinks (entry.isDirectory() returns false for symlinks)
       let stat: fs.Stats
@@ -109,33 +115,49 @@ export function discoverClaudeSkills(claudeSkillsDir: string, excludeNames: Set<
 
       const normalizedName = normalizeClaudeSkillName(parsed.metadata.name, entry.name)
       if (!normalizedName) {
-        log.warn(`Could not normalize Claude skill name for "${entry.name}", skipping`)
+        log.warn(`Could not normalize agent skill name for "${entry.name}", skipping`)
         continue
       }
 
-      // Chatbox skills win name collisions
+      // Earlier sources win name collisions
       if (excludeNames.has(normalizedName)) continue
 
-      claudeSkills.push({
+      agentSkills.push({
         ...parsed.metadata,
         name: normalizedName,
         path: entryPath,
         isBuiltin: false,
-        source: { type: 'claude-code', skillPath: realPath },
+        source: { type: sourceType, skillPath: realPath },
       })
     }
   } catch (error) {
-    log.error(`Failed to scan Claude skills directory: ${claudeSkillsDir}`, error)
+    log.error(`Failed to scan agent skills directory: ${skillsDir}`, error)
   }
 
   // Deduplicate by normalized name (keep first occurrence)
   const seenNames = new Set<string>()
   const deduplicatedSkills: SkillInfo[] = []
-  for (const skill of claudeSkills) {
+  for (const skill of agentSkills) {
     if (seenNames.has(skill.name)) continue
     seenNames.add(skill.name)
     deduplicatedSkills.push(skill)
   }
 
   return deduplicatedSkills
+}
+
+/**
+ * Discover skills from Claude Code's skills directory (~/.claude/skills/).
+ * Thin wrapper over {@link discoverExternalAgentSkills} tagged as `claude-code`.
+ */
+export function discoverClaudeSkills(claudeSkillsDir: string, excludeNames: Set<string>): SkillInfo[] {
+  return discoverExternalAgentSkills(claudeSkillsDir, excludeNames, 'claude-code')
+}
+
+/**
+ * Discover skills from the shared agent skills directory (~/.agents/skills/),
+ * used by codex and other agents. Tagged as `agents`.
+ */
+export function discoverAgentSkills(agentSkillsDir: string, excludeNames: Set<string>): SkillInfo[] {
+  return discoverExternalAgentSkills(agentSkillsDir, excludeNames, 'agents')
 }

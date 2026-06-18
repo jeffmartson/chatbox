@@ -19,6 +19,7 @@ import {
   IconBulb,
   IconCheck,
   IconChevronDown,
+  IconChevronRight,
   IconCircleXFilled,
   IconCode,
   IconCopy,
@@ -819,6 +820,57 @@ export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] }> = ({ part
 
 // ─── User Exec (with approval) ──────────────────────────────────────
 
+// Command to be executed, collapsed by default so a long command doesn't
+// dominate the approval prompt. Shows the first line as a preview when collapsed.
+const CollapsibleCommand: FC<{ command: string }> = ({ command }) => {
+  const { t } = useTranslation()
+  const lines = command.split('\n')
+  const hiddenLineCount = Math.max(0, lines.length - 1)
+  // Collapse multi-line commands by default for readability, but surface the
+  // hidden-line count so a later (possibly destructive) line is never silently
+  // approved — the user always sees there is more to expand.
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Box>
+      <UnstyledButton onClick={() => setOpen((prev) => !prev)} style={{ width: '100%' }}>
+        <Group gap={4} wrap="nowrap" style={{ minWidth: 0 }}>
+          {open ? (
+            <IconChevronDown size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
+          ) : (
+            <IconChevronRight size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
+          )}
+          <IconTerminal size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
+          <Text
+            size="xs"
+            c="chatbox-secondary"
+            style={{
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {open ? t('Command') : lines[0]}
+          </Text>
+          {!open && hiddenLineCount > 0 && (
+            <Text size="xs" c="chatbox-warning" fw={500} style={{ flexShrink: 0 }}>
+              {t('+{{count}} more lines', { count: hiddenLineCount })}
+            </Text>
+          )}
+        </Group>
+      </UnstyledButton>
+      <Collapse in={open}>
+        <Code block style={{ fontSize: 12, marginTop: 4 }}>
+          {command}
+        </Code>
+      </Collapse>
+    </Box>
+  )
+}
+
 const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const { t } = useTranslation()
   const command = (part.args as Record<string, unknown>)?.command as string | undefined
@@ -900,9 +952,7 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
       {isWaitingApproval && (
         <Box ml={4} pl="sm" style={{ borderLeft: '2px solid var(--chatbox-tint-warning)' }}>
           <Stack gap="xs">
-            <Code block style={{ fontSize: 12 }}>
-              {pendingApproval.command}
-            </Code>
+            <CollapsibleCommand command={pendingApproval.command} />
             {!pendingApproval.explanation &&
               pendingApproval.explanation !== undefined &&
               !pendingApproval.explanationError && (
@@ -1009,9 +1059,7 @@ const UserExecDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
             {pendingApproval.title}
           </Text>
         )}
-        <Code block style={{ fontSize: 12 }}>
-          {pendingApproval.command}
-        </Code>
+        <CollapsibleCommand command={pendingApproval.command} />
         {!pendingApproval.explanation &&
           pendingApproval.explanation !== undefined &&
           !pendingApproval.explanationError && (

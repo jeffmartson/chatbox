@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { discoverClaudeSkills, discoverSkills } from '../discovery'
+import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from '../discovery'
 
 vi.mock('fs', () => ({
   default: {
@@ -325,6 +325,46 @@ describe('discoverClaudeSkills', () => {
     })
 
     const result = discoverClaudeSkills('/claude/skills', new Set())
+
+    expect(result).toEqual([])
+  })
+})
+
+describe('discoverAgentSkills', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should tag discovered skills with source.type "agents"', () => {
+    mockedExistsSync.mockReturnValue(true)
+    mockedReaddirSync.mockReturnValue([makeDirent('my-skill', true)] as Dirent[])
+    mockedStatSync.mockReturnValue({ isDirectory: () => true } as fs.Stats)
+    mockedRealpathSync.mockReturnValue('/agents/skills/my-skill')
+    mockedParseSkillFile.mockReturnValue({
+      metadata: { name: 'My Skill', description: 'desc' },
+      body: 'body',
+    })
+
+    const result = discoverAgentSkills('/agents/skills', new Set())
+
+    expect(result).toHaveLength(1)
+    expect(result[0].source).toEqual({
+      type: 'agents',
+      skillPath: '/agents/skills/my-skill',
+    })
+  })
+
+  it('should exclude names already claimed by earlier sources', () => {
+    mockedExistsSync.mockReturnValue(true)
+    mockedReaddirSync.mockReturnValue([makeDirent('my-skill', true)] as Dirent[])
+    mockedStatSync.mockReturnValue({ isDirectory: () => true } as fs.Stats)
+    mockedRealpathSync.mockReturnValue('/agents/skills/my-skill')
+    mockedParseSkillFile.mockReturnValue({
+      metadata: { name: 'my-skill', description: 'desc' },
+      body: 'body',
+    })
+
+    const result = discoverAgentSkills('/agents/skills', new Set(['my-skill']))
 
     expect(result).toEqual([])
   })

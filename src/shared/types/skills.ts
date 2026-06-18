@@ -4,7 +4,9 @@ import { z } from 'zod'
 
 /**
  * SkillSource: Metadata about where a skill comes from
- * - type: Source type (builtin, local, marketplace, github, chat, claude-code)
+ * - type: Source type (builtin, local, marketplace, github, chat, claude-code, agents)
+ *   - claude-code: discovered from Claude Code's ~/.claude/skills
+ *   - agents: discovered from the shared agent skills dir ~/.agents/skills (codex, etc.)
  * - repo: Optional repository URL or identifier
  * - commitHash: Optional repo HEAD commit hash (legacy version tracking)
  * - treeSha: Optional git subtree SHA scoped to skillPath (preferred for update checks)
@@ -12,7 +14,7 @@ import { z } from 'zod'
  * - skillPath: Optional file system path to skill
  */
 export interface SkillSource {
-  type: 'builtin' | 'local' | 'marketplace' | 'github' | 'chat' | 'claude-code'
+  type: 'builtin' | 'local' | 'marketplace' | 'github' | 'chat' | 'claude-code' | 'agents'
   repo?: string
   commitHash?: string
   treeSha?: string

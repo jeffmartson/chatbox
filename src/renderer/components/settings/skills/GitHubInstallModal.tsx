@@ -47,7 +47,9 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
       return
     }
 
-    setSelectedPaths(skills.map((skill) => skill.path))
+    // A repo may contain many skills — don't pre-select all. Only auto-select
+    // when there's a single skill (no ambiguity about what to install).
+    setSelectedPaths(skills.length === 1 ? [skills[0].path] : [])
     setInstallStatuses(
       skills.reduce<Record<string, InstallStatus>>((acc, skill) => {
         acc[skill.path] = { state: 'idle' }
@@ -59,6 +61,13 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
   const selectedSkills = useMemo(() => {
     return skills.filter((skill) => selectedPaths.includes(skill.path))
   }, [selectedPaths, skills])
+
+  const allSelected = skills.length > 0 && selectedPaths.length === skills.length
+  const someSelected = selectedPaths.length > 0 && !allSelected
+
+  const toggleSelectAll = () => {
+    setSelectedPaths(allSelected ? [] : skills.map((skill) => skill.path))
+  }
 
   const handleInstallSelected = async () => {
     if (!selectedSkills.length) return
@@ -128,6 +137,24 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
       overlayProps={{ backgroundOpacity: 0.35, blur: 7 }}
     >
       <Stack gap="sm">
+        {skills.length > 1 && (
+          <Flex align="center" justify="space-between" px={4}>
+            <Checkbox
+              checked={allSelected}
+              indeterminate={someSelected}
+              onChange={toggleSelectAll}
+              disabled={installing}
+              label={
+                <Text size="xs" fw={500}>
+                  {t('Select all')}
+                </Text>
+              }
+            />
+            <Text size="xs" c="chatbox-tertiary">
+              {t('{{count}} selected', { count: selectedPaths.length })}
+            </Text>
+          </Flex>
+        )}
         {skills.map((skill) => {
           const status = installStatuses[skill.path]?.state ?? 'idle'
           const statusError = installStatuses[skill.path]?.error

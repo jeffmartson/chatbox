@@ -22,6 +22,7 @@ import {
   IconSearch,
   IconTrash,
   IconWand,
+  IconX,
 } from '@tabler/icons-react'
 import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -123,15 +124,21 @@ const SkillCard: FC<{
 
 const SectionHeader: FC<{
   title: string
+  subtitle?: string
   count?: number
   right?: React.ReactNode
   className?: string
-}> = ({ title, count, right, className }) => (
-  <Flex justify="space-between" align="center" className={className}>
-    <Flex align="center" gap={8}>
+}> = ({ title, subtitle, count, right, className }) => (
+  <Flex justify="space-between" align="center" gap={8} className={className}>
+    <Flex align="center" gap={8} style={{ minWidth: 0 }} wrap="wrap">
       <Text size="sm" fw={600}>
         {title}
       </Text>
+      {subtitle && (
+        <Text size="xs" c="chatbox-tertiary" ff="monospace" style={{ wordBreak: 'break-all' }}>
+          {subtitle}
+        </Text>
+      )}
       {count != null && (
         <Badge size="xs" variant="light" color="gray" radius="sm">
           {count}
@@ -139,7 +146,7 @@ const SectionHeader: FC<{
       )}
     </Flex>
     {right && (
-      <Flex align="center" gap="xs">
+      <Flex align="center" gap="xs" style={{ flexShrink: 0 }}>
         {right}
       </Flex>
     )}
@@ -196,6 +203,7 @@ export const SkillsSection: FC = () => {
   const [installModalOpen, setInstallModalOpen] = useState(false)
   const [repoInfo, setRepoInfo] = useState({ owner: '', repo: '' })
   const [showGithubInput, setShowGithubInput] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const skillSettings = useSettingsStore((state) => state.skills)
   const { translatedSkills, getTranslatedName, isTranslating, translationEnabled, toggleTranslation } =
     useSkillTranslation(skills)
@@ -260,9 +268,25 @@ export const SkillsSection: FC = () => {
     return new Map(skills.filter((skill) => !skill.isBuiltin).map((skill) => [skill.path, skill]))
   }, [skills])
 
-  const builtinSkills = translatedSkills.filter((skill) => skill.isBuiltin)
-  const userSkills = translatedSkills.filter((skill) => !skill.isBuiltin && skill.source?.type !== 'claude-code')
-  const claudeCodeSkills = translatedSkills.filter((skill) => skill.source?.type === 'claude-code')
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const matchesQuery = useCallback(
+    (skill: SkillInfo) => {
+      if (!normalizedQuery) return true
+      return [skill.name, skill.description, getTranslatedName(skill), skill.source?.repo]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(normalizedQuery))
+    },
+    [normalizedQuery, getTranslatedName]
+  )
+
+  const filteredSkills = useMemo(() => translatedSkills.filter(matchesQuery), [translatedSkills, matchesQuery])
+
+  const builtinSkills = filteredSkills.filter((skill) => skill.isBuiltin)
+  const userSkills = filteredSkills.filter(
+    (skill) => !skill.isBuiltin && skill.source?.type !== 'claude-code' && skill.source?.type !== 'agents'
+  )
+  const claudeCodeSkills = filteredSkills.filter((skill) => skill.source?.type === 'claude-code')
+  const agentSkills = filteredSkills.filter((skill) => skill.source?.type === 'agents')
 
   const getOriginalUserSkill = useCallback(
     (skill: SkillInfo) => {
@@ -428,6 +452,24 @@ export const SkillsSection: FC = () => {
         </Paper>
       )}
 
+      {skills.length > 0 && (
+        <TextInput
+          size="xs"
+          mb="lg"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.currentTarget.value)}
+          placeholder={String(t('Search skills...'))}
+          leftSection={<ScalableIcon icon={IconSearch} size={14} />}
+          rightSection={
+            searchQuery ? (
+              <ActionIcon variant="subtle" size="sm" color="gray" onClick={() => setSearchQuery('')}>
+                <ScalableIcon icon={IconX} size={14} />
+              </ActionIcon>
+            ) : null
+          }
+        />
+      )}
+
       {builtinSkills.length > 0 && (
         <>
           <SectionHeader title={t('Built-in Skills')} count={builtinSkills.length} className="mb-3" />
@@ -446,7 +488,7 @@ export const SkillsSection: FC = () => {
       )}
 
       <SectionHeader
-        title={t('User Skills')}
+        title={t('Installed Skills')}
         count={userSkills.length}
         className="mb-3"
         right={
@@ -470,7 +512,13 @@ export const SkillsSection: FC = () => {
       />
 
       {userSkills.length === 0 ? (
-        <EmptyState onAddClick={skillsSpotlight.open} onOpenFolder={() => void handleOpenFolder()} />
+        normalizedQuery ? (
+          <Text size="xs" c="chatbox-tertiary" py="sm">
+            {t('No skills match "{{query}}"', { query: searchQuery.trim() })}
+          </Text>
+        ) : (
+          <EmptyState onAddClick={skillsSpotlight.open} onOpenFolder={() => void handleOpenFolder()} />
+        )
       ) : (
         <SimpleGrid type="container" cols={{ base: 1, '450px': 2, '800px': 3, '1200px': 4 }}>
           {userSkills.map((skill) => {
@@ -513,9 +561,39 @@ export const SkillsSection: FC = () => {
 
       {claudeCodeSkills.length > 0 && (
         <>
-          <SectionHeader title={t('Claude Code Skills')} count={claudeCodeSkills.length} className="mt-6 mb-3" />
+          <SectionHeader
+            title={t('Claude Code Skills')}
+            subtitle="~/.claude/skills"
+            count={claudeCodeSkills.length}
+            className="mt-6 mb-3"
+          />
           <SimpleGrid type="container" cols={{ base: 1, '450px': 2, '800px': 3, '1200px': 4 }}>
             {claudeCodeSkills.map((skill) => {
+              const originalSkill = getOriginalUserSkill(skill)
+              return (
+                <SkillCard
+                  key={originalSkill.path}
+                  skill={skill}
+                  translatedName={getTranslatedName(skill)}
+                  enabled={skillSettings.enabledSkillNames.includes(originalSkill.name)}
+                  onToggle={(name, enabled) => handleUserToggle(originalSkill.name || name, enabled)}
+                />
+              )
+            })}
+          </SimpleGrid>
+        </>
+      )}
+
+      {agentSkills.length > 0 && (
+        <>
+          <SectionHeader
+            title={t('Local Agent Skills')}
+            subtitle="~/.agents/skills"
+            count={agentSkills.length}
+            className="mt-6 mb-3"
+          />
+          <SimpleGrid type="container" cols={{ base: 1, '450px': 2, '800px': 3, '1200px': 4 }}>
+            {agentSkills.map((skill) => {
               const originalSkill = getOriginalUserSkill(skill)
               return (
                 <SkillCard
