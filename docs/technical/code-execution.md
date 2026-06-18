@@ -12,18 +12,19 @@ Chat 代码执行复用 Main 进程的本地沙箱基础设施，但在 Renderer
 
 ```
 Renderer
-  prepareAgentGenerationHarness()
-    ├─ shouldAutoEnableAgentForFiles(files)
-    ├─ computeEffectiveAgentMode(agentModeValue, shouldAutoEnableAgent, supported)
-    ├─ createSandboxProvider()                    # desktop only
-    ├─ buildToolsForSession()
-    │   ├─ web_search / parse_link                # independent of agent mode
-    │   ├─ code_execution / read_file / create_download
-    │   ├─ filesystem tools: list/search/write/edit
-    │   ├─ load_skill / install_skill / user_exec
-    │   ├─ MCP / knowledge base tools
-    │   └─ initialActiveTools for auto mode
-    └─ chatStream(..., { tools, prepareStep })
+  orchestrateGeneration()
+    ├─ shouldSuggestAgentMode()                   # 仅首轮 auto，快速分类模型
+    │   └─ 命中 → 注入 agent-mode-suggestion 卡片并停止生成
+    └─ prepareAgentGenerationHarness()
+        ├─ computeEffectiveAgentMode(agentModeValue, supported)
+        ├─ createSandboxProvider()                # desktop only
+        ├─ buildToolsForSession()
+        │   ├─ web_search / parse_link            # independent of agent mode
+        │   ├─ code_execution / read_file / create_download
+        │   ├─ filesystem tools: list/search/write/edit
+        │   ├─ load_skill / install_skill / user_exec
+        │   └─ MCP / knowledge base tools
+        └─ chatStream(..., { tools })
 
 Main
   src/main/sandbox/
@@ -95,25 +96,39 @@ interface AgentModeEntry {
 
 ### 有效模式计算
 
-`src/renderer/stores/session/agent-harness.ts` 中的逻辑：
+`src/renderer/stores/session/agent-harness.ts` 中的 `computeEffectiveAgentMode(agentModeValue, agentModeSupported)`：
 
 ```typescript
-const shouldAutoEnableAgent = shouldAutoEnableAgentForFiles(files)
-const effectiveAgentMode = computeEffectiveAgentMode(agentModeValue, shouldAutoEnableAgent, agentModeSupported)
+export function computeEffectiveAgentMode(agentModeValue, agentModeSupported) {
+  if (!agentModeSupported || agentModeValue === 'off') return 'off'
+  return agentModeValue === 'on' ? 'on' : 'off'
+}
 ```
 
 规则：
 
-- 模型不支持 agent scope，或用户选择 `off`：`effectiveAgentMode = 'off'`。
-- 用户选择 `on`：`effectiveAgentMode = 'on'`。
-- Auto 且 `shouldAutoEnableAgentForFiles(files) === true`：升级为 `on`。
-- 其他 Auto 场景保持 `auto`。
+- 模型不支持 agent scope（非桌面端），或用户选择 `off`：`effectiveAgentMode = 'off'`。
+- 用户选择 `on`：`effectiveAgentMode = 'on'`，注入完整 agent 工具集。
+- `auto`：`effectiveAgentMode = 'off'`。Auto **不再**根据文件类型或数量自动升级；是否进入 Agent Mode 由首轮的建议分类器决定（见下）。
 
-`shouldAutoEnableAgentForFiles()` 的当前策略：
+### Auto 建议机制（首轮分类器）
 
-- 文件数大于 1：返回 `true`。
-- 单个 `.txt`、`.doc`、`.docx` 或对应 MIME 类型：返回 `false`。
-- 其他文件类型：返回 `true`。
+文件触发已被移除，改为在会话首轮用一个独立的快速分类模型判断意图。逻辑位于 `orchestration.ts` 的 `shouldSuggestAgentMode()` 与 `agent-mode-suggestion.ts`。
+
+触发条件（全部满足才运行分类器）：
+
+- `operationType === 'send_message'` 且非 `appendToMessage`、非 `skipAgentModeSuggestion`。
+- 桌面端（`agentModeSupported`）且 `agentModeValue === 'auto'`。
+- 模型支持 `agent` scope。
+- 当前是该 thread 的首条用户消息（`isFirstUserTurn()`）。
+
+流程：
+
+1. 分类模型优先取全局设置的 `threadNamingModel`（廉价快速），无法创建时回退到对话模型。
+2. 用 `AGENT_MODE_SUGGESTION_PROMPT` 让模型判断该消息是否需要代码执行、文件操作、本地工具、知识库、加载 Skill 等 Agent 能力，返回 `{"suggest":boolean,"reason":string}`。
+3. **suggest=true**：在消息中注入一个 `agent-mode-suggestion` content part（携带 `reason`，与用户消息同语言），`finishReason: 'agent-mode-suggested'`，**停止本轮生成**。用户点击卡片上的“使用 Agent Mode”才将会话切为 On 并继续；点击“继续普通回答”则按普通文本对话处理。
+4. **suggest=false**：静默跳过，按 `effectiveAgentMode = 'off'` 走普通文本生成，不注入 Agent 工具。
+5. 分类期间用户取消时，消息被标记为 stopped，不会落入已 abort 的生成流程。
 
 ### 锁定机制
 
@@ -121,20 +136,14 @@ const effectiveAgentMode = computeEffectiveAgentMode(agentModeValue, shouldAutoE
 |------|------|------|
 | `message_sent` | 用户在 On 模式发送消息 | 锁定为 On |
 | `load_skill` | 模型加载 Skill | 锁定为 On |
-| `file_upload` | Auto 遇到多文件或复杂文件类型 | 锁定为 On |
 
-单个简单 txt/doc/docx 不再触发 `file_upload` 锁定。
+`AgentModeLockReason` 类型仍保留 `'file_upload'` 取值以兼容历史会话数据，但当前代码不再因文件上传触发该锁定。
 
-### Auto 初始工具门控
+### Auto 工具门控
 
-`buildToolsForSession()` 会返回 `initialActiveTools`。Auto 模式初始隐藏：
+由于 `auto` 的 `effectiveAgentMode` 为 `'off'`，普通 Auto 对话不注入任何 Agent 工具；用户接受建议后会话变为 `on`，此时注入完整工具集。
 
-- `code_execution`
-- `parse_file`
-- 文件系统工具：`list_files`、`search_files`、`write_file`、`edit_file`
-- `user_exec`
-
-`load_skill`、Web Search、部分轻量工具可先使用。`prepareStep` 发现已经调用 `load_skill` 后，会把 `activeTools` 切换为完整工具集。
+`buildToolsForSession()` 仍保留按 `agentMode === 'auto'` 计算 `initialActiveTools` 的渐进门控逻辑（隐藏 `code_execution`、文件系统读写、`user_exec`，待 `load_skill` 触发后由 `prepareStep` 解锁完整工具集），但在当前 Chat 编排里 builder 收到的是 `effectiveAgentMode`（只会是 `on`/`off`），因此该渐进门控目前只在单元测试中覆盖，不在实时流程触发。
 
 ## Tool 构建
 
@@ -212,7 +221,8 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 
 重点测试：
 
-- `agent-harness.test.ts`：有效模式、Auto 文件触发规则、初始 active tools。
+- `agent-harness.test.ts`：有效模式计算、harness 准备。
+- `agent-mode-suggestion.test.ts`：首轮建议分类器的 prompt 构造与决策解析。
 - `tools-builder.test.ts`：不同 agent mode、code execution provider、web search、sandbox_* 不可见。
 - `agent-mode-orchestration.test.ts`：prepareStep、暂停/继续和 append 行为。
 - `code-execution.test.ts`：懒初始化、文件注入、执行和错误处理。
@@ -225,7 +235,7 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 |------|------|------|
 | Chat 工具形态 | 高层 `code_execution` 替代 `sandbox_*` | 降低模型误用底层 shell/file 工具的概率 |
 | 运行时 | Node.js/Bash，不内置 Python 科学栈 | 控制安装包体积和签名风险，聚焦简单文件处理 |
-| 文件触发 | Auto 只对多文件或复杂文件升级 On | 减少简单文档/纯文本对话的上下文污染 |
+| Auto 进入条件 | 首轮快速分类模型建议 + 用户手动确认，移除文件类型自动升级 | 避免误判，把控制权交回用户，减少纯文本对话的上下文污染 |
 | 暂停机制 | 持久化 `paused` tool call | 重启可恢复，继续后能 append 到原消息 |
 | HTML 预览 | 本地 preview server + 沙箱相对路径 | 支持相对资源文件，不依赖远端 artifact 域名 |
 | 工具结果 | 小结果入消息，大结果入文件 | 控制 session 数据体积和上下文缓存压力 |
