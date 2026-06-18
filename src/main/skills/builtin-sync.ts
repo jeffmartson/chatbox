@@ -6,6 +6,7 @@ import path from 'path'
 import { getLogger } from '../util'
 import { builtinSkills } from './builtin'
 import { parseSkillFile } from './parser'
+import { isValidSkillName } from './validation'
 
 const log = getLogger('skills:builtin-sync')
 
@@ -205,6 +206,12 @@ export async function syncBuiltinSkills(lang?: string): Promise<boolean> {
 
   for (const item of remote.data) {
     if (!item?.name || typeof item.hash !== 'string') continue
+    // 安全：name 会被用作快照目录路径，必须校验，防止后端异常/被篡改的 name（如 "../foo"）
+    // 导致 writeSnapshotSkill 写到快照目录之外
+    if (!isValidSkillName(item.name)) {
+      log.warn(`syncBuiltinSkills: skipping invalid skill name "${item.name}"`)
+      continue
+    }
     const local = manifest.skills[item.name]
     if (local && local.hash === item.hash) continue // 内容未变，跳过
 
