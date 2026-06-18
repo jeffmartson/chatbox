@@ -190,5 +190,8 @@ storybook-static
 .worktrees/
 .claude/worktrees/
 
-tmp-*.md
+todo.md
+plan.md
+tmp-*.*
+tmp_*.*
 /docs/superpowers/plans

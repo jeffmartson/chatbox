@@ -295,9 +295,7 @@ export function registerSandboxIPCHandlers() {
         return { success: false, error: 'Access denied: symlinks not allowed' }
       }
       const resolved = await fsRealpath(params.filePath)
-      const isInsideSandbox = sandboxRoots.some(
-        (root) => resolved === root || resolved.startsWith(root + path.sep)
-      )
+      const isInsideSandbox = sandboxRoots.some((root) => resolved === root || resolved.startsWith(root + path.sep))
       if (!isInsideSandbox) {
         return { success: false, error: 'Access denied: path outside sandbox directory' }
       }
