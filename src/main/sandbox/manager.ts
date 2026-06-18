@@ -101,6 +101,49 @@ function toWSLPath(winPath: string): string {
   return normalized
 }
 
+/**
+ * Sandbox shell commands run inside WSL (Linux) on Windows, so a Windows-absolute
+ * path passed to a bash command (cat/ls/grep/find …) must be rewritten to its WSL
+ * mount form. No-op on POSIX platforms and for relative paths.
+ */
+export function toSandboxShellPath(p: string): string {
+  if (process.platform === 'win32' && /^[A-Za-z]:[\\/]/.test(p)) {
+    return toWSLPath(p)
+  }
+  return p
+}
+
+/**
+ * Terminate a spawned child and its descendants across platforms.
+ * POSIX: signal the detached process group (negative pid). Windows: `taskkill /T`
+ * since detached process-group signalling does not exist there.
+ */
+export function killProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): void {
+  if (process.platform === 'win32') {
+    if (child.pid) {
+      try {
+        // taskkill failing (e.g. process already gone) surfaces as an async 'error'
+        // event; swallow it so it never crashes the main process.
+        spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }).on('error', () => {})
+        return
+      } catch {
+        // fall through to child.kill
+      }
+    }
+    child.kill(signal)
+    return
+  }
+  if (child.pid) {
+    try {
+      process.kill(-child.pid, signal)
+    } catch {
+      child.kill(signal)
+    }
+  } else {
+    child.kill(signal)
+  }
+}
+
 function buildConfig(workDir: string): Omit<SandboxRuntimeConfig, 'network'> & {
   network: Omit<SandboxRuntimeConfig['network'], 'allowedDomains'>
 } {
@@ -285,43 +328,28 @@ export async function execCommand(
     if (session.workingDirectory) {
       const cacheDir = path.join(session.workingDirectory, '.cache')
       mkdirSync(cacheDir, { recursive: true })
-      env.XDG_CACHE_HOME = cacheDir
-      env.TMPDIR = session.workingDirectory
-      env.TMP = session.workingDirectory
-      env.TEMP = session.workingDirectory
+      // The command runs inside WSL on Windows, so these env vars must be WSL paths
+      // (the dir is still created on the Windows fs above, which WSL sees at /mnt/...).
+      env.XDG_CACHE_HOME = toSandboxShellPath(cacheDir)
+      env.TMPDIR = env.TMP = env.TEMP = toSandboxShellPath(session.workingDirectory)
     }
 
     const child = spawn(wrappedCommand, {
       shell: true,
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
+      // POSIX needs its own process group so we can signal the whole tree via -pid.
+      // On Windows detached spawns a separate console window; the tree is killed via
+      // taskkill /T instead, so detaching is unnecessary and undesirable.
+      detached: process.platform !== 'win32',
       env,
     })
     session.runningChild = child
 
     let timedOut = false
     const killTree = () => {
-      if (child.pid) {
-        try {
-          process.kill(-child.pid, 'SIGTERM')
-        } catch {
-          child.kill('SIGTERM')
-        }
-      } else {
-        child.kill('SIGTERM')
-      }
-      setTimeout(() => {
-        if (child.pid) {
-          try {
-            process.kill(-child.pid, 'SIGKILL')
-          } catch {
-            child.kill('SIGKILL')
-          }
-        } else {
-          child.kill('SIGKILL')
-        }
-      }, 3_000)
+      killProcessTree(child, 'SIGTERM')
+      setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
     }
     const timer = setTimeout(() => {
       timedOut = true
@@ -382,15 +410,7 @@ export function killRunningCommand(sessionId?: string): { killed: boolean } {
 
   const child = session.runningChild
   if (child && !child.killed) {
-    if (child.pid) {
-      try {
-        process.kill(-child.pid, 'SIGTERM')
-      } catch {
-        child.kill('SIGTERM')
-      }
-    } else {
-      child.kill('SIGTERM')
-    }
+    killProcessTree(child, 'SIGTERM')
     log.info(`Killed running sandbox command for session ${sessionId || DEFAULT_SESSION}`)
     return { killed: true }
   }
@@ -404,7 +424,7 @@ export async function readFile(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`cat ${shellEscape(filePath)}`, { sessionId })
+    const result = await execCommand(`cat ${shellEscape(toSandboxShellPath(filePath))}`, { sessionId })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -493,7 +513,7 @@ export async function listDir(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`ls -la ${shellEscape(dirPath)}`, { sessionId })
+    const result = await execCommand(`ls -la ${shellEscape(toSandboxShellPath(dirPath))}`, { sessionId })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -510,7 +530,7 @@ export async function grepFiles(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const target = dirPath ? shellEscape(dirPath) : '.'
+    const target = dirPath ? shellEscape(toSandboxShellPath(dirPath)) : '.'
     const includeFlag = options?.include ? `--include=${shellEscape(options.include)}` : ''
     const result = await execCommand(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, { sessionId })
     // grep returns exit code 1 when no matches found — not an error
@@ -530,7 +550,9 @@ export async function findFiles(
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const nameFlag = pattern ? `-name ${shellEscape(pattern)}` : ''
-    const result = await execCommand(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, { sessionId })
+    const result = await execCommand(`find ${shellEscape(toSandboxShellPath(dirPath))} ${nameFlag} -type f`, {
+      sessionId,
+    })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }

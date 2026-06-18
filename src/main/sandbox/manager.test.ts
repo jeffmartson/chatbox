@@ -1,11 +1,16 @@
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 vi.mock('../util', () => ({
   getLogger: () => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
-import { shellEscape } from './manager'
+import { shellEscape, toSandboxShellPath } from './manager'
+
+const originalPlatform = process.platform
+function setPlatform(platform: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+}
 
 describe('shellEscape', () => {
   test('wraps a simple string in single quotes', () => {
@@ -51,5 +56,29 @@ describe('shellEscape', () => {
   test('handles spaces and tabs', () => {
     expect(shellEscape('hello world')).toBe("'hello world'")
     expect(shellEscape('hello\tworld')).toBe("'hello\tworld'")
+  })
+})
+
+describe('toSandboxShellPath', () => {
+  afterEach(() => {
+    setPlatform(originalPlatform)
+  })
+
+  test('rewrites a Windows-absolute path to its WSL mount form on win32', () => {
+    setPlatform('win32')
+    expect(toSandboxShellPath('C:\\Users\\alice\\file.txt')).toBe('/mnt/c/Users/alice/file.txt')
+    expect(toSandboxShellPath('D:/data/out.csv')).toBe('/mnt/d/data/out.csv')
+  })
+
+  test('leaves relative and POSIX-absolute paths untouched on win32', () => {
+    setPlatform('win32')
+    expect(toSandboxShellPath('sub/dir/file.txt')).toBe('sub/dir/file.txt')
+    expect(toSandboxShellPath('/tmp/file.txt')).toBe('/tmp/file.txt')
+  })
+
+  test('is a no-op on POSIX platforms', () => {
+    setPlatform('linux')
+    expect(toSandboxShellPath('C:\\Users\\alice')).toBe('C:\\Users\\alice')
+    expect(toSandboxShellPath('/home/alice/file.txt')).toBe('/home/alice/file.txt')
   })
 })

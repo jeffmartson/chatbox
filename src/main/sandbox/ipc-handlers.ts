@@ -230,6 +230,18 @@ export function registerSandboxIPCHandlers() {
   })
 
   ipcMain.handle('sandbox:node-command', () => {
+    // On Windows, sandbox commands run inside WSL (Linux). The Windows Electron
+    // binary cannot execute in the Linux sandbox, and reaching it via WSL interop
+    // would also escape the sandbox. Use WSL's own node instead — if it is not
+    // installed the user gets a clear "node: command not found" error.
+    //
+    // The renderer embeds this value into a bash function literally named `node`
+    // (buildNodeShellFunction). A bare `node` would resolve back to that function
+    // and recurse forever; `command` bypasses function lookup and runs the PATH
+    // binary. (POSIX is unaffected: it returns an absolute path, not `node`.)
+    if (process.platform === 'win32') {
+      return 'command node'
+    }
     const executable = shellQuote(process.execPath)
     return process.versions.electron ? `ELECTRON_RUN_AS_NODE=1 ${executable}` : executable
   })

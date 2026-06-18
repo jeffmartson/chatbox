@@ -55,6 +55,19 @@ console.log('ok')
     }
   })
 
+  // On Windows the node command is `command node` (see sandbox:node-command). It is
+  // embedded into a bash function literally named `node`, so a bare `node` would recurse
+  // into that function forever. `command` must bypass the function and run the PATH binary.
+  // The spawnSync timeout makes a reintroduced recursion fail fast instead of hanging.
+  test('command-node wrapper (Windows) resolves the real node instead of recursing', () => {
+    const command = buildNodeExecutionCommand(encodeCode("console.log('ok')"), 'command node')
+
+    const result = spawnSync('sh', ['-c', command], { encoding: 'utf8', timeout: 10_000 })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toBe('ok\n')
+  })
+
   test('makes node available to bash scripts without PATH', () => {
     const command = buildBashExecutionCommand(encodeCode('node -e "console.log(\'ok\')"'), shellQuote(process.execPath))
 
