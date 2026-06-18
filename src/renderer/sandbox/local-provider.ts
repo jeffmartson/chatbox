@@ -46,6 +46,12 @@ export class LocalSandboxProvider implements SandboxProvider {
     return { initialized: this.initialized, sessionId: this.sessionId ?? undefined }
   }
 
+  async resolveWorkingDirectory(sessionId: string): Promise<string | null> {
+    if (!platform.sandboxResolveWorkingDir) return null
+    const result = await platform.sandboxResolveWorkingDir({ sessionId })
+    return result.workingDirectory ?? null
+  }
+
   async copyFileIn(content: string, targetFilename: string): Promise<{ success: boolean; error?: string }> {
     if (!platform.sandboxCopyFile) {
       return { success: false, error: 'Sandbox copy not available' }

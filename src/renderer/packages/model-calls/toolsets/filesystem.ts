@@ -4,6 +4,7 @@ import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
+import { remapPhantomHomePath } from './sandbox-paths'
 
 interface FilesystemContext {
   sessionId?: string
@@ -222,6 +223,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input) => {
       const listInput = input as { path: string }
+      listInput.path = remapPhantomHomePath(listInput.path)
       if (await shouldUseSandbox(context, listInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
@@ -265,6 +267,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input) => {
       const searchInput = input as { path: string; query: string; include?: string }
+      searchInput.path = remapPhantomHomePath(searchInput.path)
       if (await shouldUseSandbox(context, searchInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
@@ -311,6 +314,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input, toolOptions) => {
       const writeInput = input as { file_path: string; content: string }
+      writeInput.file_path = remapPhantomHomePath(writeInput.file_path)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       if (await shouldUseSandbox(context, writeInput.file_path)) {
         const result = await writeSandboxFile(context, writeInput.file_path, writeInput.content)
@@ -338,6 +342,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     inputSchema: editFileInputSchema,
     execute: async (input, toolOptions) => {
       const editInput = input as EditFileInput
+      editInput.file_path = remapPhantomHomePath(editInput.file_path)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       const validatedInput = validateEditInput(editInput)
       if ('error' in validatedInput) return { error: validatedInput.error }
@@ -380,8 +385,9 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     },
     description: `
 ## Filesystem
-Use these tools when you need to inspect or modify files.
-- Relative paths are resolved in the session sandbox and can be written or edited without confirmation.
+Use these tools (write_file / edit_file / list_files / search_files) as the primary way to create and modify files — prefer them over writing files through code_execution.
+- Relative paths are resolved in the session sandbox working directory and can be written or edited without confirmation. Prefer relative paths.
+- Do NOT use phantom home paths like /home/user or /root — they do not exist. Use relative paths instead.
 - Absolute paths access the user's real filesystem. Read/list/search only when the user provided or clearly requested the path.
 - Writing or editing an absolute user filesystem path requires user approval. Do not attempt destructive operations; file deletion is not available.
 - Keep tool results small. For large generated outputs, write a file and return a path plus a short summary.

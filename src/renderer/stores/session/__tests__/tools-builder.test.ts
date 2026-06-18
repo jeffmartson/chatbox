@@ -176,6 +176,7 @@ function createMockSandboxProvider(): SandboxProvider {
     exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
     copyFileIn: vi.fn().mockResolvedValue(undefined),
     checkAvailability: vi.fn().mockResolvedValue({ available: true }),
+    resolveWorkingDirectory: vi.fn().mockResolvedValue(null),
     destroy: vi.fn(),
   } as unknown as SandboxProvider
 }

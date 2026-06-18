@@ -1215,7 +1215,7 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
   const isApproval = pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval'
   const title =
     pauseReason?.type === 'tool_call_limit'
-      ? t('Tool execution paused after {{count}} tool calls to avoid an infinite loop.', {
+      ? t('Paused after {{count}} steps. Check whether the task is on track, then continue or stop to adjust.', {
           count: pauseReason.maxToolCalls,
         })
       : pauseReason?.type === 'user_exec_approval'

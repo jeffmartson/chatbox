@@ -4,6 +4,7 @@ import { escapeSingleQuotes } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
+import { remapPhantomHomePath } from './sandbox-paths'
 
 const log = getLogger('toolset:code-execution')
 
@@ -120,8 +121,9 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       'Run short Node.js or Bash code in a sandbox for lightweight file processing, data analysis, ' +
       'calculations, simple HTML/SVG/Canvas chart generation, and file conversion. Prefer Node.js built-ins ' +
       'and shell tools. Avoid installing packages or creating projects unless the user explicitly asks for ' +
-      'that and the task cannot be completed with the available runtime. Generated files can be made ' +
-      'downloadable via create_download.',
+      'that and the task cannot be completed with the available runtime. To create or modify files, prefer ' +
+      'the write_file/edit_file tools rather than writing through code here. Use relative paths (they resolve ' +
+      'to the working directory); do not use /home/user. Generated files can be made downloadable via create_download.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -200,6 +202,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
     }),
     execute: async (input) => {
       const readInput = input as { file_path: string; offset?: number; limit?: number }
+      readInput.file_path = remapPhantomHomePath(readInput.file_path)
       if (isAbsolutePath(readInput.file_path)) {
         const status = await provider.getStatus().catch(() => null)
         const sandboxRoot = status?.workingDirectory
@@ -305,6 +308,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
     }),
     execute: async (input) => {
       const downloadInput = input as { file_path: string; display_name: string }
+      downloadInput.file_path = remapPhantomHomePath(downloadInput.file_path)
       // Verify the file exists and resolve to absolute path (so download survives app restart)
       const escapedPath = escapeSingleQuotes(downloadInput.file_path)
       const checkResult = await provider.exec({

@@ -178,6 +178,8 @@ export interface Platform extends Storage {
   sandboxStatus?(params?: {
     sessionId?: string
   }): Promise<{ state: string; workingDirectory?: string | null; platform?: string }>
+  /** Resolve a session's sandbox working directory without initializing the sandbox. */
+  sandboxResolveWorkingDir?(params: { sessionId: string }): Promise<{ workingDirectory: string | null }>
   sandboxCheckAvailability?(): Promise<{ available: boolean; reason?: string }>
 
   // Sandbox temp dir operations (Desktop only, for code execution)

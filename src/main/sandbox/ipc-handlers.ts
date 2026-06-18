@@ -24,6 +24,7 @@ import {
   readFile,
   removeSessionArtifacts,
   resetSandbox,
+  resolveSandboxWorkingDir,
   writeFile,
 } from './manager'
 import { createSandboxHtmlPreviewUrl } from './preview-server'
@@ -183,6 +184,10 @@ export function registerSandboxIPCHandlers() {
 
   ipcMain.handle('sandbox:status', (_event, params?: { sessionId?: string }) => {
     return getStatus(params?.sessionId)
+  })
+
+  ipcMain.handle('sandbox:resolve-working-dir', (_event, params: { sessionId: string }) => {
+    return { workingDirectory: resolveSandboxWorkingDir(params.sessionId) }
   })
 
   ipcMain.handle('sandbox:check-availability', async () => {

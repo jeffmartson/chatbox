@@ -353,6 +353,14 @@ export async function execCommand(
       mkdirSync(cacheDir, { recursive: true })
       env.XDG_CACHE_HOME = cacheDir
       env.TMPDIR = env.TMP = env.TEMP = session.workingDirectory
+      // Point HOME at the working directory so `~`, `$HOME`, and os.homedir() resolve there.
+      // Models trained on cloud sandboxes often write to a home dir; this makes those writes
+      // land in the sandbox working dir instead of a non-existent path. Confinement is
+      // unaffected: sandbox-runtime expands `~` in deny rules via the main process's
+      // os.homedir() when wrapWithSandbox bakes the seatbelt policy (before spawn), so the
+      // child's overridden HOME only affects that child shell's own `~` expansion, never the
+      // deny-read/write rules (e.g. ~/.ssh stays denied at the real home path).
+      env.HOME = session.workingDirectory
     }
 
     const child = spawn(wrappedCommand, {
@@ -799,6 +807,19 @@ export async function initSandboxWithTempDir(
     log.error('initSandboxWithTempDir failed:', msg)
     return { success: false, error: msg }
   }
+}
+
+/**
+ * Compute the deterministic working directory for a session's temp sandbox without
+ * creating it or initializing the sandbox. Mirrors the tempBase path used by
+ * initSandboxWithTempDir, so callers can tell the model its working directory before the
+ * sandbox lazily initializes on first tool call. Returns null for invalid session ids.
+ */
+export function resolveSandboxWorkingDir(sessionId: string): string | null {
+  if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
+    return null
+  }
+  return path.join(getSandboxTmpRoot(), sessionId)
 }
 
 /**

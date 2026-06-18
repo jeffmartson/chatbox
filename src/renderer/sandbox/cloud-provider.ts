@@ -21,6 +21,10 @@ export class CloudSandboxProvider implements SandboxProvider {
     return { initialized: false }
   }
 
+  async resolveWorkingDirectory(_sessionId: string): Promise<string | null> {
+    return null
+  }
+
   async copyFileIn(_content: string, _targetFilename: string): Promise<{ success: boolean; error?: string }> {
     return { success: false, error: 'Cloud sandbox not yet implemented' }
   }

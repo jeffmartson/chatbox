@@ -433,6 +433,10 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:status', params)
   }
 
+  public async sandboxResolveWorkingDir(params: { sessionId: string }) {
+    return this.ipc.invoke('sandbox:resolve-working-dir', params)
+  }
+
   public async sandboxCheckAvailability() {
     return this.ipc.invoke('sandbox:check-availability')
   }

@@ -23,6 +23,13 @@ export interface SandboxProvider {
   /** Get current sandbox status */
   getStatus(): Promise<{ initialized: boolean; sessionId?: string; workingDirectory?: string | null }>
 
+  /**
+   * Resolve the working directory for a session without initializing the sandbox.
+   * Used to tell the model its working directory before the sandbox lazily initializes.
+   * Returns null when unknown (e.g. cloud sandbox).
+   */
+  resolveWorkingDirectory(sessionId: string): Promise<string | null>
+
   /** Copy a file into the sandbox working directory */
   copyFileIn(content: string, targetFilename: string): Promise<{ success: boolean; error?: string }>
 

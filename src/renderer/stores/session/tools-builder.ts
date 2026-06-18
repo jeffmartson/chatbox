@@ -9,6 +9,7 @@ import { buildChatboxCliToolSet } from '@/packages/model-calls/toolsets/chatbox-
 import { buildCodeExecutionTools } from '@/packages/model-calls/toolsets/code-execution'
 import fileToolSet from '@/packages/model-calls/toolsets/file'
 import { buildFilesystemTools } from '@/packages/model-calls/toolsets/filesystem'
+import { remapPhantomHomePath } from '@/packages/model-calls/toolsets/sandbox-paths'
 import { getToolSet as getKBToolSet } from '@/packages/model-calls/toolsets/knowledge-base'
 import { getToolSet as getSessionAttachmentRagToolSet } from '@/packages/model-calls/toolsets/session-attachment-rag'
 import { getToolSetDescription, parseLinkTool, webSearchTool } from '@/packages/model-calls/toolsets/web-search'
@@ -61,6 +62,26 @@ export interface BuildToolsResult {
   instructions: string
   /** When agentMode is 'auto', only these tools are active until load_skill escalates to full mode. */
   initialActiveTools?: string[]
+}
+
+/**
+ * Tell the model where its sandbox working directory is and how to address files there.
+ * Without this, models default to phantom home paths like /home/user (a training-prior
+ * artifact from cloud sandboxes) that do not exist on the desktop host, wasting tool calls
+ * on failed writes. workingDir may be null when the path is not yet known (e.g. cloud).
+ */
+function buildWorkingDirectoryInstruction(workingDir: string | null): string {
+  const dirLine = workingDir
+    ? `Your sandbox working directory is: ${workingDir}`
+    : 'You have a sandbox working directory.'
+  return `
+## Working Directory & File Paths
+${dirLine}
+- Prefer relative paths for file operations — they resolve to the working directory. This is the simplest and most reliable approach.
+- \`~\` and \`$HOME\` also point to the working directory.
+- Do NOT use absolute paths like /home/user or /root — they do not exist here. Write to the working directory instead.
+- To create or modify files, prefer the write_file and edit_file tools over writing through code_execution (echo, heredoc, fs.writeFileSync). The structured tools are more reliable and let the user see what changed.
+`
 }
 
 function buildSkillToolsInstruction(enabledSkills: Array<{ name: string; description: string }>): string {
@@ -188,6 +209,10 @@ In long conversations, earlier tool call results may be automatically compressed
   let codeExecToolSet: ReturnType<typeof buildCodeExecutionTools> | null = null
   if (includeAgentTools && codeExecution) {
     codeExecToolSet = buildCodeExecutionTools(codeExecution)
+    const workingDir = await codeExecution.provider
+      .resolveWorkingDirectory(codeExecution.sessionId)
+      .catch(() => null)
+    instructions += buildWorkingDirectoryInstruction(workingDir)
     instructions += codeExecToolSet.description
   }
 
@@ -340,8 +365,12 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
         return { error: 'Code execution not available. Agent mode with sandbox is required.' }
       }
 
+      // Tolerate phantom home paths (e.g. /home/user/skill) the model may emit; the
+      // installer resolves relative paths against the sandbox working directory.
+      const sandboxPath = remapPhantomHomePath(installInput.sandboxPath)
+
       const result = await skillsController.installFromSandbox(
-        installInput.sandboxPath,
+        sandboxPath,
         options.codeExecution.sessionId,
         installInput.sourceInfo
       )
