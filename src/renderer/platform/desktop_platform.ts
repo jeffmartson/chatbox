@@ -382,6 +382,15 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:exec', params)
   }
 
+  public async sandboxExecCode(params: {
+    code: string
+    language: 'bash' | 'node'
+    timeout?: number
+    sessionId?: string
+  }) {
+    return this.ipc.invoke('sandbox:exec-code', params)
+  }
+
   public async sandboxRead(params: { filePath: string; sessionId?: string }) {
     return this.ipc.invoke('sandbox:read', params)
   }

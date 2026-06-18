@@ -135,6 +135,13 @@ export interface Platform extends Storage {
     timeout?: number
     sessionId?: string
   }): Promise<{ stdout: string; stderr: string; exitCode: number }>
+  // Native code execution (Windows): runs code without an OS sandbox.
+  sandboxExecCode?(params: {
+    code: string
+    language: 'bash' | 'node'
+    timeout?: number
+    sessionId?: string
+  }): Promise<{ stdout: string; stderr: string; exitCode: number }>
   sandboxRead?(params: {
     filePath: string
     sessionId?: string

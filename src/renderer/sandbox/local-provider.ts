@@ -90,11 +90,23 @@ export class LocalSandboxProvider implements SandboxProvider {
   }
 
   async exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
+    const timeout = params.timeout ?? DEFAULT_EXEC_TIMEOUT
+
+    // Native Windows has no POSIX shell and the SRT sandbox does not run there, so route the
+    // raw code to the native executor (no OS isolation — see docs/technical/windows-sandbox.md)
+    // instead of building a bash/base64 command for the SRT path.
+    if (isWindowsRenderer() && platform.sandboxExecCode) {
+      return platform.sandboxExecCode({
+        code: params.code,
+        language: params.language,
+        timeout,
+        sessionId: this.sessionId ?? undefined,
+      })
+    }
+
     if (!platform.sandboxExec) {
       return { stdout: '', stderr: 'Sandbox not available on this platform', exitCode: 1 }
     }
-
-    const timeout = params.timeout ?? DEFAULT_EXEC_TIMEOUT
 
     // For multi-line code or code with special characters, use base64 encoding
     // to avoid all shell escaping issues
@@ -119,6 +131,11 @@ export class LocalSandboxProvider implements SandboxProvider {
     }
     return platform.sandboxCheckAvailability()
   }
+}
+
+// Mirrors getOS() === 'Windows' without importing navigator.ts (keeps this hot path light).
+function isWindowsRenderer(): boolean {
+  return typeof navigator !== 'undefined' && (navigator.userAgent ?? '').includes('Windows')
 }
 
 async function getNodeCommand(): Promise<string> {

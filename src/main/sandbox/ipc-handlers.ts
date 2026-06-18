@@ -8,6 +8,7 @@ import {
   copyBlobToSandbox,
   copyFileToSandbox,
   editFile,
+  execCode,
   execCommand,
   exportFileFromSandbox,
   findFiles,
@@ -56,6 +57,22 @@ export function registerSandboxIPCHandlers() {
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error)
         log.error('sandbox:exec failed', msg)
+        return { stdout: '', stderr: msg, exitCode: 1 }
+      }
+    }
+  )
+
+  // Native code execution path (Windows): runs code without an OS sandbox. The renderer
+  // routes here on Windows instead of building a POSIX bash command for sandbox:exec.
+  ipcMain.handle(
+    'sandbox:exec-code',
+    async (_event, params: { code: string; language: 'bash' | 'node'; timeout?: number; sessionId?: string }) => {
+      try {
+        log.debug(`sandbox:exec-code language=${params.language} bytes=${params.code.length}`)
+        return await execCode(params)
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        log.error('sandbox:exec-code failed', msg)
         return { stdout: '', stderr: msg, exitCode: 1 }
       }
     }
@@ -229,19 +246,9 @@ export function registerSandboxIPCHandlers() {
     }
   })
 
+  // macOS/Linux only: the bash code-execution wrapper runs node via this command inside the
+  // SRT sandbox. Windows uses native execCode (sandbox:exec-code) and never calls this.
   ipcMain.handle('sandbox:node-command', () => {
-    // On Windows, sandbox commands run inside WSL (Linux). The Windows Electron
-    // binary cannot execute in the Linux sandbox, and reaching it via WSL interop
-    // would also escape the sandbox. Use WSL's own node instead — if it is not
-    // installed the user gets a clear "node: command not found" error.
-    //
-    // The renderer embeds this value into a bash function literally named `node`
-    // (buildNodeShellFunction). A bare `node` would resolve back to that function
-    // and recurse forever; `command` bypasses function lookup and runs the PATH
-    // binary. (POSIX is unaffected: it returns an absolute path, not `node`.)
-    if (process.platform === 'win32') {
-      return 'command node'
-    }
     const executable = shellQuote(process.execPath)
     return process.versions.electron ? `ELECTRON_RUN_AS_NODE=1 ${executable}` : executable
   })

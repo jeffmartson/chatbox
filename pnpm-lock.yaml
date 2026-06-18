@@ -811,8 +811,8 @@ importers:
   release/app:
     dependencies:
       '@anthropic-ai/sandbox-runtime':
-        specifier: ^0.0.34
-        version: 0.0.34
+        specifier: ^0.0.54
+        version: 0.0.54
       '@libsql/client':
         specifier: ^0.15.6
         version: 0.15.15
@@ -1011,8 +1011,8 @@ packages:
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
-  '@anthropic-ai/sandbox-runtime@0.0.34':
-    resolution: {integrity: sha512-kdzOfa1X7gB1bmkLsdMQYAE+YpvE6LO7ZjYu4HhCvxyUQl0cvU+B806QW7yp5c/m6swZuiboogtHKAfXRRTRYA==}
+  '@anthropic-ai/sandbox-runtime@0.0.54':
+    resolution: {integrity: sha512-zszEoq/z02SgJLlPFcoegqz2UonYbn3Gi//Hwza6KdUolg9HeGw/mPuO7Ybp4EzgLxG6ifA4KOrozErYKJuFag==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -5760,9 +5760,6 @@ packages:
   '@types/linkify-it@5.0.0':
     resolution: {integrity: sha512-sVDA58zAw4eWAffKOaQH5/5j3XeayukzDk+ewSsnv3p4yJEZHCCzMDiZM8e0OUrRvmpGZ85jf4yDHkHsgBNr9Q==}
 
-  '@types/lodash-es@4.17.12':
-    resolution: {integrity: sha512-0NgftHUcV4v34VhXm8QBSftKVXtbkBG3ViCjs6+eJ5a6y6Mi/jiFGPc1sC7QK+9BFhWrURE3EOggmWaSxL9OzQ==}
-
   '@types/lodash@4.17.23':
     resolution: {integrity: sha512-RDvF6wTulMPjrNdCoYRC8gNR880JNGT8uB+REUpC2Ns4pRqQJhGz90wh7rgdXDPpCczF3VGktDuFGVnz8zP7HA==}
 
@@ -10496,6 +10493,10 @@ packages:
     resolution: {integrity: sha512-rLvcdSyRCyouf6jcOIPe/BgwG/d7hKjzMKOas33/pHEr6gbq18IK9zV7DiPvzsz0oBJPme6qr6H6kGZuI9/DZg==}
     engines: {node: '>= 6.13.0'}
 
+  node-forge@1.4.0:
+    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+    engines: {node: '>= 6.13.0'}
+
   node-gyp@11.5.0:
     resolution: {integrity: sha512-ra7Kvlhxn5V9Slyus0ygMa2h+UqExPqUIkfk7Pc8QTLT956JLSy51uWFwHtIYy0vI8cB4BDhc/S03+880My/LQ==}
     engines: {node: ^18.17.0 || >=20.5.0}
@@ -12306,6 +12307,10 @@ packages:
 
   shell-quote@1.8.3:
     resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
+    engines: {node: '>= 0.4'}
+
+  shell-quote@1.8.4:
+    resolution: {integrity: sha512-VsC6n6vz1ihYYyZZwX7YZSF5l5x36ca17OC+a69h94YqB7X6XLwf+5MOgynYir2SLFUbl8gIYvBo8K8RoNQ6bQ==}
     engines: {node: '>= 0.4'}
 
   shiki-stream@0.1.4:
@@ -14174,13 +14179,12 @@ snapshots:
       package-manager-detector: 1.6.0
       tinyexec: 1.0.2
 
-  '@anthropic-ai/sandbox-runtime@0.0.34':
+  '@anthropic-ai/sandbox-runtime@0.0.54':
     dependencies:
       '@pondwader/socks5-server': 1.0.10
-      '@types/lodash-es': 4.17.12
       commander: 12.1.0
-      lodash-es: 4.17.23
-      shell-quote: 1.8.3
+      node-forge: 1.4.0
+      shell-quote: 1.8.4
       zod: 3.25.76
 
   '@apidevtools/json-schema-ref-parser@11.9.3':
@@ -20187,10 +20191,6 @@ snapshots:
 
   '@types/linkify-it@5.0.0': {}
 
-  '@types/lodash-es@4.17.12':
-    dependencies:
-      '@types/lodash': 4.17.23
-
   '@types/lodash@4.17.23': {}
 
   '@types/mark.js@8.11.12':
@@ -25851,6 +25851,8 @@ snapshots:
 
   node-forge@1.3.3: {}
 
+  node-forge@1.4.0: {}
+
   node-gyp@11.5.0:
     dependencies:
       env-paths: 2.2.1
@@ -27911,6 +27913,8 @@ snapshots:
       strip-ansi: 7.1.2
 
   shell-quote@1.8.3: {}
+
+  shell-quote@1.8.4: {}
 
   shiki-stream@0.1.4(react@18.3.1):
     dependencies:

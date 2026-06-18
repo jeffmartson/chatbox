@@ -22,6 +22,7 @@
 | [Agent Skills 技术设计](./agent-skills.md) | Skills 发现/解析、IPC 通道、上下文注入与会话级配置 |
 | [Chat 代码执行](./code-execution.md) | Agent Mode、Code Execution 工具集、SandboxProvider 抽象、会话隔离 |
 | [Task 模式](./task-mode.md) | 沙箱管理、IPC 通道、7 个 AI 工具、TaskSession 数据层、路由架构 |
+| [Windows 原生代码执行](./windows-sandbox.md) | Windows 代码执行根因分析、SRT/Codex 方案对比、当前最小原生支持（放弃隔离）与未来强隔离演进 |
 | [状态管理](./state-management.md) | 三层状态体系（Jotai/Zustand/React Query）、协作关系 |
 | [构建与部署](./build-and-deployment.md) | 构建工具链、依赖管理、签名打包、CI/CD |
 | [自动更新系统](./auto-updater.md) | electron-updater 机制、状态管理、Feed URL Fallback、本地测试方法 |

@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import {
@@ -92,25 +92,39 @@ function safeRealpathSync(p: string): string {
   }
 }
 
-function toWSLPath(winPath: string): string {
-  const normalized = winPath.replace(/\\/g, '/')
-  const match = normalized.match(/^([A-Za-z]):\/(.*)$/)
-  if (match) {
-    return `/mnt/${match[1].toLowerCase()}/${match[2]}`
+/** True if `cmd` resolves on PATH (Windows `where`). Used only on win32. */
+function which(cmd: string): boolean {
+  try {
+    return spawnSync('where', [cmd], { stdio: 'ignore' }).status === 0
+  } catch {
+    return false
   }
-  return normalized
 }
 
 /**
- * Sandbox shell commands run inside WSL (Linux) on Windows, so a Windows-absolute
- * path passed to a bash command (cat/ls/grep/find …) must be rewritten to its WSL
- * mount form. No-op on POSIX platforms and for relative paths.
+ * Resolve a POSIX shell for the `bash` code-execution language on native Windows.
+ * Native Windows has no bash, so we use any `bash` on PATH (Git Bash / MSYS) and
+ * fall back to WSL's bash. The script is fed via stdin, so the shell's path format
+ * (C:\ vs /mnt/c) never matters. Returns null when none is available.
  */
-export function toSandboxShellPath(p: string): string {
-  if (process.platform === 'win32' && /^[A-Za-z]:[\\/]/.test(p)) {
-    return toWSLPath(p)
-  }
-  return p
+export function resolveWindowsBash(): { cmd: string; args: string[] } | null {
+  if (which('bash')) return { cmd: 'bash', args: [] }
+  if (which('wsl')) return { cmd: 'wsl', args: ['bash'] }
+  return null
+}
+
+/**
+ * On Windows, bash (Git Bash / WSL / Cygwin) reports POSIX-style paths from `realpath`
+ * (`/c/...`, `/mnt/c/...`, `/cygdrive/c/...`). Convert them back to native Windows form so
+ * artifact validation against Windows roots works (e.g. create_download). No-op for paths
+ * already in Windows form, for relative paths, and on non-Windows platforms.
+ */
+export function normalizeWindowsShellPath(p: string): string {
+  if (process.platform !== 'win32') return p
+  const m = p.match(/^\/(?:mnt\/|cygdrive\/)?([a-zA-Z])(\/.*)?$/)
+  if (!m) return p
+  const rest = (m[2] ?? '').replace(/\//g, '\\')
+  return `${m[1].toUpperCase()}:${rest || '\\'}`
 }
 
 /**
@@ -147,11 +161,10 @@ export function killProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKIL
 function buildConfig(workDir: string): Omit<SandboxRuntimeConfig, 'network'> & {
   network: Omit<SandboxRuntimeConfig['network'], 'allowedDomains'>
 } {
+  // buildConfig is only used by the macOS/Linux SRT path; Windows skips SRT (see initSandbox).
   const isMacOS = process.platform === 'darwin'
-  const isWindows = process.platform === 'win32'
-  const resolvedDir = isWindows ? toWSLPath(workDir) : workDir
-  const tempWritePaths = isWindows ? [] : [tmpdir(), '/tmp'].flatMap((p) => [p, safeRealpathSync(p)])
-  const allowWrite = [...new Set([resolvedDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths])]
+  const tempWritePaths = [tmpdir(), '/tmp'].flatMap((p) => [p, safeRealpathSync(p)])
+  const allowWrite = [...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths])]
 
   // WARN: `allowedDomains: ['*']` is NOT a wildcard — it's a literal match.
   // Omit `allowedDomains` so wrapWithSandbox generates `(allow network*)`.
@@ -269,6 +282,16 @@ export async function initSandbox(workDir: string, sessionId?: string): Promise<
     session = getOrCreateSession(sessionId)
   }
 
+  // Native Windows path: @anthropic-ai/sandbox-runtime only runs on macOS/Linux. On Windows
+  // we execute code natively with NO OS sandbox (see docs/technical/windows-sandbox.md), so
+  // skip SRT entirely and just record the working directory.
+  if (process.platform === 'win32') {
+    session.workingDirectory = workDir
+    session.state = 'initialized'
+    log.info(`Sandbox session ${sessionId || DEFAULT_SESSION} initialized (native Windows, no OS isolation)`)
+    return { success: true }
+  }
+
   try {
     // Initialize the global SandboxManager once (shared across sessions).
     // Per-session config is passed via customConfig to wrapWithSandbox().
@@ -328,10 +351,8 @@ export async function execCommand(
     if (session.workingDirectory) {
       const cacheDir = path.join(session.workingDirectory, '.cache')
       mkdirSync(cacheDir, { recursive: true })
-      // The command runs inside WSL on Windows, so these env vars must be WSL paths
-      // (the dir is still created on the Windows fs above, which WSL sees at /mnt/...).
-      env.XDG_CACHE_HOME = toSandboxShellPath(cacheDir)
-      env.TMPDIR = env.TMP = env.TEMP = toSandboxShellPath(session.workingDirectory)
+      env.XDG_CACHE_HOME = cacheDir
+      env.TMPDIR = env.TMP = env.TEMP = session.workingDirectory
     }
 
     const child = spawn(wrappedCommand, {
@@ -404,6 +425,117 @@ export async function execCommand(
   })
 }
 
+/**
+ * Execute code natively on Windows — NO OS sandbox (see docs/technical/windows-sandbox.md).
+ *
+ * The sandbox-runtime only runs on macOS/Linux, so on Windows we run the user's code
+ * directly with the session working directory as cwd. `node` uses the bundled Electron
+ * binary via ELECTRON_RUN_AS_NODE; `bash` uses any bash on PATH (Git Bash) or WSL. The
+ * program is fed via stdin, so there is no shell escaping or path translation. There is
+ * no filesystem/network confinement on this path.
+ */
+export async function execCode(params: {
+  code: string
+  language: 'bash' | 'node'
+  timeout?: number
+  sessionId?: string
+}): Promise<ExecResult> {
+  // SECURITY: this path runs code with NO sandbox. It must never be reachable off Windows,
+  // where it would let a renderer bypass the SRT confinement that execCommand applies. The
+  // renderer-side OS check is convenience only; this is the authoritative boundary.
+  if (process.platform !== 'win32') {
+    throw new Error('execCode is only available on native Windows; other platforms use the sandboxed exec path.')
+  }
+  const session = getSession(params.sessionId)
+  if (!session || session.state !== 'initialized') {
+    throw new Error('Sandbox not initialized. Call initSandbox first.')
+  }
+  const cwd = session.workingDirectory ?? undefined
+  const timeout = params.timeout ?? 30_000
+
+  const env = { ...process.env }
+  if (session.workingDirectory) {
+    env.TMPDIR = env.TMP = env.TEMP = session.workingDirectory
+  }
+
+  let cmd: string
+  let args: string[]
+  if (params.language === 'node') {
+    // The Electron binary acts as Node with ELECTRON_RUN_AS_NODE; with no script arg and
+    // piped (non-TTY) stdin it executes the piped program.
+    cmd = process.execPath
+    args = []
+    env.ELECTRON_RUN_AS_NODE = '1'
+  } else {
+    const bash = resolveWindowsBash()
+    if (!bash) {
+      return {
+        stdout: '',
+        stderr: 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.',
+        exitCode: 127,
+      }
+    }
+    cmd = bash.cmd
+    args = bash.args
+  }
+
+  const MAX_BUFFER_BYTES = 10 * 1024 * 1024
+  return new Promise((resolve, reject) => {
+    const stdoutChunks: Uint8Array[] = []
+    const stderrChunks: Uint8Array[] = []
+    let stdoutBytes = 0
+    let stderrBytes = 0
+    let stdoutCapped = false
+    let stderrCapped = false
+
+    const child = spawn(cmd, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false })
+    session.runningChild = child
+
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      killProcessTree(child, 'SIGTERM')
+      setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
+    }, timeout)
+
+    child.stdout.on('data', (chunk: Uint8Array) => {
+      if (!stdoutCapped) {
+        stdoutBytes += chunk.byteLength
+        if (stdoutBytes > MAX_BUFFER_BYTES) stdoutCapped = true
+        else stdoutChunks.push(chunk)
+      }
+    })
+    child.stderr.on('data', (chunk: Uint8Array) => {
+      if (!stderrCapped) {
+        stderrBytes += chunk.byteLength
+        if (stderrBytes > MAX_BUFFER_BYTES) stderrCapped = true
+        else stderrChunks.push(chunk)
+      }
+    })
+    child.on('error', (err) => {
+      clearTimeout(timer)
+      session.runningChild = null
+      reject(err)
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      session.runningChild = null
+      let stdout = tailTruncate(Buffer.concat(stdoutChunks).toString('utf-8'))
+      let stderr = tailTruncate(Buffer.concat(stderrChunks).toString('utf-8'))
+      const exitCode = timedOut ? 124 : (code ?? 1)
+      if (stdoutCapped) stdout += `\n[Output truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
+      if (stderrCapped) stderr += `\n[Stderr truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
+      if (timedOut) stderr += `\n[Process timed out after ${timeout}ms]`
+      resolve({ stdout, stderr, exitCode })
+    })
+
+    // Feed the program via stdin: node executes the piped script; bash runs the piped commands.
+    child.stdin.on('error', () => {})
+    child.stdin.write(params.code)
+    child.stdin.end()
+  })
+}
+
 export function killRunningCommand(sessionId?: string): { killed: boolean } {
   const session = getSession(sessionId)
   if (!session) return { killed: false }
@@ -424,7 +556,7 @@ export async function readFile(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`cat ${shellEscape(toSandboxShellPath(filePath))}`, { sessionId })
+    const result = await execCommand(`cat ${shellEscape(filePath)}`, { sessionId })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -513,7 +645,7 @@ export async function listDir(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`ls -la ${shellEscape(toSandboxShellPath(dirPath))}`, { sessionId })
+    const result = await execCommand(`ls -la ${shellEscape(dirPath)}`, { sessionId })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -530,7 +662,7 @@ export async function grepFiles(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const target = dirPath ? shellEscape(toSandboxShellPath(dirPath)) : '.'
+    const target = dirPath ? shellEscape(dirPath) : '.'
     const includeFlag = options?.include ? `--include=${shellEscape(options.include)}` : ''
     const result = await execCommand(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, { sessionId })
     // grep returns exit code 1 when no matches found — not an error
@@ -550,9 +682,7 @@ export async function findFiles(
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const nameFlag = pattern ? `-name ${shellEscape(pattern)}` : ''
-    const result = await execCommand(`find ${shellEscape(toSandboxShellPath(dirPath))} ${nameFlag} -type f`, {
-      sessionId,
-    })
+    const result = await execCommand(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, { sessionId })
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -633,21 +763,10 @@ export async function checkAvailability(): Promise<{ available: boolean; reason?
   }
 
   if (process.platform === 'win32') {
-    try {
-      const result = await new Promise<{ stdout: string; exitCode: number }>((resolve, reject) => {
-        const child = spawn('wsl', ['--status'], { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-        const chunks: Uint8Array[] = []
-        child.stdout.on('data', (c: Uint8Array) => chunks.push(c))
-        child.on('error', reject)
-        child.on('close', (code) => resolve({ stdout: Buffer.concat(chunks).toString('utf-8'), exitCode: code ?? 1 }))
-      })
-      if (result.exitCode === 0) {
-        return { available: true }
-      }
-      return { available: false, reason: 'wsl2_required' }
-    } catch {
-      return { available: false, reason: 'wsl2_required' }
-    }
+    // Native Windows runs code without an OS sandbox (see docs/technical/windows-sandbox.md).
+    // The bundled Node runtime is always present, so `node` is available; the `bash` language
+    // additionally needs Git Bash or WSL on PATH, which execCode checks at call time.
+    return { available: true }
   }
 
   return { available: false, reason: `Unsupported platform: ${process.platform}` }
@@ -870,6 +989,9 @@ export async function persistSandboxArtifact(
   if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
     return { success: false, error: 'Invalid session ID' }
   }
+  // On Windows the path may arrive in bash/POSIX form (e.g. /c/... from Git Bash realpath);
+  // normalize to native Windows form before absolute/root validation.
+  sandboxPath = normalizeWindowsShellPath(sandboxPath)
   if (!path.isAbsolute(sandboxPath)) {
     return { success: false, error: 'Artifact path must be absolute' }
   }

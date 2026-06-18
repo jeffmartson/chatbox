@@ -4,12 +4,14 @@ vi.mock('electron', () => ({ app: { isPackaged: false } }))
 vi.mock('../util', () => ({
   getLogger: () => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
+vi.mock('node:child_process', () => ({ spawn: vi.fn(), spawnSync: vi.fn() }))
 
-import { shellEscape, toSandboxShellPath } from './manager'
+import { spawnSync } from 'node:child_process'
+import { normalizeWindowsShellPath, resolveWindowsBash, shellEscape } from './manager'
 
 const originalPlatform = process.platform
-function setPlatform(platform: NodeJS.Platform) {
-  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+function setPlatform(p: NodeJS.Platform) {
+  Object.defineProperty(process, 'platform', { value: p, configurable: true })
 }
 
 describe('shellEscape', () => {
@@ -59,26 +61,48 @@ describe('shellEscape', () => {
   })
 })
 
-describe('toSandboxShellPath', () => {
-  afterEach(() => {
-    setPlatform(originalPlatform)
+describe('resolveWindowsBash', () => {
+  const mockWhich = (present: string[]) => {
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((_cmd: string, args: string[]) => ({
+      status: present.includes(args[0]) ? 0 : 1,
+    }))
+  }
+
+  test('prefers bash on PATH', () => {
+    mockWhich(['bash', 'wsl'])
+    expect(resolveWindowsBash()).toEqual({ cmd: 'bash', args: [] })
   })
 
-  test('rewrites a Windows-absolute path to its WSL mount form on win32', () => {
-    setPlatform('win32')
-    expect(toSandboxShellPath('C:\\Users\\alice\\file.txt')).toBe('/mnt/c/Users/alice/file.txt')
-    expect(toSandboxShellPath('D:/data/out.csv')).toBe('/mnt/d/data/out.csv')
+  test('falls back to wsl bash when bash is absent', () => {
+    mockWhich(['wsl'])
+    expect(resolveWindowsBash()).toEqual({ cmd: 'wsl', args: ['bash'] })
   })
 
-  test('leaves relative and POSIX-absolute paths untouched on win32', () => {
+  test('returns null when neither bash nor wsl is available', () => {
+    mockWhich([])
+    expect(resolveWindowsBash()).toBeNull()
+  })
+})
+
+describe('normalizeWindowsShellPath', () => {
+  afterEach(() => setPlatform(originalPlatform))
+
+  test('converts Git Bash, WSL and Cygwin paths to native Windows form on win32', () => {
     setPlatform('win32')
-    expect(toSandboxShellPath('sub/dir/file.txt')).toBe('sub/dir/file.txt')
-    expect(toSandboxShellPath('/tmp/file.txt')).toBe('/tmp/file.txt')
+    expect(normalizeWindowsShellPath('/c/Users/a/out.txt')).toBe('C:\\Users\\a\\out.txt')
+    expect(normalizeWindowsShellPath('/mnt/c/data/x.csv')).toBe('C:\\data\\x.csv')
+    expect(normalizeWindowsShellPath('/cygdrive/d/y')).toBe('D:\\y')
+    expect(normalizeWindowsShellPath('/c')).toBe('C:\\')
+  })
+
+  test('leaves already-Windows and non-drive POSIX paths unchanged on win32', () => {
+    setPlatform('win32')
+    expect(normalizeWindowsShellPath('C:\\foo\\bar')).toBe('C:\\foo\\bar')
+    expect(normalizeWindowsShellPath('/home/alice/x')).toBe('/home/alice/x')
   })
 
   test('is a no-op on POSIX platforms', () => {
     setPlatform('linux')
-    expect(toSandboxShellPath('C:\\Users\\alice')).toBe('C:\\Users\\alice')
-    expect(toSandboxShellPath('/home/alice/file.txt')).toBe('/home/alice/file.txt')
+    expect(normalizeWindowsShellPath('/c/x')).toBe('/c/x')
   })
 })
