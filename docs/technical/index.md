@@ -12,6 +12,7 @@
 |------|------|
 | [跨平台架构](./architecture.md) | 应用整体架构、平台抽象层、进程模型、模块划分 |
 | [AI 供应商系统](./ai-providers.md) | 模型供应商注册表、OAuth 登录集成、模型类层级、能力声明、自建供应商 |
+| [思考控制（Reasoning Control）](./reasoning-control.md) | 思考控制支持条件判定（provider + 写死 model id）、effectiveProvider/apiStyle 映射、参数流转与请求侧兜底 |
 | [会话管理系统](./session-management.md) | 数据模型、模块拆分、新会话机制、线程历史、消息分叉 |
 | [存储架构](./storage.md) | 混合存储策略、跨平台方案、版本迁移历史 |
 | [Token 估算系统](./token-estimation.md) | 异步队列架构、优先级调度、Real Context 一致性 |

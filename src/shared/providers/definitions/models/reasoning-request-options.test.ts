@@ -30,6 +30,10 @@ type ClaudeFetchHarness = {
   createFetch(): typeof globalThis.fetch | undefined
 }
 
+type ResolveCallSettingsHarness = {
+  resolveCallSettings(options: CallChatCompletionOptions): { providerOptions?: unknown }
+}
+
 function createDependencies(): ModelDependencies {
   return {
     request: {
@@ -58,6 +62,24 @@ const reasoningModel = (modelId: string): ProviderModelInfo => ({
   modelId,
   type: 'chat',
   capabilities: ['reasoning'],
+})
+
+// A Qwen model id that is NOT in the hard-coded reasoning list (does not match /^qwen3/),
+// so reasoning control reports it as unsupported regardless of capability metadata.
+const nonReasoningQwenModel = (modelId: string): ProviderModelInfo => ({
+  modelId,
+  type: 'chat',
+  capabilities: ['reasoning'], // capability flag is intentionally unreliable; the gate must ignore it
+  providerId: 'qwen',
+})
+
+// A Qwen model id that IS in the hard-coded reasoning list (matches /^qwen3/), so reasoning
+// control reports it as supported even though the registry metadata lacks the flag.
+const supportedQwenModel = (modelId: string): ProviderModelInfo => ({
+  modelId,
+  type: 'chat',
+  capabilities: [], // no 'reasoning' flag, yet reasoning control supports it by provider + id
+  providerId: 'qwen',
 })
 
 describe('reasoning request options', () => {
@@ -249,6 +271,98 @@ describe('reasoning request options', () => {
     )
 
     const settings = qwen.exposeCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 8192,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: {
+        enable_thinking: true,
+        thinking_budget: 8192,
+      },
+      Qwen: {
+        enable_thinking: true,
+        thinking_budget: 8192,
+      },
+    })
+  })
+
+  it('strips reasoning provider options when reasoning control does not support the model', () => {
+    // qwen-max is not in the hard-coded reasoning list, even though the model carries a
+    // (stale/unreliable) 'reasoning' capability flag. The gate must rely on provider + id.
+    const qwen = new TestQwen(
+      {
+        name: 'Qwen',
+        apiKey: 'test-key',
+        apiHost: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        model: nonReasoningQwenModel('qwen-max'),
+      },
+      createDependencies()
+    )
+
+    const settings = (qwen as unknown as ResolveCallSettingsHarness).resolveCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 8192,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toBeUndefined()
+  })
+
+  it('keeps reasoning provider options for models supported by provider + model-id', () => {
+    // qwen3.7-max matches the hard-coded reasoning list despite lacking the capability flag.
+    const qwen = new TestQwen(
+      {
+        name: 'Qwen',
+        apiKey: 'test-key',
+        apiHost: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        model: supportedQwenModel('qwen3.7-max'),
+      },
+      createDependencies()
+    )
+
+    const settings = (qwen as unknown as ResolveCallSettingsHarness).resolveCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 8192,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: {
+        enable_thinking: true,
+        thinking_budget: 8192,
+      },
+      Qwen: {
+        enable_thinking: true,
+        thinking_budget: 8192,
+      },
+    })
+  })
+
+  it('leaves reasoning provider options untouched when the provider id is unknown', () => {
+    // Defensive default: without a provider id we cannot positively classify support,
+    // so options must pass through unchanged.
+    const qwen = new TestQwen(
+      {
+        name: 'Qwen',
+        apiKey: 'test-key',
+        apiHost: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        model: { modelId: 'qwen-max', type: 'chat' },
+      },
+      createDependencies()
+    )
+
+    const settings = (qwen as unknown as ResolveCallSettingsHarness).resolveCallSettings({
       providerOptions: {
         openaiCompatible: {
           enable_thinking: true,

@@ -33,6 +33,10 @@ export const DEFAULT_DOCUMENT_PARSER_CONFIG: DocumentParserConfig = {
 
 export const ProviderModelInfoSchema = z.object({
   modelId: z.string(),
+  // The provider id this model was resolved under (e.g. 'chatbox-ai', 'qwen').
+  // Stamped at model-resolution time (getModel); not part of persisted model lists.
+  // Used to evaluate reasoning-control support with the same provider+model-id logic as the UI.
+  providerId: z.string().optional().catch(undefined),
   type: z.enum(['chat', 'embedding', 'rerank', 'image']).optional().catch(undefined),
   apiStyle: z.enum(['google', 'openai', 'openai-responses', 'anthropic']).optional().catch(undefined),
   nickname: z.string().optional().catch(undefined),

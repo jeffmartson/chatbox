@@ -127,12 +127,33 @@ function getEffectiveProvider(
   return ModelProviderEnum.OpenAI
 }
 
+// All built-in provider ids. Any id outside this set is a user-created custom provider,
+// whose reasoning support must be judged by its API style (provider type) + model id.
+const BUILTIN_PROVIDER_IDS = new Set<string>(Object.values(ModelProviderEnum))
+
+function isCustomProviderId(provider: ModelProvider | undefined): boolean {
+  return !!provider && !BUILTIN_PROVIDER_IDS.has(provider)
+}
+
 function usesModelApiStyleForReasoning(provider: ModelProvider | undefined): boolean {
-  return provider === ModelProviderEnum.ChatboxAI || provider === ModelProviderEnum.Custom
+  // ChatboxAI proxies many backend models, and custom providers wrap an upstream API,
+  // so for both we resolve the effective provider from the model's API style rather than
+  // the provider id itself.
+  return (
+    provider === ModelProviderEnum.ChatboxAI ||
+    provider === ModelProviderEnum.Custom ||
+    isCustomProviderId(provider)
+  )
 }
 
 function isOpenAICompatibleApiStyle(provider: ModelProvider | undefined, model: ProviderModelInfo): boolean {
-  return provider === ModelProviderEnum.ChatboxAI && (!model.apiStyle || model.apiStyle === 'openai')
+  // ChatboxAI and custom providers can both expose OpenAI-compatible endpoints; treat a
+  // missing/`openai` API style as OpenAI-compatible so model-id based detection (e.g. DeepSeek)
+  // works the same way for both.
+  return (
+    (provider === ModelProviderEnum.ChatboxAI || isCustomProviderId(provider)) &&
+    (!model.apiStyle || model.apiStyle === 'openai')
+  )
 }
 
 export function getReasoningControlCapabilities(
@@ -469,5 +490,38 @@ function compactProviderOptions(options: ProviderOptions): ProviderOptions | und
   if (!next.deepseek) delete next.deepseek
   if (!next.openaiCompatible) delete next.openaiCompatible
   if (!next.openrouter) delete next.openrouter
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
+// Provider option namespaces that exclusively carry reasoning/thinking configuration.
+// Keep this in sync with ProviderOptionsSchema in shared/types/settings.ts.
+const REASONING_PROVIDER_OPTION_KEYS = [
+  'claude',
+  'openai',
+  'google',
+  'deepseek',
+  'openaiCompatible',
+  'openrouter',
+] as const satisfies readonly (keyof ProviderOptions)[]
+
+/**
+ * Removes reasoning/thinking provider options so they are never sent to a model
+ * that does not support reasoning control. This guards against stale options
+ * persisted on a session (e.g. set on a reasoning-capable model, then carried
+ * over after switching to a model without reasoning support).
+ */
+export function stripReasoningProviderOptions(
+  providerOptions: ProviderOptions | undefined
+): ProviderOptions | undefined {
+  if (!providerOptions) return providerOptions
+  const next: ProviderOptions = { ...providerOptions }
+  let changed = false
+  for (const key of REASONING_PROVIDER_OPTION_KEYS) {
+    if (next[key] !== undefined) {
+      delete next[key]
+      changed = true
+    }
+  }
+  if (!changed) return providerOptions
   return Object.keys(next).length > 0 ? next : undefined
 }

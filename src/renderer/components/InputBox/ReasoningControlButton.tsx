@@ -92,7 +92,7 @@ export default function ReasoningControlButton({
         </Tooltip>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Label fw={600}>{t('Thinking')}</Menu.Label>
+        <Menu.Label fw={600}>{t('Thinking Effort')}</Menu.Label>
         {options.map((item) => (
           <Menu.Item
             key={item.level}

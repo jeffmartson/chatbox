@@ -31,6 +31,7 @@ import type {
   StreamTextResult,
 } from '../types'
 import type { ModelDependencies } from '../types/adapters'
+import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
 import { ApiError, ChatboxAIAPIError } from './errors'
 import { repairToolCallJson } from './tool-call-json-repair'
 import type {
@@ -193,6 +194,25 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     return {}
   }
 
+  // Resolves call settings while ensuring reasoning provider options are never sent
+  // to a model that does not support reasoning control. Stale options can linger on a
+  // session after switching from a reasoning-capable model, so we strip them at the
+  // request edge using the same provider + hard-coded model-id logic as the UI control
+  // (the generic `reasoning` capability flag is unreliable — some reasoning models, e.g.
+  // qwen3.x, ship without it in their registry metadata). When the provider is unknown we
+  // leave options untouched to avoid stripping anything we cannot positively classify.
+  private resolveCallSettings(options: CallChatCompletionOptions): CallSettings {
+    const providerId = this.options.model.providerId
+    const shouldStrip =
+      !!providerId &&
+      !!options.providerOptions &&
+      !getReasoningControlCapabilities(providerId, this.options.model).supported
+    const sanitizedOptions = shouldStrip
+      ? { ...options, providerOptions: stripReasoningProviderOptions(options.providerOptions) }
+      : options
+    return this.getCallSettings(sanitizedOptions)
+  }
+
   public async chat(messages: ModelMessage[], options: CallChatCompletionOptions): Promise<StreamTextResult> {
     try {
       return await this._callChatCompletion(messages, options)
@@ -230,7 +250,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     options: ChatStreamOptions
   ): AsyncGenerator<ModelStreamPart<T>> {
     let baseModel = this.getChatModel(options)
-    const callSettings = this.getCallSettings(options)
+    const callSettings = this.resolveCallSettings(options)
 
     if (this.options.stream === false) {
       baseModel = wrapLanguageModel({
@@ -802,7 +822,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     options: CallChatCompletionOptions<T>
   ): Promise<StreamTextResult> {
     let baseModel = this.getChatModel(options)
-    const callSettings = this.getCallSettings(options)
+    const callSettings = this.resolveCallSettings(options)
 
     if (this.options.stream === false) {
       baseModel = wrapLanguageModel({

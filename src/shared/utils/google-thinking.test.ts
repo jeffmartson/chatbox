@@ -10,6 +10,7 @@ describe('google-thinking utils', () => {
   it('detects the correct thinking mode for Gemini model families', () => {
     expect(getGoogleThinkingMode('gemini-2.5-flash')).toBe('budget')
     expect(getGoogleThinkingMode('gemini-3-pro-preview')).toBe('level')
+    expect(getGoogleThinkingMode('gemini-3.5-flash')).toBe('level')
     expect(getGoogleThinkingMode('gemini-2.0-flash')).toBe('none')
   })
 
@@ -26,6 +27,7 @@ describe('google-thinking utils', () => {
     expect(getSupportedGoogleThinkingLevels('gemini-3.1-pro-preview')).toEqual(['low', 'medium', 'high'])
     // Flash models: minimal/low/medium/high
     expect(getSupportedGoogleThinkingLevels('gemini-3-flash-preview')).toEqual(['minimal', 'low', 'medium', 'high'])
+    expect(getSupportedGoogleThinkingLevels('gemini-3.5-flash')).toEqual(['minimal', 'low', 'medium', 'high'])
     expect(getSupportedGoogleThinkingLevels('gemini-3.1-flash-lite-preview')).toEqual([
       'minimal',
       'low',

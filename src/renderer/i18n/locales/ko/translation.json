@@ -925,7 +925,7 @@
   "Thinking controls are disabled because this GPT model is not exposed through an OpenAI API style.": "이 GPT 모델은 OpenAI API 스타일을 통해 노출되지 않으므로 사고 제어 기능이 비활성화되었습니다.",
   "Thinking controls are disabled because this Grok model is not exposed through the xAI API style.": "이 Grok 모델은 xAI API 스타일을 통해 노출되지 않으므로 사고 제어 기능이 비활성화되었습니다.",
   "Thinking controls are disabled because this Qwen model is not exposed through the Qwen API style.": "이 Qwen 모델은 Qwen API 스타일을 통해 노출되지 않으므로 사고 제어 기능이 비활성화되었습니다.",
-  "Thinking Effort": "Thinking Effort",
+  "Thinking Effort": "사고 강도",
   "Thinking Effort only works for OpenAI o-series models": "Thinking Effort는 OpenAI o-시리즈 모델에서만 작동합니다",
   "Thinking Level": "Thinking Level",
   "Thinking Level only works for Gemini 3 models": "Thinking Level은 Gemini 3 모델에서만 작동합니다",

@@ -925,7 +925,7 @@
   "Thinking controls are disabled because this GPT model is not exposed through an OpenAI API style.": "Denk-Steuerungen sind deaktiviert, da dieses GPT-Modell nicht über einen OpenAI API-Stil bereitgestellt wird.",
   "Thinking controls are disabled because this Grok model is not exposed through the xAI API style.": "Denk-Steuerungen sind deaktiviert, da dieses Grok-Modell nicht über den xAI API-Stil bereitgestellt wird.",
   "Thinking controls are disabled because this Qwen model is not exposed through the Qwen API style.": "Denk-Steuerungen sind deaktiviert, da dieses Qwen-Modell nicht über den Qwen API-Stil bereitgestellt wird.",
-  "Thinking Effort": "Thinking Effort",
+  "Thinking Effort": "Denkaufwand",
   "Thinking Effort only works for OpenAI o-series models": "Thinking Effort funktioniert nur mit OpenAI o-Serien Modellen",
   "Thinking Level": "Thinking Level",
   "Thinking Level only works for Gemini 3 models": "Thinking Level funktioniert nur mit Gemini 3 Modellen",

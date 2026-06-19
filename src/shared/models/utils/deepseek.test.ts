@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDeepSeekWeakToolUse } from './deepseek'
+import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from './deepseek'
 
 describe('isDeepSeekWeakToolUse', () => {
   const scopes = ['agent', 'web-browsing', 'read-file'] as const
@@ -69,4 +69,37 @@ describe('isDeepSeekWeakToolUse', () => {
   it('returns false for non-scoped tool use (knowledge-base)', () => {
     expect(isDeepSeekWeakToolUse('deepseek-chat', 'knowledge-base')).toBe(false)
   })
+})
+
+describe('isDeepSeekReasoningModel', () => {
+  // Reasoning/thinking-capable model ids per DeepSeek docs (V4-Flash/V4-Pro support a
+  // thinking toggle; deepseek-reasoner is the legacy thinking alias) and provider variants.
+  const reasoningModels = [
+    'deepseek-reasoner',
+    'deepseek-r1',
+    'deepseek-v3.2',
+    'deepseek-v4-flash',
+    'deepseek-v4-pro',
+    'deepseek-v4',
+    'deepseek-v4.1',
+    'deepseek-v4-250528',
+    'deepseek-ai/DeepSeek-V4',
+    'deepseek/deepseek-v4-pro',
+    'deepseek/deepseek-r1:free',
+  ]
+
+  // Non-reasoning ids: deepseek-chat is the legacy non-thinking alias; VL is a different family.
+  const nonReasoningModels = ['deepseek-chat', 'deepseek-ai/deepseek-vl2', 'gpt-5.1']
+
+  for (const model of reasoningModels) {
+    it(`detects ${model} as a reasoning model`, () => {
+      expect(isDeepSeekReasoningModel(model)).toBe(true)
+    })
+  }
+
+  for (const model of nonReasoningModels) {
+    it(`does not flag ${model} as a reasoning model`, () => {
+      expect(isDeepSeekReasoningModel(model)).toBe(false)
+    })
+  }
 })

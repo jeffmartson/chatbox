@@ -8,6 +8,7 @@ import {
   getReasoningControlOptions,
   getReasoningProviderOptions,
   isClaudeAdaptiveThinkingModel,
+  stripReasoningProviderOptions,
 } from './reasoning-control'
 
 const model = (modelId: string, apiStyle?: ProviderModelInfo['apiStyle']): ProviderModelInfo => ({
@@ -254,6 +255,27 @@ describe('reasoning-control', () => {
     expect(chatboxDeepSeekAsOpenAI.supported).toBe(true)
   })
 
+  it('judges custom providers (arbitrary ids) by API style + model id', () => {
+    // A user-created provider has an arbitrary id, not the literal 'custom' enum value.
+    // Reasoning support must still resolve via its API style (provider type) + model id.
+    const customOpenAIGpt5 = getReasoningControlCapabilities('my-openai-proxy', model('gpt-5.1', 'openai'))
+    const customAnthropicClaude = getReasoningControlCapabilities('acme-llm', model('claude-opus-4-8', 'anthropic'))
+    const customOpenAIDeepSeek = getReasoningControlCapabilities('my-openai-proxy', model('deepseek-reasoner', 'openai'))
+    const customOpenAIPlainChat = getReasoningControlCapabilities('my-openai-proxy', model('some-chat-model', 'openai'))
+    const customAnthropicMismatch = getReasoningControlCapabilities('acme-llm', model('claude-opus-4-8', 'openai'))
+
+    expect(customOpenAIGpt5.supported).toBe(true)
+    expect(customOpenAIGpt5.kind).toBe('openai-effort')
+    expect(customAnthropicClaude.supported).toBe(true)
+    expect(customOpenAIDeepSeek.supported).toBe(true)
+    expect(customOpenAIDeepSeek.kind).toBe('toggle')
+    // A non-reasoning model on a custom provider stays unsupported (no stale params sent).
+    expect(customOpenAIPlainChat.supported).toBe(false)
+    // Claude model id behind an OpenAI-style custom endpoint is flagged, like ChatboxAI.
+    expect(customAnthropicMismatch.supported).toBe(false)
+    expect(customAnthropicMismatch.disabledReason).toBe('requires-anthropic-api-style')
+  })
+
   it('uses OpenRouter reasoning controls for reasoning-capable OpenRouter models', () => {
     const modelInfo: ProviderModelInfo = {
       modelId: 'anthropic/claude-sonnet-4.6',
@@ -274,6 +296,11 @@ describe('reasoning-control', () => {
     }
     const options = getReasoningProviderOptions(ModelProviderEnum.OpenRouter, modelInfo, 'off')
 
+    // Latest DeepSeek V4 routed via OpenRouter must still be detected as reasoning-capable.
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenRouter, modelInfo)).toEqual({
+      supported: true,
+      kind: 'openrouter-reasoning',
+    })
     expect(options?.openrouter).toEqual({ reasoning: { enabled: false, exclude: true } })
     expect(getReasoningControlLevel(ModelProviderEnum.OpenRouter, modelInfo, options)).toBe('off')
   })
@@ -342,5 +369,32 @@ describe('reasoning-control', () => {
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-7')).toBe(true)
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-8')).toBe(true)
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-5')).toBe(false)
+  })
+
+  describe('stripReasoningProviderOptions', () => {
+    it('returns undefined/empty inputs unchanged', () => {
+      expect(stripReasoningProviderOptions(undefined)).toBeUndefined()
+      expect(stripReasoningProviderOptions({})).toEqual({})
+    })
+
+    it('removes all reasoning provider option namespaces', () => {
+      expect(
+        stripReasoningProviderOptions({
+          openai: { reasoningEffort: 'none', forceReasoning: true },
+        })
+      ).toBeUndefined()
+      expect(
+        stripReasoningProviderOptions({
+          claude: { thinking: { type: 'enabled', budgetTokens: 1024 } },
+          google: { thinkingConfig: { thinkingBudget: 0, includeThoughts: false } },
+          openaiCompatible: { enable_thinking: true },
+        })
+      ).toBeUndefined()
+    })
+
+    it('returns the same reference when there is nothing to strip', () => {
+      const input = {}
+      expect(stripReasoningProviderOptions(input)).toBe(input)
+    })
   })
 })

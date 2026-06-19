@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as chatStore from '@/stores/chatStore'
-import {
-  ModelProviderType,
-  type ProviderInfo,
-  type ProviderModelInfo,
-  type ProviderOptions,
-  type SessionSettings,
-} from '../../../shared/types'
+import { apiStyleFromProviderType } from '../../../shared/providers/api-style'
+import type { ProviderInfo, ProviderModelInfo, ProviderOptions, SessionSettings } from '../../../shared/types'
 import { getReasoningProviderOptions, type ReasoningControlLevel } from '../../../shared/utils/reasoning-control'
 
 type SelectedModel = {
@@ -34,16 +29,9 @@ interface ReasoningControlState {
   waitForPendingPersist: () => Promise<void>
 }
 
-const API_STYLE_BY_PROVIDER_TYPE: Partial<Record<ModelProviderType, ProviderModelInfo['apiStyle']>> = {
-  [ModelProviderType.Claude]: 'anthropic',
-  [ModelProviderType.Gemini]: 'google',
-  [ModelProviderType.OpenAIResponses]: 'openai-responses',
-  [ModelProviderType.OpenAI]: 'openai',
-}
-
 function withProviderApiStyleFallback(modelInfo: ProviderModelInfo, providerType?: string): ProviderModelInfo {
   if (modelInfo.apiStyle) return modelInfo
-  const apiStyle = providerType ? API_STYLE_BY_PROVIDER_TYPE[providerType as ModelProviderType] : undefined
+  const apiStyle = apiStyleFromProviderType(providerType)
   return apiStyle ? { ...modelInfo, apiStyle } : modelInfo
 }
 
