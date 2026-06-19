@@ -1,7 +1,6 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { Box, Paper, Stack, Text } from '@mantine/core'
-import { TASK_DEFAULT_DIRECTORY } from '@shared/constants/task'
-import type { Message, Session, SessionMeta, SessionMetaRecord, TaskSession } from '@shared/types'
+import type { Message, Session, SessionMeta, SessionMetaRecord } from '@shared/types'
 import { MessageRoleEnum } from '@shared/types'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -10,10 +9,8 @@ import { getDefaultStore } from 'jotai'
 import { createContext, type MutableRefObject, type ReactNode, useContext, useEffect, useRef } from 'react'
 import { currentSessionIdAtom, showThreadHistoryDrawerAtom } from '@/stores/atoms'
 import { QueryKeys } from '@/stores/chatStore'
-import { TASK_SESSION_LIST_QUERY_KEY, taskSessionStore } from '@/stores/taskSessionStore'
 import SessionItem from '../session/SessionItem'
 import SessionList from '../session/SessionList'
-import TaskSessionList from '../session/TaskSessionList'
 import ThreadHistoryDrawer from '../session/ThreadHistoryDrawer'
 
 const queryClient = new QueryClient({
@@ -73,24 +70,6 @@ const sessionMetaRecords: SessionMetaRecord[] = sessionMetas.map((session, index
   sortOrder: 1000 - index,
   createdAt: Date.now() - index * 1000 * 60 * 60,
 }))
-
-const taskSessions: TaskSession[] = [
-  {
-    id: 'task-codebase',
-    name: 'Review release blocker fixes',
-    workingDirectory: '/Users/themez/workspace/chatboxai/chatbox-pro',
-    messages: [],
-    createdAt: Date.now() - 1000 * 60 * 20,
-    updatedAt: Date.now() - 1000 * 60 * 5,
-  },
-  {
-    id: 'task-docs',
-    name: 'Draft onboarding notes',
-    workingDirectory: TASK_DEFAULT_DIRECTORY,
-    messages: [],
-    createdAt: Date.now() - 1000 * 60 * 60 * 4,
-  },
-]
 
 const message = (id: string, role: Message['role'], text: string): Message => ({
   id,
@@ -179,18 +158,6 @@ export const SessionListStates: StoryObj = {
   ),
 }
 
-export const TaskSessionListStates: StoryObj = {
-  name: 'Task session list selected directory states',
-  parameters: {
-    uiInventoryTargets: ['src/renderer/components/session/TaskSessionList'],
-  },
-  render: () => (
-    <StoryRouter>
-      <TaskSessionListFixture />
-    </StoryRouter>
-  ),
-}
-
 function ThreadHistoryDrawerFixture() {
   useEffect(() => {
     const store = getDefaultStore()
@@ -246,49 +213,6 @@ function SessionListFixture() {
         style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
         <SessionList sessionListViewportRef={viewportRef as MutableRefObject<HTMLDivElement | null>} />
-      </Paper>
-    </Stack>
-  )
-}
-
-function TaskSessionListFixture() {
-  const seededRef = useRef(false)
-  if (!seededRef.current) {
-    seededRef.current = true
-    taskSessionStore.getState().setInitialized(true)
-    taskSessionStore.getState().setCurrentTaskId(taskSessions[0].id)
-    queryClient.setQueryData([TASK_SESSION_LIST_QUERY_KEY], {
-      pages: [
-        {
-          items: taskSessions,
-          nextCursor: null,
-          total: taskSessions.length,
-        },
-      ],
-      pageParams: [0],
-    })
-  }
-
-  useEffect(() => {
-    return () => {
-      taskSessionStore.getState().setCurrentTaskId(null)
-    }
-  }, [])
-
-  return (
-    <Stack gap="lg">
-      <SurfaceLabel
-        title="TaskSessionList"
-        description="Actual task sidebar list with selected task, custom working directory, and default-directory display states."
-      />
-      <Paper
-        withBorder
-        radius="md"
-        h={220}
-        maw={420}
-        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-      >
-        <TaskSessionList />
       </Paper>
     </Stack>
   )

@@ -16,7 +16,6 @@ Chatbox Pro 是一款跨平台 AI 聊天客户端，支持桌面（macOS / Windo
 | 工具与集成 | MCP 工具扩展、网页搜索、文件读取 | [工具与集成](./tools-and-integrations.md) |
 | Agent Skills | 遵循 agentskills.io 规范的技能系统，支持全局与会话级启用 | [Agent Skills](./agent-skills.md) |
 | Chat 代码执行 | 在聊天对话中执行代码、解析文档、生成可下载文件（桌面端） | [Chat 代码执行](./code-execution.md) |
-| Task 模式 | AI 编程助手，在安全隔离环境中执行代码和操作文件（桌面端） | [Task 模式](./task-mode.md) |
 | 跨平台 | 桌面 / 移动 / 网页三端一致体验 | [跨平台支持](./cross-platform.md) |
 | 智能上下文 | 自动压缩长对话、Token 用量实时估算 | [智能上下文管理](./context-and-tokens.md) |
 

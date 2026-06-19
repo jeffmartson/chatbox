@@ -10,7 +10,6 @@ import type { ImageGenerationStorage } from '@/storage/ImageGenerationStorage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
 import { SQLiteImageGenerationStorage } from '@/storage/SQLiteImageGenerationStorage'
 import { SQLiteSessionMetaStorage } from '@/storage/SQLiteSessionMetaStorage'
-import { IndexedDBTaskSessionStorage, type TaskSessionStorage } from '@/storage/TaskSessionStorage'
 import { CHATBOX_BUILD_PLATFORM } from '@/variables'
 import { getBrowser, getOS } from '../packages/navigator'
 import type { Platform, PlatformType } from './interfaces'
@@ -28,7 +27,6 @@ export default class MobilePlatform extends MobileSQLiteStorage implements Platf
 
   private navigationCallback: ((path: string) => void) | null = null
   private _imageGenerationStorage: ImageGenerationStorage | null = null
-  private _taskSessionStorage: TaskSessionStorage | null = null
   private _sessionMetaStorage: SessionMetaStorage | null = null
 
   constructor() {
@@ -286,13 +284,6 @@ export default class MobilePlatform extends MobileSQLiteStorage implements Platf
       this._imageGenerationStorage = new SQLiteImageGenerationStorage()
     }
     return this._imageGenerationStorage
-  }
-
-  public getTaskSessionStorage(): TaskSessionStorage {
-    if (!this._taskSessionStorage) {
-      this._taskSessionStorage = new IndexedDBTaskSessionStorage()
-    }
-    return this._taskSessionStorage
   }
 
   public getSessionMetaStorage(): SessionMetaStorage {

@@ -2,7 +2,7 @@
 
 > Last updated: 2026-06
 
-本文档描述 Chat 模式下代码执行、Agent Mode、工具暂停审批和 HTML 产物预览的技术设计。产品说明见 [`docs/product/code-execution.md`](../product/code-execution.md)，Task 模式沙箱见 [`./task-mode.md`](./task-mode.md)。
+本文档描述 Chat 模式下代码执行、Agent Mode、工具暂停审批和 HTML 产物预览的技术设计。产品说明见 [`docs/product/code-execution.md`](../product/code-execution.md)。
 
 ---
 
@@ -35,17 +35,11 @@ Main
     └─ truncate.ts                                # output trimming
 ```
 
-## 与 Task 模式的差异
+## Sandbox 工具说明
 
-| 维度 | Task 模式 | Chat 代码执行 |
-|------|-----------|--------------|
-| 工具集 | `sandbox_*` 底层工具 | `code_execution` / `read_file` / `create_download` 高层工具 |
-| 工作目录 | 用户选择真实目录 | 自动临时沙箱目录 |
-| 文件注入 | 用户直接操作工作目录 | 上传文件在首次工具调用时复制进沙箱 |
-| 工具门控 | Task 会话内可见 | Agent Mode auto/on/off 控制 |
-| 产物展示 | 面向任务日志和文件 | 消息末尾产物区、HTML 预览 |
+Chat 模式向模型注入的是 `code_execution` / `read_file` / `create_download` 等高层工具，工作目录为自动创建的临时沙箱目录，上传文件在首次工具调用时复制进沙箱，工具可见性由 Agent Mode 的 auto/on/off 控制。
 
-Chat 模式当前不再向模型注入 `sandbox_*` 工具。`toolsets/sandbox.ts` 仍保留给 Task 模式和历史消息渲染使用。
+Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sandbox.ts` 仍保留给历史消息渲染使用。
 
 ## Code Execution 工具集
 
@@ -245,4 +239,3 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 - 产品说明：[`docs/product/code-execution.md`](../product/code-execution.md)
 - 工具与集成系统：[`./tools-and-integrations.md`](./tools-and-integrations.md)
 - Agent Skills：[`./agent-skills.md`](./agent-skills.md)
-- Task 模式：[`./task-mode.md`](./task-mode.md)

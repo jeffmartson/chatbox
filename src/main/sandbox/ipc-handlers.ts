@@ -16,7 +16,6 @@ import {
   getStatus,
   grepFiles,
   hasSessionArtifacts,
-  initSandbox,
   initSandboxWithTempDir,
   killRunningCommand,
   listDir,
@@ -32,17 +31,6 @@ import { createSandboxHtmlPreviewUrl } from './preview-server'
 const log = getLogger('sandbox:ipc-handlers')
 
 export function registerSandboxIPCHandlers() {
-  ipcMain.handle('sandbox:init', async (_event, params: { workingDirectory: string; sessionId?: string }) => {
-    try {
-      log.info(`sandbox:init workDir=${params.workingDirectory} session=${params.sessionId || 'default'}`)
-      return await initSandbox(params.workingDirectory, params.sessionId)
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error)
-      log.error('sandbox:init failed', msg)
-      return { success: false, error: msg }
-    }
-  })
-
   ipcMain.handle(
     'sandbox:exec',
     async (_event, params: { command: string; timeout?: number; cwd?: string; sessionId?: string }) => {
@@ -200,19 +188,16 @@ export function registerSandboxIPCHandlers() {
     }
   })
 
-  ipcMain.handle(
-    'sandbox:init-temp',
-    async (_event, params: { sessionId: string; workingDirectories?: string[] }) => {
-      try {
-        log.info(`sandbox:init-temp sessionId=${params.sessionId}`)
-        return await initSandboxWithTempDir(params.sessionId, params.workingDirectories ?? [])
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error)
-        log.error('sandbox:init-temp failed', msg)
-        return { success: false, error: msg }
-      }
+  ipcMain.handle('sandbox:init-temp', async (_event, params: { sessionId: string; workingDirectories?: string[] }) => {
+    try {
+      log.info(`sandbox:init-temp sessionId=${params.sessionId}`)
+      return await initSandboxWithTempDir(params.sessionId, params.workingDirectories ?? [])
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      log.error('sandbox:init-temp failed', msg)
+      return { success: false, error: msg }
     }
-  )
+  })
 
   ipcMain.handle(
     'sandbox:copy-file',

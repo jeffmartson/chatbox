@@ -229,15 +229,11 @@ Model Chat Refactor 中的核心部分已落地：
 - **buildToolsForSession()**：统一工具构建函数（`src/renderer/stores/session/tools-builder.ts`），根据会话配置和模型能力组装工具集与系统提示词注入指令
 - **Orchestration 层**：`src/renderer/stores/session/orchestration.ts` 组合 ContextBuilder → buildToolsForSession → chatStream 完成完整的 AI 调用流程
 
-## Sandbox 工具集（Task 模式）
+## Sandbox 工具集（历史保留）
 
-Task 模式引入了第四类工具集——Sandbox 工具集（`toolsets/sandbox.ts`），为 AI 提供本地代码执行和文件操作能力。与其他工具集不同，Sandbox 工具通过 Electron IPC 调用 Main 进程中的沙箱管理器执行，所有操作在 OS 级沙箱中隔离运行。
+底层 Sandbox 工具集（`toolsets/sandbox.ts`）通过 Electron IPC 调用 Main 进程中的沙箱管理器执行，所有操作在 OS 级沙箱中隔离运行。包含 7 个工具：`sandbox_bash`（Shell 执行）、`sandbox_read`（文件读取）、`sandbox_write`（文件写入）、`sandbox_edit`（精确替换）、`sandbox_grep`（内容搜索）、`sandbox_ls`（目录列表）、`sandbox_find`（文件查找）。
 
-包含 7 个工具：`sandbox_bash`（Shell 执行）、`sandbox_read`（文件读取）、`sandbox_write`（文件写入）、`sandbox_edit`（精确替换）、`sandbox_grep`（内容搜索）、`sandbox_ls`（目录列表）、`sandbox_find`（文件查找）。
-
-Task 会话通过独立的 Task 生成路径注入这些工具，不影响普通 Chat 会话。Chat Agent 当前不再 fallback 注入 `sandbox_*` 工具。
-
-详细技术设计参见 [`./task-mode.md`](./task-mode.md)。
+这些 `sandbox_*` 底层工具当前不再注入到任何生成路径中，Chat Agent 使用下文的 Code Execution 高层工具集；`toolsets/sandbox.ts` 仅保留用于渲染历史消息中的 `sandbox_*` 工具调用。
 
 ## Code Execution 工具集（Chat 模式）
 

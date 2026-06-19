@@ -27,20 +27,20 @@ export type UiInventoryItem = {
   hasTranslation: boolean
 }
 
-export const uiInventoryGeneratedAt = '2026-06-16T07:14:23.076Z'
+export const uiInventoryGeneratedAt = '2026-06-19T08:14:14.675Z'
 
 export const uiInventorySummary = {
-  total: 228,
+  total: 225,
   byKind: {
-    component: 131,
+    component: 129,
     story: 20,
-    modal: 17,
+    modal: 18,
     ui: 1,
-    page: 34,
+    page: 32,
     'route-component': 25,
   },
   byArea: {
-    app: 76,
+    app: 75,
     chat: 8,
     common: 25,
     input: 10,
@@ -48,19 +48,18 @@ export const uiInventorySummary = {
     layout: 7,
     'message-parts': 1,
     'model-selector': 5,
-    session: 4,
+    session: 3,
     settings: 36,
-    modal: 17,
+    modal: 18,
     copilots: 9,
     dev: 6,
     guide: 6,
     'image-creator': 10,
-    task: 2,
   },
   byPlatform: {
-    all: 199,
+    all: 195,
     mobile: 19,
-    desktop: 14,
+    desktop: 15,
     web: 3,
   },
 } as const
@@ -87,9 +86,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App controls accordion action menu adaptive select and styled menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--controls-and-menus-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--controls-and-menus-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -117,9 +116,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App controls accordion action menu adaptive select and styled menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--controls-and-menus-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--controls-and-menus-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -147,9 +146,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App controls accordion action menu adaptive select and styled menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--controls-and-menus-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--controls-and-menus-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -190,8 +189,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Markdown mermaid SVG and artifact preview states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--rich-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--rich-content-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -219,9 +219,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Compaction running and failed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--compaction-status-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--compaction-running-and-failed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--compaction-status-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--compaction-running-and-failed-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -236,7 +236,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
     components: ['CollapseButton', 'ImageInStorageGalleryItem', 'MessageActionIcon', 'PictureGallery'],
     states: [
       'actionMenuOpened',
+      'collapsed',
       'error',
+      'hasFoldableProcess',
       'isBubbleLayout',
       'isButton',
       'isCollapsed',
@@ -248,17 +250,30 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'isUserBubble',
       'opened',
       'previewArtifact',
+      'processCollapsed',
       'retryChoiceOpened',
       'shouldThrowError',
     ],
-    variants: ['color:chatbox-brand', 'color:chatbox-secondary', 'light', 'size:11px', 'size:sm', 'size:xs', 'subtle'],
+    variants: [
+      'color:chatbox-brand',
+      'color:chatbox-secondary',
+      'color:gray',
+      'light',
+      'size:11px',
+      'size:sm',
+      'size:xs',
+      'subtle',
+    ],
     platforms: ['mobile'],
     platformNotes: ['checks platform.type === mobile', 'responsive branch via isSmallScreen/useIsSmallScreen'],
     previewModes: ['desktop-wide', 'narrow/mobile-layout'],
     text: [
+      '{{count}} steps',
+      'Agent Mode suggested',
       'characters',
       'Click to view full text',
       'Collapse',
+      'Continue normally',
       'copied to clipboard',
       'copy',
       'Copy',
@@ -284,8 +299,10 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'The response failed after the last step. What would you like to retry?',
       'Token count',
       'Total tokens consumed',
+      'Use Agent Mode',
       'View Message JSON',
       'Word count',
+      'Worked for {{time}}',
     ],
     stories: [],
     storyNames: [],
@@ -307,8 +324,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message system user assistant error generating attachment states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-system-user-assistant-error-generating-attachment-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-system-user-assistant-error-generating-attachment-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -336,9 +354,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message attachments with files, links, and RAG states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--attachment-grid-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-attachments-with-files-links-and-rag-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--attachment-grid-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-attachments-with-files-links-and-rag-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -392,6 +410,20 @@ export const uiInventoryItems: UiInventoryItem[] = [
     dependencies: ['src/renderer/components/common/ChatboxAIErrorMessage', 'src/renderer/components/common/Link'],
     previewLinks: [
       {
+        label: 'Storybook: Auth Error (401)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--auth-error-401',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--auth-error-401&viewMode=story',
+      },
+      {
+        label: 'Storybook: Context Length Error',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--context-length-error',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--context-length-error&viewMode=story',
+      },
+      {
         label: 'Storybook: Generic Error',
         kind: 'storybook',
         href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--generic-error',
@@ -405,38 +437,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-messageerrtips--generic-error-bubble-layout&viewMode=story',
       },
       {
-        label: 'Storybook: Network Error (fetch failed)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--network-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--network-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Rate Limit Error (429)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--rate-limit-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--rate-limit-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Auth Error (401)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--auth-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--auth-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Context Length Error',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--context-length-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--context-length-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Server Error (500)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--server-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--server-error&viewMode=story',
-      },
-      {
         label: 'Storybook: Long Error with Response Body',
         kind: 'storybook',
         href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--long-error-with-response-body',
@@ -444,17 +444,39 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-messageerrtips--long-error-with-response-body&viewMode=story',
       },
       {
-        label: 'Storybook: Error Without Retry Button',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--without-retry',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--without-retry&viewMode=story',
-      },
-      {
         label: 'Storybook: Multiple Error Types Comparison',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--multiple-errors',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--multiple-error-types-comparison',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--multiple-errors&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--multiple-error-types-comparison&viewMode=story',
+      },
+      {
+        label: 'Storybook: Network Error (fetch failed)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--network-error-fetch-failed',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--network-error-fetch-failed&viewMode=story',
+      },
+      {
+        label: 'Storybook: Rate Limit Error (429)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--rate-limit-error-429',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--rate-limit-error-429&viewMode=story',
+      },
+      {
+        label: 'Storybook: Server Error (500)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--server-error-500',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--server-error-500&viewMode=story',
+      },
+      {
+        label: 'Storybook: Error Without Retry Button',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--error-without-retry-button',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--error-without-retry-button&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -514,9 +536,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message list grouped conversation summary navigation states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-list-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-list-grouped-conversation-summary-navigation-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-list-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-list-grouped-conversation-summary-navigation-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -556,9 +578,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message loading and tool preparation states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-loading-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-loading-and-tool-preparation-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-loading-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-loading-and-tool-preparation-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -586,9 +608,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message navigation floating controls',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--navigation-controls',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-navigation-floating-controls',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--navigation-controls&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-navigation-floating-controls&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -627,9 +649,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Summary message latest editable state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--summary-message-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--summary-message-latest-editable-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--summary-message-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--summary-message-latest-editable-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -657,9 +679,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Adaptive modal open actions and close button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--adaptive-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--adaptive-modal-open-actions-and-close-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--adaptive-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--adaptive-modal-open-actions-and-close-button-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -691,9 +713,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Avatar user assistant system chat picture states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--avatar-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--avatar-user-assistant-system-chat-picture-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--avatar-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--avatar-user-assistant-system-chat-picture-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -721,9 +743,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Chatbox AI error message quota license file and web browsing states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-ai-error-message-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-ai-error-message-quota-license-file-and-web-browsing-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-ai-error-message-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-ai-error-message-quota-license-file-and-web-browsing-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -761,9 +783,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Chatbox welcome card login no-license and expired states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-welcome-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-welcome-card-login-no-license-and-expired-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-welcome-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-welcome-card-login-no-license-and-expired-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -795,9 +817,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Compression modal opened confirmation state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--compression-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--compression-modal-opened-confirmation-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--compression-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--compression-modal-opened-confirmation-state&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -825,9 +847,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Confirm delete button and menu item idle confirm states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--confirm-delete-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--confirm-delete-button-and-menu-item-idle-confirm-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--confirm-delete-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--confirm-delete-button-and-menu-item-idle-confirm-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -855,9 +877,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Creatable select password reset and mini button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--form-field-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--form-field-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--creatable-select-password-reset-and-mini-button-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -885,9 +907,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -915,9 +937,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Error boundary fallback and retry states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--error-boundary-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--error-boundary-fallback-and-retry-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--error-boundary-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--error-boundary-fallback-and-retry-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -945,9 +967,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Lazy number slider combined slider and context count states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--numeric-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--numeric-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -975,9 +997,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Lazy number slider combined slider and context count states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--numeric-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--numeric-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1005,9 +1027,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1035,9 +1057,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1069,9 +1091,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Lazy number slider combined slider and context count states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--numeric-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--numeric-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1099,9 +1121,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message layout selector classic bubble selected states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--message-layout-selector-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--message-layout-selector-classic-bubble-selected-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--message-layout-selector-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--message-layout-selector-classic-bubble-selected-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -1129,9 +1151,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Creatable select password reset and mini button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--form-field-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--form-field-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--creatable-select-password-reset-and-mini-button-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1159,9 +1181,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Creatable select password reset and mini button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--form-field-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--form-field-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--creatable-select-password-reset-and-mini-button-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1189,9 +1211,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Popover confirm opened and confirm action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--popover-confirm-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--popover-confirm-opened-and-confirm-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--popover-confirm-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--popover-confirm-opened-and-confirm-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1219,9 +1241,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -1249,9 +1271,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1279,9 +1301,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Lazy number slider combined slider and context count states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--numeric-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--numeric-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1309,9 +1331,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Temperature and top-p slider settings states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--model-parameter-slider-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--temperature-and-top-p-slider-settings-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--model-parameter-slider-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--temperature-and-top-p-slider-settings-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1339,9 +1361,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Creatable select password reset and mini button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--form-field-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--form-field-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--creatable-select-password-reset-and-mini-button-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1369,8 +1391,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Toast stack top-right feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--toast-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-common-feedback--toast-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--toast-stack-top-right-feedback-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--toast-stack-top-right-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1398,9 +1421,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Temperature and top-p slider settings states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--model-parameter-slider-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--temperature-and-top-p-slider-settings-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--model-parameter-slider-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--temperature-and-top-p-slider-settings-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1428,9 +1451,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1458,8 +1481,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Dev header theme switch session RAG pane and error test panel states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-tools-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--dev-tools-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1507,8 +1531,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Dev header theme switch session RAG pane and error test panel states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-tools-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--dev-tools-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1536,8 +1561,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Dev header theme switch session RAG pane and error test panel states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-tools-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--dev-tools-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1565,9 +1591,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1595,9 +1621,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1625,8 +1651,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Dev header theme switch session RAG pane and error test panel states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-tools-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--dev-tools-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -1654,9 +1681,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1684,9 +1711,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1714,9 +1741,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1744,9 +1771,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1774,9 +1801,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1804,9 +1831,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1834,9 +1861,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1864,9 +1891,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1894,9 +1921,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1924,9 +1951,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1954,9 +1981,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -1984,9 +2011,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2014,9 +2041,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2044,9 +2071,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2074,9 +2101,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2104,9 +2131,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2134,9 +2161,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2164,9 +2191,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2194,9 +2221,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image display count style and model select states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--media-and-generation-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--image-display-count-style-and-model-select-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--media-and-generation-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--image-display-count-style-and-model-select-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2224,9 +2251,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image display count style and model select states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--media-and-generation-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--image-display-count-style-and-model-select-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--media-and-generation-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--image-display-count-style-and-model-select-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2254,9 +2281,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image display count style and model select states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--media-and-generation-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--image-display-count-style-and-model-select-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--media-and-generation-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--image-display-count-style-and-model-select-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2284,9 +2311,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image display count style and model select states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--media-and-generation-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--image-display-count-style-and-model-select-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--media-and-generation-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--image-display-count-style-and-model-select-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2304,7 +2331,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     platforms: ['all'],
     platformNotes: [],
     previewModes: [],
-    text: ['Auto'],
+    text: [],
     stories: [],
     storyNames: [],
     storyTargets: [],
@@ -2317,14 +2344,14 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Agent mode button auto on off unsupported popover states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-button-auto-on-off-unsupported-popover-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-button-auto-on-off-unsupported-popover-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
     hasNiceModal: false,
-    hasTranslation: true,
+    hasTranslation: false,
   },
   {
     path: 'src/renderer/components/InputBox/AgentModePanel.tsx',
@@ -2336,11 +2363,13 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'active',
       'checked',
       'disabled',
+      'error',
       'expanded',
       'isActive',
       'isDisabled',
       'isLockedDisabled',
       'isModelDisabled',
+      'isNewSession',
       'isPremium',
       'isProviderAvailable',
       'isSelected',
@@ -2353,6 +2382,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'visible',
     ],
     variants: [
+      'color:red',
       'color:var(--chatbox-tint-brand)',
       'color:var(--chatbox-tint-tertiary)',
       'knowledge-base',
@@ -2365,28 +2395,33 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'skills',
       'subtle',
       'web-search',
+      'working-directory',
     ],
-    platforms: ['all'],
-    platformNotes: [],
+    platforms: ['desktop'],
+    platformNotes: ['checks platform.type === desktop'],
     previewModes: [],
     text: [
+      'Add Folder',
       'Add Skills',
       'Add your first MCP server',
       'Agent Mode',
-      'Auto',
+      'AUTO',
       'Built-in',
-      'Cannot change after activation',
       'Code Execution',
       'Configure in Settings',
       'Create',
       'Extensions',
+      'Grant the agent read/write access to local folders without per-action approval.',
       'Knowledge Base',
+      'Locked after the chat starts to keep tools and context consistent — start a new chat to change',
       'MCP',
       'OFF',
       'ON',
+      'Remove',
       'Skills',
       'This model does not support Agent Mode',
       'Web Search',
+      'Working Directory',
     ],
     stories: [],
     storyNames: [],
@@ -2401,9 +2436,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Agent mode panel auto on off unsupported and extension states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-panel-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-panel-auto-on-off-unsupported-and-extension-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-panel-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-panel-auto-on-off-unsupported-and-extension-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2469,23 +2504,23 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Attachment mini card image file processing completed error states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-mini-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-mini-card-image-file-processing-completed-error-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-mini-card-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Message attachment inline retrieval indexed indexing blocked failed states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--message-attachment-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--message-attachment-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-mini-card-image-file-processing-completed-error-states&viewMode=story',
       },
       {
         label: 'Storybook: Attachment parser type label local chatbox-ai mineru inline and indexed',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-parser-type-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-parser-type-label-local-chatbox-ai-mineru-inline-and-indexed',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-parser-type-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-parser-type-label-local-chatbox-ai-mineru-inline-and-indexed&viewMode=story',
+      },
+      {
+        label: 'Storybook: Message attachment inline retrieval indexed indexing blocked failed states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--message-attachment-inline-retrieval-indexed-indexing-blocked-failed-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--message-attachment-inline-retrieval-indexed-indexing-blocked-failed-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2513,9 +2548,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image upload button desktop and mobile states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-button-desktop-and-mobile-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-button-desktop-and-mobile-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2543,9 +2578,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Hidden image upload input configuration',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-input-state',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--hidden-image-upload-input-configuration',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-input-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--hidden-image-upload-input-configuration&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2571,6 +2606,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'hasSessionRetrievalFiles',
       'hasText',
       'hasTextContent',
+      'isActive',
       'isAgentModeActive',
       'isAutoCompactionEnabled',
       'isCalculating',
@@ -2582,7 +2618,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'isFetched',
       'isModelToolCapabilityFetched',
       'isNewSession',
-      'isPreprocessing',
     ],
     variants: ['color:dark', 'default', 'filled', 'light', 'size:sm', 'size:xs', 'size:xxs'],
     platforms: ['desktop', 'mobile'],
@@ -2657,9 +2692,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: InputBox composer ready selected model generating and missing model states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--input-box-composer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--input-box-composer-ready-selected-model-generating-and-missing-model-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--input-box-composer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--input-box-composer-ready-selected-model-generating-and-missing-model-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2683,6 +2718,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Medium',
       'Off',
       'On',
+      'Thinking',
       'Thinking controls are disabled because this Claude model is not exposed through the Anthropic API style.',
       'Thinking controls are disabled because this DeepSeek model is not exposed through the DeepSeek API style.',
       'Thinking controls are disabled because this Gemini model is not exposed through the Google API style.',
@@ -2722,9 +2758,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Session settings button enabled disabled and mobile states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--session-settings-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--session-settings-button-enabled-disabled-and-mobile-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--session-settings-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--session-settings-button-enabled-disabled-and-mobile-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2764,9 +2800,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Token count menu normal calculating and auto compaction states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--token-count-menu-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--token-count-menu-normal-calculating-and-auto-compaction-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--token-count-menu-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--token-count-menu-normal-calculating-and-auto-compaction-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2794,9 +2830,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Web browsing button active and inactive states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--web-browsing-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--web-browsing-button-active-and-inactive-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--web-browsing-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--web-browsing-button-active-and-inactive-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -2831,9 +2867,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base chunks preview and remote retry modal states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -2938,9 +2974,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base page list documents and provider states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-page-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-page-list-documents-and-provider-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-page-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-page-list-documents-and-provider-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3049,9 +3085,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base documents upload ready processing paused failed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-documents-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-documents-upload-ready-processing-paused-failed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-documents-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-documents-upload-ready-processing-paused-failed-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3119,9 +3155,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base form provider parser model and action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-form-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-form-provider-parser-model-and-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-form-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-form-provider-parser-model-and-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3149,9 +3185,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base menu selected and create states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-menu-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-menu-selected-and-create-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-menu-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-menu-selected-and-create-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3200,9 +3236,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Knowledge base chunks preview and remote retry modal states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3214,17 +3250,25 @@ export const uiInventoryItems: UiInventoryItem[] = [
     title: 'components/layout/DesktopDownloadReminder',
     kind: 'component',
     area: 'layout',
-    components: ['DesktopDownloadReminder'],
-    states: [],
-    variants: ['color:chatbox-secondary', 'size:compact-sm', 'size:xs', 'subtle'],
+    components: ['ANDROID_APK_URL', 'DesktopDownloadReminder', 'IOS_APP_STORE_URL'],
+    states: ['isSmallScreen'],
+    variants: ['color:chatbox-secondary', 'light', 'size:compact-sm', 'size:xs', 'subtle'],
     platforms: ['web'],
-    platformNotes: ['branches when platform.type is not web', 'mentions web-only behavior'],
-    previewModes: [],
+    platformNotes: [
+      'branches when platform.type is not web',
+      'mentions web-only behavior',
+      'responsive branch via isSmallScreen/useIsSmallScreen',
+    ],
+    previewModes: ['desktop-wide', 'narrow/mobile-layout'],
     text: [
       '1. Your chat history on web version can only be stored in the browser cache (unreliable - it may be cleaned by browser). \\n2. MCP and Knowledge Base are currently supported on the desktop app only.',
+      'Android APK',
+      'App Store',
       'Close',
       'Download Desktop App',
       'More advanced features are available in Chatbox Desktop.',
+      'Recommended to use Chatbox App',
+      'Your chat history on web version can only be stored in the browser cache (unreliable - it may be cleaned by browser).',
     ],
     stories: [],
     storyNames: [],
@@ -3235,9 +3279,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Desktop download reminder web floating prompt state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--desktop-download-reminder-state',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--desktop-download-reminder-web-floating-prompt-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--desktop-download-reminder-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--desktop-download-reminder-web-floating-prompt-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3265,9 +3309,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Exit fullscreen hit area state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--exit-fullscreen-button-state',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--exit-fullscreen-hit-area-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--exit-fullscreen-button-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--exit-fullscreen-hit-area-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3281,7 +3325,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     area: 'layout',
     components: ['Header'],
     states: ['hasGeneratingMessage', 'isSmallScreen'],
-    variants: ['color:chatbox-tertiary', 'color:gray', 'light', 'size:18px', 'size:xs', 'subtle'],
+    variants: ['color:chatbox-tertiary', 'size:18px', 'subtle'],
     platforms: ['all'],
     platformNotes: ['responsive branch via isSmallScreen/useIsSmallScreen'],
     previewModes: ['desktop-wide', 'narrow/mobile-layout'],
@@ -3306,14 +3350,8 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Long Session Title',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--long-title',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--long-title&viewMode=story',
-      },
-      {
-        label: 'Storybook: Untitled Session',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--untitled-session',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--untitled-session&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-header--long-session-title',
+        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--long-session-title&viewMode=story',
       },
       {
         label: 'Storybook: No Thread Name',
@@ -3324,9 +3362,15 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Thread Name Same as Session (hidden)',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--same-thread-name-as-session',
+        href: 'http://localhost:6006/?path=/story/real-components-header--thread-name-same-as-session-hidden',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-header--same-thread-name-as-session&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-header--thread-name-same-as-session-hidden&viewMode=story',
+      },
+      {
+        label: 'Storybook: Untitled Session',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-header--untitled-session',
+        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--untitled-session&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3354,8 +3398,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Overlay modal drawer stacked escape management states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--overlay-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--overlay-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--overlay-modal-drawer-stacked-escape-management-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--overlay-modal-drawer-stacked-escape-management-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3383,8 +3428,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Page header sidebar title and action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--page-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--page-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--page-header-sidebar-title-and-action-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--page-header-sidebar-title-and-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3426,8 +3472,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Toolbar search layout thread history and menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--toolbar-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--toolbar-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--toolbar-search-layout-thread-history-and-menu-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--toolbar-search-layout-thread-history-and-menu-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3455,9 +3502,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Window controls normal and maximized desktop states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--window-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--window-controls-normal-and-maximized-desktop-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--window-controls-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--window-controls-normal-and-maximized-desktop-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3510,8 +3557,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Markdown mermaid SVG and artifact preview states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--rich-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--rich-content-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3539,8 +3587,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: MCP menu and status idle running starting error states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-runtime-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-runtime-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3568,8 +3617,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: MCP menu and status idle running starting error states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-runtime-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-runtime-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3597,8 +3647,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Markdown mermaid SVG and artifact preview states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--rich-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--rich-content-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3622,7 +3673,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'TOOL_PAYLOAD_PREVIEW_LENGTH',
     ],
     states: [
+      'active',
       'checked',
+      'collapsed',
       'disabled',
       'error',
       'expanded',
@@ -3644,8 +3697,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'isHtmlFile',
       'isImageFile',
       'isLast',
-      'isLoading',
-      'isPaused',
     ],
     variants: [
       'color:chatbox-brand',
@@ -3668,6 +3719,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     previewModes: [],
     text: [
       '{{count}} results',
+      '+{{count}} more lines',
       'AI Explain',
       'AI explanation consumes additional tokens',
       'Analyzing command...',
@@ -3688,6 +3740,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Failed',
       'File no longer available',
       'Paused',
+      'Paused after {{count}} steps. Check whether the task is on track, then continue or stop to adjust.',
       'Preparing file...',
       'Preview',
       'Preview not available',
@@ -3701,7 +3754,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Thought for {{time}}',
       'Tool call failed',
       'Tool execution is paused.',
-      'Tool execution paused after {{count}} tool calls to avoid an infinite loop.',
       'Waiting for approval',
     ],
     stories: [],
@@ -3722,53 +3774,32 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--actively-thinking&viewMode=story',
       },
       {
+        label: 'Storybook: Completed — No Streaming Mode (no timer)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-no-streaming-mode-no-timer',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-no-streaming-mode-no-timer&viewMode=story',
+      },
+      {
         label: 'Storybook: Completed — With Reasoning Content',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-content',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-reasoning-content',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-content&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-reasoning-content&viewMode=story',
       },
       {
         label: 'Storybook: Completed — With Duration Timer',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-duration',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-duration-timer',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-duration&viewMode=story',
-      },
-      {
-        label: 'Storybook: Completed — No Streaming Mode (no timer)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-no-streaming-mode',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-no-streaming-mode&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-duration-timer&viewMode=story',
       },
       {
         label: 'Storybook: Completed — Empty Content',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--empty-reasoning-content',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-empty-content',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--empty-reasoning-content&viewMode=story',
-      },
-      {
-        label: 'Storybook: Web Search — Loading',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-loading',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-loading&viewMode=story',
-      },
-      {
-        label: 'Storybook: Web Search — Success',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-success',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-success&viewMode=story',
-      },
-      {
-        label: 'Storybook: Web Search — Error',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-error&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-empty-content&viewMode=story',
       },
       {
         label: 'Storybook: Code Search — Success',
@@ -3785,18 +3816,11 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--knowledge-base-loading&viewMode=story',
       },
       {
-        label: 'Storybook: Terminal — Success',
+        label: 'Storybook: Multiple Tool Calls',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--terminal-success',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--multiple-tool-calls',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--terminal-success&viewMode=story',
-      },
-      {
-        label: 'Storybook: Read File — Success',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--read-file-success',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--read-file-success&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--multiple-tool-calls&viewMode=story',
       },
       {
         label: 'Storybook: Parse Link — Loading',
@@ -3806,11 +3830,60 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--parse-link-loading&viewMode=story',
       },
       {
-        label: 'Storybook: Multiple Tool Calls',
+        label: 'Storybook: Read File — Success',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--multiple-pills',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--read-file-success',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--multiple-pills&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--read-file-success&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Reasoning + Tools',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-reasoning-tools',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-reasoning-tools&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Running',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-running',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-running&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Interleaved Text',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-interleaved-text',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-interleaved-text&viewMode=story',
+      },
+      {
+        label: 'Storybook: Terminal — Success',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--terminal-success',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--terminal-success&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Error',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-error',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-error&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Loading',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-loading',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-loading&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Success',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-success',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-success&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3857,11 +3930,11 @@ export const uiInventoryItems: UiInventoryItem[] = [
     dependencies: ['src/renderer/components/common/ScalableIcon'],
     previewLinks: [
       {
-        label: 'Storybook: Model list shortcut table directory menu and sortable placeholder states',
+        label: 'Storybook: Model list shortcut table and sortable placeholder states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-shortcut-and-task-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--model-shortcut-and-task-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3899,18 +3972,18 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Model selector dropdown with configured providers',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Desktop model selector all favorite search disabled states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--desktop-model-selector-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--desktop-model-selector-all-favorite-search-disabled-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--desktop-model-selector-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--desktop-model-selector-all-favorite-search-disabled-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Model selector dropdown with configured providers',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-with-configured-providers',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-with-configured-providers&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -3943,9 +4016,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Model selector dropdown with configured providers',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-with-configured-providers',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-with-configured-providers&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -3977,9 +4050,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Mobile model selector drawer states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--mobile-model-selector-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--mobile-model-selector-drawer-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--mobile-model-selector-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--mobile-model-selector-drawer-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4011,9 +4084,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Provider header default favorite mobile custom and collapsed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--provider-header-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--provider-header-default-favorite-mobile-custom-and-collapsed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--provider-header-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--provider-header-default-favorite-mobile-custom-and-collapsed-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4041,9 +4114,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Model item selected favorited disabled capability and drawer states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-item-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-item-selected-favorited-disabled-capability-and-drawer-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-item-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-item-selected-favorited-disabled-capability-and-drawer-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4250,7 +4323,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     kind: 'component',
     area: 'app',
     components: ['ModelRow', 'RowIconButton'],
-    states: ['disabled', 'selected', 'visible'],
+    states: ['disabled', 'isDisabled', 'selected', 'visible'],
     variants: ['size:sm', 'transparent'],
     platforms: ['all'],
     platformNotes: [],
@@ -4319,8 +4392,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Session item selected starred and picture states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--session-item-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-session--session-item-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-session--session-item-selected-starred-and-picture-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-session--session-item-selected-starred-and-picture-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4348,43 +4422,14 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Session list search clear selected paginated states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--session-list-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-session--session-list-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-session--session-list-search-clear-selected-paginated-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-session--session-list-search-clear-selected-paginated-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
     hasNiceModal: true,
     hasTranslation: true,
-  },
-  {
-    path: 'src/renderer/components/session/TaskSessionList.tsx',
-    title: 'components/session/TaskSessionList',
-    kind: 'component',
-    area: 'session',
-    components: ['TaskSessionItem', 'TaskSessionList'],
-    states: ['hasNextPage', 'isSmallScreen', 'selected'],
-    variants: ['size:sm', 'size:xs'],
-    platforms: ['all'],
-    platformNotes: ['responsive branch via isSmallScreen/useIsSmallScreen'],
-    previewModes: ['desktop-wide', 'narrow/mobile-layout'],
-    text: [],
-    stories: [],
-    storyNames: [],
-    storyTargets: [],
-    storybookIds: [],
-    dependencies: ['src/renderer/components/common/ScalableIcon'],
-    previewLinks: [
-      {
-        label: 'Storybook: Task session list selected directory states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--task-session-list-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-session--task-session-list-states&viewMode=story',
-      },
-    ],
-    hasDefaultExport: true,
-    hasNiceModal: false,
-    hasTranslation: false,
   },
   {
     path: 'src/renderer/components/session/ThreadHistoryDrawer.tsx',
@@ -4411,9 +4456,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Thread history drawer with current and archived threads',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--thread-history-drawer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-session--thread-history-drawer-with-current-and-archived-threads',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-session--thread-history-drawer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-session--thread-history-drawer-with-current-and-archived-threads&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4455,9 +4500,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Document parser desktop mineru and token states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--document-parser-settings-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--document-parser-desktop-mineru-and-token-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--document-parser-settings-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--document-parser-desktop-mineru-and-token-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4485,9 +4530,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Builtin MCP server premium accessible states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--builtin-mcp-servers-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--builtin-mcp-server-premium-accessible-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--builtin-mcp-servers-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--builtin-mcp-server-premium-accessible-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4537,9 +4582,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: MCP config modal http edit form states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-config-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-config-modal-http-edit-form-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-config-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-config-modal-http-edit-form-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4581,9 +4626,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Custom MCP server cards add edit and install states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--custom-mcp-servers-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--custom-mcp-server-cards-add-edit-and-install-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--custom-mcp-servers-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--custom-mcp-server-cards-add-edit-and-install-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4621,9 +4666,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: MCP registry spotlight custom import official and community states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-registry-spotlight-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-registry-spotlight-custom-import-official-and-community-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-registry-spotlight-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-registry-spotlight-custom-import-official-and-community-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4661,9 +4706,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Add provider modal name and API mode states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--add-provider-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--add-provider-modal-name-and-api-mode-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--add-provider-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--add-provider-modal-name-and-api-mode-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4708,9 +4753,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Import provider modal overwrite and model preview states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--import-provider-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--import-provider-modal-overwrite-and-model-preview-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--import-provider-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--import-provider-modal-overwrite-and-model-preview-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4738,9 +4783,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Provider icon image aliases and fallback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-icon-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-icon-image-aliases-and-fallback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-icon-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-icon-image-aliases-and-fallback-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4773,9 +4818,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Provider list activated featured custom and add states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-list-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-list-activated-featured-custom-and-add-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-list-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-list-activated-featured-custom-and-add-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -4818,9 +4863,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Provider spotlight quick actions popular and more providers',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-spotlight-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-spotlight-quick-actions-popular-and-more-providers',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-spotlight-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-spotlight-quick-actions-popular-and-more-providers&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4841,6 +4886,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'installStatuses',
       'loading',
       'opened',
+      'selected',
       'selectedPaths',
       'success',
     ],
@@ -4849,6 +4895,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     platformNotes: [],
     previewModes: [],
     text: [
+      '{{count}} selected',
       'Cancel',
       'Failed',
       'Install failed',
@@ -4856,6 +4903,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Install Skills from {{owner}}/{{repo}}',
       'Installed',
       'Installing',
+      'Select all',
     ],
     stories: [],
     storyNames: [],
@@ -4866,9 +4914,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: GitHub install modal detected skill selection states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--git-hub-install-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--git-hub-install-modal-detected-skill-selection-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--git-hub-install-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--git-hub-install-modal-detected-skill-selection-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -4895,6 +4943,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'opened',
       'repoInfo',
       'scanning',
+      'searchQuery',
       'showGithubInput',
       'skills',
       'success',
@@ -4918,6 +4967,8 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'https://github.com/owner/repo',
       'Install from GitHub',
       'Install from GitHub Repository',
+      'Installed Skills',
+      'Local Agent Skills',
       'No custom skills yet',
       'No skills found in this repository',
       'No updates for {{name}}',
@@ -4925,10 +4976,10 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Please enter a valid GitHub repository URL',
       'Refresh',
       'Scan',
+      'Search skills...',
       'Skill deleted',
       'Translate',
       'Update available for {{name}}',
-      'User Skills',
     ],
     stories: [],
     storyNames: [],
@@ -4944,9 +4995,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Skills section builtin user claude and GitHub install entry states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-section-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-section-builtin-user-claude-and-git-hub-install-entry-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-section-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-section-builtin-user-claude-and-git-hub-install-entry-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -5025,9 +5076,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Skills spotlight popular installed and replacement states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-spotlight-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-spotlight-popular-installed-and-replacement-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-spotlight-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-spotlight-popular-installed-and-replacement-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5087,11 +5138,11 @@ export const uiInventoryItems: UiInventoryItem[] = [
     dependencies: ['src/renderer/components/common/ScalableIcon'],
     previewLinks: [
       {
-        label: 'Storybook: Model list shortcut table directory menu and sortable placeholder states',
+        label: 'Storybook: Model list shortcut table and sortable placeholder states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-shortcut-and-task-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--model-shortcut-and-task-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -5117,11 +5168,11 @@ export const uiInventoryItems: UiInventoryItem[] = [
     dependencies: [],
     previewLinks: [
       {
-        label: 'Storybook: Model list shortcut table directory menu and sortable placeholder states',
+        label: 'Storybook: Model list shortcut table and sortable placeholder states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-shortcut-and-task-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--model-shortcut-and-task-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -5149,9 +5200,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App icons provider avatars file icons and static feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5169,7 +5220,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'DevToolsFixture',
       'McpRuntimeFixture',
       'MediaAndGenerationFixture',
-      'ModelShortcutAndTaskFixture',
+      'ModelShortcutFixture',
       'RichContentFixture',
       'SeedAppBase',
       'SettingsSurface',
@@ -5201,7 +5252,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Actual command palette and Radix dialog primitives used by app overlays.',
       'Actual HTML surface',
       'Actual image display and image generation controls.',
-      'Actual list and configuration surfaces used by settings and task sessions.',
+      'Actual list and configuration surfaces used by settings.',
       'Actual Markdown, Mermaid, SVG, and artifact rendering surfaces.',
       'Actual MCP status dots and hover menu trigger with enabled tool count.',
       'Actual provider, brand, model, file, avatar, and feedback visuals.',
@@ -5227,8 +5278,8 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Markdown mermaid SVG and artifact preview states',
       'MCP menu and status idle running starting error states',
       'MCP runtime',
-      'Model list shortcut table directory menu and sortable placeholder states',
-      'Models, shortcuts, and task directory',
+      'Model list shortcut table and sortable placeholder states',
+      'Models and shortcuts',
       'New Chat',
       'No command found.',
       'Open action menu',
@@ -5257,29 +5308,46 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'DevToolsStates',
       'McpRuntimeStates',
       'MediaAndGenerationControlsStates',
-      'ModelShortcutAndTaskStates',
+      'ModelShortcutStates',
       'RichContentStates',
       'RootRouteShellState',
       'VisualIdentityStates',
     ],
     storyNames: [
-      'App controls accordion action menu adaptive select and styled menu states',
-      'App icons provider avatars file icons and static feedback states',
-      'Image display count style and model select states',
-      'Markdown mermaid SVG and artifact preview states',
-      'MCP menu and status idle running starting error states',
-      'Model list shortcut table directory menu and sortable placeholder states',
-      'Dev header theme switch session RAG pane and error test panel states',
       'Command palette primitives and dialog primitives states',
+      'App controls accordion action menu adaptive select and styled menu states',
+      'Dev header theme switch session RAG pane and error test panel states',
+      'MCP menu and status idle running starting error states',
+      'Image display count style and model select states',
+      'Model list shortcut table and sortable placeholder states',
+      'Markdown mermaid SVG and artifact preview states',
       'Root route shell provider and outlet state',
+      'App icons provider avatars file icons and static feedback states',
     ],
     storyTargets: [
+      ['src/renderer/components/ui/command', 'src/renderer/components/ui/dialog'],
       [
         'src/renderer/components/Accordion',
         'src/renderer/components/ActionMenu',
         'src/renderer/components/AdaptiveSelect',
         'src/renderer/components/StyledMenu',
       ],
+      [
+        'src/renderer/components/dev/DevHeader',
+        'src/renderer/components/dev/SessionAttachmentRagDevPane',
+        'src/renderer/components/dev/ThemeSwitchButton',
+        'src/renderer/components/ErrorTestPannel',
+      ],
+      ['src/renderer/components/mcp/MCPMenu', 'src/renderer/components/mcp/MCPStatus'],
+      [
+        'src/renderer/components/Image',
+        'src/renderer/components/ImageCountSlider',
+        'src/renderer/components/ImageModelSelect',
+        'src/renderer/components/ImageStyleSelect',
+      ],
+      ['src/renderer/components/ModelList', 'src/renderer/components/Shortcut', 'src/renderer/components/SortableItem'],
+      ['src/renderer/components/Artifact', 'src/renderer/components/Markdown', 'src/renderer/components/Mermaid'],
+      ['src/renderer/routes/__root'],
       [
         'src/renderer/components/CustomProviderIcon',
         'src/renderer/components/Disclaimer',
@@ -5304,40 +5372,18 @@ export const uiInventoryItems: UiInventoryItem[] = [
         'src/renderer/components/icons/Robot',
         'src/renderer/components/SponsorChip',
       ],
-      [
-        'src/renderer/components/Image',
-        'src/renderer/components/ImageCountSlider',
-        'src/renderer/components/ImageModelSelect',
-        'src/renderer/components/ImageStyleSelect',
-      ],
-      ['src/renderer/components/Artifact', 'src/renderer/components/Markdown', 'src/renderer/components/Mermaid'],
-      ['src/renderer/components/mcp/MCPMenu', 'src/renderer/components/mcp/MCPStatus'],
-      [
-        'src/renderer/components/ModelList',
-        'src/renderer/components/Shortcut',
-        'src/renderer/components/task/DirectoryMenu',
-        'src/renderer/components/SortableItem',
-      ],
-      [
-        'src/renderer/components/dev/DevHeader',
-        'src/renderer/components/dev/SessionAttachmentRagDevPane',
-        'src/renderer/components/dev/ThemeSwitchButton',
-        'src/renderer/components/ErrorTestPannel',
-      ],
-      ['src/renderer/components/ui/command', 'src/renderer/components/ui/dialog'],
-      ['src/renderer/routes/__root'],
     ],
     storybookTitle: 'Real Components/App Base',
     storybookIds: [
-      'real-components-app-base--controls-and-menus-states',
-      'real-components-app-base--visual-identity-states',
-      'real-components-app-base--media-and-generation-controls-states',
-      'real-components-app-base--rich-content-states',
-      'real-components-app-base--mcp-runtime-states',
-      'real-components-app-base--model-shortcut-and-task-states',
-      'real-components-app-base--dev-tools-states',
-      'real-components-app-base--command-and-dialog-states',
-      'real-components-app-base--root-route-shell-state',
+      'real-components-app-base--command-palette-primitives-and-dialog-primitives-states',
+      'real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
+      'real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+      'real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states',
+      'real-components-app-base--image-display-count-style-and-model-select-states',
+      'real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states',
+      'real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states',
+      'real-components-app-base--root-route-shell-provider-and-outlet-state',
+      'real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
     ],
     dependencies: [
       'src/renderer/components/Accordion',
@@ -5381,70 +5427,72 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'src/renderer/components/Shortcut',
       'src/renderer/components/SponsorChip',
       'src/renderer/components/StyledMenu',
-      'src/renderer/components/task/DirectoryMenu',
       'src/renderer/components/ui/command',
       'src/renderer/components/ui/dialog',
     ],
     previewLinks: [
       {
+        label: 'Storybook: Command palette primitives and dialog primitives states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-palette-primitives-and-dialog-primitives-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--command-palette-primitives-and-dialog-primitives-states&viewMode=story',
+      },
+      {
         label: 'Storybook: App controls accordion action menu adaptive select and styled menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--controls-and-menus-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--controls-and-menus-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: App icons provider avatars file icons and static feedback states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--visual-identity-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--visual-identity-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Image display count style and model select states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--media-and-generation-controls-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--media-and-generation-controls-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Markdown mermaid SVG and artifact preview states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--rich-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--rich-content-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: MCP menu and status idle running starting error states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-runtime-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-runtime-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Model list shortcut table directory menu and sortable placeholder states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-shortcut-and-task-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--model-shortcut-and-task-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states&viewMode=story',
       },
       {
         label: 'Storybook: Dev header theme switch session RAG pane and error test panel states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-tools-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-app-base--dev-tools-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--dev-header-theme-switch-session-rag-pane-and-error-test-panel-states&viewMode=story',
       },
       {
-        label: 'Storybook: Command palette primitives and dialog primitives states',
+        label: 'Storybook: MCP menu and status idle running starting error states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-and-dialog-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--command-and-dialog-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--mcp-menu-and-status-idle-running-starting-error-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Image display count style and model select states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--image-display-count-style-and-model-select-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--image-display-count-style-and-model-select-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Model list shortcut table and sortable placeholder states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--model-list-shortcut-table-and-sortable-placeholder-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Markdown mermaid SVG and artifact preview states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--markdown-mermaid-svg-and-artifact-preview-states&viewMode=story',
       },
       {
         label: 'Storybook: Root route shell provider and outlet state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--root-route-shell-state',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--root-route-shell-provider-and-outlet-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--root-route-shell-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--root-route-shell-provider-and-outlet-state&viewMode=story',
+      },
+      {
+        label: 'Storybook: App icons provider avatars file icons and static feedback states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-icons-provider-avatars-file-icons-and-static-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5500,32 +5548,32 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'SummaryMessageStates',
     ],
     storyNames: [
-      'Message system user assistant error generating attachment states',
-      'Message list grouped conversation summary navigation states',
-      'Message loading and tool preparation states',
       'Message attachments with files, links, and RAG states',
       'Compaction running and failed states',
-      'Summary message latest editable state',
+      'Message list grouped conversation summary navigation states',
+      'Message loading and tool preparation states',
+      'Message system user assistant error generating attachment states',
       'Message navigation floating controls',
+      'Summary message latest editable state',
     ],
     storyTargets: [
-      ['src/renderer/components/chat/Message'],
-      ['src/renderer/components/chat/MessageList'],
-      ['src/renderer/components/chat/MessageLoading'],
       ['src/renderer/components/chat/MessageAttachmentGrid'],
       ['src/renderer/components/chat/CompactionStatus'],
-      ['src/renderer/components/chat/SummaryMessage'],
+      ['src/renderer/components/chat/MessageList'],
+      ['src/renderer/components/chat/MessageLoading'],
+      ['src/renderer/components/chat/Message'],
       ['src/renderer/components/chat/MessageNavigation'],
+      ['src/renderer/components/chat/SummaryMessage'],
     ],
     storybookTitle: 'Real Components/Chat Surfaces',
     storybookIds: [
-      'real-components-chat-surfaces--message-states',
-      'real-components-chat-surfaces--message-list-states',
-      'real-components-chat-surfaces--message-loading-states',
-      'real-components-chat-surfaces--attachment-grid-states',
-      'real-components-chat-surfaces--compaction-status-states',
-      'real-components-chat-surfaces--summary-message-states',
-      'real-components-chat-surfaces--navigation-controls',
+      'real-components-chat-surfaces--message-attachments-with-files-links-and-rag-states',
+      'real-components-chat-surfaces--compaction-running-and-failed-states',
+      'real-components-chat-surfaces--message-list-grouped-conversation-summary-navigation-states',
+      'real-components-chat-surfaces--message-loading-and-tool-preparation-states',
+      'real-components-chat-surfaces--message-system-user-assistant-error-generating-attachment-states',
+      'real-components-chat-surfaces--message-navigation-floating-controls',
+      'real-components-chat-surfaces--summary-message-latest-editable-state',
     ],
     dependencies: [
       'src/renderer/components/chat/CompactionStatus',
@@ -5538,52 +5586,53 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Message system user assistant error generating attachment states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Message list grouped conversation summary navigation states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-list-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-list-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Message loading and tool preparation states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-loading-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-loading-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Message attachments with files, links, and RAG states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--attachment-grid-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-attachments-with-files-links-and-rag-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--attachment-grid-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-attachments-with-files-links-and-rag-states&viewMode=story',
       },
       {
         label: 'Storybook: Compaction running and failed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--compaction-status-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--compaction-running-and-failed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--compaction-status-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--compaction-running-and-failed-states&viewMode=story',
       },
       {
-        label: 'Storybook: Summary message latest editable state',
+        label: 'Storybook: Message list grouped conversation summary navigation states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--summary-message-states',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-list-grouped-conversation-summary-navigation-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--summary-message-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-list-grouped-conversation-summary-navigation-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Message loading and tool preparation states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-loading-and-tool-preparation-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-loading-and-tool-preparation-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Message system user assistant error generating attachment states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-system-user-assistant-error-generating-attachment-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-system-user-assistant-error-generating-attachment-states&viewMode=story',
       },
       {
         label: 'Storybook: Message navigation floating controls',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--navigation-controls',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--message-navigation-floating-controls',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--navigation-controls&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--message-navigation-floating-controls&viewMode=story',
+      },
+      {
+        label: 'Storybook: Summary message latest editable state',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-chat-surfaces--summary-message-latest-editable-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-chat-surfaces--summary-message-latest-editable-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5670,40 +5719,40 @@ export const uiInventoryItems: UiInventoryItem[] = [
     storyNames: [
       'Adaptive modal open actions and close button states',
       'Confirm delete button and menu item idle confirm states',
-      'Popover confirm opened and confirm action states',
-      'Message layout selector classic bubble selected states',
-      'Lazy number slider combined slider and context count states',
-      'Temperature and top-p slider settings states',
       'Creatable select password reset and mini button states',
+      'Message layout selector classic bubble selected states',
+      'Temperature and top-p slider settings states',
+      'Lazy number slider combined slider and context count states',
+      'Popover confirm opened and confirm action states',
     ],
     storyTargets: [
       ['src/renderer/components/common/AdaptiveModal'],
       ['src/renderer/components/common/ConfirmDeleteButton'],
-      ['src/renderer/components/common/PopoverConfirm'],
-      ['src/renderer/components/common/MessageLayoutPreview'],
-      [
-        'src/renderer/components/common/LazyNumberInput',
-        'src/renderer/components/common/LazySlider',
-        'src/renderer/components/common/SliderWithInput',
-        'src/renderer/components/common/MaxContextMessageCountSlider',
-      ],
-      ['src/renderer/components/common/TemperatureSlider', 'src/renderer/components/common/TopPSlider'],
       [
         'src/renderer/components/common/CreatableSelect',
         'src/renderer/components/common/PasswordTextField',
         'src/renderer/components/common/TextFieldReset',
         'src/renderer/components/common/MiniButton',
       ],
+      ['src/renderer/components/common/MessageLayoutPreview'],
+      ['src/renderer/components/common/TemperatureSlider', 'src/renderer/components/common/TopPSlider'],
+      [
+        'src/renderer/components/common/LazyNumberInput',
+        'src/renderer/components/common/LazySlider',
+        'src/renderer/components/common/SliderWithInput',
+        'src/renderer/components/common/MaxContextMessageCountSlider',
+      ],
+      ['src/renderer/components/common/PopoverConfirm'],
     ],
     storybookTitle: 'Real Components/Common Controls',
     storybookIds: [
-      'real-components-common-controls--adaptive-modal-states',
-      'real-components-common-controls--confirm-delete-states',
-      'real-components-common-controls--popover-confirm-states',
-      'real-components-common-controls--message-layout-selector-states',
-      'real-components-common-controls--numeric-controls-states',
-      'real-components-common-controls--model-parameter-slider-states',
-      'real-components-common-controls--form-field-states',
+      'real-components-common-controls--adaptive-modal-open-actions-and-close-button-states',
+      'real-components-common-controls--confirm-delete-button-and-menu-item-idle-confirm-states',
+      'real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
+      'real-components-common-controls--message-layout-selector-classic-bubble-selected-states',
+      'real-components-common-controls--temperature-and-top-p-slider-settings-states',
+      'real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
+      'real-components-common-controls--popover-confirm-opened-and-confirm-action-states',
     ],
     dependencies: [
       'src/renderer/components/common/AdaptiveModal',
@@ -5726,51 +5775,51 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Adaptive modal open actions and close button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--adaptive-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--adaptive-modal-open-actions-and-close-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--adaptive-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--adaptive-modal-open-actions-and-close-button-states&viewMode=story',
       },
       {
         label: 'Storybook: Confirm delete button and menu item idle confirm states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--confirm-delete-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--confirm-delete-button-and-menu-item-idle-confirm-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--confirm-delete-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Popover confirm opened and confirm action states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--popover-confirm-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--popover-confirm-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Message layout selector classic bubble selected states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--message-layout-selector-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--message-layout-selector-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Lazy number slider combined slider and context count states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--numeric-controls-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--numeric-controls-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Temperature and top-p slider settings states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--model-parameter-slider-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--model-parameter-slider-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--confirm-delete-button-and-menu-item-idle-confirm-states&viewMode=story',
       },
       {
         label: 'Storybook: Creatable select password reset and mini button states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-controls--form-field-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--creatable-select-password-reset-and-mini-button-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-controls--form-field-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--creatable-select-password-reset-and-mini-button-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Message layout selector classic bubble selected states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--message-layout-selector-classic-bubble-selected-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--message-layout-selector-classic-bubble-selected-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Temperature and top-p slider settings states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--temperature-and-top-p-slider-settings-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--temperature-and-top-p-slider-settings-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Lazy number slider combined slider and context count states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--lazy-number-slider-combined-slider-and-context-count-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Popover confirm opened and confirm action states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-common-controls--popover-confirm-opened-and-confirm-action-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-controls--popover-confirm-opened-and-confirm-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5856,13 +5905,13 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     storybookTitle: 'Real Components/Common Feedback',
     storybookIds: [
-      'real-components-common-feedback--avatar-states',
-      'real-components-common-feedback--chatbox-ai-error-message-states',
-      'real-components-common-feedback--chatbox-welcome-card-states',
-      'real-components-common-feedback--compression-modal-states',
-      'real-components-common-feedback--error-boundary-states',
-      'real-components-common-feedback--inline-utility-states',
-      'real-components-common-feedback--toast-states',
+      'real-components-common-feedback--avatar-user-assistant-system-chat-picture-states',
+      'real-components-common-feedback--chatbox-ai-error-message-quota-license-file-and-web-browsing-states',
+      'real-components-common-feedback--chatbox-welcome-card-login-no-license-and-expired-states',
+      'real-components-common-feedback--compression-modal-opened-confirmation-state',
+      'real-components-common-feedback--error-boundary-fallback-and-retry-states',
+      'real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
+      'real-components-common-feedback--toast-stack-top-right-feedback-states',
     ],
     dependencies: [
       'src/renderer/components/common/Avatar',
@@ -5881,50 +5930,51 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Avatar user assistant system chat picture states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--avatar-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--avatar-user-assistant-system-chat-picture-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--avatar-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--avatar-user-assistant-system-chat-picture-states&viewMode=story',
       },
       {
         label: 'Storybook: Chatbox AI error message quota license file and web browsing states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-ai-error-message-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-ai-error-message-quota-license-file-and-web-browsing-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-ai-error-message-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-ai-error-message-quota-license-file-and-web-browsing-states&viewMode=story',
       },
       {
         label: 'Storybook: Chatbox welcome card login no-license and expired states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-welcome-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--chatbox-welcome-card-login-no-license-and-expired-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-welcome-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--chatbox-welcome-card-login-no-license-and-expired-states&viewMode=story',
       },
       {
         label: 'Storybook: Compression modal opened confirmation state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--compression-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--compression-modal-opened-confirmation-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--compression-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--compression-modal-opened-confirmation-state&viewMode=story',
       },
       {
         label: 'Storybook: Error boundary fallback and retry states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--error-boundary-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--error-boundary-fallback-and-retry-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--error-boundary-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--error-boundary-fallback-and-retry-states&viewMode=story',
       },
       {
         label: 'Storybook: Divider link mark scalable icon and segmented control states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--inline-utility-states',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-common-feedback--inline-utility-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--divider-link-mark-scalable-icon-and-segmented-control-states&viewMode=story',
       },
       {
         label: 'Storybook: Toast stack top-right feedback states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--toast-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-common-feedback--toast-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-common-feedback--toast-stack-top-right-feedback-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-common-feedback--toast-stack-top-right-feedback-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -5972,52 +6022,53 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     stories: ['CopilotDetailModalStates', 'CopilotItemStates', 'CopilotSettingsModalStates', 'ExpandableSearchStates'],
     storyNames: [
-      'Copilot item local starred remote and highlighted states',
       'Copilot detail local remote screenshots and action states',
+      'Copilot item local starred remote and highlighted states',
       'Copilot settings create edit form states',
       'Expandable search collapsed expanded and typed states',
     ],
     storyTargets: [
-      ['src/renderer/routes/copilots/-components/CopilotItem'],
       ['src/renderer/routes/copilots/-components/CopilotDetailModal'],
+      ['src/renderer/routes/copilots/-components/CopilotItem'],
       ['src/renderer/routes/copilots/-components/CopilotSettingsModal'],
       ['src/renderer/routes/copilots/-components/ExpandableSearch'],
     ],
     storybookTitle: 'Real Components/Copilots',
     storybookIds: [
-      'real-components-copilots--copilot-item-states',
-      'real-components-copilots--copilot-detail-modal-states',
-      'real-components-copilots--copilot-settings-modal-states',
-      'real-components-copilots--expandable-search-states',
+      'real-components-copilots--copilot-detail-local-remote-screenshots-and-action-states',
+      'real-components-copilots--copilot-item-local-starred-remote-and-highlighted-states',
+      'real-components-copilots--copilot-settings-create-edit-form-states',
+      'real-components-copilots--expandable-search-collapsed-expanded-and-typed-states',
     ],
     dependencies: [],
     previewLinks: [
       {
-        label: 'Storybook: Copilot item local starred remote and highlighted states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-item-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-item-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Copilot detail local remote screenshots and action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-detail-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-detail-local-remote-screenshots-and-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-detail-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-detail-local-remote-screenshots-and-action-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Copilot item local starred remote and highlighted states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-item-local-starred-remote-and-highlighted-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-item-local-starred-remote-and-highlighted-states&viewMode=story',
       },
       {
         label: 'Storybook: Copilot settings create edit form states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-settings-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-settings-create-edit-form-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-settings-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-settings-create-edit-form-states&viewMode=story',
       },
       {
         label: 'Storybook: Expandable search collapsed expanded and typed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--expandable-search-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--expandable-search-collapsed-expanded-and-typed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--expandable-search-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--expandable-search-collapsed-expanded-and-typed-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6089,61 +6140,63 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'UserTypeCardsStates',
     ],
     storyNames: [
-      'Guide action login settings license free trial and new chat states',
-      'Guide user type cards active disabled and selected states',
-      'Guide suggested questions active and disabled states',
       'Guide claim waiting card polling and escape actions',
+      'Guide action login settings license free trial and new chat states',
       'Guide message user assistant streaming and tool part states',
+      'Guide suggested questions active and disabled states',
+      'Guide user type cards active disabled and selected states',
     ],
     storyTargets: [
-      ['src/renderer/routes/guide/-components/ActionButton'],
-      ['src/renderer/routes/guide/-components/UserTypeCards'],
-      ['src/renderer/routes/guide/-components/SuggestedQuestions'],
       ['src/renderer/routes/guide/-components/ClaimWaitingCard'],
+      ['src/renderer/routes/guide/-components/ActionButton'],
       ['src/renderer/routes/guide/-components/GuideMessage'],
+      ['src/renderer/routes/guide/-components/SuggestedQuestions'],
+      ['src/renderer/routes/guide/-components/UserTypeCards'],
     ],
     storybookTitle: 'Real Components/Guide',
     storybookIds: [
-      'real-components-guide--guide-action-buttons-states',
-      'real-components-guide--user-type-cards-states',
-      'real-components-guide--suggested-questions-states',
-      'real-components-guide--claim-waiting-card-states',
-      'real-components-guide--guide-message-states',
+      'real-components-guide--guide-claim-waiting-card-polling-and-escape-actions',
+      'real-components-guide--guide-action-login-settings-license-free-trial-and-new-chat-states',
+      'real-components-guide--guide-message-user-assistant-streaming-and-tool-part-states',
+      'real-components-guide--guide-suggested-questions-active-and-disabled-states',
+      'real-components-guide--guide-user-type-cards-active-disabled-and-selected-states',
     ],
     dependencies: [],
     previewLinks: [
       {
-        label: 'Storybook: Guide action login settings license free trial and new chat states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-action-buttons-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--guide-action-buttons-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Guide user type cards active disabled and selected states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--user-type-cards-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-guide--user-type-cards-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Guide suggested questions active and disabled states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--suggested-questions-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--suggested-questions-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Guide claim waiting card polling and escape actions',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--claim-waiting-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-claim-waiting-card-polling-and-escape-actions',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--claim-waiting-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-claim-waiting-card-polling-and-escape-actions&viewMode=story',
+      },
+      {
+        label: 'Storybook: Guide action login settings license free trial and new chat states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-action-login-settings-license-free-trial-and-new-chat-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-action-login-settings-license-free-trial-and-new-chat-states&viewMode=story',
       },
       {
         label: 'Storybook: Guide message user assistant streaming and tool part states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-message-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-guide--guide-message-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-message-user-assistant-streaming-and-tool-part-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-message-user-assistant-streaming-and-tool-part-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Guide suggested questions active and disabled states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-suggested-questions-active-and-disabled-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-suggested-questions-active-and-disabled-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Guide user type cards active disabled and selected states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-user-type-cards-active-disabled-and-selected-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-user-type-cards-active-disabled-and-selected-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6177,18 +6230,18 @@ export const uiInventoryItems: UiInventoryItem[] = [
     storyNames: [
       'Default',
       'Long Session Title',
-      'Untitled Session',
       'No Thread Name',
       'Thread Name Same as Session (hidden)',
+      'Untitled Session',
     ],
     storyTargets: [[], [], [], [], []],
     storybookTitle: 'Real Components/Header',
     storybookIds: [
       'real-components-header--default',
-      'real-components-header--long-title',
-      'real-components-header--untitled-session',
+      'real-components-header--long-session-title',
       'real-components-header--no-thread-name',
-      'real-components-header--same-thread-name-as-session',
+      'real-components-header--thread-name-same-as-session-hidden',
+      'real-components-header--untitled-session',
     ],
     dependencies: ['src/renderer/components/layout/Header'],
     previewLinks: [
@@ -6201,14 +6254,8 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Long Session Title',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--long-title',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--long-title&viewMode=story',
-      },
-      {
-        label: 'Storybook: Untitled Session',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--untitled-session',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--untitled-session&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-header--long-session-title',
+        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--long-session-title&viewMode=story',
       },
       {
         label: 'Storybook: No Thread Name',
@@ -6219,9 +6266,15 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Thread Name Same as Session (hidden)',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-header--same-thread-name-as-session',
+        href: 'http://localhost:6006/?path=/story/real-components-header--thread-name-same-as-session-hidden',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-header--same-thread-name-as-session&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-header--thread-name-same-as-session-hidden&viewMode=story',
+      },
+      {
+        label: 'Storybook: Untitled Session',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-header--untitled-session',
+        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-header--untitled-session&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6312,10 +6365,10 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Image generation history item active desktop mobile and empty thumbnail states',
       'Image creator history panel loading empty populated and collapsed states',
       'Image generation error tips moderation provider and retrying states',
+      'Image creator shimmer loading animation state',
       'Image creator mobile history model and ratio drawer states',
       'Image creator prompt display with model and reference count states',
       'Image creator reference images preview removable and add states',
-      'Image creator shimmer loading animation state',
     ],
     storyTargets: [
       ['src/renderer/routes/image-creator/-components/EmptyState'],
@@ -6323,87 +6376,87 @@ export const uiInventoryItems: UiInventoryItem[] = [
       ['src/renderer/routes/image-creator/-components/HistoryItem'],
       ['src/renderer/routes/image-creator/-components/HistoryPanel'],
       ['src/renderer/routes/image-creator/-components/ImageGenerationErrorTips'],
+      ['src/renderer/routes/image-creator/-components/Shimmer'],
       ['src/renderer/routes/image-creator/-components/MobileDrawers'],
       ['src/renderer/routes/image-creator/-components/PromptDisplay'],
       ['src/renderer/routes/image-creator/-components/ReferenceImagesPreview'],
-      ['src/renderer/routes/image-creator/-components/Shimmer'],
     ],
     storybookTitle: 'Real Components/Image Creator',
     storybookIds: [
-      'real-components-image-creator--empty-state-states',
-      'real-components-image-creator--generated-images-gallery-states',
-      'real-components-image-creator--history-item-states',
-      'real-components-image-creator--history-panel-states',
-      'real-components-image-creator--image-generation-error-tips-states',
-      'real-components-image-creator--mobile-drawer-states',
-      'real-components-image-creator--prompt-display-states',
-      'real-components-image-creator--reference-images-preview-states',
-      'real-components-image-creator--loading-shimmer-states',
+      'real-components-image-creator--image-creator-empty-quick-prompt-states',
+      'real-components-image-creator--generated-images-gallery-desktop-aspect-hover-action-states',
+      'real-components-image-creator--image-generation-history-item-active-desktop-mobile-and-empty-thumbnail-states',
+      'real-components-image-creator--image-creator-history-panel-loading-empty-populated-and-collapsed-states',
+      'real-components-image-creator--image-generation-error-tips-moderation-provider-and-retrying-states',
+      'real-components-image-creator--image-creator-shimmer-loading-animation-state',
+      'real-components-image-creator--image-creator-mobile-history-model-and-ratio-drawer-states',
+      'real-components-image-creator--image-creator-prompt-display-with-model-and-reference-count-states',
+      'real-components-image-creator--image-creator-reference-images-preview-removable-and-add-states',
     ],
     dependencies: [],
     previewLinks: [
       {
         label: 'Storybook: Image creator empty quick prompt states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--empty-state-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-empty-quick-prompt-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--empty-state-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-empty-quick-prompt-states&viewMode=story',
       },
       {
         label: 'Storybook: Generated images gallery desktop aspect hover action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--generated-images-gallery-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--generated-images-gallery-desktop-aspect-hover-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--generated-images-gallery-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--generated-images-gallery-desktop-aspect-hover-action-states&viewMode=story',
       },
       {
         label: 'Storybook: Image generation history item active desktop mobile and empty thumbnail states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--history-item-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-history-item-active-desktop-mobile-and-empty-thumbnail-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--history-item-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-history-item-active-desktop-mobile-and-empty-thumbnail-states&viewMode=story',
       },
       {
         label: 'Storybook: Image creator history panel loading empty populated and collapsed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--history-panel-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-history-panel-loading-empty-populated-and-collapsed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--history-panel-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-history-panel-loading-empty-populated-and-collapsed-states&viewMode=story',
       },
       {
         label: 'Storybook: Image generation error tips moderation provider and retrying states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-error-tips-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-error-tips-moderation-provider-and-retrying-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-error-tips-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Image creator mobile history model and ratio drawer states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--mobile-drawer-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--mobile-drawer-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Image creator prompt display with model and reference count states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--prompt-display-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--prompt-display-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Image creator reference images preview removable and add states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--reference-images-preview-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--reference-images-preview-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-error-tips-moderation-provider-and-retrying-states&viewMode=story',
       },
       {
         label: 'Storybook: Image creator shimmer loading animation state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--loading-shimmer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-shimmer-loading-animation-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--loading-shimmer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-shimmer-loading-animation-state&viewMode=story',
+      },
+      {
+        label: 'Storybook: Image creator mobile history model and ratio drawer states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-mobile-history-model-and-ratio-drawer-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-mobile-history-model-and-ratio-drawer-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Image creator prompt display with model and reference count states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-prompt-display-with-model-and-reference-count-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-prompt-display-with-model-and-reference-count-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Image creator reference images preview removable and add states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-reference-images-preview-removable-and-add-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-reference-images-preview-removable-and-add-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6456,26 +6509,26 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'WebBrowsingButtonStates',
     ],
     storyNames: [
-      'Web browsing button active and inactive states',
-      'Session settings button enabled disabled and mobile states',
       'Image upload button desktop and mobile states',
       'Hidden image upload input configuration',
+      'Session settings button enabled disabled and mobile states',
       'Token count menu normal calculating and auto compaction states',
+      'Web browsing button active and inactive states',
     ],
     storyTargets: [
-      ['src/renderer/components/InputBox/WebBrowsingButton'],
-      ['src/renderer/components/InputBox/SessionSettingsButton'],
       ['src/renderer/components/InputBox/ImageUploadButton'],
       ['src/renderer/components/InputBox/ImageUploadInput'],
+      ['src/renderer/components/InputBox/SessionSettingsButton'],
       ['src/renderer/components/InputBox/TokenCountMenu'],
+      ['src/renderer/components/InputBox/WebBrowsingButton'],
     ],
     storybookTitle: 'Real Components/Input Controls',
     storybookIds: [
-      'real-components-input-controls--web-browsing-button-states',
-      'real-components-input-controls--session-settings-button-states',
-      'real-components-input-controls--image-upload-button-states',
-      'real-components-input-controls--image-upload-input-state',
-      'real-components-input-controls--token-count-menu-states',
+      'real-components-input-controls--image-upload-button-desktop-and-mobile-states',
+      'real-components-input-controls--hidden-image-upload-input-configuration',
+      'real-components-input-controls--session-settings-button-enabled-disabled-and-mobile-states',
+      'real-components-input-controls--token-count-menu-normal-calculating-and-auto-compaction-states',
+      'real-components-input-controls--web-browsing-button-active-and-inactive-states',
     ],
     dependencies: [
       'src/renderer/components/InputBox/ImageUploadButton',
@@ -6486,39 +6539,39 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Web browsing button active and inactive states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--web-browsing-button-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--web-browsing-button-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Session settings button enabled disabled and mobile states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--session-settings-button-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--session-settings-button-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Image upload button desktop and mobile states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-button-desktop-and-mobile-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-button-desktop-and-mobile-states&viewMode=story',
       },
       {
         label: 'Storybook: Hidden image upload input configuration',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--image-upload-input-state',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--hidden-image-upload-input-configuration',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--image-upload-input-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--hidden-image-upload-input-configuration&viewMode=story',
+      },
+      {
+        label: 'Storybook: Session settings button enabled disabled and mobile states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--session-settings-button-enabled-disabled-and-mobile-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--session-settings-button-enabled-disabled-and-mobile-states&viewMode=story',
       },
       {
         label: 'Storybook: Token count menu normal calculating and auto compaction states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-controls--token-count-menu-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--token-count-menu-normal-calculating-and-auto-compaction-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-controls--token-count-menu-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--token-count-menu-normal-calculating-and-auto-compaction-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web browsing button active and inactive states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-input-controls--web-browsing-button-active-and-inactive-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-input-controls--web-browsing-button-active-and-inactive-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6545,7 +6598,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     platformNotes: [],
     previewModes: [],
     text: [
-      'Actual agent mode capability panel with Auto/ON/OFF modes, web search, code execution, skills, MCP, and knowledge base rows.',
+      'Actual agent mode capability panel with AUTO/ON/OFF modes, web search, code execution, skills, MCP, and knowledge base rows.',
       'Actual chat composer with model selector, agent mode, file/image upload actions, token menu, send/stop, and session settings controls.',
       'Actual composer button with mode color, mode label, disabled state, and hover popover.',
       'Actual message attachment row with inline file, URL, retrieval indexing progress, ready, blocked, failed, and retry states.',
@@ -6593,29 +6646,29 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'MessageAttachmentStates',
     ],
     storyNames: [
-      'Agent mode panel auto on off unsupported and extension states',
       'Agent mode button auto on off unsupported popover states',
+      'Agent mode panel auto on off unsupported and extension states',
       'Attachment mini card image file processing completed error states',
-      'Message attachment inline retrieval indexed indexing blocked failed states',
       'Attachment parser type label local chatbox-ai mineru inline and indexed',
       'InputBox composer ready selected model generating and missing model states',
+      'Message attachment inline retrieval indexed indexing blocked failed states',
     ],
     storyTargets: [
-      ['src/renderer/components/InputBox/AgentModePanel'],
       ['src/renderer/components/InputBox/AgentModeButton'],
-      ['src/renderer/components/InputBox/Attachments'],
+      ['src/renderer/components/InputBox/AgentModePanel'],
       ['src/renderer/components/InputBox/Attachments'],
       ['src/renderer/components/InputBox/Attachments'],
       ['src/renderer/components/InputBox/InputBox'],
+      ['src/renderer/components/InputBox/Attachments'],
     ],
     storybookTitle: 'Real Components/Input Surfaces',
     storybookIds: [
-      'real-components-input-surfaces--agent-mode-panel-states',
-      'real-components-input-surfaces--agent-mode-button-states',
-      'real-components-input-surfaces--attachment-mini-card-states',
-      'real-components-input-surfaces--message-attachment-states',
-      'real-components-input-surfaces--attachment-parser-type-states',
-      'real-components-input-surfaces--input-box-composer-states',
+      'real-components-input-surfaces--agent-mode-button-auto-on-off-unsupported-popover-states',
+      'real-components-input-surfaces--agent-mode-panel-auto-on-off-unsupported-and-extension-states',
+      'real-components-input-surfaces--attachment-mini-card-image-file-processing-completed-error-states',
+      'real-components-input-surfaces--attachment-parser-type-label-local-chatbox-ai-mineru-inline-and-indexed',
+      'real-components-input-surfaces--input-box-composer-ready-selected-model-generating-and-missing-model-states',
+      'real-components-input-surfaces--message-attachment-inline-retrieval-indexed-indexing-blocked-failed-states',
     ],
     dependencies: [
       'src/renderer/components/InputBox/AgentModeButton',
@@ -6625,46 +6678,46 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Agent mode panel auto on off unsupported and extension states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-panel-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-panel-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Agent mode button auto on off unsupported popover states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-button-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-button-auto-on-off-unsupported-popover-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-button-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-button-auto-on-off-unsupported-popover-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Agent mode panel auto on off unsupported and extension states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--agent-mode-panel-auto-on-off-unsupported-and-extension-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--agent-mode-panel-auto-on-off-unsupported-and-extension-states&viewMode=story',
       },
       {
         label: 'Storybook: Attachment mini card image file processing completed error states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-mini-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-mini-card-image-file-processing-completed-error-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-mini-card-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Message attachment inline retrieval indexed indexing blocked failed states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--message-attachment-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--message-attachment-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-mini-card-image-file-processing-completed-error-states&viewMode=story',
       },
       {
         label: 'Storybook: Attachment parser type label local chatbox-ai mineru inline and indexed',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-parser-type-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--attachment-parser-type-label-local-chatbox-ai-mineru-inline-and-indexed',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-parser-type-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--attachment-parser-type-label-local-chatbox-ai-mineru-inline-and-indexed&viewMode=story',
       },
       {
         label: 'Storybook: InputBox composer ready selected model generating and missing model states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--input-box-composer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--input-box-composer-ready-selected-model-generating-and-missing-model-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--input-box-composer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--input-box-composer-ready-selected-model-generating-and-missing-model-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Message attachment inline retrieval indexed indexing blocked failed states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-input-surfaces--message-attachment-inline-retrieval-indexed-indexing-blocked-failed-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-input-surfaces--message-attachment-inline-retrieval-indexed-indexing-blocked-failed-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6736,14 +6789,13 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'KnowledgeBasePageStates',
     ],
     storyNames: [
-      'Knowledge base page list documents and provider states',
       'Knowledge base documents upload ready processing paused failed states',
       'Knowledge base form provider parser model and action states',
       'Knowledge base menu selected and create states',
       'Knowledge base chunks preview and remote retry modal states',
+      'Knowledge base page list documents and provider states',
     ],
     storyTargets: [
-      ['src/renderer/components/knowledge-base/KnowledgeBase'],
       ['src/renderer/components/knowledge-base/KnowledgeBaseDocuments'],
       ['src/renderer/components/knowledge-base/KnowledgeBaseForm'],
       ['src/renderer/components/knowledge-base/KnowledgeBaseMenu'],
@@ -6751,14 +6803,15 @@ export const uiInventoryItems: UiInventoryItem[] = [
         'src/renderer/components/knowledge-base/ChunksPreviewModal',
         'src/renderer/components/knowledge-base/RemoteRetryModal',
       ],
+      ['src/renderer/components/knowledge-base/KnowledgeBase'],
     ],
     storybookTitle: 'Real Components/Knowledge Base',
     storybookIds: [
-      'real-components-knowledge-base--knowledge-base-page-states',
-      'real-components-knowledge-base--knowledge-base-documents-states',
-      'real-components-knowledge-base--knowledge-base-form-states',
-      'real-components-knowledge-base--knowledge-base-menu-states',
-      'real-components-knowledge-base--knowledge-base-modal-states',
+      'real-components-knowledge-base--knowledge-base-documents-upload-ready-processing-paused-failed-states',
+      'real-components-knowledge-base--knowledge-base-form-provider-parser-model-and-action-states',
+      'real-components-knowledge-base--knowledge-base-menu-selected-and-create-states',
+      'real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states',
+      'real-components-knowledge-base--knowledge-base-page-list-documents-and-provider-states',
     ],
     dependencies: [
       'src/renderer/components/knowledge-base/ChunksPreviewModal',
@@ -6770,39 +6823,39 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Knowledge base page list documents and provider states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-page-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-page-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Knowledge base documents upload ready processing paused failed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-documents-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-documents-upload-ready-processing-paused-failed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-documents-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-documents-upload-ready-processing-paused-failed-states&viewMode=story',
       },
       {
         label: 'Storybook: Knowledge base form provider parser model and action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-form-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-form-provider-parser-model-and-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-form-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-form-provider-parser-model-and-action-states&viewMode=story',
       },
       {
         label: 'Storybook: Knowledge base menu selected and create states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-menu-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-menu-selected-and-create-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-menu-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-menu-selected-and-create-states&viewMode=story',
       },
       {
         label: 'Storybook: Knowledge base chunks preview and remote retry modal states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-chunks-preview-and-remote-retry-modal-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Knowledge base page list documents and provider states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-knowledge-base--knowledge-base-page-list-documents-and-provider-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-knowledge-base--knowledge-base-page-list-documents-and-provider-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6876,29 +6929,29 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'WindowControlsStates',
     ],
     storyNames: [
+      'Desktop download reminder web floating prompt state',
+      'Exit fullscreen hit area state',
+      'Overlay modal drawer stacked escape management states',
       'Page header sidebar title and action states',
       'Toolbar search layout thread history and menu states',
       'Window controls normal and maximized desktop states',
-      'Overlay modal drawer stacked escape management states',
-      'Exit fullscreen hit area state',
-      'Desktop download reminder web floating prompt state',
     ],
     storyTargets: [
+      ['src/renderer/components/layout/DesktopDownloadReminder'],
+      ['src/renderer/components/layout/ExitFullscreenButton'],
+      ['src/renderer/components/layout/Overlay'],
       ['src/renderer/components/layout/Page'],
       ['src/renderer/components/layout/Toolbar'],
       ['src/renderer/components/layout/WindowControls'],
-      ['src/renderer/components/layout/Overlay'],
-      ['src/renderer/components/layout/ExitFullscreenButton'],
-      ['src/renderer/components/layout/DesktopDownloadReminder'],
     ],
     storybookTitle: 'Real Components/Layout',
     storybookIds: [
-      'real-components-layout--page-states',
-      'real-components-layout--toolbar-states',
-      'real-components-layout--window-controls-states',
-      'real-components-layout--overlay-states',
-      'real-components-layout--exit-fullscreen-button-state',
-      'real-components-layout--desktop-download-reminder-state',
+      'real-components-layout--desktop-download-reminder-web-floating-prompt-state',
+      'real-components-layout--exit-fullscreen-hit-area-state',
+      'real-components-layout--overlay-modal-drawer-stacked-escape-management-states',
+      'real-components-layout--page-header-sidebar-title-and-action-states',
+      'real-components-layout--toolbar-search-layout-thread-history-and-menu-states',
+      'real-components-layout--window-controls-normal-and-maximized-desktop-states',
     ],
     dependencies: [
       'src/renderer/components/common/ScalableIcon',
@@ -6911,43 +6964,46 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Page header sidebar title and action states',
+        label: 'Storybook: Desktop download reminder web floating prompt state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--page-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--page-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Toolbar search layout thread history and menu states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--toolbar-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--toolbar-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Window controls normal and maximized desktop states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--window-controls-states',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--desktop-download-reminder-web-floating-prompt-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--window-controls-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Overlay modal drawer stacked escape management states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--overlay-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-layout--overlay-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--desktop-download-reminder-web-floating-prompt-state&viewMode=story',
       },
       {
         label: 'Storybook: Exit fullscreen hit area state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--exit-fullscreen-button-state',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--exit-fullscreen-hit-area-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--exit-fullscreen-button-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--exit-fullscreen-hit-area-state&viewMode=story',
       },
       {
-        label: 'Storybook: Desktop download reminder web floating prompt state',
+        label: 'Storybook: Overlay modal drawer stacked escape management states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-layout--desktop-download-reminder-state',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--overlay-modal-drawer-stacked-escape-management-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-layout--desktop-download-reminder-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-layout--overlay-modal-drawer-stacked-escape-management-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Page header sidebar title and action states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--page-header-sidebar-title-and-action-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--page-header-sidebar-title-and-action-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Toolbar search layout thread history and menu states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--toolbar-search-layout-thread-history-and-menu-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--toolbar-search-layout-thread-history-and-menu-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Window controls normal and maximized desktop states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-layout--window-controls-normal-and-maximized-desktop-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-layout--window-controls-normal-and-maximized-desktop-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -6990,33 +7046,47 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'WithoutRetry',
     ],
     storyNames: [
-      'Generic Error',
-      'Generic Error — Bubble Layout',
-      'Network Error (fetch failed)',
-      'Rate Limit Error (429)',
       'Auth Error (401)',
       'Context Length Error',
-      'Server Error (500)',
+      'Generic Error',
+      'Generic Error — Bubble Layout',
       'Long Error with Response Body',
-      'Error Without Retry Button',
       'Multiple Error Types Comparison',
+      'Network Error (fetch failed)',
+      'Rate Limit Error (429)',
+      'Server Error (500)',
+      'Error Without Retry Button',
     ],
     storyTargets: [[], [], [], [], [], [], [], [], [], []],
     storybookTitle: 'Real Components/MessageErrTips',
     storybookIds: [
+      'real-components-messageerrtips--auth-error-401',
+      'real-components-messageerrtips--context-length-error',
       'real-components-messageerrtips--generic-error',
       'real-components-messageerrtips--generic-error-bubble-layout',
-      'real-components-messageerrtips--network-error',
-      'real-components-messageerrtips--rate-limit-error',
-      'real-components-messageerrtips--auth-error',
-      'real-components-messageerrtips--context-length-error',
-      'real-components-messageerrtips--server-error',
       'real-components-messageerrtips--long-error-with-response-body',
-      'real-components-messageerrtips--without-retry',
-      'real-components-messageerrtips--multiple-errors',
+      'real-components-messageerrtips--multiple-error-types-comparison',
+      'real-components-messageerrtips--network-error-fetch-failed',
+      'real-components-messageerrtips--rate-limit-error-429',
+      'real-components-messageerrtips--server-error-500',
+      'real-components-messageerrtips--error-without-retry-button',
     ],
     dependencies: ['src/renderer/components/chat/MessageErrTips'],
     previewLinks: [
+      {
+        label: 'Storybook: Auth Error (401)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--auth-error-401',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--auth-error-401&viewMode=story',
+      },
+      {
+        label: 'Storybook: Context Length Error',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--context-length-error',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--context-length-error&viewMode=story',
+      },
       {
         label: 'Storybook: Generic Error',
         kind: 'storybook',
@@ -7031,38 +7101,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-messageerrtips--generic-error-bubble-layout&viewMode=story',
       },
       {
-        label: 'Storybook: Network Error (fetch failed)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--network-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--network-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Rate Limit Error (429)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--rate-limit-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--rate-limit-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Auth Error (401)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--auth-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--auth-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Context Length Error',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--context-length-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--context-length-error&viewMode=story',
-      },
-      {
-        label: 'Storybook: Server Error (500)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--server-error',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--server-error&viewMode=story',
-      },
-      {
         label: 'Storybook: Long Error with Response Body',
         kind: 'storybook',
         href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--long-error-with-response-body',
@@ -7070,17 +7108,39 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-messageerrtips--long-error-with-response-body&viewMode=story',
       },
       {
-        label: 'Storybook: Error Without Retry Button',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--without-retry',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-messageerrtips--without-retry&viewMode=story',
-      },
-      {
         label: 'Storybook: Multiple Error Types Comparison',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--multiple-errors',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--multiple-error-types-comparison',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--multiple-errors&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--multiple-error-types-comparison&viewMode=story',
+      },
+      {
+        label: 'Storybook: Network Error (fetch failed)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--network-error-fetch-failed',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--network-error-fetch-failed&viewMode=story',
+      },
+      {
+        label: 'Storybook: Rate Limit Error (429)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--rate-limit-error-429',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--rate-limit-error-429&viewMode=story',
+      },
+      {
+        label: 'Storybook: Server Error (500)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--server-error-500',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--server-error-500&viewMode=story',
+      },
+      {
+        label: 'Storybook: Error Without Retry Button',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-messageerrtips--error-without-retry-button',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-messageerrtips--error-without-retry-button&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7189,173 +7249,183 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'WelcomeStates',
     ],
     storyNames: [
-      'Modal registry real NiceModal registration preview',
       'App Store rating modal rate now and maybe later actions',
+      'Artifact preview modal html preview refresh and close states',
       'Attach link modal multiline URL entry states',
       'Clear session list modal numeric retention state',
+      'Content viewer modal parser index metadata content copy state',
+      'EdgeOne deploy success modal link copy and open states',
       'Export chat modal scope format warning states',
       'File parse error modal unknown and file-specific state',
       'JSON viewer modal pretty printed copy state',
-      'EdgeOne deploy success modal link copy and open states',
+      'Message edit modal role text parts and save states',
+      'Modal registry real NiceModal registration preview',
       'Model edit modal existing chat model capability states',
       'Report content modal type and detail states',
-      'Welcome modal setup provider and later states',
-      'Artifact preview modal html preview refresh and close states',
-      'Content viewer modal parser index metadata content copy state',
-      'Message edit modal role text parts and save states',
       'Session settings modal chat config background and system prompt states',
-      'Thread name edit modal current and historical thread states',
       'Settings modal general route and navigation shell state',
+      'Thread name edit modal current and historical thread states',
+      'Welcome modal setup provider and later states',
     ],
     storyTargets: [
-      ['src/renderer/modals/index'],
       ['src/renderer/modals/AppStoreRating'],
+      ['src/renderer/modals/ArtifactPreview'],
       ['src/renderer/modals/AttachLink'],
       ['src/renderer/modals/ClearSessionList'],
+      ['src/renderer/modals/ContentViewer'],
+      ['src/renderer/modals/EdgeOneDeploySuccess'],
       ['src/renderer/modals/ExportChat'],
       ['src/renderer/modals/FileParseError'],
       ['src/renderer/modals/JsonViewer'],
-      ['src/renderer/modals/EdgeOneDeploySuccess'],
+      ['src/renderer/modals/MessageEdit'],
+      ['src/renderer/modals/index'],
       ['src/renderer/modals/ModelEdit'],
       ['src/renderer/modals/ReportContent'],
-      ['src/renderer/modals/Welcome'],
-      ['src/renderer/modals/ArtifactPreview'],
-      ['src/renderer/modals/ContentViewer'],
-      ['src/renderer/modals/MessageEdit'],
       ['src/renderer/modals/SessionSettings'],
-      ['src/renderer/modals/ThreadNameEdit'],
       ['src/renderer/modals/Settings'],
+      ['src/renderer/modals/ThreadNameEdit'],
+      ['src/renderer/modals/Welcome'],
     ],
     storybookTitle: 'Real Components/Modals',
     storybookIds: [
-      'real-components-modals--modal-registry-states',
-      'real-components-modals--app-store-rating-states',
-      'real-components-modals--attach-link-states',
-      'real-components-modals--clear-session-list-states',
-      'real-components-modals--export-chat-states',
-      'real-components-modals--file-parse-error-states',
-      'real-components-modals--json-viewer-states',
-      'real-components-modals--edge-one-deploy-success-states',
-      'real-components-modals--model-edit-states',
-      'real-components-modals--report-content-states',
-      'real-components-modals--welcome-states',
-      'real-components-modals--artifact-preview-states',
-      'real-components-modals--content-viewer-states',
-      'real-components-modals--message-edit-states',
-      'real-components-modals--session-settings-states',
-      'real-components-modals--thread-name-edit-states',
-      'real-components-modals--settings-modal-states',
+      'real-components-modals--app-store-rating-modal-rate-now-and-maybe-later-actions',
+      'real-components-modals--artifact-preview-modal-html-preview-refresh-and-close-states',
+      'real-components-modals--attach-link-modal-multiline-url-entry-states',
+      'real-components-modals--clear-session-list-modal-numeric-retention-state',
+      'real-components-modals--content-viewer-modal-parser-index-metadata-content-copy-state',
+      'real-components-modals--edge-one-deploy-success-modal-link-copy-and-open-states',
+      'real-components-modals--export-chat-modal-scope-format-warning-states',
+      'real-components-modals--file-parse-error-modal-unknown-and-file-specific-state',
+      'real-components-modals--json-viewer-modal-pretty-printed-copy-state',
+      'real-components-modals--message-edit-modal-role-text-parts-and-save-states',
+      'real-components-modals--modal-registry-real-nice-modal-registration-preview',
+      'real-components-modals--model-edit-modal-existing-chat-model-capability-states',
+      'real-components-modals--report-content-modal-type-and-detail-states',
+      'real-components-modals--session-settings-modal-chat-config-background-and-system-prompt-states',
+      'real-components-modals--settings-modal-general-route-and-navigation-shell-state',
+      'real-components-modals--thread-name-edit-modal-current-and-historical-thread-states',
+      'real-components-modals--welcome-modal-setup-provider-and-later-states',
     ],
     dependencies: [],
     previewLinks: [
       {
-        label: 'Storybook: Modal registry real NiceModal registration preview',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--modal-registry-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--modal-registry-states&viewMode=story',
-      },
-      {
         label: 'Storybook: App Store rating modal rate now and maybe later actions',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--app-store-rating-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--app-store-rating-modal-rate-now-and-maybe-later-actions',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--app-store-rating-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Attach link modal multiline URL entry states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--attach-link-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--attach-link-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Clear session list modal numeric retention state',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--clear-session-list-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--clear-session-list-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Export chat modal scope format warning states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--export-chat-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--export-chat-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: File parse error modal unknown and file-specific state',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--file-parse-error-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--file-parse-error-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: JSON viewer modal pretty printed copy state',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--json-viewer-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--json-viewer-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: EdgeOne deploy success modal link copy and open states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--edge-one-deploy-success-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--edge-one-deploy-success-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Model edit modal existing chat model capability states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--model-edit-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--model-edit-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Report content modal type and detail states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--report-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--report-content-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Welcome modal setup provider and later states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--welcome-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--welcome-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--app-store-rating-modal-rate-now-and-maybe-later-actions&viewMode=story',
       },
       {
         label: 'Storybook: Artifact preview modal html preview refresh and close states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--artifact-preview-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--artifact-preview-modal-html-preview-refresh-and-close-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--artifact-preview-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--artifact-preview-modal-html-preview-refresh-and-close-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Attach link modal multiline URL entry states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--attach-link-modal-multiline-url-entry-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--attach-link-modal-multiline-url-entry-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Clear session list modal numeric retention state',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--clear-session-list-modal-numeric-retention-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--clear-session-list-modal-numeric-retention-state&viewMode=story',
       },
       {
         label: 'Storybook: Content viewer modal parser index metadata content copy state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--content-viewer-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--content-viewer-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--content-viewer-modal-parser-index-metadata-content-copy-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--content-viewer-modal-parser-index-metadata-content-copy-state&viewMode=story',
+      },
+      {
+        label: 'Storybook: EdgeOne deploy success modal link copy and open states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--edge-one-deploy-success-modal-link-copy-and-open-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--edge-one-deploy-success-modal-link-copy-and-open-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Export chat modal scope format warning states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--export-chat-modal-scope-format-warning-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--export-chat-modal-scope-format-warning-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: File parse error modal unknown and file-specific state',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--file-parse-error-modal-unknown-and-file-specific-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--file-parse-error-modal-unknown-and-file-specific-state&viewMode=story',
+      },
+      {
+        label: 'Storybook: JSON viewer modal pretty printed copy state',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--json-viewer-modal-pretty-printed-copy-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--json-viewer-modal-pretty-printed-copy-state&viewMode=story',
       },
       {
         label: 'Storybook: Message edit modal role text parts and save states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--message-edit-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--message-edit-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--message-edit-modal-role-text-parts-and-save-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--message-edit-modal-role-text-parts-and-save-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Modal registry real NiceModal registration preview',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--modal-registry-real-nice-modal-registration-preview',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--modal-registry-real-nice-modal-registration-preview&viewMode=story',
+      },
+      {
+        label: 'Storybook: Model edit modal existing chat model capability states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--model-edit-modal-existing-chat-model-capability-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--model-edit-modal-existing-chat-model-capability-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Report content modal type and detail states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--report-content-modal-type-and-detail-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--report-content-modal-type-and-detail-states&viewMode=story',
       },
       {
         label: 'Storybook: Session settings modal chat config background and system prompt states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--session-settings-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--session-settings-modal-chat-config-background-and-system-prompt-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--session-settings-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Thread name edit modal current and historical thread states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--thread-name-edit-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--thread-name-edit-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--session-settings-modal-chat-config-background-and-system-prompt-states&viewMode=story',
       },
       {
         label: 'Storybook: Settings modal general route and navigation shell state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--settings-modal-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--settings-modal-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--settings-modal-general-route-and-navigation-shell-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--settings-modal-general-route-and-navigation-shell-state&viewMode=story',
+      },
+      {
+        label: 'Storybook: Thread name edit modal current and historical thread states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--thread-name-edit-modal-current-and-historical-thread-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--thread-name-edit-modal-current-and-historical-thread-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Welcome modal setup provider and later states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--welcome-modal-setup-provider-and-later-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--welcome-modal-setup-provider-and-later-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7422,26 +7492,26 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'ProviderHeaderStates',
     ],
     storyNames: [
-      'Model selector dropdown with configured providers',
       'Desktop model selector all favorite search disabled states',
       'Mobile model selector drawer states',
-      'Provider header default favorite mobile custom and collapsed states',
       'Model item selected favorited disabled capability and drawer states',
+      'Model selector dropdown with configured providers',
+      'Provider header default favorite mobile custom and collapsed states',
     ],
     storyTargets: [
-      ['src/renderer/components/ModelSelector/index', 'src/renderer/components/ModelSelector/DesktopModelSelector'],
       ['src/renderer/components/ModelSelector/DesktopModelSelector'],
       ['src/renderer/components/ModelSelector/MobileModelSelector'],
-      ['src/renderer/components/ModelSelector/ProviderHeader'],
       ['src/renderer/components/ModelSelector/shared'],
+      ['src/renderer/components/ModelSelector/index', 'src/renderer/components/ModelSelector/DesktopModelSelector'],
+      ['src/renderer/components/ModelSelector/ProviderHeader'],
     ],
     storybookTitle: 'Real Components/Model Selector',
     storybookIds: [
-      'real-components-model-selector--model-selector-dropdown-states',
-      'real-components-model-selector--desktop-model-selector-states',
-      'real-components-model-selector--mobile-model-selector-states',
-      'real-components-model-selector--provider-header-states',
-      'real-components-model-selector--model-item-states',
+      'real-components-model-selector--desktop-model-selector-all-favorite-search-disabled-states',
+      'real-components-model-selector--mobile-model-selector-drawer-states',
+      'real-components-model-selector--model-item-selected-favorited-disabled-capability-and-drawer-states',
+      'real-components-model-selector--model-selector-dropdown-with-configured-providers',
+      'real-components-model-selector--provider-header-default-favorite-mobile-custom-and-collapsed-states',
     ],
     dependencies: [
       'src/renderer/components/ModelSelector',
@@ -7452,39 +7522,39 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Model selector dropdown with configured providers',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Desktop model selector all favorite search disabled states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--desktop-model-selector-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--desktop-model-selector-all-favorite-search-disabled-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--desktop-model-selector-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--desktop-model-selector-all-favorite-search-disabled-states&viewMode=story',
       },
       {
         label: 'Storybook: Mobile model selector drawer states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--mobile-model-selector-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--mobile-model-selector-drawer-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--mobile-model-selector-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Provider header default favorite mobile custom and collapsed states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--provider-header-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--provider-header-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--mobile-model-selector-drawer-states&viewMode=story',
       },
       {
         label: 'Storybook: Model item selected favorited disabled capability and drawer states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-item-states',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-item-selected-favorited-disabled-capability-and-drawer-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-item-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-item-selected-favorited-disabled-capability-and-drawer-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Model selector dropdown with configured providers',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--model-selector-dropdown-with-configured-providers',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--model-selector-dropdown-with-configured-providers&viewMode=story',
+      },
+      {
+        label: 'Storybook: Provider header default favorite mobile custom and collapsed states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-model-selector--provider-header-default-favorite-mobile-custom-and-collapsed-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-model-selector--provider-header-default-favorite-mobile-custom-and-collapsed-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7518,19 +7588,19 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     storyNames: [
       'Actively Thinking',
+      'Completed — No Streaming Mode (no timer)',
       'Completed — With Reasoning Content',
       'Completed — With Duration Timer',
-      'Completed — No Streaming Mode (no timer)',
       'Completed — Empty Content',
     ],
     storyTargets: [[], [], [], [], []],
     storybookTitle: 'Real Components/ReasoningContentUI',
     storybookIds: [
       'real-components-reasoningcontentui--actively-thinking',
-      'real-components-reasoningcontentui--completed-with-content',
-      'real-components-reasoningcontentui--completed-with-duration',
-      'real-components-reasoningcontentui--completed-no-streaming-mode',
-      'real-components-reasoningcontentui--empty-reasoning-content',
+      'real-components-reasoningcontentui--completed-no-streaming-mode-no-timer',
+      'real-components-reasoningcontentui--completed-with-reasoning-content',
+      'real-components-reasoningcontentui--completed-with-duration-timer',
+      'real-components-reasoningcontentui--completed-empty-content',
     ],
     dependencies: ['src/renderer/components/message-parts/ToolCallPartUI'],
     previewLinks: [
@@ -7542,32 +7612,32 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--actively-thinking&viewMode=story',
       },
       {
+        label: 'Storybook: Completed — No Streaming Mode (no timer)',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-no-streaming-mode-no-timer',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-no-streaming-mode-no-timer&viewMode=story',
+      },
+      {
         label: 'Storybook: Completed — With Reasoning Content',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-content',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-reasoning-content',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-content&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-reasoning-content&viewMode=story',
       },
       {
         label: 'Storybook: Completed — With Duration Timer',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-duration',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-with-duration-timer',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-duration&viewMode=story',
-      },
-      {
-        label: 'Storybook: Completed — No Streaming Mode (no timer)',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-no-streaming-mode',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-no-streaming-mode&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-with-duration-timer&viewMode=story',
       },
       {
         label: 'Storybook: Completed — Empty Content',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--empty-reasoning-content',
+        href: 'http://localhost:6006/?path=/story/real-components-reasoningcontentui--completed-empty-content',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--empty-reasoning-content&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-reasoningcontentui--completed-empty-content&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7585,7 +7655,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'StoryRouter',
       'StoryRouteSlot',
       'SurfaceLabel',
-      'TaskSessionListFixture',
       'ThreadHistoryDrawerFixture',
     ],
     states: ['opened', 'selected'],
@@ -7596,78 +7665,64 @@ export const uiInventoryItems: UiInventoryItem[] = [
     text: [
       'Actual session list row with assistant avatar, selected state, starred state, and picture session variant.',
       'Actual sortable chat session list with search action, clear action, selected row, starred row, and picture session row.',
-      'Actual task sidebar list with selected task, custom working directory, and default-directory display states.',
       'Actual thread history drawer populated from a real Session object with historical threads.',
       'Campaign hero image exploration',
-      'Draft onboarding notes',
       'Launch planning',
       'Positioning research',
       'Pricing page copy',
       'Product strategy and release notes',
-      'Review release blocker fixes',
       'Session item selected starred and picture states',
       'Session list search clear selected paginated states',
       'SessionItem',
       'SessionList',
       'Support reply drafts for enterprise users',
-      'Task session list selected directory states',
-      'TaskSessionList',
       'The drawer is opened through the same Jotai UI state used by the app.',
       'Thread history drawer with current and archived threads',
       'ThreadHistoryDrawer',
     ],
-    stories: ['SessionItemStates', 'SessionListStates', 'TaskSessionListStates', 'ThreadHistoryDrawerStates'],
+    stories: ['SessionItemStates', 'SessionListStates', 'ThreadHistoryDrawerStates'],
     storyNames: [
       'Session item selected starred and picture states',
-      'Thread history drawer with current and archived threads',
       'Session list search clear selected paginated states',
-      'Task session list selected directory states',
+      'Thread history drawer with current and archived threads',
     ],
     storyTargets: [
       ['src/renderer/components/session/SessionItem'],
-      ['src/renderer/components/session/ThreadHistoryDrawer'],
       ['src/renderer/components/session/SessionList'],
-      ['src/renderer/components/session/TaskSessionList'],
+      ['src/renderer/components/session/ThreadHistoryDrawer'],
     ],
     storybookTitle: 'Real Components/Session',
     storybookIds: [
-      'real-components-session--session-item-states',
-      'real-components-session--thread-history-drawer-states',
-      'real-components-session--session-list-states',
-      'real-components-session--task-session-list-states',
+      'real-components-session--session-item-selected-starred-and-picture-states',
+      'real-components-session--session-list-search-clear-selected-paginated-states',
+      'real-components-session--thread-history-drawer-with-current-and-archived-threads',
     ],
     dependencies: [
       'src/renderer/components/session/SessionItem',
       'src/renderer/components/session/SessionList',
-      'src/renderer/components/session/TaskSessionList',
       'src/renderer/components/session/ThreadHistoryDrawer',
     ],
     previewLinks: [
       {
         label: 'Storybook: Session item selected starred and picture states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--session-item-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-session--session-item-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Thread history drawer with current and archived threads',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--thread-history-drawer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-session--session-item-selected-starred-and-picture-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-session--thread-history-drawer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-session--session-item-selected-starred-and-picture-states&viewMode=story',
       },
       {
         label: 'Storybook: Session list search clear selected paginated states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--session-list-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-session--session-list-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-session--session-list-search-clear-selected-paginated-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-session--session-list-search-clear-selected-paginated-states&viewMode=story',
       },
       {
-        label: 'Storybook: Task session list selected directory states',
+        label: 'Storybook: Thread history drawer with current and archived threads',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-session--task-session-list-states',
+        href: 'http://localhost:6006/?path=/story/real-components-session--thread-history-drawer-with-current-and-archived-threads',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-session--task-session-list-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-session--thread-history-drawer-with-current-and-archived-threads&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7723,83 +7778,83 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'ModelManagementStates',
     ],
     storyNames: [
-      'Chatbox AI login view real account entry states',
       'Email code login modal email and verification states',
-      'License key view inactive activation and purchase states',
-      'Logged in account selected license and quota states',
-      'License selection modal active expired and quota states',
       'License detail card active expired quota and reward states',
+      'License key view inactive activation and purchase states',
+      'License selection modal active expired and quota states',
+      'Logged in account selected license and quota states',
+      'Chatbox AI login view real account entry states',
       'Model management list fetch reset add remove states',
     ],
     storyTargets: [
-      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LoginView'],
       ['src/renderer/routes/settings/provider/chatbox-ai/-components/EmailCodeLoginModal'],
-      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LicenseKeyView'],
-      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LoggedInView'],
-      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LicenseSelectionModal'],
       ['src/renderer/routes/settings/provider/chatbox-ai/-components/LicenseDetailCard'],
+      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LicenseKeyView'],
+      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LicenseSelectionModal'],
+      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LoggedInView'],
+      ['src/renderer/routes/settings/provider/chatbox-ai/-components/LoginView'],
       ['src/renderer/routes/settings/provider/chatbox-ai/-components/ModelManagement'],
     ],
     storybookTitle: 'Real Components/Settings Chatbox AI',
     storybookIds: [
-      'real-components-settings-chatbox-ai--login-view-states',
-      'real-components-settings-chatbox-ai--email-code-login-modal-states',
-      'real-components-settings-chatbox-ai--license-key-view-states',
-      'real-components-settings-chatbox-ai--logged-in-view-states',
-      'real-components-settings-chatbox-ai--license-selection-modal-states',
-      'real-components-settings-chatbox-ai--license-detail-card-states',
-      'real-components-settings-chatbox-ai--model-management-states',
+      'real-components-settings-chatbox-ai--email-code-login-modal-email-and-verification-states',
+      'real-components-settings-chatbox-ai--license-detail-card-active-expired-quota-and-reward-states',
+      'real-components-settings-chatbox-ai--license-key-view-inactive-activation-and-purchase-states',
+      'real-components-settings-chatbox-ai--license-selection-modal-active-expired-and-quota-states',
+      'real-components-settings-chatbox-ai--logged-in-account-selected-license-and-quota-states',
+      'real-components-settings-chatbox-ai--chatbox-ai-login-view-real-account-entry-states',
+      'real-components-settings-chatbox-ai--model-management-list-fetch-reset-add-remove-states',
     ],
     dependencies: [],
     previewLinks: [
       {
-        label: 'Storybook: Chatbox AI login view real account entry states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--login-view-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--login-view-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Email code login modal email and verification states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--email-code-login-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--email-code-login-modal-email-and-verification-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--email-code-login-modal-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: License key view inactive activation and purchase states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-key-view-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-key-view-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Logged in account selected license and quota states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--logged-in-view-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--logged-in-view-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: License selection modal active expired and quota states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-selection-modal-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-selection-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--email-code-login-modal-email-and-verification-states&viewMode=story',
       },
       {
         label: 'Storybook: License detail card active expired quota and reward states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-detail-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-detail-card-active-expired-quota-and-reward-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-detail-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-detail-card-active-expired-quota-and-reward-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: License key view inactive activation and purchase states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-key-view-inactive-activation-and-purchase-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-key-view-inactive-activation-and-purchase-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: License selection modal active expired and quota states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-selection-modal-active-expired-and-quota-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-selection-modal-active-expired-and-quota-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Logged in account selected license and quota states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--logged-in-account-selected-license-and-quota-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--logged-in-account-selected-license-and-quota-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Chatbox AI login view real account entry states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--chatbox-ai-login-view-real-account-entry-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--chatbox-ai-login-view-real-account-entry-states&viewMode=story',
       },
       {
         label: 'Storybook: Model management list fetch reset add remove states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--model-management-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--model-management-list-fetch-reset-add-remove-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--model-management-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--model-management-list-fetch-reset-add-remove-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -7903,50 +7958,50 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'SkillsSpotlightStates',
     ],
     storyNames: [
-      'Document parser desktop mineru and token states',
-      'Provider list activated featured custom and add states',
-      'Provider icon image aliases and fallback states',
       'Add provider modal name and API mode states',
-      'Import provider modal overwrite and model preview states',
-      'Provider spotlight quick actions popular and more providers',
       'Builtin MCP server premium accessible states',
       'Custom MCP server cards add edit and install states',
+      'Document parser desktop mineru and token states',
+      'GitHub install modal detected skill selection states',
+      'Import provider modal overwrite and model preview states',
       'MCP config modal http edit form states',
       'MCP registry spotlight custom import official and community states',
+      'Provider icon image aliases and fallback states',
+      'Provider list activated featured custom and add states',
+      'Provider spotlight quick actions popular and more providers',
       'Skills section builtin user claude and GitHub install entry states',
       'Skills spotlight popular installed and replacement states',
-      'GitHub install modal detected skill selection states',
     ],
     storyTargets: [
-      ['src/renderer/components/settings/DocumentParserSettings'],
-      ['src/renderer/components/settings/provider/ProviderList'],
-      ['src/renderer/components/settings/provider/providerIcons'],
       ['src/renderer/components/settings/provider/AddProviderModal'],
-      ['src/renderer/components/settings/provider/ImportProviderModal'],
-      ['src/renderer/components/settings/provider/ProviderSpotlight'],
       ['src/renderer/components/settings/mcp/BuiltinServersSection'],
       ['src/renderer/components/settings/mcp/CustomServersSection'],
+      ['src/renderer/components/settings/DocumentParserSettings'],
+      ['src/renderer/components/settings/skills/GitHubInstallModal'],
+      ['src/renderer/components/settings/provider/ImportProviderModal'],
       ['src/renderer/components/settings/mcp/ConfigModal'],
       ['src/renderer/components/settings/mcp/ServerRegistrySpotlight'],
+      ['src/renderer/components/settings/provider/providerIcons'],
+      ['src/renderer/components/settings/provider/ProviderList'],
+      ['src/renderer/components/settings/provider/ProviderSpotlight'],
       ['src/renderer/components/settings/skills/SkillsSection'],
       ['src/renderer/components/settings/skills/SkillsSpotlight'],
-      ['src/renderer/components/settings/skills/GitHubInstallModal'],
     ],
     storybookTitle: 'Real Components/Settings Management',
     storybookIds: [
-      'real-components-settings-management--document-parser-settings-states',
-      'real-components-settings-management--provider-list-states',
-      'real-components-settings-management--provider-icon-states',
-      'real-components-settings-management--add-provider-modal-states',
-      'real-components-settings-management--import-provider-modal-states',
-      'real-components-settings-management--provider-spotlight-states',
-      'real-components-settings-management--builtin-mcp-servers-states',
-      'real-components-settings-management--custom-mcp-servers-states',
-      'real-components-settings-management--mcp-config-modal-states',
-      'real-components-settings-management--mcp-registry-spotlight-states',
-      'real-components-settings-management--skills-section-states',
-      'real-components-settings-management--skills-spotlight-states',
-      'real-components-settings-management--git-hub-install-modal-states',
+      'real-components-settings-management--add-provider-modal-name-and-api-mode-states',
+      'real-components-settings-management--builtin-mcp-server-premium-accessible-states',
+      'real-components-settings-management--custom-mcp-server-cards-add-edit-and-install-states',
+      'real-components-settings-management--document-parser-desktop-mineru-and-token-states',
+      'real-components-settings-management--git-hub-install-modal-detected-skill-selection-states',
+      'real-components-settings-management--import-provider-modal-overwrite-and-model-preview-states',
+      'real-components-settings-management--mcp-config-modal-http-edit-form-states',
+      'real-components-settings-management--mcp-registry-spotlight-custom-import-official-and-community-states',
+      'real-components-settings-management--provider-icon-image-aliases-and-fallback-states',
+      'real-components-settings-management--provider-list-activated-featured-custom-and-add-states',
+      'real-components-settings-management--provider-spotlight-quick-actions-popular-and-more-providers',
+      'real-components-settings-management--skills-section-builtin-user-claude-and-git-hub-install-entry-states',
+      'real-components-settings-management--skills-spotlight-popular-installed-and-replacement-states',
     ],
     dependencies: [
       'src/renderer/components/settings/DocumentParserSettings',
@@ -7965,95 +8020,95 @@ export const uiInventoryItems: UiInventoryItem[] = [
     ],
     previewLinks: [
       {
-        label: 'Storybook: Document parser desktop mineru and token states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--document-parser-settings-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--document-parser-settings-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Provider list activated featured custom and add states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-list-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-list-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Provider icon image aliases and fallback states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-icon-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-icon-states&viewMode=story',
-      },
-      {
         label: 'Storybook: Add provider modal name and API mode states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--add-provider-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--add-provider-modal-name-and-api-mode-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--add-provider-modal-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Import provider modal overwrite and model preview states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--import-provider-modal-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--import-provider-modal-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Provider spotlight quick actions popular and more providers',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-spotlight-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-spotlight-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--add-provider-modal-name-and-api-mode-states&viewMode=story',
       },
       {
         label: 'Storybook: Builtin MCP server premium accessible states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--builtin-mcp-servers-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--builtin-mcp-server-premium-accessible-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--builtin-mcp-servers-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--builtin-mcp-server-premium-accessible-states&viewMode=story',
       },
       {
         label: 'Storybook: Custom MCP server cards add edit and install states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--custom-mcp-servers-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--custom-mcp-server-cards-add-edit-and-install-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--custom-mcp-servers-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--custom-mcp-server-cards-add-edit-and-install-states&viewMode=story',
       },
       {
-        label: 'Storybook: MCP config modal http edit form states',
+        label: 'Storybook: Document parser desktop mineru and token states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-config-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--document-parser-desktop-mineru-and-token-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-config-modal-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: MCP registry spotlight custom import official and community states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-registry-spotlight-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-registry-spotlight-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Skills section builtin user claude and GitHub install entry states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-section-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-section-states&viewMode=story',
-      },
-      {
-        label: 'Storybook: Skills spotlight popular installed and replacement states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-spotlight-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-spotlight-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--document-parser-desktop-mineru-and-token-states&viewMode=story',
       },
       {
         label: 'Storybook: GitHub install modal detected skill selection states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-management--git-hub-install-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--git-hub-install-modal-detected-skill-selection-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-management--git-hub-install-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--git-hub-install-modal-detected-skill-selection-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Import provider modal overwrite and model preview states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--import-provider-modal-overwrite-and-model-preview-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--import-provider-modal-overwrite-and-model-preview-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: MCP config modal http edit form states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-config-modal-http-edit-form-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-config-modal-http-edit-form-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: MCP registry spotlight custom import official and community states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--mcp-registry-spotlight-custom-import-official-and-community-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--mcp-registry-spotlight-custom-import-official-and-community-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Provider icon image aliases and fallback states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-icon-image-aliases-and-fallback-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-icon-image-aliases-and-fallback-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Provider list activated featured custom and add states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-list-activated-featured-custom-and-add-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-list-activated-featured-custom-and-add-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Provider spotlight quick actions popular and more providers',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--provider-spotlight-quick-actions-popular-and-more-providers',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--provider-spotlight-quick-actions-popular-and-more-providers&viewMode=story',
+      },
+      {
+        label: 'Storybook: Skills section builtin user claude and GitHub install entry states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-section-builtin-user-claude-and-git-hub-install-entry-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-section-builtin-user-claude-and-git-hub-install-entry-states&viewMode=story',
+      },
+      {
+        label: 'Storybook: Skills spotlight popular installed and replacement states',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-management--skills-spotlight-popular-installed-and-replacement-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-settings-management--skills-spotlight-popular-installed-and-replacement-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8066,7 +8121,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
     kind: 'story',
     area: 'app',
     components: ['ToolCallPartReal.stories'],
-    states: ['error'],
+    states: ['error', 'isStreamingMode'],
     variants: ['size:sm'],
     platforms: ['all'],
     platformNotes: [],
@@ -8078,6 +8133,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Multiple tool calls in a single message:',
       'Parse Link — Loading',
       'Read File — Success',
+      'Step Timeline — Interleaved Text',
+      'Step Timeline — Reasoning + Tools',
+      'Step Timeline — Running',
       'Terminal — Success',
       'Web Search — Error',
       'Web Search — Loading',
@@ -8089,58 +8147,46 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'MultiplePills',
       'ParseLinkLoading',
       'ReadFileSuccess',
+      'StepTimelineReasoningAndTools',
+      'StepTimelineRunning',
+      'StepTimelineWithInterleavedText',
       'TerminalSuccess',
       'WebSearchError',
       'WebSearchLoading',
       'WebSearchSuccess',
     ],
     storyNames: [
-      'Web Search — Loading',
-      'Web Search — Success',
-      'Web Search — Error',
       'Code Search — Success',
       'Knowledge Base — Loading',
-      'Terminal — Success',
-      'Read File — Success',
-      'Parse Link — Loading',
       'Multiple Tool Calls',
+      'Parse Link — Loading',
+      'Read File — Success',
+      'Step Timeline — Reasoning + Tools',
+      'Step Timeline — Running',
+      'Step Timeline — Interleaved Text',
+      'Terminal — Success',
+      'Web Search — Error',
+      'Web Search — Loading',
+      'Web Search — Success',
     ],
-    storyTargets: [[], [], [], [], [], [], [], [], []],
+    storyTargets: [[], [], [], [], [], [], [], [], [], [], [], []],
     storybookTitle: 'Real Components/ToolCallPartUI',
     storybookIds: [
-      'real-components-toolcallpartui--web-search-loading',
-      'real-components-toolcallpartui--web-search-success',
-      'real-components-toolcallpartui--web-search-error',
       'real-components-toolcallpartui--code-search-success',
       'real-components-toolcallpartui--knowledge-base-loading',
-      'real-components-toolcallpartui--terminal-success',
-      'real-components-toolcallpartui--read-file-success',
+      'real-components-toolcallpartui--multiple-tool-calls',
       'real-components-toolcallpartui--parse-link-loading',
-      'real-components-toolcallpartui--multiple-pills',
+      'real-components-toolcallpartui--read-file-success',
+      'real-components-toolcallpartui--step-timeline-reasoning-tools',
+      'real-components-toolcallpartui--step-timeline-running',
+      'real-components-toolcallpartui--step-timeline-interleaved-text',
+      'real-components-toolcallpartui--terminal-success',
+      'real-components-toolcallpartui--web-search-error',
+      'real-components-toolcallpartui--web-search-loading',
+      'real-components-toolcallpartui--web-search-success',
     ],
     dependencies: ['src/renderer/components/message-parts/ToolCallPartUI'],
     previewLinks: [
-      {
-        label: 'Storybook: Web Search — Loading',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-loading',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-loading&viewMode=story',
-      },
-      {
-        label: 'Storybook: Web Search — Success',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-success',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-success&viewMode=story',
-      },
-      {
-        label: 'Storybook: Web Search — Error',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-error',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-error&viewMode=story',
-      },
       {
         label: 'Storybook: Code Search — Success',
         kind: 'storybook',
@@ -8156,18 +8202,11 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--knowledge-base-loading&viewMode=story',
       },
       {
-        label: 'Storybook: Terminal — Success',
+        label: 'Storybook: Multiple Tool Calls',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--terminal-success',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--multiple-tool-calls',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--terminal-success&viewMode=story',
-      },
-      {
-        label: 'Storybook: Read File — Success',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--read-file-success',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--read-file-success&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--multiple-tool-calls&viewMode=story',
       },
       {
         label: 'Storybook: Parse Link — Loading',
@@ -8177,11 +8216,60 @@ export const uiInventoryItems: UiInventoryItem[] = [
           'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--parse-link-loading&viewMode=story',
       },
       {
-        label: 'Storybook: Multiple Tool Calls',
+        label: 'Storybook: Read File — Success',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--multiple-pills',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--read-file-success',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--multiple-pills&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--read-file-success&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Reasoning + Tools',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-reasoning-tools',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-reasoning-tools&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Running',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-running',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-running&viewMode=story',
+      },
+      {
+        label: 'Storybook: Step Timeline — Interleaved Text',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--step-timeline-interleaved-text',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--step-timeline-interleaved-text&viewMode=story',
+      },
+      {
+        label: 'Storybook: Terminal — Success',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--terminal-success',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--terminal-success&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Error',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-error',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-error&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Loading',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-loading',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-loading&viewMode=story',
+      },
+      {
+        label: 'Storybook: Web Search — Success',
+        kind: 'storybook',
+        href: 'http://localhost:6006/?path=/story/real-components-toolcallpartui--web-search-success',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-toolcallpartui--web-search-success&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8209,44 +8297,14 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App controls accordion action menu adaptive select and styled menu states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--controls-and-menus-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--controls-and-menus-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--app-controls-accordion-action-menu-adaptive-select-and-styled-menu-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
     hasNiceModal: false,
     hasTranslation: false,
-  },
-  {
-    path: 'src/renderer/components/task/DirectoryMenu.tsx',
-    title: 'components/task/DirectoryMenu',
-    kind: 'component',
-    area: 'app',
-    components: ['DirectoryMenu'],
-    states: ['hasDirectory'],
-    variants: ['color:var(--mantine-color-blue-5)', 'size:sm', 'size:xs'],
-    platforms: ['all'],
-    platformNotes: [],
-    previewModes: [],
-    text: ['Add Directory', 'Choose a different folder', 'Recent'],
-    stories: [],
-    storyNames: [],
-    storyTargets: [],
-    storybookIds: [],
-    dependencies: [],
-    previewLinks: [
-      {
-        label: 'Storybook: Model list shortcut table directory menu and sortable placeholder states',
-        kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--model-shortcut-and-task-states',
-        iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--model-shortcut-and-task-states&viewMode=story',
-      },
-    ],
-    hasDefaultExport: true,
-    hasNiceModal: false,
-    hasTranslation: true,
   },
   {
     path: 'src/renderer/components/ui/command.tsx',
@@ -8279,9 +8337,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Command palette primitives and dialog primitives states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-and-dialog-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-palette-primitives-and-dialog-primitives-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--command-and-dialog-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--command-palette-primitives-and-dialog-primitives-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -8319,9 +8377,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Command palette primitives and dialog primitives states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-and-dialog-states',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--command-palette-primitives-and-dialog-primitives-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--command-and-dialog-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--command-palette-primitives-and-dialog-primitives-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -8355,9 +8413,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: App Store rating modal rate now and maybe later actions',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--app-store-rating-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--app-store-rating-modal-rate-now-and-maybe-later-actions',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--app-store-rating-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--app-store-rating-modal-rate-now-and-maybe-later-actions&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8385,9 +8443,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Artifact preview modal html preview refresh and close states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--artifact-preview-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--artifact-preview-modal-html-preview-refresh-and-close-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--artifact-preview-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--artifact-preview-modal-html-preview-refresh-and-close-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8415,8 +8473,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Attach link modal multiline URL entry states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--attach-link-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--attach-link-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--attach-link-modal-multiline-url-entry-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--attach-link-modal-multiline-url-entry-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8448,11 +8507,33 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Clear session list modal numeric retention state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--clear-session-list-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--clear-session-list-modal-numeric-retention-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--clear-session-list-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--clear-session-list-modal-numeric-retention-state&viewMode=story',
       },
     ],
+    hasDefaultExport: true,
+    hasNiceModal: true,
+    hasTranslation: true,
+  },
+  {
+    path: 'src/renderer/modals/ConfirmModal.tsx',
+    title: 'modals/ConfirmModal',
+    kind: 'modal',
+    area: 'modal',
+    components: ['ConfirmModal'],
+    states: ['error', 'opened', 'visible'],
+    variants: ['size:sm'],
+    platforms: ['all'],
+    platformNotes: [],
+    previewModes: [],
+    text: ['Cancel', 'Confirm'],
+    stories: [],
+    storyNames: [],
+    storyTargets: [],
+    storybookIds: [],
+    dependencies: ['src/renderer/components/common/AdaptiveModal'],
+    previewLinks: [],
     hasDefaultExport: true,
     hasNiceModal: true,
     hasTranslation: true,
@@ -8478,8 +8559,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Content viewer modal parser index metadata content copy state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--content-viewer-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--content-viewer-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--content-viewer-modal-parser-index-metadata-content-copy-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--content-viewer-modal-parser-index-metadata-content-copy-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8514,9 +8596,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: EdgeOne deploy success modal link copy and open states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--edge-one-deploy-success-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--edge-one-deploy-success-modal-link-copy-and-open-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--edge-one-deploy-success-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--edge-one-deploy-success-modal-link-copy-and-open-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8550,8 +8632,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Export chat modal scope format warning states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--export-chat-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--export-chat-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--export-chat-modal-scope-format-warning-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--export-chat-modal-scope-format-warning-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8595,9 +8678,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: File parse error modal unknown and file-specific state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--file-parse-error-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--file-parse-error-modal-unknown-and-file-specific-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--file-parse-error-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--file-parse-error-modal-unknown-and-file-specific-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8625,8 +8708,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Modal registry real NiceModal registration preview',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--modal-registry-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--modal-registry-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--modal-registry-real-nice-modal-registration-preview',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--modal-registry-real-nice-modal-registration-preview&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -8654,8 +8738,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: JSON viewer modal pretty printed copy state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--json-viewer-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--json-viewer-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--json-viewer-modal-pretty-printed-copy-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--json-viewer-modal-pretty-printed-copy-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8702,8 +8787,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Message edit modal role text parts and save states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--message-edit-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--message-edit-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--message-edit-modal-role-text-parts-and-save-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--message-edit-modal-role-text-parts-and-save-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8769,8 +8855,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Model edit modal existing chat model capability states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--model-edit-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--model-edit-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--model-edit-modal-existing-chat-model-capability-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--model-edit-modal-existing-chat-model-capability-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8813,8 +8900,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Report content modal type and detail states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--report-content-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--report-content-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--report-content-modal-type-and-detail-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--report-content-modal-type-and-detail-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8921,9 +9009,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Session settings modal chat config background and system prompt states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--session-settings-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--session-settings-modal-chat-config-background-and-system-prompt-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--session-settings-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--session-settings-modal-chat-config-background-and-system-prompt-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -8972,8 +9060,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Settings modal general route and navigation shell state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--settings-modal-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--settings-modal-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--settings-modal-general-route-and-navigation-shell-state',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--settings-modal-general-route-and-navigation-shell-state&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9001,9 +9090,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Thread name edit modal current and historical thread states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--thread-name-edit-states',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--thread-name-edit-modal-current-and-historical-thread-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-modals--thread-name-edit-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-modals--thread-name-edit-modal-current-and-historical-thread-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9040,8 +9129,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Welcome modal setup provider and later states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-modals--welcome-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-modals--welcome-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-modals--welcome-modal-setup-provider-and-later-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-modals--welcome-modal-setup-provider-and-later-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9089,9 +9179,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Root route shell provider and outlet state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-app-base--root-route-shell-state',
+        href: 'http://localhost:6006/?path=/story/real-components-app-base--root-route-shell-provider-and-outlet-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-app-base--root-route-shell-state&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-app-base--root-route-shell-provider-and-outlet-state&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -9206,9 +9296,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Copilot detail local remote screenshots and action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-detail-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-detail-local-remote-screenshots-and-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-detail-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-detail-local-remote-screenshots-and-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9240,8 +9330,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Copilot item local starred remote and highlighted states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-item-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-item-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-item-local-starred-remote-and-highlighted-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-item-local-starred-remote-and-highlighted-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9286,9 +9377,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Copilot settings create edit form states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-settings-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--copilot-settings-create-edit-form-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-settings-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--copilot-settings-create-edit-form-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9316,9 +9407,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Expandable search collapsed expanded and typed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-copilots--expandable-search-states',
+        href: 'http://localhost:6006/?path=/story/real-components-copilots--expandable-search-collapsed-expanded-and-typed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-copilots--expandable-search-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-copilots--expandable-search-collapsed-expanded-and-typed-states&viewMode=story',
       },
     ],
     hasDefaultExport: true,
@@ -9860,9 +9951,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Guide action login settings license free trial and new chat states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-action-buttons-states',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-action-login-settings-license-free-trial-and-new-chat-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--guide-action-buttons-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-action-login-settings-license-free-trial-and-new-chat-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -9890,9 +9981,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Guide claim waiting card polling and escape actions',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--claim-waiting-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-claim-waiting-card-polling-and-escape-actions',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--claim-waiting-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-claim-waiting-card-polling-and-escape-actions&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -9924,8 +10015,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Guide message user assistant streaming and tool part states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-message-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-guide--guide-message-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-message-user-assistant-streaming-and-tool-part-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-message-user-assistant-streaming-and-tool-part-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -9960,9 +10052,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Guide suggested questions active and disabled states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--suggested-questions-states',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-suggested-questions-active-and-disabled-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-guide--suggested-questions-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-suggested-questions-active-and-disabled-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -9990,8 +10082,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Guide user type cards active disabled and selected states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-guide--user-type-cards-states',
-        iframeHref: 'http://localhost:6006/iframe.html?id=real-components-guide--user-type-cards-states&viewMode=story',
+        href: 'http://localhost:6006/?path=/story/real-components-guide--guide-user-type-cards-active-disabled-and-selected-states',
+        iframeHref:
+          'http://localhost:6006/iframe.html?id=real-components-guide--guide-user-type-cards-active-disabled-and-selected-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10092,9 +10185,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator empty quick prompt states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--empty-state-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-empty-quick-prompt-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--empty-state-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-empty-quick-prompt-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10150,9 +10243,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Generated images gallery desktop aspect hover action states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--generated-images-gallery-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--generated-images-gallery-desktop-aspect-hover-action-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--generated-images-gallery-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--generated-images-gallery-desktop-aspect-hover-action-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10188,9 +10281,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image generation history item active desktop mobile and empty thumbnail states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--history-item-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-history-item-active-desktop-mobile-and-empty-thumbnail-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--history-item-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-history-item-active-desktop-mobile-and-empty-thumbnail-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10218,9 +10311,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator history panel loading empty populated and collapsed states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--history-panel-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-history-panel-loading-empty-populated-and-collapsed-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--history-panel-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-history-panel-loading-empty-populated-and-collapsed-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10267,9 +10360,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image generation error tips moderation provider and retrying states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-error-tips-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-generation-error-tips-moderation-provider-and-retrying-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-error-tips-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-generation-error-tips-moderation-provider-and-retrying-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10297,9 +10390,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator mobile history model and ratio drawer states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--mobile-drawer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-mobile-history-model-and-ratio-drawer-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--mobile-drawer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-mobile-history-model-and-ratio-drawer-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10327,9 +10420,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator prompt display with model and reference count states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--prompt-display-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-prompt-display-with-model-and-reference-count-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--prompt-display-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-prompt-display-with-model-and-reference-count-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10357,9 +10450,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator reference images preview removable and add states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--reference-images-preview-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-reference-images-preview-removable-and-add-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--reference-images-preview-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-reference-images-preview-removable-and-add-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -10387,9 +10480,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Image creator shimmer loading animation state',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-image-creator--loading-shimmer-states',
+        href: 'http://localhost:6006/?path=/story/real-components-image-creator--image-creator-shimmer-loading-animation-state',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-image-creator--loading-shimmer-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-image-creator--image-creator-shimmer-loading-animation-state&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11160,9 +11253,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Email code login modal email and verification states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--email-code-login-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--email-code-login-modal-email-and-verification-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--email-code-login-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--email-code-login-modal-email-and-verification-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11218,9 +11311,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: License detail card active expired quota and reward states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-detail-card-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-detail-card-active-expired-quota-and-reward-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-detail-card-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-detail-card-active-expired-quota-and-reward-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11282,9 +11375,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: License key view inactive activation and purchase states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-key-view-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-key-view-inactive-activation-and-purchase-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-key-view-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-key-view-inactive-activation-and-purchase-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11320,9 +11413,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: License selection modal active expired and quota states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-selection-modal-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--license-selection-modal-active-expired-and-quota-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-selection-modal-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--license-selection-modal-active-expired-and-quota-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11403,9 +11496,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Logged in account selected license and quota states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--logged-in-view-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--logged-in-account-selected-license-and-quota-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--logged-in-view-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--logged-in-account-selected-license-and-quota-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11451,9 +11544,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Chatbox AI login view real account entry states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--login-view-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--chatbox-ai-login-view-real-account-entry-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--login-view-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--chatbox-ai-login-view-real-account-entry-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11485,9 +11578,9 @@ export const uiInventoryItems: UiInventoryItem[] = [
       {
         label: 'Storybook: Model management list fetch reset add remove states',
         kind: 'storybook',
-        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--model-management-states',
+        href: 'http://localhost:6006/?path=/story/real-components-settings-chatbox-ai--model-management-list-fetch-reset-add-remove-states',
         iframeHref:
-          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--model-management-states&viewMode=story',
+          'http://localhost:6006/iframe.html?id=real-components-settings-chatbox-ai--model-management-list-fetch-reset-add-remove-states&viewMode=story',
       },
     ],
     hasDefaultExport: false,
@@ -11724,151 +11817,6 @@ export const uiInventoryItems: UiInventoryItem[] = [
         label: 'Open route preview',
         kind: 'route',
         href: '/settings/web-search',
-      },
-    ],
-    hasDefaultExport: false,
-    hasNiceModal: false,
-    hasTranslation: true,
-  },
-  {
-    path: 'src/renderer/routes/task/$taskId.tsx',
-    title: 'routes/task/:taskId',
-    kind: 'page',
-    area: 'task',
-    route: '/task/$taskId',
-    components: [
-      'DEEPSEEK_EXCLUDED_RE',
-      'Route',
-      'TaskChat',
-      'TaskMessageBubble',
-      'TaskSessionRoute',
-      'ToolCallItem',
-      'ToolResultDisplay',
-    ],
-    states: [
-      'disabled',
-      'error',
-      'expanded',
-      'hasAssistantReply',
-      'hasContent',
-      'hasGeneratingMessage',
-      'hasResult',
-      'input',
-      'isCalculating',
-      'isComposing',
-      'isError',
-      'isFetching',
-      'isRunning',
-      'isSmallScreen',
-      'isTaskGenerating',
-      'isUser',
-    ],
-    variants: [
-      'color:chatbox-brand',
-      'color:dark',
-      'color:yellow',
-      'filled',
-      'outline',
-      'size:18px',
-      'size:lg',
-      'size:md',
-      'size:sm',
-      'size:xs',
-      'subtle',
-    ],
-    platforms: ['all'],
-    platformNotes: ['responsive branch via isSmallScreen/useIsSmallScreen'],
-    previewModes: ['desktop-wide', 'narrow/mobile-layout'],
-    text: [
-      'Back to Tasks',
-      'Describe what you want to do...',
-      'Generating...',
-      'Select Model',
-      'Send a message to start working in this directory.',
-      'Send a message to start. Choose a working directory for file access.',
-      'Send message',
-      'Stop generating',
-      'Task not found',
-    ],
-    stories: [],
-    storyNames: [],
-    storyTargets: [],
-    storybookIds: [],
-    dependencies: [
-      'src/renderer/components/common/Divider',
-      'src/renderer/components/common/ScalableIcon',
-      'src/renderer/components/icons/ProviderImageIcon',
-      'src/renderer/components/InputBox/TokenCountMenu',
-      'src/renderer/components/layout/WindowControls',
-      'src/renderer/components/Markdown',
-      'src/renderer/components/ModelSelectorV2',
-      'src/renderer/components/task/DirectoryMenu',
-    ],
-    previewLinks: [
-      {
-        label: 'Open route preview',
-        kind: 'route',
-        href: '/task/$taskId',
-      },
-    ],
-    hasDefaultExport: false,
-    hasNiceModal: false,
-    hasTranslation: true,
-  },
-  {
-    path: 'src/renderer/routes/task/index.tsx',
-    title: 'routes/task',
-    kind: 'page',
-    area: 'task',
-    route: '/task/',
-    components: ['CheckingState', 'DirectorySelector', 'Route', 'TaskPage', 'UnavailableState'],
-    states: ['disabled', 'error', 'isWsl2Required', 'loading', 'loadingButton', 'pageState', 'unavailableReason'],
-    variants: [
-      'checking',
-      'color:blue',
-      'color:red',
-      'filled',
-      'light',
-      'select-directory',
-      'size:lg',
-      'size:sm',
-      'size:xl',
-      'size:xs',
-      'unavailable',
-    ],
-    platforms: ['all'],
-    platformNotes: [],
-    previewModes: [],
-    text: [
-      '1. Open PowerShell or Command Prompt as Administrator',
-      '2. Run command: wsl --install',
-      '3. Restart your computer when prompted',
-      'Checking availability...',
-      'Choose a directory',
-      'Choose a local directory for the AI to work in. Files in this directory will be accessible to the sandbox.',
-      'Directory selection is not available on this platform.',
-      'How to install WSL2',
-      'Learn more about WSL2',
-      'New Task',
-      'or choose a directory',
-      'Quick Start',
-      'Recent',
-      'Sandbox Not Available',
-      'Select Working Directory',
-      'Task',
-      'This feature is not available on your system. Please check the system requirements.',
-      'This feature requires WSL2 on Windows. Please install WSL2 to use sandbox features.',
-    ],
-    stories: [],
-    storyNames: [],
-    storyTargets: [],
-    storybookIds: [],
-    dependencies: ['src/renderer/components/layout/Page'],
-    previewLinks: [
-      {
-        label: 'Open route preview',
-        kind: 'route',
-        href: '/task/',
       },
     ],
     hasDefaultExport: false,

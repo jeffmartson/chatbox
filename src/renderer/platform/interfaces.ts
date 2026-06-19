@@ -2,7 +2,6 @@
 import type { Config, Language, Settings, ShortcutSetting } from '@shared/types'
 import type { ImageGenerationStorage } from '@/storage/ImageGenerationStorage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
-import type { TaskSessionStorage } from '@/storage/TaskSessionStorage'
 import type { KnowledgeBaseController } from './knowledge-base/interface'
 import type { SessionAttachmentRagController } from './session-attachment-rag/interface'
 
@@ -125,12 +124,9 @@ export interface Platform extends Storage {
 
   getImageGenerationStorage(): ImageGenerationStorage
 
-  getTaskSessionStorage(): TaskSessionStorage
-
   getSessionMetaStorage(): SessionMetaStorage
 
   // Sandbox operations (Desktop only)
-  sandboxInit?(config: { workingDirectory: string; sessionId?: string }): Promise<{ success: boolean; error?: string }>
   sandboxExec?(params: {
     command: string
     timeout?: number

@@ -15,7 +15,6 @@ export const JK_EVENTS = {
 
 export const JK_PAGE_NAMES = {
   CHAT_PAGE: 'chat_page',
-  TASK_PAGE: 'task_page',
   SETTING_PAGE: 'setting_page',
   IMAGE_PAGE: 'image_page',
   COPILOTS_PAGE: 'copilots_page',

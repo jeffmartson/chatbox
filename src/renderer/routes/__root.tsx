@@ -64,7 +64,6 @@ import { initOnboardingStore, onboardingStore } from '@/stores/onboardingStore'
 import * as premiumActions from '@/stores/premiumActions'
 import * as settingActions from '@/stores/settingActions'
 import { initSettingsStore, settingsStore, useLanguage, useSettingsStore, useTheme } from '@/stores/settingsStore'
-import { getTaskSession } from '@/stores/taskSessionStore'
 import { useUIStore } from '@/stores/uiStore'
 import { CHATBOX_BUILD_CHANNEL, CHATBOX_BUILD_PLATFORM } from '@/variables'
 import { blobToDataUrl } from './image-creator/-components/constants'
@@ -251,18 +250,6 @@ function Root() {
     }
   }, [])
 
-  // Route → sidebar mode sync
-  const setSidebarMode = useUIStore((s) => s.setSidebarMode)
-  useEffect(() => {
-    const pathname = location.pathname
-    if (pathname === '/task' || pathname.startsWith('/task/')) {
-      setSidebarMode('task')
-    } else if (pathname === '/' || pathname.startsWith('/session/')) {
-      setSidebarMode('chat')
-    }
-    // Other routes (settings, copilots, about, etc.) don't change sidebarMode
-  }, [location.pathname, setSidebarMode])
-
   // Page view tracking
   const settingsSearch = (location.search as Record<string, unknown>)?.settings as string | undefined
   useEffect(() => {
@@ -274,8 +261,6 @@ function Root() {
       pageName = JK_PAGE_NAMES.SETTING_PAGE
     } else if (pathname === '/' || pathname.startsWith('/session/')) {
       pageName = JK_PAGE_NAMES.CHAT_PAGE
-    } else if (pathname === '/task' || pathname.startsWith('/task/')) {
-      pageName = JK_PAGE_NAMES.TASK_PAGE
     } else if (pathname.startsWith('/image-creator')) {
       pageName = JK_PAGE_NAMES.IMAGE_PAGE
     } else if (pathname.startsWith('/copilots')) {
@@ -297,10 +282,6 @@ function Root() {
         const sessionId = pathname.slice('/session/'.length)
         const session = await getSession(sessionId).catch(() => null)
         content = session?.name
-      } else if (pathname.startsWith('/task/') && pathname.length > '/task/'.length) {
-        const taskId = pathname.slice('/task/'.length)
-        const taskSession = await getTaskSession(taskId).catch(() => null)
-        content = taskSession?.name
       }
 
       trackJkViewEvent(JK_EVENTS.PAGE_VIEW, {

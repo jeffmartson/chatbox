@@ -50,7 +50,6 @@ import MCPStatus from '@/components/mcp/MCPStatus'
 import { Keys, ShortcutConfig } from '@/components/Shortcut'
 import SponsorChip from '@/components/SponsorChip'
 import StyledMenu from '@/components/StyledMenu'
-import DirectoryMenu from '@/components/task/DirectoryMenu'
 import {
   Command,
   CommandDialog,
@@ -217,17 +216,16 @@ export const McpRuntimeStates: StoryObj = {
   render: () => <McpRuntimeFixture />,
 }
 
-export const ModelShortcutAndTaskStates: StoryObj = {
-  name: 'Model list shortcut table directory menu and sortable placeholder states',
+export const ModelShortcutStates: StoryObj = {
+  name: 'Model list shortcut table and sortable placeholder states',
   parameters: {
     uiInventoryTargets: [
       'src/renderer/components/ModelList',
       'src/renderer/components/Shortcut',
-      'src/renderer/components/task/DirectoryMenu',
       'src/renderer/components/SortableItem',
     ],
   },
-  render: () => <ModelShortcutAndTaskFixture />,
+  render: () => <ModelShortcutFixture />,
 }
 
 export const DevToolsStates: StoryObj = {
@@ -479,13 +477,13 @@ function McpRuntimeFixture() {
   )
 }
 
-function ModelShortcutAndTaskFixture() {
+function ModelShortcutFixture() {
   const [shortcuts, setShortcuts] = useState(createDefaultSettings().shortcuts)
   return (
     <Stack gap="lg">
       <SurfaceLabel
-        title="Models, shortcuts, and task directory"
-        description="Actual list and configuration surfaces used by settings and task sessions."
+        title="Models and shortcuts"
+        description="Actual list and configuration surfaces used by settings."
       />
       <Paper withBorder radius="md" p="md">
         <ModelList
@@ -504,13 +502,6 @@ function ModelShortcutAndTaskFixture() {
           <Keys keys={['mod', 'shift', 'k']} />
         </Group>
         <ShortcutConfig shortcuts={shortcuts} setShortcuts={setShortcuts} />
-      </Paper>
-      <Paper withBorder radius="md" p="md">
-        <DirectoryMenu
-          currentDirectory="/Users/themez/workspace/chatboxai/chatbox-pro"
-          onSelect={() => undefined}
-          menuProps={{ opened: true }}
-        />
       </Paper>
       <Paper withBorder radius="md" p="md">
         <Text size="sm" c="dimmed">

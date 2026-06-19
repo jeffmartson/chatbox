@@ -62,7 +62,6 @@ export const uiStore = createStore(
         widthFull: false, // Stored UI preference
         showCopilotsInNewSession: false,
         sidebarWidth: null as number | null, // Custom sidebar width, null means use default
-        sidebarMode: 'chat' as 'chat' | 'task',
         sessionAgentModeMap: {} as Record<string, AgentModeEntry>,
         sessionCodeExecutionMap: {} as Record<string, boolean | undefined>,
       },
@@ -217,10 +216,6 @@ export const uiStore = createStore(
 
         setSidebarWidth: (sidebarWidth: number | null) => {
           set({ sidebarWidth })
-        },
-
-        setSidebarMode: (sidebarMode: 'chat' | 'task') => {
-          set({ sidebarMode })
         },
 
         setSessionAgentMode: (sessionId: string, value: AgentModeValue) => {
