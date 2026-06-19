@@ -203,6 +203,10 @@ function Index() {
         settings: {
           ...session.settings,
           ...settingsPatch,
+          // Working directories bound while the chat was still "new" (not yet persisted).
+          ...(newSessionState.workingDirectories?.length
+            ? { workingDirectories: newSessionState.workingDirectories }
+            : {}),
         },
       })
 
@@ -212,10 +216,13 @@ function Index() {
           .catch((error) => console.warn('[recordCopilotUsage] failed', error))
       }
 
-      // Transfer knowledge base from newSessionState to the actual session
+      // Transfer knowledge base / working directories from newSessionState to the actual
+      // session, then clear it so nothing bleeds into the next new chat. (workingDirectories
+      // is already baked into the created session's settings above; this only clears it.)
       if (newSessionState.knowledgeBase) {
         addSessionKnowledgeBase(newSession.id, newSessionState.knowledgeBase)
-        // Clear newSessionState after transfer
+      }
+      if (newSessionState.knowledgeBase || newSessionState.workingDirectories?.length) {
         setNewSessionState({})
       }
 
@@ -249,6 +256,7 @@ function Index() {
       session,
       addSessionKnowledgeBase,
       newSessionState.knowledgeBase,
+      newSessionState.workingDirectories,
       setNewSessionState,
       sessionWebBrowsingMap,
       setSessionWebBrowsing,

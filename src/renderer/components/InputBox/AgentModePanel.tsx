@@ -191,23 +191,37 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   )
 
   // Working directories (desktop only): real local dirs the sandbox may read/write freely.
+  // A brand-new chat (sessionId === 'new') is not yet persisted, so its binding is held in
+  // newSessionState and transferred into the created session's settings on first submit
+  // (see routes/index.tsx) — mirroring how knowledge base / web browsing are handled.
+  const isNewSession = sessionId === 'new'
+  const newSessionState = useUIStore((s) => s.newSessionState)
+  const setNewSessionState = useUIStore((s) => s.setNewSessionState)
   const { sessionSettings } = useSessionSettings(sessionId)
-  const workingDirectories = useMemo(() => sessionSettings.workingDirectories ?? [], [sessionSettings])
+  const workingDirectories = useMemo(
+    () => (isNewSession ? (newSessionState.workingDirectories ?? []) : (sessionSettings.workingDirectories ?? [])),
+    [isNewSession, newSessionState.workingDirectories, sessionSettings]
+  )
 
   const updateWorkingDirectories = useCallback(
     async (next: string[]) => {
+      const value = next.length ? next : undefined
+      if (isNewSession) {
+        setNewSessionState((prev) => ({ ...prev, workingDirectories: value }))
+        return
+      }
       try {
         await chatStore.updateSession(sessionId, (session) => {
           if (!session) {
             throw new Error('Session not found')
           }
-          return { ...session, settings: { ...session.settings, workingDirectories: next.length ? next : undefined } }
+          return { ...session, settings: { ...session.settings, workingDirectories: value } }
         })
       } catch (err) {
         console.error('Failed to update working directories:', err)
       }
     },
-    [sessionId]
+    [isNewSession, sessionId, setNewSessionState]
   )
 
   const handleAddWorkingDirectory = useCallback(async () => {
