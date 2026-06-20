@@ -196,8 +196,10 @@ export async function syncBuiltinSkills(lang?: string): Promise<boolean> {
   const langQuery = lang ? `?lang=${encodeURIComponent(lang)}` : ''
   const manifestUrl = `${origin}/api/builtin_skills${langQuery}`
 
+  log.info(`syncBuiltinSkills: fetching manifest from ${manifestUrl}`)
   const remote = await fetchJson<{ data: RemoteManifestItem[] }>(manifestUrl)
   if (!remote || !Array.isArray(remote.data)) {
+    log.warn(`syncBuiltinSkills: no usable manifest from ${manifestUrl}, keeping local snapshot`)
     return false
   }
 
@@ -240,6 +242,7 @@ export async function syncBuiltinSkills(lang?: string): Promise<boolean> {
 
   manifest.syncedAt = Date.now()
   writeManifest(manifest)
+  log.info(`syncBuiltinSkills: done, remote=${remote.data.length} skill(s), changed=${changed}`)
   return changed
 }
 
