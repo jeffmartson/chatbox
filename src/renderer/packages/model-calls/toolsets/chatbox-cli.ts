@@ -1,6 +1,7 @@
 import type { ChatboxAILicenseDetail } from '@shared/types/settings'
 import { jsonSchema, type ToolSet } from 'ai'
 import * as remote from '@/packages/remote'
+import platform from '@/platform'
 import { settingsStore } from '@/stores/settingsStore'
 
 function maskLicenseKey(key?: string): string | undefined {
@@ -66,18 +67,28 @@ function help() {
   return {
     commands: [
       'help - show available commands',
+      'version - show the installed Chatbox client version and platform',
       'status - show signed-in/license/plan summary',
       'license - show license and plan summary without exposing the raw key',
       'quota - show remaining token/image/expansion-pack quota from cached local data',
       'refresh - refresh license/quota details from Chatbox API, then show status',
     ],
-    examples: ['chatbox account status', 'chatbox quota', 'chatbox license refresh'],
+    examples: ['chatbox version', 'chatbox account status', 'chatbox quota', 'chatbox license refresh'],
   }
 }
 
-function parseAction(command: string): 'help' | 'status' | 'license' | 'quota' | 'refresh' | 'unknown' {
+async function clientVersion() {
+  const [installedVersion, platformName] = await Promise.all([
+    platform.getVersion().catch(() => 'unknown'),
+    platform.getPlatform().catch(() => 'unknown'),
+  ])
+  return { installedVersion, platform: platformName }
+}
+
+function parseAction(command: string): 'help' | 'version' | 'status' | 'license' | 'quota' | 'refresh' | 'unknown' {
   const normalized = command.trim().toLowerCase()
   if (!normalized || normalized === 'help' || normalized.includes('--help') || normalized.includes('-h')) return 'help'
+  if (/\bversions?\b|--version|\b-v\b/.test(normalized)) return 'version'
   if (/\brefresh\b|\bsync\b|\breload\b/.test(normalized)) return 'refresh'
   if (/\bquota\b|\busage\b|\bremaining\b|\bcredits?\b/.test(normalized)) return 'quota'
   if (/\blicen[cs]e\b|\bplan\b|\bsubscription\b|\bbilling\b/.test(normalized)) return 'license'
@@ -89,15 +100,15 @@ export function buildChatboxCliToolSet(options?: { onUsed?: () => void }) {
   const chatbox_cli: ToolSet[string] = {
     description:
       'Run a virtual Chatbox account CLI command. This is a controlled tool, not a real shell. ' +
-      'Use it for Chatbox account, license, plan, quota, and billing status questions. ' +
-      'Supported commands: help, status, license, quota, refresh.',
+      'Use it for Chatbox account, license, plan, quota, billing status, and the installed client version. ' +
+      'Supported commands: help, version, status, license, quota, refresh.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
         command: {
           type: 'string',
           description:
-            'Virtual CLI command, e.g. "chatbox account status", "chatbox quota", or "chatbox license refresh"',
+            'Virtual CLI command, e.g. "chatbox version", "chatbox account status", "chatbox quota", or "chatbox license refresh"',
         },
       },
       required: ['command'],
@@ -108,6 +119,7 @@ export function buildChatboxCliToolSet(options?: { onUsed?: () => void }) {
       options?.onUsed?.()
       const action = parseAction(cliInput.command)
       if (action === 'help') return help()
+      if (action === 'version') return clientVersion()
       if (action === 'unknown') {
         return {
           error: `Unsupported chatbox_cli command: ${cliInput.command}`,
@@ -159,7 +171,8 @@ export function buildChatboxCliToolSet(options?: { onUsed?: () => void }) {
 ### Chatbox Account CLI
 When answering Chatbox product, billing, license, plan, or quota questions, you can call \`chatbox_cli\`.
 It accepts CLI-like commands but runs as a controlled app tool, not a real shell.
-Use commands such as \`chatbox account status\`, \`chatbox quota\`, \`chatbox license\`, or \`chatbox license refresh\`.
+Use commands such as \`chatbox version\`, \`chatbox account status\`, \`chatbox quota\`, \`chatbox license\`, or \`chatbox license refresh\`.
+Use \`chatbox version\` to check the installed client version (e.g. to confirm a skill's required client version is met).
 The tool never returns the raw license key.
 `,
     tools: { chatbox_cli },
