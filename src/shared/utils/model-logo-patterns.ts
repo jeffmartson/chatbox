@@ -26,6 +26,7 @@ export type ModelBrand =
   | 'cohere'
   | 'grok'
   | 'perplexity'
+  | 'xiaomi'
 
 export const MODEL_BRAND_PATTERNS: ReadonlyArray<readonly [RegExp, ModelBrand]> = [
   [/\b(o1|o3|o4|gpt|chatgpt)/i, 'openai'],
@@ -48,6 +49,7 @@ export const MODEL_BRAND_PATTERNS: ReadonlyArray<readonly [RegExp, ModelBrand]> 
   [/cohere|command-r/i, 'cohere'],
   [/grok/i, 'grok'],
   [/perplexity|sonar/i, 'perplexity'],
+  [/(^|[/:_-])(mimo|xiaomi)([/:_-]|$)/i, 'xiaomi'],
 ]
 
 export function matchModelBrand(modelId: string): ModelBrand | undefined {

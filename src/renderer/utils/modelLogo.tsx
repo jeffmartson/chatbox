@@ -1,6 +1,3 @@
-import { matchModelBrand, type ModelBrand } from '@shared/utils/model-logo-patterns'
-import type { ComponentType, ReactElement } from 'react'
-
 // Import only Mono and Color components to avoid @lobehub/ui dependency
 import BaichuanColor from '@lobehub/icons/es/Baichuan/components/Color'
 import ChatGLMColor from '@lobehub/icons/es/ChatGLM/components/Color'
@@ -11,7 +8,7 @@ import DoubaoColor from '@lobehub/icons/es/Doubao/components/Color'
 import GeminiColor from '@lobehub/icons/es/Gemini/components/Color'
 import GrokMono from '@lobehub/icons/es/Grok/components/Mono'
 import HunyuanColor from '@lobehub/icons/es/Hunyuan/components/Color'
-import KimiColor from '@lobehub/icons/es/Kimi/components/Color'
+import KimiMono from '@lobehub/icons/es/Kimi/components/Mono'
 import MetaColor from '@lobehub/icons/es/Meta/components/Color'
 import MinimaxColor from '@lobehub/icons/es/Minimax/components/Color'
 import MistralColor from '@lobehub/icons/es/Mistral/components/Color'
@@ -20,8 +17,11 @@ import OpenAIMono from '@lobehub/icons/es/OpenAI/components/Mono'
 import PerplexityColor from '@lobehub/icons/es/Perplexity/components/Color'
 import QwenColor from '@lobehub/icons/es/Qwen/components/Color'
 import StepfunColor from '@lobehub/icons/es/Stepfun/components/Color'
+import XiaomiMiMoMono from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
 import YiColor from '@lobehub/icons/es/Yi/components/Color'
 import ZhipuColor from '@lobehub/icons/es/Zhipu/components/Color'
+import { type ModelBrand, matchModelBrand } from '@shared/utils/model-logo-patterns'
+import type { ComponentType, ReactElement } from 'react'
 
 interface IconProps {
   size?: number | string
@@ -49,7 +49,7 @@ const BRAND_ICONS: Record<ModelBrand, ModelLogoConfig> = {
   meta: { icon: MetaColor },
   mistral: { icon: MistralColor },
   moonshot: { icon: MoonshotMono, darkModeColor: '#fff' },
-  kimi: { icon: KimiColor },
+  kimi: { icon: KimiMono, darkModeColor: '#fff' },
   chatglm: { icon: ChatGLMColor },
   zhipu: { icon: ZhipuColor },
   doubao: { icon: DoubaoColor },
@@ -61,6 +61,7 @@ const BRAND_ICONS: Record<ModelBrand, ModelLogoConfig> = {
   cohere: { icon: CohereColor },
   grok: { icon: GrokMono, darkModeColor: '#fff' },
   perplexity: { icon: PerplexityColor },
+  xiaomi: { icon: XiaomiMiMoMono, darkModeColor: '#fff' },
 }
 
 /**
