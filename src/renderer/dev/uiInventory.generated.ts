@@ -2637,7 +2637,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'Attach Image',
       'Audio files are not supported',
       'Binary/executable files are not supported',
-      'Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.',
+      'Chat attachments must be {{limit}} or smaller.',
       'Conversation Settings',
       'Document is still indexing',
       'File Content',

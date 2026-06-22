@@ -144,7 +144,7 @@
   "Changelog": "更新日誌",
   "characters": "字元",
   "Chat": "聊天",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "聊天附件必須小於 {{limit}}。若要上傳較大的文件，請使用知識庫。",
+  "Chat attachments must be {{limit}} or smaller.": "聊天附件必須不超過 {{limit}}。",
   "Chat History": "對話紀錄",
   "Chat Settings": "對話設定",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AI 文件解析失敗。請稍後再試。",

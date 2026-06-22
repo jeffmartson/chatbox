@@ -144,7 +144,7 @@
   "Changelog": "Endringslogg",
   "characters": "tegn",
   "Chat": "Chat",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "Vedlegg i chatten må være {{limit}} eller mindre. Vennligst last opp større dokumenter via kunnskapsbasen.",
+  "Chat attachments must be {{limit}} or smaller.": "Vedlegg i chatten må være {{limit}} eller mindre.",
   "Chat History": "Chat-historikk",
   "Chat Settings": "Chat-innstillinger",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AI-dokumentparsing mislyktes. Vennligst prøv igjen senere.",

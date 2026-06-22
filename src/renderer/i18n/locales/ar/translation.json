@@ -144,7 +144,7 @@
   "Changelog": "سجل التغييرات",
   "characters": "حرف",
   "Chat": "دردشة",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "يجب أن تكون مرفقات المحادثة {{limit}} أو أصغر. يرجى رفع المستندات الأكبر عبر قاعدة المعرفة.",
+  "Chat attachments must be {{limit}} or smaller.": "يجب أن تكون مرفقات المحادثة {{limit}} أو أصغر.",
   "Chat History": "سجل المحادثات",
   "Chat Settings": "إعدادات المحادثة",
   "Chatbox AI document parsing failed. Please try again later.": "فشل تحليل المستند بواسطة Chatbox AI. يرجى المحاولة مرة أخرى لاحقًا.",

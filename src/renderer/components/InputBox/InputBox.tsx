@@ -1008,12 +1008,9 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         } else {
           if (file.size > KNOWLEDGE_BASE_MAX_FILE_SIZE) {
             toastActions.add(
-              t(
-                'Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.',
-                {
-                  limit: KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL,
-                }
-              )
+              t('Chat attachments must be {{limit}} or smaller.', {
+                limit: KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL,
+              })
             )
             continue
           }

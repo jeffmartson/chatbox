@@ -144,7 +144,7 @@
   "Changelog": "更新履歴",
   "characters": "文字",
   "Chat": "チャット",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "チャットへの添付ファイルは{{limit}}以下である必要があります。より大きなドキュメントはナレッジベースからアップロードしてください。",
+  "Chat attachments must be {{limit}} or smaller.": "チャットへの添付ファイルは{{limit}}以下である必要があります。",
   "Chat History": "チャット履歴",
   "Chat Settings": "チャット設定",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AIのドキュメント解析に失敗しました。後でもう一度お試しください。",

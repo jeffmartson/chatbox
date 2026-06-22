@@ -144,7 +144,7 @@
   "Changelog": "Registro delle modifiche",
   "characters": "caratteri",
   "Chat": "Chat",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "Gli allegati della chat devono essere {{limit}} o più piccoli. Si prega di caricare documenti più grandi tramite la Knowledge Base.",
+  "Chat attachments must be {{limit}} or smaller.": "Gli allegati della chat devono essere di {{limit}} o meno.",
   "Chat History": "Cronologia chat",
   "Chat Settings": "Impostazioni Chat",
   "Chatbox AI document parsing failed. Please try again later.": "Analisi del documento Chatbox AI non riuscita. Riprova più tardi.",

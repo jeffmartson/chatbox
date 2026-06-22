@@ -144,7 +144,7 @@
   "Changelog": "변경 내역",
   "characters": "글자",
   "Chat": "채팅",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "채팅 첨부 파일은 {{limit}} 이하여야 합니다. 더 큰 문서는 지식 베이스를 통해 업로드해 주세요.",
+  "Chat attachments must be {{limit}} or smaller.": "채팅 첨부 파일은 {{limit}} 이하여야 합니다.",
   "Chat History": "채팅 기록",
   "Chat Settings": "채팅 설정",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AI 문서 파싱에 실패했습니다. 나중에 다시 시도해 주세요.",

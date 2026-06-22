@@ -144,7 +144,7 @@
   "Changelog": "Ändringslogg",
   "characters": "tecken",
   "Chat": "Chatt",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "Chat-bilagor måste vara {{limit}} eller mindre. Ladda upp större dokument via kunskapsbasen.",
+  "Chat attachments must be {{limit}} or smaller.": "Chat-bilagor måste vara {{limit}} eller mindre.",
   "Chat History": "Chatthistorik",
   "Chat Settings": "Chattinställningar",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AI dokumenttolkning misslyckades. Vänligen försök igen senare.",

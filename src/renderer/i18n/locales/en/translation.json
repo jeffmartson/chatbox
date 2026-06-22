@@ -144,7 +144,7 @@
   "Changelog": "Changelog",
   "characters": "characters",
   "Chat": "Chat",
-  "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.": "Chat attachments must be {{limit}} or smaller. Please upload larger documents through Knowledge Base.",
+  "Chat attachments must be {{limit}} or smaller.": "Chat attachments must be {{limit}} or smaller.",
   "Chat History": "Chat History",
   "Chat Settings": "Chat Settings",
   "Chatbox AI document parsing failed. Please try again later.": "Chatbox AI document parsing failed. Please try again later.",
