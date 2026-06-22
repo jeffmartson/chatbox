@@ -139,9 +139,9 @@ export function ShortcutConfig(props: {
       keys: shortcuts.newChat,
     },
     {
-      label: t('Create a New Image-Creator Conversation'),
-      name: 'newPictureChat',
-      keys: shortcuts.newPictureChat,
+      label: t('New Thread'),
+      name: 'messageListRefreshContext',
+      keys: shortcuts.messageListRefreshContext,
     },
     {
       label: t('Navigate to the Next Conversation'),

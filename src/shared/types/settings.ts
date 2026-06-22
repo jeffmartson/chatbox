@@ -255,24 +255,47 @@ const ShortcutSendValueSchema = z.enum(shortcutSendValues as [string, ...string[
 export const shortcutToggleWindowValues = ['', 'Alt+`', 'Alt+Space', 'Ctrl+Alt+Space', 'Ctrl+Space']
 const ShortcutToggleWindowValueSchema = z.enum(shortcutToggleWindowValues as [string, ...string[]])
 
-const ShortcutSettingSchema = z.object({
-  quickToggle: ShortcutToggleWindowValueSchema,
-  inputBoxFocus: z.string(),
-  inputBoxWebBrowsingMode: z.string(),
-  newChat: z.string(),
-  newPictureChat: z.string(),
-  sessionListNavNext: z.string(),
-  sessionListNavPrev: z.string(),
-  sessionListNavTargetIndex: z.string(),
-  // workaround: 去掉mod+r 快捷键，如果用户再回退版本，会导致崩溃。如果要完整修复，需要支持高版本到低版本的config migration，不值得
-  messageListRefreshContext: z.string().default('mod+r'),
-  dialogOpenSearch: z.string(),
-  optionNavUp: z.string(),
-  optionNavDown: z.string(),
-  optionSelect: z.string(),
-  inputBoxSendMessage: ShortcutSendValueSchema,
-  inputBoxSendMessageWithoutResponse: ShortcutSendValueSchema,
-})
+const newThreadShortcut = 'mod+shift+n'
+const legacyNewThreadShortcut = 'mod+r'
+const legacyNewPictureChatShortcut = 'mod+shift+n'
+
+const ShortcutSettingSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return value
+    }
+
+    const shortcuts: Record<string, unknown> = { ...value }
+    if (
+      shortcuts.messageListRefreshContext === undefined ||
+      shortcuts.messageListRefreshContext === legacyNewThreadShortcut
+    ) {
+      shortcuts.messageListRefreshContext = newThreadShortcut
+    }
+    if (shortcuts.newPictureChat === legacyNewPictureChatShortcut) {
+      shortcuts.newPictureChat = ''
+    }
+    return shortcuts
+  },
+  z.object({
+    quickToggle: ShortcutToggleWindowValueSchema,
+    inputBoxFocus: z.string(),
+    inputBoxWebBrowsingMode: z.string(),
+    newChat: z.string(),
+    newPictureChat: z.string(),
+    sessionListNavNext: z.string(),
+    sessionListNavPrev: z.string(),
+    sessionListNavTargetIndex: z.string(),
+    // Keep the historical key name so exported settings still load in downgrade/import paths.
+    messageListRefreshContext: z.string().default(newThreadShortcut),
+    dialogOpenSearch: z.string(),
+    optionNavUp: z.string(),
+    optionNavDown: z.string(),
+    optionSelect: z.string(),
+    inputBoxSendMessage: ShortcutSendValueSchema,
+    inputBoxSendMessageWithoutResponse: ShortcutSendValueSchema,
+  })
+)
 
 const ExtensionSettingsSchema = z.object({
   webSearch: z.object({

@@ -33,3 +33,41 @@ describe('SettingsSchema RAG default models', () => {
     expect(parsed.defaultRerankModel).toBeUndefined()
   })
 })
+
+describe('SettingsSchema shortcut compatibility', () => {
+  test('adds the new thread shortcut when loading settings without the historical key', () => {
+    const shortcuts: Record<string, unknown> = { ...defaultSettings().shortcuts }
+    delete shortcuts.messageListRefreshContext
+
+    const parsed = SettingsSchema.parse({
+      ...defaultSettings(),
+      shortcuts,
+    })
+
+    expect(parsed.shortcuts.messageListRefreshContext).toBe('mod+shift+n')
+  })
+
+  test('migrates the removed cmd+r shortcut to cmd+shift+n', () => {
+    const parsed = SettingsSchema.parse({
+      ...defaultSettings(),
+      shortcuts: {
+        ...defaultSettings().shortcuts,
+        messageListRefreshContext: 'mod+r',
+      },
+    })
+
+    expect(parsed.shortcuts.messageListRefreshContext).toBe('mod+shift+n')
+  })
+
+  test('moves the old image creator shortcut away from cmd+shift+n', () => {
+    const parsed = SettingsSchema.parse({
+      ...defaultSettings(),
+      shortcuts: {
+        ...defaultSettings().shortcuts,
+        newPictureChat: 'mod+shift+n',
+      },
+    })
+
+    expect(parsed.shortcuts.newPictureChat).toBe('')
+  })
+})

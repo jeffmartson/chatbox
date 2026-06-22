@@ -39,6 +39,7 @@ describe('defaults', () => {
         'sessionListNavNext',
         'sessionListNavPrev',
         'sessionListNavTargetIndex',
+        'messageListRefreshContext',
         'dialogOpenSearch',
         'inputBoxSendMessage',
         'inputBoxSendMessageWithoutResponse',
@@ -47,6 +48,8 @@ describe('defaults', () => {
         'optionSelect',
       ].sort()
     )
+    expect(result.messageListRefreshContext).toBe('mod+shift+n')
+    expect(result.newPictureChat).toBe('')
   })
 
   it('newConfigs() returns object with uuid string', () => {
