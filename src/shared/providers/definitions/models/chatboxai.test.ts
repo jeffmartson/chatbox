@@ -140,6 +140,47 @@ describe('ChatboxAI openai-responses models', () => {
     expect(chatModel.modelId).toBe('gpt-5-mini')
   })
 
+  it('forces store=false for openai-responses gateway requests while preserving user OpenAI provider options', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'high',
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openai: {
+        reasoningEffort: 'high',
+        store: false,
+      },
+    })
+  })
+
+  it('forces store=false for openai-responses gateway requests without user provider options', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({})
+
+    expect(settings.providerOptions).toEqual({
+      openai: {
+        store: false,
+      },
+    })
+  })
+
   it('maps OpenAI-style reasoning options to OpenAI-compatible gateway extra body', () => {
     const model = createModel({
       modelId: 'gpt-5.5',

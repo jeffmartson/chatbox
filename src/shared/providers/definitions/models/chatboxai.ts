@@ -161,11 +161,18 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       }
     }
     if (this.options.model.apiStyle === 'openai-responses') {
+      // Responses 的服务端状态（item_reference / previous_response_id）无法跨 provider 解析。
+      // store=false 让 AI SDK 内联完整历史，不依赖服务端状态。
       return {
         temperature: this.options.temperature,
         topP: this.options.topP,
         maxOutputTokens: this.options.maxOutputTokens,
-        providerOptions: options.providerOptions?.openai ? { openai: options.providerOptions.openai } : undefined,
+        providerOptions: {
+          openai: {
+            ...options.providerOptions?.openai,
+            store: false,
+          },
+        },
       }
     }
     const openAICompatibleOptions = options.providerOptions?.openaiCompatible || options.providerOptions?.openai
