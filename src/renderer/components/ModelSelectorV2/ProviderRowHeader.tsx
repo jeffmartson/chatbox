@@ -3,6 +3,7 @@ import { IconChevronDown } from '@tabler/icons-react'
 import clsx from 'clsx'
 import { ScalableIcon } from '../common/ScalableIcon'
 import ProviderIcon from '../icons/ProviderIcon'
+import { MODEL_SELECTOR_SURFACE_CLASS } from './constants'
 
 export function ProviderRowHeader({
   provider,
@@ -25,8 +26,11 @@ export function ProviderRowHeader({
       className={clsx(
         'w-full flex items-center gap-2 border-0 border-b border-solid text-chatbox-tint-primary cursor-pointer transition-colors focus:outline-none focus-visible:outline-none',
         isChatbox
-          ? 'sticky top-0 z-20 h-11 pl-4 pr-2.5 border-chatbox-border-primary bg-chatbox-background-primary'
-          : 'h-10 px-2.5 border-chatbox-border-primary bg-chatbox-background-primary hover:bg-chatbox-background-primary-hover'
+          ? ['sticky top-0 z-20 h-11 pl-4 pr-2.5 border-chatbox-border-primary', MODEL_SELECTOR_SURFACE_CLASS]
+          : [
+              'h-10 px-2.5 border-chatbox-border-primary hover:bg-chatbox-background-secondary-hover',
+              MODEL_SELECTOR_SURFACE_CLASS,
+            ]
       )}
     >
       <ScalableIcon

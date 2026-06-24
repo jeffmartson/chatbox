@@ -1,50 +1,14 @@
-import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Flex, Text } from '@mantine/core'
 import type { ProviderModelInfo } from '@shared/types'
-import { IconBolt, IconEye, IconInfoCircle, IconLock, IconStar, IconStarFilled } from '@tabler/icons-react'
+import { IconBulb, IconEye, IconInfoCircle, IconLock, IconStar, IconStarFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import platform from '@/platform'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { ModelIcon } from '../icons/ModelIcon'
+import { CAPABILITY_ICON_COLOR_CLASSES } from './CapabilityIconRow'
 import { HOVER_CLASS, MOBILE_TAP_RESET_STYLE, SELECTED_CLASS } from './constants'
-import { getCostLabel } from './helpers'
 import type { DetailModel } from './types'
-
-function RowIconButton({
-  label,
-  children,
-  onClick,
-  mobile,
-}: {
-  label: string
-  children: React.ReactNode
-  onClick?: () => void
-  mobile?: boolean
-}) {
-  return (
-    <Tooltip
-      label={label}
-      position="top"
-      withArrow
-      events={{ hover: !mobile, focus: true, touch: !!mobile }}
-      openDelay={160}
-    >
-      <ActionIcon
-        aria-label={label}
-        variant="transparent"
-        size={mobile ? 'sm' : 'xs'}
-        className="text-chatbox-tint-tertiary hover:text-chatbox-tint-secondary"
-        onClick={(event) => {
-          event.stopPropagation()
-          onClick?.()
-        }}
-      >
-        {children}
-      </ActionIcon>
-    </Tooltip>
-  )
-}
 
 export function ModelRow({
   detail,
@@ -55,7 +19,6 @@ export function ModelRow({
   mobile,
   hideFavorite,
   brandedInset,
-  pricingLink,
   onSelect,
   onFavorite,
   onShowDetail,
@@ -71,7 +34,6 @@ export function ModelRow({
   mobile?: boolean
   hideFavorite?: boolean
   brandedInset?: boolean
-  pricingLink?: string
   onSelect: () => void
   onFavorite: () => void
   onShowDetail?: () => void
@@ -130,25 +92,36 @@ export function ModelRow({
       <Text span size="sm" fw={500} lh={1.15} className="min-w-0 flex-shrink truncate">
         {detail.name}
       </Text>
-      <Flex align="center" gap={mobile ? 4 : 1} className="min-w-0 flex-shrink-0">
-        {detail.costLevel && (
-          <RowIconButton
-            label={getCostLabel(detail.costLevel, t)}
-            onClick={() => pricingLink && platform.openLink(pricingLink)}
-            mobile={mobile}
-          >
-            <ScalableIcon icon={IconBolt} size={mobile ? 16 : 14} className="text-chatbox-tint-warning" />
-          </RowIconButton>
-        )}
+      <Flex align="center" gap={mobile ? 6 : 4} className="min-w-0 flex-shrink-0">
         {providerModel.capabilities?.includes('vision') && (
-          <RowIconButton label={t('Vision')} mobile={mobile}>
-            <ScalableIcon icon={IconEye} size={mobile ? 16 : 14} />
-          </RowIconButton>
+          <ScalableIcon
+            icon={IconEye}
+            size={mobile ? 16 : 14}
+            aria-label={t('Vision') as string}
+            className={CAPABILITY_ICON_COLOR_CLASSES.vision}
+          />
+        )}
+        {providerModel.capabilities?.includes('reasoning') && (
+          <ScalableIcon
+            icon={IconBulb}
+            size={mobile ? 16 : 14}
+            aria-label={t('Reasoning') as string}
+            className={CAPABILITY_ICON_COLOR_CLASSES.reasoning}
+          />
         )}
         {mobile && (
-          <RowIconButton label={t('Model details')} onClick={onShowDetail} mobile={mobile}>
+          <ActionIcon
+            aria-label={t('Model details') as string}
+            variant="transparent"
+            size="sm"
+            className="text-chatbox-tint-tertiary hover:text-chatbox-tint-secondary"
+            onClick={(event) => {
+              event.stopPropagation()
+              onShowDetail?.()
+            }}
+          >
             <ScalableIcon icon={IconInfoCircle} size={15} />
-          </RowIconButton>
+          </ActionIcon>
         )}
       </Flex>
       <Flex align="center" gap={4} ml="auto" className="flex-shrink-0">

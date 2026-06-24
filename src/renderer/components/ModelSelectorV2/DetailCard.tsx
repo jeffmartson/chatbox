@@ -1,5 +1,5 @@
 import { Badge, Button, Flex, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconBolt, IconSparkles } from '@tabler/icons-react'
+import { IconSparkles } from '@tabler/icons-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -8,9 +8,32 @@ import { formatNumber } from '@/utils/format'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { ModelIcon } from '../icons/ModelIcon'
 import { CapabilityIconRow } from './CapabilityIconRow'
-import { CARD_SURFACE_STYLE, FALLBACK_UPGRADE_URL } from './constants'
-import { getCostLabel } from './helpers'
+import { CARD_SURFACE_STYLE, FALLBACK_UPGRADE_URL, MODEL_SELECTOR_SURFACE_CLASS } from './constants'
+import { getCostLabel, getCostLevelBarCount } from './helpers'
 import type { DetailModel } from './types'
+
+const COST_LEVEL_BAR_IDS = ['cost-level-bar-1', 'cost-level-bar-2', 'cost-level-bar-3'] as const
+
+function ComputePointIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path
+        d="M4.5 7C4.5 7.8285 5.843 8.5 7.5 8.5C9.157 8.5 10.5 7.8285 10.5 7C10.5 6.1715 9.157 5.5 7.5 5.5C5.843 5.5 4.5 6.1715 4.5 7Z"
+        stroke="#FAB005"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.5 7V9C4.5 9.828 5.843 10.5 7.5 10.5C9.157 10.5 10.5 9.828 10.5 9V7M1.5 3C1.5 3.536 2.072 4.031 3 4.299C3.928 4.567 5.072 4.567 6 4.299C6.928 4.031 7.5 3.536 7.5 3C7.5 2.464 6.928 1.969 6 1.701C5.072 1.433 3.928 1.433 3 1.701C2.072 1.969 1.5 2.464 1.5 3Z"
+        stroke="#FAB005"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M1.5 3V8C1.5 8.444 1.886 8.725 2.5 9" stroke="#FAB005" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M1.5 5.5C1.5 5.944 1.886 6.225 2.5 6.5" stroke="#FAB005" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 function formatPrice(value: number, isCN: boolean) {
   return isCN ? `$${value.toFixed(2)} / 百万 token` : `$${value.toFixed(2)} / 1M token`
@@ -236,6 +259,55 @@ function PricingBlock({
   )
 }
 
+function CostLevelIndicator({
+  costLevel,
+  costLabel,
+  pricingLink,
+  t,
+}: {
+  costLevel?: string
+  costLabel: string
+  pricingLink?: string
+  t: (key: string) => string
+}) {
+  const filledBarCount = getCostLevelBarCount(costLevel)
+  const bars = COST_LEVEL_BAR_IDS.map((barId, index) => {
+    const filled = index < filledBarCount
+    return (
+      <span
+        key={barId}
+        aria-hidden
+        className={clsx(
+          'h-2 w-[34.5px] rounded-[3px] border border-solid border-chatbox-tint-primary',
+          filled ? 'bg-chatbox-tint-primary' : 'bg-transparent'
+        )}
+      />
+    )
+  })
+
+  return (
+    <Stack gap={8}>
+      <Text size="sm" fw={750} c="chatbox-secondary">
+        {t('Pricing')}
+      </Text>
+      <Flex gap={8} wrap="nowrap" aria-label={`Cost level ${filledBarCount} of 3`}>
+        {bars}
+      </Flex>
+      {costLabel && (
+        <UnstyledButton
+          className="self-start flex items-center gap-1.5 text-chatbox-tint-warning"
+          onClick={() => pricingLink && platform.openLink(pricingLink)}
+        >
+          <ComputePointIcon />
+          <Text span size="sm" c="inherit">
+            {costLabel}
+          </Text>
+        </UnstyledButton>
+      )}
+    </Stack>
+  )
+}
+
 export function DetailCard({
   model,
   pricingLink,
@@ -262,7 +334,8 @@ export function DetailCard({
       gap={mobile ? 'md' : 'md'}
       className={clsx(
         'relative border border-solid text-chatbox-tint-primary',
-        mobile ? 'border-0 px-6 pb-6 pt-4' : 'w-[320px] rounded-[20px] p-6'
+        MODEL_SELECTOR_SURFACE_CLASS,
+        mobile ? 'm-[4px] border-0 px-4 pb-0 pt-3 rounded-[20px]' : 'm-[4px] w-[320px] rounded-[20px] px-4 pb-0 pt-4'
       )}
       style={mobile ? undefined : CARD_SURFACE_STYLE}
     >
@@ -277,21 +350,11 @@ export function DetailCard({
           {model.description}
         </Text>
       )}
-      {costLabel && (
-        <UnstyledButton
-          className="self-start flex items-center gap-1.5 text-chatbox-tint-warning"
-          onClick={() => pricingLink && platform.openLink(pricingLink)}
-        >
-          <ScalableIcon icon={IconBolt} size={16} />
-          <Text span size="sm" fw={600} c="inherit">
-            {costLabel}
-          </Text>
-        </UnstyledButton>
-      )}
+      <CostLevelIndicator costLevel={model.costLevel} costLabel={costLabel} pricingLink={pricingLink} t={t} />
       {/* Temporarily hide model pricing information. */}
       {showPricing && <PricingBlock model={model} mobile={mobile} t={t} isCN={isCN} />}
       <Stack gap="xs" mt="sm">
-        <Text size="xs" fw={750} c="chatbox-primary" className="uppercase tracking-[0.08em]">
+        <Text size="sm" fw={750} c="chatbox-secondary">
           {t('Capabilities')}
         </Text>
         <CapabilityIconRow capabilities={model.capabilities} />

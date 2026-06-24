@@ -15,7 +15,7 @@ import {
   isChatboxAIModelLocked,
   modelMatchesSearch,
 } from './chatboxCatalog'
-import { FALLBACK_UPGRADE_URL, MOBILE_TAP_RESET_STYLE } from './constants'
+import { FALLBACK_UPGRADE_URL, MOBILE_TAP_RESET_STYLE, MODEL_SELECTOR_SURFACE_CLASS } from './constants'
 import { getGroupLabel, toProviderModelInfo } from './helpers'
 import { ModelRow } from './ModelRow'
 import { ProviderRowHeader } from './ProviderRowHeader'
@@ -149,7 +149,6 @@ export function ChatboxProviderRows({
             locked={locked}
             mobile={isMobile}
             brandedInset
-            pricingLink={catalog.links?.modelPricing}
             onSelect={() => onSelect(provider.id, modelId)}
             onFavorite={() => onToggleFavorite(provider.id, modelId)}
             onShowDetail={() => onShowMobileDetail(detail)}
@@ -233,7 +232,8 @@ export function ChatboxProviderRows({
   return (
     <section
       className={clsx(
-        'relative border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-primary',
+        'relative border-0 border-b border-solid border-chatbox-border-primary',
+        MODEL_SELECTOR_SURFACE_CLASS,
         isMobile ? 'mb-2' : 'mb-1'
       )}
     >

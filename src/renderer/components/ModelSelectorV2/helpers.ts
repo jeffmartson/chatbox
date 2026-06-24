@@ -44,6 +44,13 @@ export function getGroupLabel(groupId: string, t: (key: string) => string) {
   return groupId
 }
 
+export function getCostLevelBarCount(costLevel: string | undefined) {
+  const normalizedCostLevel = costLevel?.toLowerCase()
+  if (normalizedCostLevel === 'high') return 3
+  if (normalizedCostLevel === 'medium') return 2
+  return 1
+}
+
 export function getCostLabel(costLevel: string | undefined, t: (key: string) => string) {
-  return costLevel ? t('Consumes more token') : ''
+  return getCostLevelBarCount(costLevel) > 1 ? t('Consumes more token') : ''
 }

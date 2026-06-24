@@ -29,11 +29,14 @@ import { ChatboxProviderRows } from './ChatboxProviderRows'
 import { buildChatboxAIGroupViews, modelMatchesSearch } from './chatboxCatalog'
 import {
   DESKTOP_DETAIL_CARD_GAP,
+  DESKTOP_DETAIL_CARD_MARGIN,
+  DESKTOP_DETAIL_CARD_OUTER_WIDTH,
   DESKTOP_DETAIL_CARD_WIDTH,
   DESKTOP_DETAIL_VIEWPORT_MARGIN,
   DRAWER_SURFACE_STYLE,
   EMPTY_MODEL_IDS,
   HOVER_CLASS,
+  MODEL_SELECTOR_SURFACE_CLASS,
   SELECTED_CLASS,
 } from './constants'
 import { DetailCard } from './DetailCard'
@@ -192,12 +195,15 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
       if (!dropdownRect) return
       clearDesktopDetailCloseTimer()
       const rect = anchor.getBoundingClientRect()
-      const rightSideLeft = rect.right + DESKTOP_DETAIL_CARD_GAP
+      const rightSideLeft = rect.right + DESKTOP_DETAIL_CARD_GAP - DESKTOP_DETAIL_CARD_MARGIN
       const hasRightSideSpace =
-        rightSideLeft + DESKTOP_DETAIL_CARD_WIDTH <= window.innerWidth - DESKTOP_DETAIL_VIEWPORT_MARGIN
+        rightSideLeft + DESKTOP_DETAIL_CARD_OUTER_WIDTH <= window.innerWidth - DESKTOP_DETAIL_VIEWPORT_MARGIN
       const left = hasRightSideSpace
         ? rightSideLeft
-        : Math.max(DESKTOP_DETAIL_VIEWPORT_MARGIN, rect.left - DESKTOP_DETAIL_CARD_GAP - DESKTOP_DETAIL_CARD_WIDTH)
+        : Math.max(
+            DESKTOP_DETAIL_VIEWPORT_MARGIN - DESKTOP_DETAIL_CARD_MARGIN,
+            rect.left - DESKTOP_DETAIL_CARD_GAP - DESKTOP_DETAIL_CARD_WIDTH - DESKTOP_DETAIL_CARD_MARGIN
+          )
       setDesktopDetail({
         key,
         model,
@@ -353,7 +359,8 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
       <Stack
         gap={0}
         className={clsx(
-          'overflow-hidden bg-chatbox-background-primary',
+          'overflow-hidden',
+          MODEL_SELECTOR_SURFACE_CLASS,
           isMobile ? 'border-0' : 'rounded-[14px] border border-solid border-chatbox-border-primary shadow-xl'
         )}
       >
@@ -550,7 +557,10 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
               <Drawer.Content className="fixed bottom-0 left-0 right-0 outline-none">
                 <Stack
                   gap={0}
-                  className="max-h-[88vh] rounded-t-[26px] border border-b-0 border-solid bg-chatbox-background-primary"
+                  className={clsx(
+                    'max-h-[88vh] rounded-t-[26px] border border-b-0 border-solid',
+                    MODEL_SELECTOR_SURFACE_CLASS
+                  )}
                   style={DRAWER_SURFACE_STYLE}
                 >
                   <div aria-hidden className="mx-auto my-3 h-1 w-14 rounded-full bg-chatbox-tint-tertiary opacity-70" />
@@ -574,7 +584,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
               <Drawer.Content className="fixed bottom-0 left-0 right-0 outline-none">
                 <Stack
                   gap={0}
-                  className="rounded-t-[26px] border border-b-0 border-solid bg-chatbox-background-primary"
+                  className={clsx('rounded-t-[26px] border border-b-0 border-solid', MODEL_SELECTOR_SURFACE_CLASS)}
                   style={DRAWER_SURFACE_STYLE}
                 >
                   <div aria-hidden className="mx-auto my-3 h-1 w-14 rounded-full bg-chatbox-tint-tertiary opacity-70" />
@@ -635,7 +645,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
               style={{
                 left: desktopDetail.left,
                 top: desktopDetail.top,
-                width: DESKTOP_DETAIL_CARD_WIDTH,
+                width: DESKTOP_DETAIL_CARD_OUTER_WIDTH,
                 transform: 'translateY(-50%)',
                 zIndex: 1,
               }}
