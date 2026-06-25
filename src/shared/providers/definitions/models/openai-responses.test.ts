@@ -56,7 +56,7 @@ function createModel(overrides: Partial<ConstructorParameters<typeof OpenAIRespo
 
 describe('OpenAIResponses call settings', () => {
   it('forces store=false for stateless responses while preserving user OpenAI provider options', () => {
-    const openaiResponses = createModel({ forceStatelessResponses: true })
+    const openaiResponses = createModel()
 
     const settings = openaiResponses.exposeCallSettings({
       providerOptions: {
@@ -94,15 +94,20 @@ describe('OpenAIResponses call settings', () => {
         reasoningSummary: 'auto',
         include: ['reasoning.encrypted_content'],
         forceReasoning: true,
+        store: false,
       },
     })
   })
 
-  it('does not inject OpenAI provider options when stateless mode is disabled', () => {
+  it('forces store=false even without user-provided OpenAI provider options', () => {
     const openaiResponses = createModel()
 
     const settings = openaiResponses.exposeCallSettings()
 
-    expect(settings.providerOptions).toBeUndefined()
+    expect(settings.providerOptions).toEqual({
+      openai: {
+        store: false,
+      },
+    })
   })
 })
