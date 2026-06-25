@@ -3,7 +3,11 @@ import { builtinSkills } from './index'
 
 describe('builtinSkills', () => {
   it('only includes practical built-in skills', () => {
-    expect(builtinSkills.map((item) => item.metadata.name)).toEqual(['data-analysis', 'chatbox-product-info'])
+    expect(builtinSkills.map((item) => item.metadata.name)).toEqual([
+      'data-analysis',
+      'chatbox-product-info',
+      'frontend-design',
+    ])
   })
 
   it('includes Chatbox product information skill', () => {
