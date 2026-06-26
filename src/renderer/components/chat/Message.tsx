@@ -76,6 +76,7 @@ import '../../static/Block.css'
 import {
   generate,
   generateMore,
+  isRetryableToolCallStep,
   modifyMessage,
   regenerateInNewFork,
   removeMessage,
@@ -213,18 +214,17 @@ const _Message: FC<Props> = (props) => {
   }, [msg, sessionId, setSessionAgentMode])
 
   const lastStepForRetry = useMemo(() => {
-    if (!msg.error) return undefined
     for (let index = msg.contentParts.length - 1; index >= 0; index -= 1) {
       const part = msg.contentParts[index]
       if (part.type === 'tool-call') {
         const toolCallPart = part as MessageToolCallPart
-        if (toolCallPart.state === 'result' || toolCallPart.state === 'error') {
+        if (isRetryableToolCallStep(toolCallPart)) {
           return toolCallPart
         }
       }
     }
     return undefined
-  }, [msg.contentParts, msg.error])
+  }, [msg.contentParts])
 
   const handleRetryWholeMessage = useCallback(() => {
     setRetryChoiceOpened(false)

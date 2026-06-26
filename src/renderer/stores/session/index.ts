@@ -61,6 +61,7 @@ export { getOCRModel, ocrImagesInMessages } from './ocr-helper'
 // Orchestration and AI helpers
 export {
   continuePausedToolCall,
+  isRetryableToolCallStep,
   orchestrateGeneration,
   retryFromLastToolCallAfterApiError,
   stopPausedToolCall,

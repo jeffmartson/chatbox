@@ -290,8 +290,8 @@ function findLastRetryableToolCallPart(message: Message): MessageToolCallPart | 
   return undefined
 }
 
-function isRetryableToolCallStep(part: MessageToolCallPart): boolean {
-  return part.state === 'result' || part.state === 'error'
+export function isRetryableToolCallStep(part: MessageToolCallPart): boolean {
+  return part.state === 'call' || part.state === 'result' || part.state === 'error'
 }
 
 function keepContentPartsThroughToolCall(message: Message, toolCallId: string): MessageContentParts {
@@ -775,7 +775,7 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
   if (!message) return
   const part = findToolCallPart(message, toolCallId)
   const lastRetryableToolCall = findLastRetryableToolCallPart(message)
-  if (!part || !isRetryableToolCallStep(part) || !message.error || lastRetryableToolCall?.toolCallId !== toolCallId) {
+  if (!part || !isRetryableToolCallStep(part) || lastRetryableToolCall?.toolCallId !== toolCallId) {
     return
   }
 
@@ -786,6 +786,59 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
     errorCode: undefined,
     errorExtra: undefined,
     contentParts: keepContentPartsThroughToolCall(message, toolCallId),
+  }
+
+  if (part.state === 'call') {
+    const settings = await chatStore.getSessionSettings(sessionId)
+    if (!settings) return
+
+    let retryMessage = updateToolCallPart(retrySourceMessage, toolCallId, (toolPart) => ({
+      ...toolPart,
+      state: 'call',
+      result: undefined,
+      resultStorageKey: undefined,
+      resultProviderMetadata: undefined,
+      startTime: Date.now(),
+      duration: undefined,
+    }))
+    await modifyMessage(sessionId, retryMessage, false)
+
+    try {
+      const { tools } = await buildToolsForPausedToolCall(session, settings, retryMessage)
+      const toolValue = (tools as Record<string, unknown>)[part.toolName]
+      const executableTool = toolValue && typeof toolValue === 'object' ? (toolValue as ExecutableTool) : undefined
+      if (typeof executableTool?.execute !== 'function') {
+        throw new Error(`Tool "${part.toolName}" is not available`)
+      }
+
+      const result = await executableTool.execute(part.args, { toolCallId, approved: true })
+      retryMessage = updateToolCallPart(retryMessage, toolCallId, (toolPart) => ({
+        ...toolPart,
+        state: 'result',
+        result,
+        duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
+      }))
+      await modifyMessage(sessionId, retryMessage, true)
+
+      await orchestrateGeneration(
+        sessionId,
+        { ...retryMessage, generating: true },
+        { operationType: 'regenerate', appendToMessage: true }
+      )
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      await modifyMessage(
+        sessionId,
+        updateToolCallPart(retryMessage, toolCallId, (toolPart) => ({
+          ...toolPart,
+          state: 'error',
+          result: { error: errorMessage },
+          duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
+        })),
+        true
+      )
+    }
+    return
   }
 
   await modifyMessage(sessionId, retrySourceMessage, true)
