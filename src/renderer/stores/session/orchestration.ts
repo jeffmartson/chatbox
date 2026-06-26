@@ -420,6 +420,8 @@ export async function orchestrateGeneration(
         await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
         return
       }
+
+      uiStore.getState().setSessionAgentMode(sessionId, 'off')
     }
 
     const prepared = await prepareAgentGenerationHarness({

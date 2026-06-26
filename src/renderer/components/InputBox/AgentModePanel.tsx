@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { getOS } from '@/packages/navigator'
 import platform from '@/platform'
 import * as chatStore from '@/stores/chatStore'
-import { useSessionSettings } from '@/stores/chatStore'
+import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
@@ -108,10 +108,13 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const panelRef = useRef<HTMLDivElement>(null)
   const [subPanelAlign, setSubPanelAlign] = useState<'top' | 'bottom'>('bottom')
   const [subPanelTop, setSubPanelTop] = useState<number>(0)
+  const isNewSession = sessionId === 'new'
+  const { session: currentSession } = useSession(isNewSession ? null : sessionId)
 
   // Agent mode state
   const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
   const setSessionAgentMode = useUIStore((s) => s.setSessionAgentMode)
+  const setAgentModeSmartSwitchingDefault = useUIStore((s) => s.setAgentModeSmartSwitchingDefault)
   const entry = useMemo(
     () => sessionAgentModeMap[sessionId] ?? getSessionAgentMode(sessionId),
     [sessionAgentModeMap, sessionId]
@@ -189,12 +192,18 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     },
     [sessionId, setSessionAgentMode]
   )
+  const handleSmartSwitchingChange = useCallback(
+    (enabled: boolean) => {
+      setAgentModeSmartSwitchingDefault(enabled)
+      setSessionAgentMode(sessionId, enabled ? 'auto' : 'off')
+    },
+    [sessionId, setAgentModeSmartSwitchingDefault, setSessionAgentMode]
+  )
 
   // Working directories (desktop only): real local dirs the sandbox may read/write freely.
   // A brand-new chat (sessionId === 'new') is not yet persisted, so its binding is held in
   // newSessionState and transferred into the created session's settings on first submit
   // (see routes/index.tsx) — mirroring how knowledge base / web browsing are handled.
-  const isNewSession = sessionId === 'new'
   const newSessionState = useUIStore((s) => s.newSessionState)
   const setNewSessionState = useUIStore((s) => s.setNewSessionState)
   const { sessionSettings } = useSessionSettings(sessionId)
@@ -276,7 +285,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   }, [])
 
   // --- Mode button ---
-  const ModeButton: FC<{ value: AgentModeValue; label: string }> = ({ value, label }) => {
+  const ModeButton: FC<{ value: Extract<AgentModeValue, 'on' | 'off'>; label: string }> = ({ value, label }) => {
     const isActive = agentModeUIState.displayValue === value
     const isLockedDisabled = entry.locked && value !== 'on'
     const isModelDisabled = !modelSupportsAgentMode && value !== 'off'
@@ -287,17 +296,30 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     return (
       <Tooltip label={tooltipLabel} disabled={!isDisabled} withArrow>
         <Button
-          size="compact-xs"
+          size="xs"
           variant={isActive ? 'filled' : 'default'}
+          color={isActive ? 'chatbox-brand' : undefined}
+          fullWidth
           disabled={isDisabled}
           onClick={() => handleModeChange(value)}
-          style={{ minWidth: 'fit-content' }}
         >
           {label}
         </Button>
       </Tooltip>
     )
   }
+
+  const isChatModeSelected = agentModeUIState.displayValue === 'off'
+  const smartSwitchingEnabled = entry.value === 'auto' && isChatModeSelected
+  const smartSwitchingExpired =
+    !isNewSession && Boolean(currentSession?.messages.some((message) => message.role === 'user'))
+  const isSmartSwitchingDisabled = entry.locked || !modelSupportsAgentMode || smartSwitchingExpired
+  const modeDescription = agentModeUIState.isActive
+    ? t('Best for multi-step tasks with files, code execution, tools, MCP, skills, or knowledge bases.')
+    : t('Best for quick Q&A, writing, translation, explanations, and web search.')
+  const smartSwitchingDescription = smartSwitchingExpired
+    ? t('Only available before the first message.')
+    : t('Suggest Work Mode on the first message.')
 
   // --- Extension row ---
   const ExtensionRow: FC<{
@@ -698,18 +720,43 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       }}
     >
       {/* Main panel - always visible */}
-      <Stack gap={0} py="xs" className="min-w-[260px]">
-        {/* Header: Agent Mode + mode switcher */}
-        <Flex justify="space-between" align="center" px="sm" py="xs" onMouseEnter={handleNonExtensionHover}>
-          <Text fw={600} size="sm" className="whitespace-nowrap mr-2">
-            {t('Agent Mode')}
+      <Stack gap={0} py="xs" className="w-[228px]">
+        {/* Header: mode switcher */}
+        <Stack gap="xs" px="sm" py="xs" onMouseEnter={handleNonExtensionHover}>
+          <Text fw={600} size="sm" c="chatbox-primary">
+            {t('Mode')}
           </Text>
-          <Flex gap={4} className="shrink-0">
-            <ModeButton value="auto" label="AUTO" />
-            <ModeButton value="on" label="ON" />
-            <ModeButton value="off" label="OFF" />
+          <Flex gap={6}>
+            <ModeButton value="off" label={t('Chat Mode')} />
+            <ModeButton value="on" label={t('Work Mode')} />
           </Flex>
-        </Flex>
+          <Text size="xs" c="chatbox-secondary" className="leading-snug">
+            {modeDescription}
+          </Text>
+          {isChatModeSelected && (
+            <Flex
+              justify="space-between"
+              align="center"
+              gap="sm"
+              className="rounded-md bg-chatbox-background-secondary px-2 py-1.5"
+            >
+              <Stack gap={0} className="min-w-0">
+                <Text size="xs" fw={500} c="chatbox-primary">
+                  {t('Smart Switching')}
+                </Text>
+                <Text size="xs" c="chatbox-secondary" className="leading-snug">
+                  {smartSwitchingDescription}
+                </Text>
+              </Stack>
+              <Switch
+                size="xs"
+                checked={smartSwitchingEnabled}
+                disabled={isSmartSwitchingDisabled}
+                onChange={(e) => handleSmartSwitchingChange(e.currentTarget.checked)}
+              />
+            </Flex>
+          )}
+        </Stack>
 
         {/* Capabilities - always visible, disabled when off */}
         <div style={capabilitiesDisabled ? { opacity: 0.5 } : undefined}>

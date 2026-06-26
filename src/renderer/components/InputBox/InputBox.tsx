@@ -36,6 +36,7 @@ import {
   IconPlayerStopFilled,
   IconPlus,
   IconSettings,
+  IconWand,
   IconWorldWww,
 } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
@@ -68,6 +69,7 @@ import {
   getProviderModelContextWindowSync,
   useModelRegistryVersion,
 } from '@/packages/model-registry'
+import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
 import * as picUtils from '@/packages/pic_utils'
 import platform from '@/platform'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
@@ -109,6 +111,7 @@ import { getAgentModeUIState } from './agentModeState'
 import { ImageUploadInput } from './ImageUploadInput'
 import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
 import ReasoningControlButton from './ReasoningControlButton'
+import { getTrailingSkillCommand, hasPendingApprovalToolCall, insertSkillCommandText } from './skillCommand'
 import TokenCountMenu from './TokenCountMenu'
 import { useReasoningControlState } from './useReasoningControlState'
 
@@ -275,6 +278,12 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const latestInputRef = useRef('')
     const [hasTextContent, setHasTextContent] = useState(false)
     const draftMessageIdRef = useRef<string | undefined>(undefined)
+    const enabledSkillNames = useSettingsStore((state) => state.skills.enabledSkillNames)
+    const [inputSkills, setInputSkills] = useState<Array<{ name: string; description: string }>>([])
+    const [inputSkillsLoading, setInputSkillsLoading] = useState(false)
+    const [skillCommandQuery, setSkillCommandQuery] = useState<string | null>(null)
+    const [skillCommandSelectedIndex, setSkillCommandSelectedIndex] = useState(0)
+    const skillCommandQueryRef = useRef<string | null>(null)
 
     const debouncedUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const resetHistoryIndexRef = useRef<() => void>(() => {})
@@ -284,17 +293,86 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       resetHistoryIndexRef.current()
     }, [])
 
-    const onMessageInputValueChange = useCallback((value: string) => {
-      latestInputRef.current = value
-      const hasContent = value.trim().length > 0
-      setHasTextContent((prev) => {
-        if (prev === hasContent) return prev
-        return hasContent
-      })
-      // Schedule debounced pre-constructed message update
-      clearTimeout(debouncedUpdateTimerRef.current)
-      debouncedUpdateTimerRef.current = setTimeout(() => flushRef.current(), 300)
+    const updateSkillCommandQuery = useCallback((query: string | null) => {
+      if (skillCommandQueryRef.current === query) return
+      skillCommandQueryRef.current = query
+      setSkillCommandQuery(query)
+      setSkillCommandSelectedIndex(0)
     }, [])
+
+    const onMessageInputValueChange = useCallback(
+      (value: string) => {
+        latestInputRef.current = value
+        const hasContent = value.trim().length > 0
+        setHasTextContent((prev) => {
+          if (prev === hasContent) return prev
+          return hasContent
+        })
+        const trigger = getTrailingSkillCommand(value)
+        const nextSkillCommandQuery = trigger?.query ?? null
+        updateSkillCommandQuery(nextSkillCommandQuery)
+        // Schedule debounced pre-constructed message update
+        clearTimeout(debouncedUpdateTimerRef.current)
+        debouncedUpdateTimerRef.current = setTimeout(() => flushRef.current(), 300)
+      },
+      [updateSkillCommandQuery]
+    )
+
+    const loadInputSkills = useCallback(async () => {
+      setInputSkillsLoading(true)
+      try {
+        const allSkills = await skillsController.discoverSkills()
+        setInputSkills(allSkills.map((skill) => ({ name: skill.name, description: skill.description })))
+      } catch {
+        setInputSkills([])
+      } finally {
+        setInputSkillsLoading(false)
+      }
+    }, [])
+
+    useEffect(() => {
+      if (skillCommandQuery === null || inputSkills.length > 0 || inputSkillsLoading) {
+        return
+      }
+      void loadInputSkills()
+    }, [inputSkills.length, inputSkillsLoading, loadInputSkills, skillCommandQuery])
+
+    useEffect(() => {
+      return subscribeSkillsChanged(() => {
+        setInputSkills([])
+      })
+    }, [])
+
+    const enabledInputSkills = useMemo(
+      () => inputSkills.filter((skill) => enabledSkillNames.includes(skill.name)),
+      [enabledSkillNames, inputSkills]
+    )
+    const matchingInputSkills = useMemo(() => {
+      if (skillCommandQuery === null) return []
+      const query = skillCommandQuery.trim().toLowerCase()
+      const matchingSkills = query
+        ? enabledInputSkills.filter(
+            (skill) => skill.name.toLowerCase().includes(query) || skill.description.toLowerCase().includes(query)
+          )
+        : enabledInputSkills
+      return matchingSkills.slice(0, 8)
+    }, [enabledInputSkills, skillCommandQuery])
+
+    useEffect(() => {
+      setSkillCommandSelectedIndex((index) => Math.min(index, Math.max(0, matchingInputSkills.length - 1)))
+    }, [matchingInputSkills.length])
+
+    const insertSkillCommand = useCallback(
+      (skillName: string) => {
+        messageInputFieldRef.current?.setValue((prev) => insertSkillCommandText(prev, skillName))
+        updateSkillCommandQuery(null)
+        setTimeout(() => {
+          dom.focusMessageInput()
+          dom.setMessageInputCursorToEnd()
+        }, 0)
+      },
+      [updateSkillCommandQuery]
+    )
 
     // Pre-constructed message state (scoped by session)
     const [preConstructedMessage, setPreConstructedMessage] = useAtom(
@@ -311,6 +389,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const { session: currentSession } = useSession(sessionId || null)
     const { sessionSettings: currentSessionMergedSettings } = useSessionSettings(sessionId || null)
+    const isAwaitingToolApproval = useMemo(
+      () => hasPendingApprovalToolCall(currentSession?.messages ?? []),
+      [currentSession?.messages]
+    )
     const { providers } = useProviders()
     const {
       effectiveProviderOptions,
@@ -718,6 +800,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         generating ||
         isSubmitting ||
         isPreprocessing ||
+        isAwaitingToolApproval ||
         hasPreprocessErrors ||
         hasBlockedSessionRagFiles
       ) {
@@ -833,6 +916,34 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const onKeyDown = useCallback(
       (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (skillCommandQuery !== null && matchingInputSkills.length > 0) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setSkillCommandSelectedIndex((index) => (index + 1) % matchingInputSkills.length)
+            return
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            setSkillCommandSelectedIndex(
+              (index) => (index - 1 + matchingInputSkills.length) % matchingInputSkills.length
+            )
+            return
+          }
+          if (event.key === 'Enter' || event.key === 'Tab') {
+            event.preventDefault()
+            const selectedSkill = matchingInputSkills[skillCommandSelectedIndex]
+            if (selectedSkill) {
+              insertSkillCommand(selectedSkill.name)
+            }
+            return
+          }
+        }
+        if (skillCommandQuery !== null && event.key === 'Escape') {
+          event.preventDefault()
+          updateSkillCommandQuery(null)
+          return
+        }
+
         const isPressedHash: Record<ShortcutSendValue, boolean> = {
           '': false,
           Enter: event.keyCode === 13 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey,
@@ -895,7 +1006,15 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           messageInputFieldRef.current?.getElement()?.blur()
         }
       },
-      [shortcuts, isSmallScreen]
+      [
+        insertSkillCommand,
+        isSmallScreen,
+        matchingInputSkills,
+        shortcuts,
+        skillCommandQuery,
+        skillCommandSelectedIndex,
+        updateSkillCommandQuery,
+      ]
     )
 
     const startNewThread = () => {
@@ -1242,12 +1361,46 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           {currentSessionId && <CompactionStatus sessionId={currentSessionId} />}
           <Stack
             className={cn(
-              'rounded-md bg-chatbox-background-secondary justify-between px-3 py-2',
+              'relative rounded-md bg-chatbox-background-secondary justify-between px-3 py-2',
               !isSmallScreen && 'min-h-[92px]'
             )}
             style={{ border: '1px solid var(--chatbox-border-primary)' }}
             gap="xs"
           >
+            {skillCommandQuery !== null && matchingInputSkills.length > 0 && !isAwaitingToolApproval && (
+              <Box className="absolute left-3 right-12 bottom-[52px] z-20 max-h-52 overflow-y-auto rounded-md border border-solid border-chatbox-border-primary bg-chatbox-background-primary py-1 shadow-lg">
+                {matchingInputSkills.map((skill, index) => (
+                  <UnstyledButton
+                    key={skill.name}
+                    className={cn(
+                      'flex w-full items-start gap-2 px-2 py-1.5 text-left transition-colors',
+                      index === skillCommandSelectedIndex
+                        ? 'bg-chatbox-background-tertiary'
+                        : 'hover:bg-chatbox-background-tertiary'
+                    )}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => insertSkillCommand(skill.name)}
+                  >
+                    <IconWand
+                      size={14}
+                      strokeWidth={1.8}
+                      className="mt-0.5 shrink-0 text-[var(--chatbox-tint-secondary)]"
+                    />
+                    <Stack gap={1} className="min-w-0 flex-1">
+                      <Text size="sm" truncate c="chatbox-primary">
+                        /{skill.name}
+                      </Text>
+                      {skill.description && (
+                        <Text size="xs" c="chatbox-secondary" lineClamp={1}>
+                          {skill.description}
+                        </Text>
+                      )}
+                    </Stack>
+                  </UnstyledButton>
+                ))}
+              </Box>
+            )}
+
             {/* Input Row */}
             <Flex align="flex-end" gap={4}>
               <MessageInputField
@@ -1255,8 +1408,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 isNewSession={isNewSession}
                 isSmallScreen={isSmallScreen}
                 viewportHeight={viewportHeight}
-                isReadOnly={isCompactionRunning}
-                placeholder={t('Type your question here...') || ''}
+                isReadOnly={isCompactionRunning || isAwaitingToolApproval}
+                placeholder={
+                  isAwaitingToolApproval ? t('Waiting for approval') || '' : t('Type your question here...') || ''
+                }
                 autoFocus={!isSmallScreen}
                 onValueChange={onMessageInputValueChange}
                 onUserInput={onUserInput}
@@ -1271,6 +1426,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     isPreprocessing ||
                     isSubmitting ||
                     isCompactionRunning ||
+                    isAwaitingToolApproval ||
                     hasPreprocessErrors ||
                     hasBlockedSessionRagFiles) &&
                   !generating
@@ -1287,6 +1443,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                       isPreprocessing ||
                       isSubmitting ||
                       isCompactionRunning ||
+                      isAwaitingToolApproval ||
                       hasPreprocessErrors ||
                       hasBlockedSessionRagFiles) &&
                     'disabled:!opacity-100 !text-white'
@@ -1297,6 +1454,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     isPreprocessing ||
                     isSubmitting ||
                     isCompactionRunning ||
+                    isAwaitingToolApproval ||
                     hasPreprocessErrors ||
                     hasBlockedSessionRagFiles)
                     ? { backgroundColor: 'rgba(222, 226, 230, 1)' }
@@ -1552,10 +1710,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     }}
                     currentKnowledgeBaseId={knowledgeBase?.id}
                     onKnowledgeBaseSelect={handleKnowledgeBaseSelect}
-                    onSkillSelect={(name) => {
-                      messageInputFieldRef.current?.setValue(`/${name} `)
-                      dom.focusMessageInput()
-                    }}
+                    onSkillSelect={insertSkillCommand}
                   />
                 )}
 

@@ -92,6 +92,38 @@ describe('ChatboxAI openai-responses models', () => {
     vi.clearAllMocks()
   })
 
+  it('defaults chat models without capability metadata to tool-use capable', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+    })
+
+    expect(model.isSupportToolUse('agent')).toBe(true)
+  })
+
+  it('respects explicit capability metadata when provided', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+      capabilities: [],
+    })
+
+    expect(model.isSupportToolUse('agent')).toBe(false)
+  })
+
+  it('keeps weak DeepSeek tool-use models disabled for scoped tools even without capability metadata', () => {
+    const model = createModel({
+      modelId: 'deepseek-chat',
+      type: 'chat',
+      apiStyle: 'openai',
+    })
+
+    expect(model.isSupportToolUse('agent')).toBe(false)
+    expect(model.isSupportToolUse('read-file')).toBe(false)
+  })
+
   it('accepts openai-responses as a provider model apiStyle', () => {
     const parsed = ProviderModelInfoSchema.parse({
       modelId: 'gpt-5-mini',

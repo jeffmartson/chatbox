@@ -376,6 +376,9 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
 
   public isSupportToolUse(scope?: ToolUseScope) {
     if (isDeepSeekWeakToolUse(this.options.model.modelId, scope)) return false
+    if (!this.options.model.capabilities) {
+      return !this.options.model.type || this.options.model.type === 'chat'
+    }
     return super.isSupportToolUse()
   }
 }

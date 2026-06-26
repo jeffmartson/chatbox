@@ -28,7 +28,7 @@ const defaultEntry: AgentModeEntry = { value: 'auto', locked: false, lockReason:
 
 beforeEach(() => {
   // Reset agent mode map before each test
-  uiStore.setState({ sessionAgentModeMap: {} })
+  uiStore.setState({ sessionAgentModeMap: {}, agentModeSmartSwitchingDefault: true })
 })
 
 describe('setSessionAgentMode', () => {
@@ -134,6 +134,14 @@ describe('getSessionAgentMode (from utils.ts)', () => {
   test('returns default for unknown session', () => {
     const entry = getSessionAgentMode('nonexistent-session')
     expect(entry).toEqual(defaultEntry)
+  })
+
+  test('uses smart switching preference for unknown sessions', () => {
+    uiStore.getState().setAgentModeSmartSwitchingDefault(false)
+    expect(getSessionAgentMode('new')).toEqual({ value: 'off', locked: false, lockReason: null })
+
+    uiStore.getState().setAgentModeSmartSwitchingDefault(true)
+    expect(getSessionAgentMode('new')).toEqual(defaultEntry)
   })
 
   test('returns stored entry for known session', () => {

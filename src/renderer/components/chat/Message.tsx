@@ -178,6 +178,7 @@ const _Message: FC<Props> = (props) => {
 
   const setQuote = useUIStore((state) => state.setQuote)
   const lockSessionAgentMode = useUIStore((state) => state.lockSessionAgentMode)
+  const setSessionAgentMode = useUIStore((state) => state.setSessionAgentMode)
 
   const quoteMsg = useCallback(() => {
     let input = getMessageText(msg)
@@ -205,10 +206,11 @@ const _Message: FC<Props> = (props) => {
   }, [lockSessionAgentMode, msg, sessionId])
 
   const handleContinueNormalResponse = useCallback(async () => {
+    setSessionAgentMode(sessionId, 'off')
     const nextMsg = resetMessageForAgentModeResponse(msg)
     await modifyMessage(sessionId, nextMsg, true)
     await generate(sessionId, nextMsg, { operationType: 'send_message', skipAgentModeSuggestion: true })
-  }, [msg, sessionId])
+  }, [msg, sessionId, setSessionAgentMode])
 
   const lastStepForRetry = useMemo(() => {
     if (!msg.error) return undefined
@@ -737,7 +739,7 @@ const _Message: FC<Props> = (props) => {
                         </div>
                         <Stack gap={2} className="min-w-0 flex-1">
                           <Text size="sm" fw={600} c="chatbox-primary">
-                            {t('Agent Mode suggested')}
+                            {t('Work Mode suggested')}
                           </Text>
                           {item.reason && (
                             <Text size="xs" c="chatbox-secondary" className="break-words [overflow-wrap:anywhere]">
@@ -753,7 +755,7 @@ const _Message: FC<Props> = (props) => {
                             className="shrink-0"
                             onClick={handleContinueNormalResponse}
                           >
-                            {t('Continue normally')}
+                            {t('Continue in Chat Mode')}
                           </Button>
                           <Button
                             size="xs"
@@ -763,7 +765,7 @@ const _Message: FC<Props> = (props) => {
                             leftSection={<IconRobot size={14} />}
                             onClick={handleStartAgentModeResponse}
                           >
-                            {t('Use Agent Mode')}
+                            {t('Use Work Mode')}
                           </Button>
                         </Flex>
                       </Flex>

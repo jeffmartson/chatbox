@@ -62,6 +62,7 @@ export const uiStore = createStore(
         widthFull: false, // Stored UI preference
         showCopilotsInNewSession: false,
         sidebarWidth: null as number | null, // Custom sidebar width, null means use default
+        agentModeSmartSwitchingDefault: true,
         sessionAgentModeMap: {} as Record<string, AgentModeEntry>,
         sessionCodeExecutionMap: {} as Record<string, boolean | undefined>,
       },
@@ -218,6 +219,10 @@ export const uiStore = createStore(
           set({ sidebarWidth })
         },
 
+        setAgentModeSmartSwitchingDefault: (enabled: boolean) => {
+          set({ agentModeSmartSwitchingDefault: enabled })
+        },
+
         setSessionAgentMode: (sessionId: string, value: AgentModeValue) => {
           const current = get().sessionAgentModeMap[sessionId]
           if (current?.locked && value !== 'on') return // Cannot change away from 'on' if locked
@@ -279,6 +284,7 @@ export const uiStore = createStore(
         widthFull: state.widthFull,
         showCopilotsInNewSession: state.showCopilotsInNewSession,
         sidebarWidth: state.sidebarWidth,
+        agentModeSmartSwitchingDefault: state.agentModeSmartSwitchingDefault,
         sessionWebBrowsingMap: state.sessionWebBrowsingMap,
         sessionAgentModeMap: state.sessionAgentModeMap,
         sessionCodeExecutionMap: state.sessionCodeExecutionMap,

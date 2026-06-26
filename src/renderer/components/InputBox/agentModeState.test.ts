@@ -11,10 +11,10 @@ function createEntry(value: AgentModeEntry['value']): AgentModeEntry {
 }
 
 describe('getAgentModeUIState', () => {
-  test('keeps auto mode visible but inactive (capabilities disabled) on desktop', () => {
+  test('shows auto mode as chat mode but keeps capabilities disabled on desktop', () => {
     platformMock.type = 'desktop'
     expect(getAgentModeUIState(createEntry('auto'), true)).toEqual({
-      displayValue: 'auto',
+      displayValue: 'off',
       isActive: false,
       capabilitiesDisabled: true,
       modelUnsupported: false,
