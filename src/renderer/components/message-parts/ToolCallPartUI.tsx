@@ -63,6 +63,7 @@ import { inlineSandboxHtmlAssets } from './html-artifact-assets'
 
 const TOOL_ERROR_PREVIEW_LENGTH = 1_200
 const TOOL_PAYLOAD_PREVIEW_LENGTH = 8_000
+const APPROVAL_PAYLOAD_MAX_HEIGHT = 'min(240px, 35vh)'
 
 function truncatePreview(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
@@ -874,9 +875,11 @@ const CollapsibleCommand: FC<{ command: string }> = ({ command }) => {
         </Group>
       </UnstyledButton>
       <Collapse in={open}>
-        <Code block style={{ fontSize: 12, marginTop: 4 }}>
-          {command}
-        </Code>
+        <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
+          <Code block style={{ fontSize: 12, marginTop: 4 }}>
+            {command}
+          </Code>
+        </Box>
       </Collapse>
     </Box>
   )
@@ -1264,7 +1267,9 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
           {isApproval ? t('Deny') : t('Stop')}
         </Button>
       </Group>
-      <Code block>{payload}</Code>
+      <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
+        <Code block>{payload}</Code>
+      </Box>
       {pauseReason?.type === 'user_exec_approval' && pauseReason.explanation && (
         <Text size="xs" c="chatbox-secondary" style={{ whiteSpace: 'pre-wrap' }}>
           {pauseReason.explanation}
