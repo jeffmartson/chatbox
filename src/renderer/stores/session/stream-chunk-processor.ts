@@ -205,6 +205,8 @@ export async function processStreamChunk(
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
         args,
+        providerMetadata: chunk.providerMetadata,
+        providerExecuted: 'providerExecuted' in chunk ? chunk.providerExecuted : undefined,
         startTime: Date.now(),
       }
       contentParts.push(toolCallPart)
@@ -242,6 +244,7 @@ export async function processStreamChunk(
         }
 
         existing.result = rawResult
+        existing.resultProviderMetadata = chunk.providerMetadata
       }
       break
     }
@@ -264,6 +267,8 @@ export async function processStreamChunk(
           toolCallId: chunk.toolCallId,
           toolName: chunk.toolName,
           args: chunk.input,
+          providerMetadata: chunk.providerMetadata,
+          providerExecuted: 'providerExecuted' in chunk ? chunk.providerExecuted : undefined,
         } satisfies MessageToolCallPart)
       toolCallPart.state = 'error'
       finalizeToolCallDuration(toolCallPart)

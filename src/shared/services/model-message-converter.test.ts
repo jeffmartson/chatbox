@@ -82,4 +82,90 @@ describe('convertToModelMessages — tool result sanitization', () => {
     const part = (toolMsg?.content as Array<{ type: string; output: unknown }>)[0]
     expect(part.output).toEqual({ type: 'json', value: { content: [{ type: 'text', text: 'hello' }] } })
   })
+
+  it('preserves Gemini thought signatures on assistant tool-call parts', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-1' } }
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:write_file',
+            args: { path: 'demo.txt', content: 'hello' },
+            providerMetadata,
+            providerExecuted: true,
+            result: { ok: true },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+    const assistantMsg = output.find((m) => m.role === 'assistant')
+    const toolCallPart = (assistantMsg?.content as Array<{ type: string; providerOptions?: unknown }>)[0]
+
+    expect(toolCallPart.providerOptions).toEqual(providerMetadata)
+    expect(toolCallPart).toMatchObject({ providerExecuted: true })
+    expect(() => modelMessageSchema.parse(assistantMsg)).not.toThrow()
+  })
+
+  it('preserves provider metadata on tool results', async () => {
+    const resultProviderMetadata = { openai: { itemId: 'result-item-1' } }
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'tool_search',
+            args: { query: 'docs' },
+            resultProviderMetadata,
+            result: { ok: true },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+    const toolMsg = output.find((m) => m.role === 'tool')
+    const toolResultPart = (toolMsg?.content as Array<{ type: string; providerOptions?: unknown }>)[0]
+
+    expect(toolResultPart.providerOptions).toEqual(resultProviderMetadata)
+    expect(() => modelMessageSchema.parse(toolMsg)).not.toThrow()
+  })
+
+  it('preserves reasoning only when requested by the provider path', async () => {
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          { type: 'reasoning', text: 'thinking about the answer' },
+          { type: 'text', text: 'final answer' },
+        ],
+      },
+    ]
+
+    const defaultOutput = await convertToModelMessages(messages, noImage)
+    const defaultAssistant = defaultOutput.find((m) => m.role === 'assistant')
+    expect(defaultAssistant?.content).toEqual([{ type: 'text', text: 'final answer' }])
+
+    const preservedOutput = await convertToModelMessages(messages, noImage, {
+      modelSupportVision: true,
+      preserveReasoning: true,
+    })
+    const preservedAssistant = preservedOutput.find((m) => m.role === 'assistant')
+    expect(preservedAssistant?.content).toEqual([
+      { type: 'reasoning', text: 'thinking about the answer' },
+      { type: 'text', text: 'final answer' },
+    ])
+    expect(() => modelMessageSchema.parse(preservedAssistant)).not.toThrow()
+  })
 })

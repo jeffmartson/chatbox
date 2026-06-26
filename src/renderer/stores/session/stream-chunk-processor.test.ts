@@ -302,6 +302,28 @@ describe('processStreamChunk', () => {
     })
   })
 
+  it('preserves provider metadata on tool-call chunks', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-1' } }
+    const state = createInitialState()
+    const result = await processStreamChunk(
+      chunk('tool-call', {
+        toolCallId: 'tc1',
+        toolName: 'search',
+        args: { q: 'test' },
+        providerMetadata,
+        providerExecuted: true,
+      }),
+      state,
+      callbacks
+    )
+
+    expect(result.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      providerMetadata,
+      providerExecuted: true,
+    })
+  })
+
   it('records startTime on tool-call and duration on tool-result', async () => {
     const state = createInitialState()
     const r1 = await processStreamChunk(
@@ -353,6 +375,23 @@ describe('processStreamChunk', () => {
     const part = r2.state.contentParts[0] as { state: string; result: unknown }
     expect(part.state).toBe('result')
     expect(part.result).toEqual({ data: 'found' })
+  })
+
+  it('preserves provider metadata on tool-result chunks', async () => {
+    const providerMetadata = { openai: { itemId: 'item-1' } }
+    const state = createInitialState()
+    const r1 = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: {} }),
+      state,
+      callbacks
+    )
+    const r2 = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: { data: 'found' }, providerMetadata }),
+      r1.state,
+      callbacks
+    )
+    const part = r2.state.contentParts[0] as { resultProviderMetadata?: unknown }
+    expect(part.resultProviderMetadata).toEqual(providerMetadata)
   })
 
   it('handles tool-error by updating existing tool-call', async () => {

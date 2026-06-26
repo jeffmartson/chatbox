@@ -1,4 +1,4 @@
-import type { LanguageModelUsage } from 'ai'
+import type { JSONValue, LanguageModelUsage, ProviderMetadata } from 'ai'
 import { z } from 'zod'
 import { SessionSettingsSchema } from '../types/settings'
 import { ModelProviderEnum } from './provider'
@@ -96,6 +96,11 @@ export const MessageRoleEnum = {
 
 export type MessageRole = (typeof MessageRoleEnum)[keyof typeof MessageRoleEnum]
 
+const MessageProviderMetadataSchema: z.ZodType<ProviderMetadata> = z.record(
+  z.string(),
+  z.record(z.string(), z.custom<JSONValue>().optional())
+)
+
 // Message content part schemas
 export const MessageTextPartSchema = z.object({
   type: z.literal('text'),
@@ -131,7 +136,10 @@ export const MessageToolCallPartSchema = z.object({
   state: z.enum(['call', 'result', 'error', 'paused']),
   toolCallId: z.string(),
   toolName: z.string(),
-  args: z.unknown(),
+  args: z.any(),
+  providerMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
+  resultProviderMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
+  providerExecuted: z.boolean().optional(),
   result: z.unknown().optional(),
   /** Timestamp (ms) when this tool call started executing. */
   startTime: z.number().optional(),
@@ -368,8 +376,11 @@ export type MessageImagePart = z.infer<typeof MessageImagePartSchema>
 export type MessageInfoPart = z.infer<typeof MessageInfoPartSchema>
 export type MessageAgentModeSuggestionPart = z.infer<typeof MessageAgentModeSuggestionPartSchema>
 export type MessageReasoningPart = z.infer<typeof MessageReasoningPartSchema>
-export type MessageToolCallPart<Args = unknown, Result = unknown> = z.infer<typeof MessageToolCallPartSchema> & {
-  args: Args
+export type MessageToolCallPart<Args = unknown, Result = unknown> = Omit<
+  z.infer<typeof MessageToolCallPartSchema>,
+  'args' | 'result'
+> & {
+  args?: Args
   result?: Result
   resultStorageKey?: string
 }

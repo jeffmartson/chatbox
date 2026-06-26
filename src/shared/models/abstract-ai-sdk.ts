@@ -8,6 +8,7 @@ import {
   type JSONValue,
   type LanguageModelUsage,
   type ModelMessage,
+  type ProviderMetadata,
   type Provider,
   simulateStreamingMiddleware,
   stepCountIs,
@@ -140,6 +141,7 @@ interface ToolExecutionResult {
   toolCallId: string
   result: unknown
   isError?: boolean
+  providerMetadata?: ProviderMetadata
 }
 
 export default abstract class AbstractAISDKModel implements ModelInterface {
@@ -438,6 +440,8 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
           toolCallId: toolCall.toolCallId,
           toolName: toolCall.toolName,
           args,
+          providerMetadata: toolCall.providerMetadata,
+          providerExecuted: toolCall.providerExecuted,
         },
         contentParts,
         options
@@ -455,6 +459,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
       const mappedResult: ToolExecutionResult = {
         toolCallId: toolResult.toolCallId,
         result,
+        providerMetadata: toolResult.providerMetadata,
       }
       this.updateToolResultPart(mappedResult, contentParts)
       options.onResultChange?.({ contentParts })
@@ -544,6 +549,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
       } else {
         toolCallPart.state = 'result'
         toolCallPart.result = toolResult.result
+        toolCallPart.resultProviderMetadata = toolResult.providerMetadata
       }
     }
   }

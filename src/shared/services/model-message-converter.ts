@@ -129,6 +129,8 @@ async function convertAssistantContentParts(
           toolCallId: c.toolCallId,
           toolName: c.toolName,
           input: c.args,
+          providerExecuted: c.providerExecuted,
+          providerOptions: c.providerMetadata,
         } satisfies ToolCallPart
       }
       if (c.type === 'text') {
@@ -212,6 +214,7 @@ async function emitAssistantMessages(
           toolCallId: tc.toolCallId,
           toolName: tc.toolName,
           output: toolOutput,
+          providerOptions: tc.resultProviderMetadata,
         },
       ],
     })
