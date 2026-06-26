@@ -594,7 +594,6 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                       model={mobileDetail}
                       pricingLink={chatboxAIModelList?.links?.modelPricing}
                       upgradeLink={chatboxAIModelList?.links?.upgrade}
-                      onSelect={() => handleSelect(mobileDetail.providerId, mobileDetail.modelId)}
                       onClose={() => setMobileDetail(null)}
                       onUpgradeClick={() =>
                         pageName && trackUpgradeModelClick(pageName, 'upgrade_modal', mobileDetail.modelId)
@@ -656,7 +655,6 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 model={desktopDetail.model}
                 pricingLink={desktopDetail.pricingLink}
                 upgradeLink={desktopDetail.upgradeLink}
-                onSelect={() => handleSelect(desktopDetail.model.providerId, desktopDetail.model.modelId)}
                 onUpgradeClick={() =>
                   pageName && trackUpgradeModelClick(pageName, 'upgrade_modal', desktopDetail.model.modelId)
                 }

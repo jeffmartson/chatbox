@@ -312,7 +312,6 @@ export function DetailCard({
   model,
   pricingLink,
   upgradeLink,
-  onSelect,
   onClose,
   onUpgradeClick,
   mobile,
@@ -320,7 +319,6 @@ export function DetailCard({
   model: DetailModel
   pricingLink?: string
   upgradeLink?: string
-  onSelect: () => void
   onClose?: () => void
   onUpgradeClick?: () => void
   mobile?: boolean
@@ -329,13 +327,14 @@ export function DetailCard({
   const costLabel = getCostLabel(model.costLevel, t)
   const isCN = i18n.language.toLowerCase().startsWith('zh')
   const showPricing = false
+  const showActionRow = !!onClose || model.locked
   return (
     <Stack
       gap={mobile ? 'md' : 'md'}
       className={clsx(
         'relative border border-solid text-chatbox-tint-primary',
         MODEL_SELECTOR_SURFACE_CLASS,
-        mobile ? 'm-[4px] border-0 px-4 pb-0 pt-3 rounded-[20px]' : 'm-[4px] w-[320px] rounded-[20px] px-4 pb-0 pt-4'
+        mobile ? 'm-[4px] border-0 px-4 pb-4 pt-3 rounded-[20px]' : 'm-[4px] w-[320px] rounded-[20px] px-4 pb-4 pt-4'
       )}
       style={mobile ? undefined : CARD_SURFACE_STYLE}
     >
@@ -369,56 +368,41 @@ export function DetailCard({
           {model.disabledReason}
         </Text>
       )}
-      <Flex gap="sm" mt={mobile ? 'md' : 'sm'}>
-        {onClose && (
-          <Button
-            variant="default"
-            size={mobile ? 'md' : 'sm'}
-            onClick={onClose}
-            className="flex-shrink-0"
-            styles={{ root: { height: mobile ? 46 : 42, minHeight: mobile ? 46 : 42, minWidth: mobile ? 88 : 76 } }}
-          >
-            {t('Close')}
-          </Button>
-        )}
-        {(mobile || model.locked || model.disabledReason) && (
-          <Button
-            fullWidth
-            size={mobile ? 'md' : 'sm'}
-            leftSection={model.locked ? <ScalableIcon icon={IconSparkles} size={16} /> : undefined}
-            disabled={!model.locked && !!model.disabledReason}
-            className={model.locked ? 'font-semibold' : undefined}
-            style={
-              model.locked
-                ? {
-                    minHeight: mobile ? 46 : 42,
-                    border: 0,
-                    background: 'linear-gradient(90deg, #f59f00 0%, #f06b2f 52%, #e8592c 100%)',
-                    boxShadow: '0 10px 24px rgb(232 89 44 / 0.24)',
-                  }
-                : model.disabledReason
-                  ? {
-                      minHeight: mobile ? 46 : 42,
-                    }
-                  : {
-                      minHeight: mobile ? 46 : 42,
-                      border: 0,
-                      background: 'linear-gradient(105deg, #74c0fc 0%, #228be6 46%, #1864ab 100%)',
-                    }
-            }
-            onClick={() => {
-              if (model.locked) {
+      {showActionRow && (
+        <Flex gap="sm" mt={mobile ? 'md' : 'sm'}>
+          {onClose && (
+            <Button
+              variant="default"
+              size={mobile ? 'md' : 'sm'}
+              onClick={onClose}
+              className="flex-shrink-0"
+              styles={{ root: { height: mobile ? 46 : 42, minHeight: mobile ? 46 : 42, minWidth: mobile ? 88 : 76 } }}
+            >
+              {t('Close')}
+            </Button>
+          )}
+          {model.locked && (
+            <Button
+              fullWidth
+              size={mobile ? 'md' : 'sm'}
+              leftSection={<ScalableIcon icon={IconSparkles} size={16} />}
+              className="font-semibold"
+              style={{
+                minHeight: mobile ? 46 : 42,
+                border: 0,
+                background: 'linear-gradient(90deg, #f59f00 0%, #f06b2f 52%, #e8592c 100%)',
+                boxShadow: '0 10px 24px rgb(232 89 44 / 0.24)',
+              }}
+              onClick={() => {
                 onUpgradeClick?.()
                 platform.openLink(upgradeLink || FALLBACK_UPGRADE_URL)
-              } else if (!model.disabledReason) {
-                onSelect()
-              }
-            }}
-          >
-            {model.locked ? t('Upgrade to Pro') : t('Use this model')}
-          </Button>
-        )}
-      </Flex>
+              }}
+            >
+              {t('Upgrade to Pro')}
+            </Button>
+          )}
+        </Flex>
+      )}
     </Stack>
   )
 }
