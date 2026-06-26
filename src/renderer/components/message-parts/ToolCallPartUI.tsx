@@ -682,6 +682,7 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
           await NiceModal.show('artifact-preview', {
             htmlCode: '',
             previewUrl: preview.url,
+            sandboxPath: filePath,
           })
           return
         }
