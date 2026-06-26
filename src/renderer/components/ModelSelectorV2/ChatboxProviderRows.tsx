@@ -173,11 +173,11 @@ export function ChatboxProviderRows({
             type="button"
             align="center"
             gap="xs"
-            className="w-full min-h-9 pl-4 pr-2.5 py-2 border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-brand-secondary text-chatbox-tint-primary cursor-pointer focus:outline-none focus-visible:outline-none active:bg-chatbox-background-brand-secondary-hover"
+            className="w-full min-h-9 pl-4 pr-2.5 py-2 border-0 border-b border-solid border-chatbox-border-primary bg-chatbox-background-secondary text-chatbox-tint-secondary cursor-pointer focus:outline-none focus-visible:outline-none hover:bg-chatbox-background-secondary-hover active:bg-chatbox-background-secondary-hover"
             style={isMobile ? MOBILE_TAP_RESET_STYLE : undefined}
             onClick={() => onToggleGroup(group.id)}
           >
-            <Text span fw={700} size="sm" lh={1.15}>
+            <Text span fw={650} size="sm" lh={1.15}>
               {getGroupLabel(group.id, t)}:
             </Text>
             {group.isLocked && isChatboxAIAdvancedGroup(group.id) && (

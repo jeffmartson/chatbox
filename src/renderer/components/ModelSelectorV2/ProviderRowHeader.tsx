@@ -41,7 +41,7 @@ export function ProviderRowHeader({
       <span
         className={clsx(
           'flex items-center justify-center flex-shrink-0',
-          isChatbox && 'h-6 w-6 rounded-md bg-chatbox-background-brand-secondary'
+          isChatbox && 'h-6 w-6 rounded bg-chatbox-background-secondary'
         )}
       >
         <ProviderIcon provider={provider.id} size={isChatbox ? 19 : 18} />
@@ -49,12 +49,7 @@ export function ProviderRowHeader({
       <Text span fw={isChatbox ? 720 : 650} size="sm" lh={1.2} className="min-w-0 flex-1 text-left truncate">
         {provider.name}
       </Text>
-      <Text
-        span
-        size="xs"
-        c={isChatbox ? 'chatbox-brand' : 'chatbox-tertiary'}
-        className={clsx(isChatbox && 'font-semibold')}
-      >
+      <Text span size="xs" c="chatbox-tertiary" className={clsx(isChatbox && 'font-semibold')}>
         {modelCount}
       </Text>
     </button>

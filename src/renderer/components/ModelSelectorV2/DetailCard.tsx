@@ -1,5 +1,5 @@
 import { Badge, Button, Flex, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { IconSparkles } from '@tabler/icons-react'
+import { IconDatabase, IconSparkles } from '@tabler/icons-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,27 +13,6 @@ import { getCostLabel, getCostLevelBarCount } from './helpers'
 import type { DetailModel } from './types'
 
 const COST_LEVEL_BAR_IDS = ['cost-level-bar-1', 'cost-level-bar-2', 'cost-level-bar-3'] as const
-
-function ComputePointIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
-      <path
-        d="M4.5 7C4.5 7.8285 5.843 8.5 7.5 8.5C9.157 8.5 10.5 7.8285 10.5 7C10.5 6.1715 9.157 5.5 7.5 5.5C5.843 5.5 4.5 6.1715 4.5 7Z"
-        stroke="#FAB005"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4.5 7V9C4.5 9.828 5.843 10.5 7.5 10.5C9.157 10.5 10.5 9.828 10.5 9V7M1.5 3C1.5 3.536 2.072 4.031 3 4.299C3.928 4.567 5.072 4.567 6 4.299C6.928 4.031 7.5 3.536 7.5 3C7.5 2.464 6.928 1.969 6 1.701C5.072 1.433 3.928 1.433 3 1.701C2.072 1.969 1.5 2.464 1.5 3Z"
-        stroke="#FAB005"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M1.5 3V8C1.5 8.444 1.886 8.725 2.5 9" stroke="#FAB005" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M1.5 5.5C1.5 5.944 1.886 6.225 2.5 6.5" stroke="#FAB005" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 function formatPrice(value: number, isCN: boolean) {
   return isCN ? `$${value.toFixed(2)} / 百万 token` : `$${value.toFixed(2)} / 1M token`
@@ -117,7 +96,7 @@ function TieredPricingTag({
     <Badge
       variant="light"
       size="xs"
-      className="cursor-help normal-case border border-solid border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-medium leading-none text-amber-700"
+      className="cursor-help normal-case border border-solid border-chatbox-border-primary bg-chatbox-background-secondary px-1 py-0.5 text-[10px] font-medium leading-none text-chatbox-tint-secondary"
     >
       {t('Tiered pricing')}
     </Badge>
@@ -153,8 +132,8 @@ function TieredPricingTag({
           background: 'var(--chatbox-background-primary)',
           color: 'var(--chatbox-tint-primary)',
           border: '1px solid var(--chatbox-border-primary)',
-          borderRadius: 12,
-          boxShadow: '0 18px 48px rgb(0 0 0 / 0.18)',
+          borderRadius: 8,
+          boxShadow: '0 12px 30px rgb(0 0 0 / 0.12)',
           padding: 12,
         },
         arrow: {
@@ -298,7 +277,7 @@ function CostLevelIndicator({
           className="self-start flex items-center gap-1.5 text-chatbox-tint-warning"
           onClick={() => pricingLink && platform.openLink(pricingLink)}
         >
-          <ComputePointIcon />
+          <ScalableIcon icon={IconDatabase} size={13} className="text-inherit" />
           <Text span size="sm" c="inherit">
             {costLabel}
           </Text>
@@ -334,7 +313,7 @@ export function DetailCard({
       className={clsx(
         'relative border border-solid text-chatbox-tint-primary',
         MODEL_SELECTOR_SURFACE_CLASS,
-        mobile ? 'm-[4px] border-0 px-4 pb-4 pt-3 rounded-[20px]' : 'm-[4px] w-[320px] rounded-[20px] px-4 pb-4 pt-4'
+        mobile ? 'm-[4px] border-0 px-4 pb-4 pt-3 rounded-[12px]' : 'm-[4px] w-[320px] rounded-[12px] px-4 pb-4 pt-4'
       )}
       style={mobile ? undefined : CARD_SURFACE_STYLE}
     >
@@ -383,16 +362,11 @@ export function DetailCard({
           )}
           {model.locked && (
             <Button
+              variant="light"
               fullWidth
               size={mobile ? 'md' : 'sm'}
               leftSection={<ScalableIcon icon={IconSparkles} size={16} />}
               className="font-semibold"
-              style={{
-                minHeight: mobile ? 46 : 42,
-                border: 0,
-                background: 'linear-gradient(90deg, #f59f00 0%, #f06b2f 52%, #e8592c 100%)',
-                boxShadow: '0 10px 24px rgb(232 89 44 / 0.24)',
-              }}
               onClick={() => {
                 onUpgradeClick?.()
                 platform.openLink(upgradeLink || FALLBACK_UPGRADE_URL)

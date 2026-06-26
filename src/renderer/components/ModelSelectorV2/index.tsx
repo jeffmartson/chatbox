@@ -361,7 +361,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
         className={clsx(
           'overflow-hidden',
           MODEL_SELECTOR_SURFACE_CLASS,
-          isMobile ? 'border-0' : 'rounded-[14px] border border-solid border-chatbox-border-primary shadow-xl'
+          isMobile ? 'border-0' : 'rounded-[10px] border border-solid border-chatbox-border-primary shadow-lg'
         )}
       >
         {isMobile && (
@@ -374,7 +374,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 { label: t('Favorite'), value: 'favorite' },
               ]}
               fullWidth
-              radius="md"
+              radius="sm"
               size="sm"
               styles={{
                 root: {
@@ -382,7 +382,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                   background: 'var(--chatbox-background-secondary)',
                 },
                 indicator: {
-                  boxShadow: '0 2px 8px rgb(0 0 0 / 0.08)',
+                  boxShadow: '0 1px 3px rgb(0 0 0 / 0.08)',
                 },
                 label: {
                   minHeight: 30,
@@ -558,7 +558,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 <Stack
                   gap={0}
                   className={clsx(
-                    'max-h-[88vh] rounded-t-[26px] border border-b-0 border-solid',
+                    'max-h-[88vh] rounded-t-[16px] border border-b-0 border-solid',
                     MODEL_SELECTOR_SURFACE_CLASS
                   )}
                   style={DRAWER_SURFACE_STYLE}
@@ -584,7 +584,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
               <Drawer.Content className="fixed bottom-0 left-0 right-0 outline-none">
                 <Stack
                   gap={0}
-                  className={clsx('rounded-t-[26px] border border-b-0 border-solid', MODEL_SELECTOR_SURFACE_CLASS)}
+                  className={clsx('rounded-t-[16px] border border-b-0 border-solid', MODEL_SELECTOR_SURFACE_CLASS)}
                   style={DRAWER_SURFACE_STYLE}
                 >
                   <div aria-hidden className="mx-auto my-3 h-1 w-14 rounded-full bg-chatbox-tint-tertiary opacity-70" />
