@@ -106,6 +106,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const [page, setPage] = useState<PanelPage>('main')
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const panelRef = useRef<HTMLDivElement>(null)
+  const subPanelRef = useRef<HTMLDivElement>(null)
   const [subPanelAlign, setSubPanelAlign] = useState<'top' | 'bottom'>('bottom')
   const [subPanelTop, setSubPanelTop] = useState<number>(0)
   const isNewSession = sessionId === 'new'
@@ -253,9 +254,25 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   )
 
   // Hover handlers for sub-panel with delay to prevent flicker
+  const clearSubPanelCloseTimer = useCallback(() => {
+    clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = undefined
+  }, [])
+
+  const scheduleSubPanelClose = useCallback(
+    (delay: number) => {
+      clearSubPanelCloseTimer()
+      closeTimerRef.current = setTimeout(() => {
+        setPage('main')
+        closeTimerRef.current = undefined
+      }, delay)
+    },
+    [clearSubPanelCloseTimer]
+  )
+
   const handleExtensionHover = useCallback(
     (target: PanelPage, e?: React.MouseEvent, align: 'top' | 'bottom' = 'bottom') => {
-      clearTimeout(closeTimerRef.current)
+      clearSubPanelCloseTimer()
       setPage(target)
       setSubPanelAlign(align)
       if (align === 'top' && e && panelRef.current) {
@@ -265,24 +282,28 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
         setSubPanelTop(rowRect.top - panelRect.top)
       }
     },
-    []
+    [clearSubPanelCloseTimer]
   )
 
   const handleSubPanelEnter = useCallback(() => {
-    clearTimeout(closeTimerRef.current)
-  }, [])
+    clearSubPanelCloseTimer()
+  }, [clearSubPanelCloseTimer])
 
   const handleSubPanelLeave = useCallback(() => {
-    closeTimerRef.current = setTimeout(() => setPage('main'), 150)
-  }, [])
+    scheduleSubPanelClose(150)
+  }, [scheduleSubPanelClose])
 
   const handleNonExtensionHover = useCallback(() => {
-    closeTimerRef.current = setTimeout(() => setPage('main'), 100)
-  }, [])
+    scheduleSubPanelClose(100)
+  }, [scheduleSubPanelClose])
 
   useEffect(() => {
     return () => clearTimeout(closeTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    subPanelRef.current?.scrollTo({ top: 0 })
+  }, [page])
 
   // --- Mode button ---
   const ModeButton: FC<{ value: Extract<AgentModeValue, 'on' | 'off'>; label: string }> = ({ value, label }) => {
@@ -841,6 +862,8 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       {/* Sub panel - absolutely positioned to the right */}
       {page !== 'main' && (
         <Stack
+          key={page}
+          ref={subPanelRef}
           gap={0}
           py="xs"
           className="absolute left-full w-[240px] max-h-[360px] overflow-y-auto bg-[var(--mantine-color-body)] rounded-r-lg shadow-lg border-l border-[var(--mantine-color-default-border)]"
