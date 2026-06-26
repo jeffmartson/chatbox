@@ -79,6 +79,25 @@ function stringifyErrorResult(result: unknown): string {
   return String(result)
 }
 
+/**
+ * Coerce a tool-call's stored `args` into a JSON object for the wire `tool_use.input`.
+ * Anthropic (and strict OpenAI-compatible) upstreams require `input` to be an object and reject
+ * a string with HTTP 422 ("Input should be a valid dictionary"). Malformed model output can leave
+ * `args` as an unparseable string — e.g. two concatenated JSON objects `{"q":"a"}{"q":"b"}` — which
+ * was previously serialized verbatim, so every history resend of that turn 422'd. Parse strings
+ * back into an object, falling back to `{}` when the string is not a JSON object.
+ */
+function toToolCallInput(args: unknown): unknown {
+  if (typeof args !== 'string') return args
+  try {
+    const parsed = JSON.parse(args)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+  } catch {
+    /* malformed JSON — fall through to an empty object */
+  }
+  return {}
+}
+
 async function convertContentParts<T extends TextPart | ImagePart | FilePart>(
   contentParts: MessageContentParts,
   imageType: 'image' | 'file',
@@ -128,7 +147,7 @@ async function convertAssistantContentParts(
           type: 'tool-call' as const,
           toolCallId: c.toolCallId,
           toolName: c.toolName,
-          input: c.args,
+          input: toToolCallInput(c.args),
           providerExecuted: c.providerExecuted,
           providerOptions: c.providerMetadata,
         } satisfies ToolCallPart

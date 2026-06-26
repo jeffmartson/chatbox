@@ -141,6 +141,64 @@ describe('convertToModelMessages — tool result sanitization', () => {
     expect(() => modelMessageSchema.parse(toolMsg)).not.toThrow()
   })
 
+  it('coerces an unparseable string tool-call input into an object', async () => {
+    // Regression: when a model emits malformed tool-call arguments (e.g. two concatenated JSON
+    // objects), the raw string was stored in `args` and serialized verbatim as `tool_use.input`.
+    // Strict Anthropic-compatible upstreams reject that with HTTP 422 ("Input should be a valid
+    // dictionary"). The serialized input must always be a JSON object.
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'error',
+            toolCallId: 'call-1',
+            toolName: 'web_search',
+            args: '{"query":"A"}{"query":"B"}',
+            result: { error: 'JSON parsing failed', input: '{"query":"A"}{"query":"B"}', toolName: 'web_search' },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+    const assistantMsg = output.find((m) => m.role === 'assistant')
+    const toolCallPart = (assistantMsg?.content as Array<{ type: string; input: unknown }>)[0]
+
+    expect(toolCallPart.type).toBe('tool-call')
+    expect(toolCallPart.input).toEqual({})
+    for (const msg of output) {
+      expect(() => modelMessageSchema.parse(msg)).not.toThrow()
+    }
+  })
+
+  it('parses a valid JSON-string tool-call input into an object', async () => {
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'web_search',
+            args: '{"query":"hello"}',
+            result: { ok: true },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+    const assistantMsg = output.find((m) => m.role === 'assistant')
+    const toolCallPart = (assistantMsg?.content as Array<{ type: string; input: unknown }>)[0]
+
+    expect(toolCallPart.input).toEqual({ query: 'hello' })
+  })
+
   it('preserves reasoning only when requested by the provider path', async () => {
     const messages: Message[] = [
       {
