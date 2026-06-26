@@ -2,8 +2,15 @@ productName: Chatbox
 appId: xyz.chatboxapp.app
 asar: true
 asarUnpack:
-  - "**\\*.{node,dll}"
+  - "**/*.{node,dll}"
   - "**/node_modules/libsql/**"
+  - "node_modules/@anthropic-ai/sandbox-runtime/**"
+  - "node_modules/@pondwader/socks5-server/**"
+  - "node_modules/commander/**"
+  - "node_modules/lodash-es/**"
+  - "node_modules/node-forge/**"
+  - "node_modules/shell-quote/**"
+  - "node_modules/zod/**"
 files:
   - "dist"
   # - "!dist/**/*.map"
@@ -14,8 +21,8 @@ files:
   - "package.json"
 
 beforePack: .erb/scripts/ensure-app-deps.cjs
-afterSign: .erb/scripts/notarize.js
 afterPack: .erb/scripts/patch-libsql.cjs
+afterSign: .erb/scripts/notarize.js
 
 # releaseInfo:
 #   releaseNotes: See the changelog for details
