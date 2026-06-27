@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SandboxProvider } from '@shared/sandbox-provider'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fsWrite = vi.fn(async (..._args: unknown[]) => ({ success: true }))
 const fsEdit = vi.fn(async (..._args: unknown[]) => ({ success: true }))
@@ -38,7 +38,7 @@ async function execute(tool: unknown, input: unknown) {
   const executable = tool as {
     execute: (input: unknown, options: { toolCallId: string; messages: [] }) => Promise<unknown>
   }
-  return executable.execute(input, { toolCallId: 'tool-call-id', messages: [] })
+  return await executable.execute(input, { toolCallId: 'tool-call-id', messages: [] })
 }
 
 describe('filesystem write to sandbox-writable temp (/tmp)', () => {
@@ -149,6 +149,22 @@ describe('user-granted working directories (like /tmp)', () => {
     await execute(tools.write_file, { file_path: '/etc/passwd', content: 'x' })
     expect(exec).not.toHaveBeenCalled()
     expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+
+  test('full access writes absolute paths without approval', async () => {
+    const tools = buildFilesystemTools({ sessionId: 'session-id', provider, fullAccess: true }).tools
+    await execute(tools.write_file, { file_path: '/Users/me/project/out.txt', content: 'x' })
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).not.toHaveBeenCalled()
+    expect(fsWrite).toHaveBeenCalledTimes(1)
+  })
+
+  test('full access edits absolute paths without approval', async () => {
+    const tools = buildFilesystemTools({ sessionId: 'session-id', provider, fullAccess: true }).tools
+    await execute(tools.edit_file, { file_path: '/Users/me/project/out.txt', old_text: 'a', new_text: 'b' })
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).not.toHaveBeenCalled()
+    expect(fsEdit).toHaveBeenCalledTimes(1)
   })
 })
 

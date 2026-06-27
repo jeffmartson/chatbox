@@ -207,6 +207,7 @@ function Index() {
           ...(newSessionState.workingDirectories?.length
             ? { workingDirectories: newSessionState.workingDirectories }
             : {}),
+          ...(newSessionState.agentFullAccess ? { agentFullAccess: true } : {}),
         },
       })
 
@@ -216,13 +217,18 @@ function Index() {
           .catch((error) => console.warn('[recordCopilotUsage] failed', error))
       }
 
-      // Transfer knowledge base / working directories from newSessionState to the actual
+      // Transfer knowledge base / Work Mode settings from newSessionState to the actual
       // session, then clear it so nothing bleeds into the next new chat. (workingDirectories
-      // is already baked into the created session's settings above; this only clears it.)
+      // and agentFullAccess are already baked into the created session's settings above;
+      // this only clears them.)
       if (newSessionState.knowledgeBase) {
         addSessionKnowledgeBase(newSession.id, newSessionState.knowledgeBase)
       }
-      if (newSessionState.knowledgeBase || newSessionState.workingDirectories?.length) {
+      if (
+        newSessionState.knowledgeBase ||
+        newSessionState.workingDirectories?.length ||
+        newSessionState.agentFullAccess
+      ) {
         setNewSessionState({})
       }
 
@@ -257,6 +263,7 @@ function Index() {
       addSessionKnowledgeBase,
       newSessionState.knowledgeBase,
       newSessionState.workingDirectories,
+      newSessionState.agentFullAccess,
       setNewSessionState,
       sessionWebBrowsingMap,
       setSessionWebBrowsing,

@@ -17,16 +17,16 @@ import { Link } from '@tanstack/react-router'
 import { PlusIcon } from 'lucide-react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getOS } from '@/packages/navigator'
-import platform from '@/platform'
-import * as chatStore from '@/stores/chatStore'
-import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
 import { BUILTIN_MCP_SERVERS } from '@/packages/mcp/builtin'
+import { getOS } from '@/packages/navigator'
 import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
 import { WEB_SEARCH_PROVIDERS } from '@/packages/web-search/constants'
+import platform from '@/platform'
+import * as chatStore from '@/stores/chatStore'
+import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useAutoValidate } from '@/stores/premiumActions'
 import { getSessionAgentMode } from '@/stores/session/utils'
 import { useMcpSettings, useSettingsStore } from '@/stores/settingsStore'
@@ -35,7 +35,7 @@ import { ScalableIcon } from '../common/ScalableIcon'
 import MCPStatus from '../mcp/MCPStatus'
 import { getAgentModeUIState } from './agentModeState'
 
-type PanelPage = 'main' | 'web-search' | 'skills' | 'mcp' | 'knowledge-base' | 'working-directory'
+type PanelPage = 'main' | 'web-search' | 'code-execution' | 'skills' | 'mcp' | 'knowledge-base' | 'working-directory'
 
 // The working-directory feature binds real local directories to the sandbox; only the
 // desktop build has a local sandbox and a real filesystem to grant access to. Windows is
@@ -172,7 +172,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
 
   useEffect(() => {
     if (page === 'skills') {
-      loadSkills()
+      void loadSkills()
     }
   }, [page, loadSkills, skillsVersion])
 
@@ -212,6 +212,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     () => (isNewSession ? (newSessionState.workingDirectories ?? []) : (sessionSettings.workingDirectories ?? [])),
     [isNewSession, newSessionState.workingDirectories, sessionSettings]
   )
+  const agentFullAccess = isNewSession
+    ? (newSessionState.agentFullAccess ?? false)
+    : (sessionSettings.agentFullAccess ?? false)
 
   const updateWorkingDirectories = useCallback(
     async (next: string[]) => {
@@ -246,6 +249,27 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       await updateWorkingDirectories(workingDirectories.filter((item) => item !== dir))
     },
     [workingDirectories, updateWorkingDirectories]
+  )
+
+  const updateAgentFullAccess = useCallback(
+    async (enabled: boolean) => {
+      const value = enabled || undefined
+      if (isNewSession) {
+        setNewSessionState((prev) => ({ ...prev, agentFullAccess: value }))
+        return
+      }
+      try {
+        await chatStore.updateSession(sessionId, (session) => {
+          if (!session) {
+            throw new Error('Session not found')
+          }
+          return { ...session, settings: { ...session.settings, agentFullAccess: value } }
+        })
+      } catch (err) {
+        console.error('Failed to update agent full access:', err)
+      }
+    },
+    [isNewSession, sessionId, setNewSessionState]
   )
 
   const selectedKB = useMemo(
@@ -499,6 +523,67 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       )
     }
 
+    if (page === 'code-execution') {
+      return (
+        <>
+          <SubPanelHeader title={t('Code Execution')} disabled={capabilitiesDisabled} />
+          <Divider my={4} />
+          <Flex
+            justify="space-between"
+            align="center"
+            px="sm"
+            py={6}
+            gap="sm"
+            className={`rounded ${
+              capabilitiesDisabled
+                ? 'cursor-default opacity-50'
+                : 'cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
+            }`}
+            onClick={() => {
+              if (capabilitiesDisabled) return
+              void updateAgentFullAccess(false)
+            }}
+          >
+            <Stack gap={0} className="min-w-0">
+              <Text size="sm" c={!agentFullAccess ? 'chatbox-brand' : undefined}>
+                {t('Approve')}
+              </Text>
+              <Text size="xs" c="chatbox-secondary" className="leading-snug">
+                {t('Ask before running commands or changing files.')}
+              </Text>
+            </Stack>
+            {!agentFullAccess && <IconCheck size={14} className="text-[var(--chatbox-tint-brand)] shrink-0" />}
+          </Flex>
+          <Flex
+            justify="space-between"
+            align="center"
+            px="sm"
+            py={6}
+            gap="sm"
+            className={`rounded ${
+              capabilitiesDisabled
+                ? 'cursor-default opacity-50'
+                : 'cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/30'
+            }`}
+            onClick={() => {
+              if (capabilitiesDisabled) return
+              void updateAgentFullAccess(true)
+            }}
+          >
+            <Stack gap={0} className="min-w-0">
+              <Text size="sm" c="red" fw={500}>
+                {t('Full Access')}
+              </Text>
+              <Text size="xs" c="red" className="leading-snug">
+                {t('Skip approval prompts for commands and file changes.')}
+              </Text>
+            </Stack>
+            {agentFullAccess && <IconCheck size={14} className="text-red-600 shrink-0" />}
+          </Flex>
+        </>
+      )
+    }
+
     if (page === 'skills') {
       return (
         <>
@@ -700,7 +785,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 aria-label={t('Remove')}
                 onClick={() => {
                   if (capabilitiesDisabled) return
-                  handleRemoveWorkingDirectory(dir)
+                  void handleRemoveWorkingDirectory(dir)
                 }}
               >
                 <IconTrash size={14} />
@@ -714,7 +799,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               disabled={capabilitiesDisabled}
               onClick={() => {
                 if (capabilitiesDisabled) return
-                handleAddWorkingDirectory()
+                void handleAddWorkingDirectory()
               }}
             >
               <PlusIcon size={14} className="mr-1" />
@@ -808,13 +893,28 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             }
           />
 
-          <Flex justify="space-between" align="center" px="sm" py={6} onMouseEnter={handleNonExtensionHover}>
-            <Flex gap="xs" align="center">
-              <IconCode size={16} className="text-[var(--chatbox-tint-secondary)]" />
-              <Text size="sm">{t('Code Execution')}</Text>
-            </Flex>
-            {agentModeUIState.isActive && <IconCheck size={14} className="text-[var(--chatbox-tint-brand)]" />}
-          </Flex>
+          <ExtensionRow
+            icon={<IconCode size={16} className="text-[var(--chatbox-tint-secondary)]" />}
+            label={t('Code Execution')}
+            active={page === 'code-execution'}
+            page="code-execution"
+            disabled={capabilitiesDisabled}
+            subPanelAlign="top"
+            rightContent={
+              <Flex gap="xs" align="center" className="shrink-0">
+                {agentFullAccess ? (
+                  <Badge size="xs" variant="light" color="red">
+                    {t('Full Access')}
+                  </Badge>
+                ) : (
+                  <Badge size="xs" variant="light">
+                    {t('Approve')}
+                  </Badge>
+                )}
+                <IconChevronRight size={14} className="text-[var(--chatbox-tint-tertiary)]" />
+              </Flex>
+            }
+          />
 
           {/* Extensions */}
           <Divider my={4} mx="sm" label={t('Extensions')} labelPosition="left" />

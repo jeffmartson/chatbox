@@ -50,6 +50,7 @@ export const uiStore = createStore(
           // Working directories bound before the session is persisted; transferred into the
           // created session's settings on first submit (see routes/index.tsx).
           workingDirectories?: string[]
+          agentFullAccess?: boolean
         },
         pictureShow: null as {
           picture: MessagePicture

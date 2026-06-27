@@ -12,6 +12,7 @@ interface FilesystemContext {
   // Real directories the user granted the sandbox (working-directory feature). Paths under
   // these are routed through the sandbox and written without approval, like /tmp.
   userWorkingDirectories?: string[]
+  fullAccess?: boolean
 }
 
 interface EditOperation {
@@ -286,7 +287,8 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         },
         regex: {
           type: 'boolean',
-          description: 'Treat query as an extended regular expression (ERE) instead of literal text. Defaults to false.',
+          description:
+            'Treat query as an extended regular expression (ERE) instead of literal text. Defaults to false.',
         },
         include: {
           type: 'string',
@@ -335,7 +337,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
 
   const write_file: ToolSet[string] = {
     description:
-      'Write a file. Relative sandbox paths are written directly. Writing absolute user filesystem paths requires user approval.',
+      'Write a file. Relative sandbox paths are written directly. Writing absolute user filesystem paths requires user approval unless Full Access is enabled.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -364,6 +366,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       if (!platform.fsWrite) return { error: 'Filesystem access is not available on this platform' }
       const approved =
         alreadyApproved ||
+        context.fullAccess ||
         (await requestFileMutationApproval(
           toolOptions.toolCallId,
           `Write file: ${writeInput.file_path}`,
@@ -377,7 +380,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
 
   const edit_file: ToolSet[string] = {
     description:
-      'Edit a file with one or more exact search-and-replace edits. Prefer edits[] for multiple changes in one call. Each old_text must be unique at the time it is applied. Relative sandbox paths are edited directly. Editing absolute user filesystem paths requires user approval.',
+      'Edit a file with one or more exact search-and-replace edits. Prefer edits[] for multiple changes in one call. Each old_text must be unique at the time it is applied. Relative sandbox paths are edited directly. Editing absolute user filesystem paths requires user approval unless Full Access is enabled.',
     inputSchema: editFileInputSchema,
     execute: async (input, toolOptions) => {
       const editInput = input as EditFileInput
@@ -397,6 +400,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       if (!platform.fsEdit) return { error: 'Filesystem access is not available on this platform' }
       const approved =
         alreadyApproved ||
+        context.fullAccess ||
         (await requestFileMutationApproval(
           toolOptions.toolCallId,
           edits.length === 1
@@ -428,7 +432,7 @@ Use these tools (write_file / edit_file / list_files / search_files) as the prim
 - Relative paths are resolved in the session sandbox working directory and can be written or edited without confirmation. Prefer relative paths.
 - Do NOT use phantom home paths like /home/user or /root — they do not exist. Use relative paths instead.
 - Absolute paths access the user's real filesystem. Read/list/search only when the user provided or clearly requested the path.
-- Writing or editing an absolute user filesystem path requires user approval. Do not attempt destructive operations; file deletion is not available.
+- Writing or editing an absolute user filesystem path requires user approval unless Full Access is enabled. Do not attempt destructive operations; file deletion is not available.
 - Keep tool results small. For large generated outputs, write a file and return a path plus a short summary.
 `,
   }

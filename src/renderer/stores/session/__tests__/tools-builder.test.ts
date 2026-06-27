@@ -12,6 +12,8 @@ const {
   buildCodeExecutionToolsMock,
   getSessionAttachmentRagToolSetMock,
   skillsChangedListeners,
+  requestUserExecApprovalMock,
+  userExecMock,
 } = vi.hoisted(() => ({
   discoverSkillsMock: vi.fn(),
   loadSkillMock: vi.fn(),
@@ -28,6 +30,8 @@ const {
   buildCodeExecutionToolsMock: vi.fn(),
   getSessionAttachmentRagToolSetMock: vi.fn(),
   skillsChangedListeners: new Set<() => void>(),
+  requestUserExecApprovalMock: vi.fn(),
+  userExecMock: vi.fn(),
 }))
 
 vi.hoisted(() => {
@@ -64,7 +68,12 @@ vi.mock('@/packages/skills/controller', () => ({
   skillsController: {
     discoverSkills: discoverSkillsMock,
     loadSkill: loadSkillMock,
+    userExec: userExecMock,
   },
+}))
+
+vi.mock('@/packages/user-exec-approval', () => ({
+  requestUserExecApproval: requestUserExecApprovalMock,
 }))
 
 vi.mock('@/stores/settingsStore', () => ({
@@ -217,6 +226,8 @@ beforeEach(() => {
     description: 'session attachment rag toolset',
     tools: { query_session_attachment: { execute: async () => ({}) } },
   })
+  requestUserExecApprovalMock.mockResolvedValue(true)
+  userExecMock.mockResolvedValue({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
   discoverSkillsMock.mockResolvedValue([
     { name: 'test-skill', description: 'A test skill' },
     { name: 'chatbox-product-info', description: 'Chatbox product info' },
@@ -391,6 +402,49 @@ describe('buildToolsForSession', () => {
     const refreshed = await buildToolsForSession(model, options)
     expect(refreshed.instructions).toContain('new-skill')
     expect(discoverSkillsMock).toHaveBeenCalledTimes(2)
+  })
+
+  test('agentFullAccess=true skips user_exec approval', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: true },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    const executeResult = await result.tools.user_exec.execute({ command: 'touch /tmp/full-access' }, {
+      toolCallId: 'tool-call-1',
+      messages: [],
+    } as never)
+
+    expect(requestUserExecApprovalMock).not.toHaveBeenCalled()
+    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/full-access')
+    expect(executeResult).toMatchObject({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
+  })
+
+  test('agentFullAccess=false requests user_exec approval', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    await result.tools.user_exec.execute({ command: 'touch /tmp/needs-approval' }, {
+      toolCallId: 'tool-call-2',
+      messages: [],
+    } as never)
+
+    expect(requestUserExecApprovalMock).toHaveBeenCalledWith(
+      'tool-call-2',
+      'touch /tmp/needs-approval',
+      expect.any(Object)
+    )
+    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval')
   })
 })
 

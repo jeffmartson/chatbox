@@ -194,6 +194,8 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
   // (like /tmp): files under these paths are read/written without per-action approval.
   // Desktop only.
   workingDirectories: z.array(z.string()).optional().catch(undefined),
+  // When enabled, Work Mode skips per-action approval for user_exec and real filesystem mutations.
+  agentFullAccess: z.boolean().optional().catch(undefined),
 })
 
 const UnifiedTokenUsageDetailSchema = z.object({

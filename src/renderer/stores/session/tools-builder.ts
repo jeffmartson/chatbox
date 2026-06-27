@@ -9,8 +9,8 @@ import { buildChatboxCliToolSet } from '@/packages/model-calls/toolsets/chatbox-
 import { buildCodeExecutionTools } from '@/packages/model-calls/toolsets/code-execution'
 import fileToolSet from '@/packages/model-calls/toolsets/file'
 import { buildFilesystemTools } from '@/packages/model-calls/toolsets/filesystem'
-import { remapPhantomHomePath } from '@/packages/model-calls/toolsets/sandbox-paths'
 import { getToolSet as getKBToolSet } from '@/packages/model-calls/toolsets/knowledge-base'
+import { remapPhantomHomePath } from '@/packages/model-calls/toolsets/sandbox-paths'
 import { getToolSet as getSessionAttachmentRagToolSet } from '@/packages/model-calls/toolsets/session-attachment-rag'
 import { getToolSetDescription, parseLinkTool, webSearchTool } from '@/packages/model-calls/toolsets/web-search'
 import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
@@ -89,7 +89,10 @@ ${dirLine}
 ${grantedDirsBlock}`
 }
 
-function buildSkillToolsInstruction(enabledSkills: Array<{ name: string; description: string }>): string {
+function buildSkillToolsInstruction(
+  enabledSkills: Array<{ name: string; description: string }>,
+  agentFullAccess: boolean
+): string {
   let instruction = `
 ## Skills
 You have access to skills that can extend your capabilities.
@@ -114,6 +117,7 @@ No skills are currently enabled.
 **user_exec** runs commands in the user's real environment with full system access. This is a privileged tool.
 Only use user_exec when a loaded skill explicitly instructs you to run a command in the user's environment.
 Do NOT use user_exec on your own initiative — use code_execution (sandbox) for file processing, data analysis, downloading files, and all other tasks.
+${agentFullAccess ? 'Full Access is enabled, so user_exec commands run without per-command approval.\n' : ''}
 
 ### Installing Skills
 You can install skills from any source:
@@ -214,9 +218,7 @@ In long conversations, earlier tool call results may be automatically compressed
   let codeExecToolSet: ReturnType<typeof buildCodeExecutionTools> | null = null
   if (includeAgentTools && codeExecution) {
     codeExecToolSet = buildCodeExecutionTools(codeExecution)
-    const workingDir = await codeExecution.provider
-      .resolveWorkingDirectory(codeExecution.sessionId)
-      .catch(() => null)
+    const workingDir = await codeExecution.provider.resolveWorkingDirectory(codeExecution.sessionId).catch(() => null)
     const userWorkingDirectories = options.sessionSettings?.workingDirectories?.filter((dir) => dir.trim().length > 0)
     instructions += buildWorkingDirectoryInstruction(workingDir, userWorkingDirectories)
     instructions += codeExecToolSet.description
@@ -260,6 +262,7 @@ In long conversations, earlier tool call results may be automatically compressed
       sessionId: codeExecution?.sessionId,
       provider: codeExecution?.provider,
       userWorkingDirectories: options.sessionSettings?.workingDirectories?.filter((dir) => dir.trim().length > 0),
+      fullAccess: options.sessionSettings?.agentFullAccess === true,
     })
     instructions += filesystemToolSet.description
     tools = { ...tools, ...filesystemToolSet.tools }
@@ -270,7 +273,7 @@ In long conversations, earlier tool call results may be automatically compressed
     const allSkills = await getDiscoveredSkills()
     const skillSettings = settingsStore.getState().getSettings().skills
     const enabledSkills = allSkills.filter((s) => skillSettings.enabledSkillNames.includes(s.name))
-    instructions += buildSkillToolsInstruction(enabledSkills)
+    instructions += buildSkillToolsInstruction(enabledSkills, options.sessionSettings?.agentFullAccess === true)
     tools.load_skill = buildLoadSkillTool(options)
     if (enabledSkills.some((skill) => skill.name === 'chatbox-product-info')) {
       const chatboxCliToolSet = buildChatboxCliToolSet({
@@ -414,13 +417,16 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
 }
 
 function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
+  const agentFullAccess = options.sessionSettings?.agentFullAccess === true
   return {
     description:
       "Execute a command in the user's real environment (not sandbox). " +
       'RESTRICTED: Only use when a loaded skill explicitly requires running a command in the user environment. ' +
       'Do NOT use for general tasks — use code_execution (sandbox) instead. ' +
       "Runs in the user's login shell with full system access. " +
-      'The user must approve the command before it runs.',
+      (agentFullAccess
+        ? 'Full Access is enabled, so commands run without per-command approval.'
+        : 'The user must approve the command before it runs.'),
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -451,7 +457,9 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
         : undefined
 
       const approved =
-        alreadyApproved || (await requestUserExecApproval(toolOptions.toolCallId, execInput.command, explanationCtx))
+        alreadyApproved ||
+        agentFullAccess ||
+        (await requestUserExecApproval(toolOptions.toolCallId, execInput.command, explanationCtx))
 
       if (!approved) {
         return {
