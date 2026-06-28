@@ -21,6 +21,7 @@ import useNeedRoomForWinControls from '@/hooks/useNeedRoomForWinControls'
 import { router } from '@/router'
 import { RouteComponent as SettingsChatRouteComponent } from '@/routes/settings/chat'
 import { RouteComponent as SettingsChatboxAiRouteComponent } from '@/routes/settings/chatbox-ai'
+import { RouteComponent as SettingsArchiveRouteComponent } from '@/routes/settings/archive'
 import { RouteComponent as SettingsDefaultModelsRouteComponent } from '@/routes/settings/default-models'
 import { RouteComponent as SettingsDocumentParserRouteComponent } from '@/routes/settings/document-parser'
 import { RouteComponent as SettingsGeneralRouteComponent } from '@/routes/settings/general'
@@ -163,6 +164,12 @@ const SettingsChatRoute = createRoute({
   getParentRoute: () => RootRoute,
 })
 
+const SettingsArchiveRoute = createRoute({
+  component: SettingsArchiveRouteComponent,
+  path: '/settings/archive',
+  getParentRoute: () => RootRoute,
+})
+
 const SettingsWebSearchRoute = createRoute({
   component: SettingsWebSearchRouteComponent,
   path: '/settings/web-search',
@@ -240,6 +247,7 @@ const routeTree = RootRoute.addChildren([
   SettingsChatboxAiRoute,
   SettingsGeneralRoute,
   SettingsChatRoute,
+  SettingsArchiveRoute,
   SettingsWebSearchRoute,
   SettingsMcpRoute,
   SettingsSkillsRoute,

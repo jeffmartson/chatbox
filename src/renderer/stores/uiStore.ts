@@ -68,8 +68,8 @@ export const uiStore = createStore(
         sessionCodeExecutionMap: {} as Record<string, boolean | undefined>,
       },
       (set, get) => ({
-        addToast: (content: string, duration?: number) => {
-          const newToast = { id: `toast:${uuidv4()}`, content, duration }
+        addToast: (content: string, duration?: number, action?: Toast['action']) => {
+          const newToast = { id: `toast:${uuidv4()}`, content, duration, action }
           set((state) => ({
             ...state,
             toasts: [...state.toasts, newToast],

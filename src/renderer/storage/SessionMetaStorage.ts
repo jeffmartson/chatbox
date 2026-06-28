@@ -15,6 +15,9 @@ export interface SessionMetaStorage extends SessionMetaRepositoryPort {
   delete(id: string): Promise<void>
   deleteMany(ids: string[]): Promise<void>
   getAll(): Promise<SessionMetaRecord[]>
+  getAllIncludingHidden(): Promise<SessionMetaRecord[]>
+  getArchived(): Promise<SessionMetaRecord[]>
+  getArchivedPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getTotal(): Promise<number>
   clear(): Promise<void>
@@ -22,6 +25,12 @@ export interface SessionMetaStorage extends SessionMetaRepositoryPort {
 
 // Sort logic shared with the native mobile shell.
 export { sortSessionRecords }
+
+function sortArchivedSessionRecords(records: SessionMetaRecord[]): SessionMetaRecord[] {
+  return records
+    .filter((record) => record.archivedAt !== undefined)
+    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0))
+}
 
 export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
   private db: IDBDatabase | null = null
@@ -139,12 +148,37 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   async getAll(): Promise<SessionMetaRecord[]> {
     await this.initialize()
+    const records = await this.getAllRecords()
+    return sortSessionRecords(records)
+  }
+
+  async getAllIncludingHidden(): Promise<SessionMetaRecord[]> {
+    await this.initialize()
+    const records = await this.getAllRecords()
+    return records.sort((a, b) => b.sortOrder - a.sortOrder)
+  }
+
+  async getArchived(): Promise<SessionMetaRecord[]> {
+    await this.initialize()
+    const records = await this.getAllRecords()
+    return sortArchivedSessionRecords(records)
+  }
+
+  async getArchivedPage(cursor: number = 0, limit: number = DEFAULT_PAGE_SIZE): Promise<SessionMetaPage> {
+    await this.initialize()
+    const all = await this.getArchived()
+    const items = all.slice(cursor, cursor + limit)
+    const nextCursor = cursor + items.length < all.length ? cursor + items.length : null
+    return { items, nextCursor, total: all.length }
+  }
+
+  private getAllRecords(): Promise<SessionMetaRecord[]> {
     return new Promise((resolve, reject) => {
       const store = this.getStore('readonly')
       const request = store.getAll()
       request.onsuccess = () => {
         const records = request.result as SessionMetaRecord[]
-        resolve(sortSessionRecords(records))
+        resolve(records)
       }
       request.onerror = () => reject(request.error)
     })

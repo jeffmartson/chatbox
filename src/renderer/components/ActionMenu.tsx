@@ -33,7 +33,8 @@ export type ActionMenuProps = {
   items: ActionMenuItemProps[]
   title?: string
   type?: 'desktop' | 'mobile' | 'auto'
-} & MenuProps
+  trigger?: 'click' | 'manual'
+} & Omit<MenuProps, 'trigger'>
 
 export const ActionMenu: FC<ActionMenuProps> = ({ type = 'auto', ...props }) => {
   const isSmallScreen = useIsSmallScreen()
@@ -49,6 +50,7 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
   children,
   items,
   title,
+  trigger: _trigger,
   position = 'bottom-start',
   ...menuProps
 }) => {
@@ -95,8 +97,15 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
   )
 }
 
-const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title }) => {
-  const [open, setOpen] = useState(false)
+const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title, opened, onChange, trigger = 'click' }) => {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = opened ?? uncontrolledOpen
+  const setOpen = (nextOpen: boolean) => {
+    onChange?.(nextOpen)
+    if (opened === undefined) {
+      setUncontrolledOpen(nextOpen)
+    }
+  }
 
   const handleItemClick = (onClick?: MouseEventHandler<HTMLButtonElement>) => {
     return async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -109,7 +118,7 @@ const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title }) => {
 
   return (
     <Drawer.Root open={open} onOpenChange={setOpen} noBodyStyles>
-      <Drawer.Trigger asChild>{children}</Drawer.Trigger>
+      {trigger === 'manual' ? children : <Drawer.Trigger asChild>{children}</Drawer.Trigger>}
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-chatbox-background-mask-overlay" />
         <Drawer.Content className="flex flex-col h-fit fixed bottom-0 left-0 right-0 outline-none">

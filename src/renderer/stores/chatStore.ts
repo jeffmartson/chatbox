@@ -49,6 +49,7 @@ import { UpdateQueue } from './updateQueue'
 
 export const QueryKeys = {
   ChatSessionsList: ['chat-sessions-list'],
+  ArchivedChatSessionsList: ['archived-chat-sessions-list'],
   ChatSession: (id: string) => ['chat-session', id],
   ChatSessionSettings: (id: string) => ['chat-session-settings', id],
 }
@@ -109,6 +110,28 @@ export async function listAllSessionsMeta(): Promise<SessionMetaRecord[]> {
   return await metaStorage.getAll()
 }
 
+async function _listArchivedSessionsMeta(): Promise<SessionMetaRecord[]> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getArchived()
+}
+
+async function _listArchivedSessionsMetaPage(cursor: number): Promise<SessionMetaPage> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getArchivedPage(cursor)
+}
+
+const listArchivedSessionsMetaQueryOptions = {
+  queryKey: QueryKeys.ArchivedChatSessionsList,
+  queryFn: ({ pageParam }: { pageParam: number }) => _listArchivedSessionsMetaPage(pageParam),
+  getNextPageParam: (lastPage: SessionMetaPage) => lastPage.nextCursor,
+  initialPageParam: 0,
+  staleTime: Infinity,
+}
+
+export async function listArchivedSessionsMeta(): Promise<SessionMetaRecord[]> {
+  return await _listArchivedSessionsMeta()
+}
+
 export function useSessionList() {
   const result = useInfiniteQuery(listSessionsMetaQueryOptions)
   const sessionMetaList = useMemo(() => result.data?.pages.flatMap((p) => p.items), [result.data])
@@ -118,6 +141,19 @@ export function useSessionList() {
     fetchNextPage: result.fetchNextPage,
     hasNextPage: result.hasNextPage,
     isFetchingNextPage: result.isFetchingNextPage,
+  }
+}
+
+export function useArchivedSessionList() {
+  const result = useInfiniteQuery(listArchivedSessionsMetaQueryOptions)
+  const archivedSessionMetaList = useMemo(() => result.data?.pages.flatMap((p) => p.items), [result.data])
+  return {
+    archivedSessionMetaList,
+    refetch: result.refetch,
+    fetchNextPage: result.fetchNextPage,
+    hasNextPage: result.hasNextPage,
+    isFetchingNextPage: result.isFetchingNextPage,
+    isLoading: result.isLoading,
   }
 }
 
@@ -152,6 +188,34 @@ export async function refreshSessionListCache() {
   queryClient.setQueryData<InfiniteSessionData>(QueryKeys.ChatSessionsList, {
     pages: [firstPage],
     pageParams: [0],
+  })
+}
+
+async function refreshArchivedSessionListCache() {
+  const firstPage = await _listArchivedSessionsMetaPage(0)
+  queryClient.setQueryData<InfiniteSessionData>(QueryKeys.ArchivedChatSessionsList, {
+    pages: [firstPage],
+    pageParams: [0],
+  })
+}
+
+function updateArchivedSessionListData(updater: (items: SessionMetaRecord[]) => SessionMetaRecord[]) {
+  queryClient.setQueryData<InfiniteSessionData>(QueryKeys.ArchivedChatSessionsList, (old) => {
+    if (!old || !old.pages.length) return old
+    const allItems = old.pages.flatMap((p) => p.items)
+    const updated = updater(allItems)
+    const lastPage = old.pages[old.pages.length - 1]
+    const delta = updated.length - allItems.length
+    return {
+      pages: [
+        {
+          items: updated,
+          nextCursor: lastPage.nextCursor !== null ? lastPage.nextCursor + delta : null,
+          total: (lastPage.total || 0) + delta,
+        },
+      ],
+      pageParams: [0],
+    }
   })
 }
 
@@ -372,6 +436,7 @@ export async function deleteSession(id: string) {
   const metaStorage = await getMetaStorage()
   await metaStorage.delete(id)
   updateSessionListData((items) => items.filter((session) => session.id !== id))
+  updateArchivedSessionListData((items) => items.filter((session) => session.id !== id))
   // Clean up UI state and caches to prevent memory leaks
   uiStore.getState().clearSessionWebBrowsing(id)
   uiStore.getState().removeSessionKnowledgeBase(id)
@@ -385,6 +450,17 @@ export async function deleteSession(id: string) {
   // here (the session — and its download UI — no longer exists).
   platform.sandboxReset?.({ sessionId: id }).catch(() => {})
   platform.sandboxRemoveArtifacts?.({ sessionId: id }).catch(() => {})
+}
+
+export async function archiveSession(id: string) {
+  await updateSession(id, { hidden: true, archivedAt: Date.now() })
+  await refreshArchivedSessionListCache()
+}
+
+export async function restoreSession(id: string) {
+  await updateSession(id, { hidden: false, archivedAt: undefined })
+  await refreshSessionListCache()
+  updateArchivedSessionListData((items) => items.filter((session) => session.id !== id))
 }
 
 export async function deleteSessions(ids: string[]) {
@@ -412,6 +488,7 @@ export async function deleteSessions(ids: string[]) {
   const metaStorage = await getMetaStorage()
   await metaStorage.deleteMany(uniqueIds)
   await refreshSessionListCache()
+  updateArchivedSessionListData((items) => items.filter((session) => !uniqueIds.includes(session.id)))
 
   for (const id of uniqueIds) {
     uiStore.getState().clearSessionWebBrowsing(id)

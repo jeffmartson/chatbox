@@ -20,6 +20,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
+import type { SessionMetaRecord } from '@shared/types'
 import { IconArchive, IconLoader2, IconSearch } from '@tabler/icons-react'
 import { useRouterState } from '@tanstack/react-router'
 import { type CSSProperties, type MutableRefObject, useCallback, useMemo, useState } from 'react'
@@ -34,27 +36,39 @@ export interface Props {
   sessionListViewportRef: MutableRefObject<HTMLDivElement | null>
 }
 
+type SessionListItem =
+  | { type: 'section'; id: string; label: string }
+  | { type: 'session'; id: string; session: SessionMetaRecord }
+
+function SessionListLoadingFooter() {
+  return (
+    <Flex justify="center" py="xs">
+      <IconLoader2 size={16} className="animate-spin" style={{ color: 'var(--mantine-color-dimmed)' }} />
+    </Flex>
+  )
+}
+
 export default function SessionList(props: Props) {
   const { t } = useTranslation()
   const { sessionMetaList: sortedSessions, fetchNextPage, hasNextPage, isFetchingNextPage } = useSessionList()
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const setOpenSearchDialog = useUIStore((s) => s.setOpenSearchDialog)
-  const sensors = useSensors(
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 10,
-      },
-    }),
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 10,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
+  const isSmallScreen = useMediaQuery('(max-width: 768px)')
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 10,
+    },
+  })
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 10,
+    },
+  })
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  })
+  const sensors = useSensors(...(isSmallScreen ? [] : [touchSensor]), mouseSensor, keyboardSensor)
   const onDragStart = (event: DragStartEvent) => {
     setActiveDragId(String(event.active.id))
   }
@@ -85,6 +99,28 @@ export default function SessionList(props: Props) {
     [activeDragId, sortedSessions]
   )
   const sortableSessionIds = useMemo(() => sortedSessions?.map((session) => session.id) ?? [], [sortedSessions])
+  const displayItems = useMemo<SessionListItem[]>(() => {
+    if (!sortedSessions) {
+      return []
+    }
+
+    const pinnedSessions = sortedSessions.filter((session) => session.starred)
+    const otherSessions = sortedSessions.filter((session) => !session.starred)
+    if (pinnedSessions.length === 0) {
+      return otherSessions.map((session) => ({ type: 'session', id: session.id, session }))
+    }
+
+    return [
+      { type: 'section', id: 'section:pinned', label: t('Pinned') },
+      ...pinnedSessions.map((session) => ({ type: 'session' as const, id: session.id, session })),
+      ...(otherSessions.length > 0
+        ? [
+            { type: 'section' as const, id: 'section:chats', label: t('Chats') },
+            ...otherSessions.map((session) => ({ type: 'session' as const, id: session.id, session })),
+          ]
+        : []),
+    ]
+  }, [sortedSessions, t])
   const routerState = useRouterState()
   const onEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -95,11 +131,7 @@ export default function SessionList(props: Props) {
     () =>
       hasNextPage
         ? {
-            Footer: () => (
-              <Flex justify="center" py="xs">
-                <IconLoader2 size={16} className="animate-spin" style={{ color: 'var(--mantine-color-dimmed)' }} />
-              </Flex>
-            ),
+            Footer: SessionListLoadingFooter,
           }
         : {},
     [hasNextPage]
@@ -147,8 +179,8 @@ export default function SessionList(props: Props) {
           <SortableContext items={sortableSessionIds} strategy={verticalListSortingStrategy}>
             <Virtuoso
               style={{ flex: 1 }}
-              data={sortedSessions}
-              computeItemKey={(_index, session) => session.id}
+              data={displayItems}
+              computeItemKey={(_index, item) => item.id}
               scrollerRef={(ref) => {
                 if (ref instanceof HTMLDivElement) {
                   props.sessionListViewportRef.current = ref
@@ -156,14 +188,20 @@ export default function SessionList(props: Props) {
               }}
               endReached={onEndReached}
               components={virtuosoComponents}
-              itemContent={(_index, session) => (
-                <SortableItem id={session.id}>
-                  <SessionItem
-                    selected={routerState.location.pathname === `/session/${session.id}`}
-                    session={session}
-                  />
-                </SortableItem>
-              )}
+              itemContent={(_index, item) =>
+                item.type === 'section' ? (
+                  <Text px="md" pt="sm" pb={4} size="xs" fw={600} c="chatbox-tertiary">
+                    {item.label}
+                  </Text>
+                ) : (
+                  <SortableItem id={item.session.id}>
+                    <SessionItem
+                      selected={routerState.location.pathname === `/session/${item.session.id}`}
+                      session={item.session}
+                    />
+                  </SortableItem>
+                )
+              }
             />
             <DragOverlay>
               {activeDragSession ? (

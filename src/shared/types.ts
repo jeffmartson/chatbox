@@ -112,6 +112,10 @@ export interface CopilotDetail {
 export interface Toast {
   id: string
   content: string
+  action?: {
+    label: string
+    settingsPath?: string
+  }
   duration?: number
 }
 

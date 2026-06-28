@@ -394,7 +394,7 @@ const ImportExportDataSection = () => {
         if (exportItems.includes(ExportDataItem.Conversations)) {
           try {
             const metaStorage = await getMetaStorage()
-            const allMeta = await metaStorage.getAll()
+            const allMeta = await metaStorage.getAllIncludingHidden()
             if (allMeta.length > 0) {
               yield ','
               yield `"${StorageKey.ChatSessionsList}":${JSON.stringify(allMeta)}`
