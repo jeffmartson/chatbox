@@ -4,6 +4,7 @@ import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
 import { remapPhantomHomePath } from './sandbox-paths'
 
 interface FilesystemContext {
@@ -73,6 +74,26 @@ const editFileInputSchema = jsonSchema({
 const SEARCH_MAX_MATCHES_PER_FILE = 50
 // Cap total result lines returned to the model.
 const SEARCH_MAX_TOTAL_LINES = 100
+
+function formatWriteFileOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const filePath = stringField(record, 'file_path')
+  return filePath ? `Status: success\nAction: write_file\nPath: ${filePath}` : contentOrErrorText(output)
+}
+
+function formatEditFileOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const filePath = stringField(record, 'file_path')
+  const edits = numberField(record, 'edits')
+  if (filePath && edits !== undefined) {
+    return `Status: success\nAction: edit_file\nPath: ${filePath}\nEdits applied: ${edits}`
+  }
+  return contentOrErrorText(output)
+}
 
 function isAbsolutePath(filePath: string): boolean {
   return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
@@ -267,6 +288,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       const result = await platform.fsList({ dirPath: listInput.path })
       return result.success ? { content: result.content ?? '' } : { error: result.error }
     },
+    toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'Directory is empty.' }),
   }
 
   const search_files: ToolSet[string] = {
@@ -333,6 +355,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       })
       return result.success ? { content: result.content ?? '' } : { error: result.error }
     },
+    toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'No matches found.' }),
   }
 
   const write_file: ToolSet[string] = {
@@ -376,6 +399,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       const result = await platform.fsWrite({ filePath: writeInput.file_path, content: writeInput.content })
       return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
     },
+    toModelOutput: toTextModelOutput(formatWriteFileOutput),
   }
 
   const edit_file: ToolSet[string] = {
@@ -417,6 +441,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         ? { success: true, file_path: editInput.file_path, edits: edits.length }
         : { error: result.error }
     },
+    toModelOutput: toTextModelOutput(formatEditFileOutput),
   }
 
   return {

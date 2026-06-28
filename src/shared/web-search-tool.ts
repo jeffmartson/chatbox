@@ -16,6 +16,22 @@ export interface WebSearchToolResult {
   searchResults: Array<{ title: string; snippet: string; link: string }>
 }
 
+function formatWebSearchOutput(output: unknown): string {
+  if (!output || typeof output !== 'object' || !('searchResults' in output)) {
+    return JSON.stringify(output) ?? String(output)
+  }
+  const searchResults = (output as WebSearchToolResult).searchResults
+  if (!Array.isArray(searchResults) || searchResults.length === 0) return 'No search results found.'
+  return searchResults
+    .map((result, index) => {
+      const parts = [`Result ${index + 1}`, `Title: ${result.title}`]
+      if (result.link) parts.push(`URL: ${result.link}`)
+      if (result.snippet) parts.push(`Snippet:\n${result.snippet}`)
+      return parts.join('\n')
+    })
+    .join('\n\n')
+}
+
 export function createWebSearchTool(
   executor: (query: string, abortSignal?: AbortSignal) => Promise<WebSearchToolResult>
 ): ToolSet[string] {
@@ -34,5 +50,9 @@ export function createWebSearchTool(
       const searchInput = input as { query: string }
       return await executor(searchInput.query, abortSignal)
     },
+    toModelOutput: ({ output }) => ({
+      type: 'text',
+      value: formatWebSearchOutput(output),
+    }),
   }
 }

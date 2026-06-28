@@ -4,6 +4,7 @@ import { escapeSingleQuotes } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
 import { remapPhantomHomePath } from './sandbox-paths'
 
 const log = getLogger('toolset:code-execution')
@@ -29,6 +30,37 @@ function isAbsolutePath(filePath: string): boolean {
 function isInsideRoot(root: string, filePath: string): boolean {
   const normalizedRoot = root.endsWith('/') ? root : `${root}/`
   return filePath === root || filePath.startsWith(normalizedRoot)
+}
+
+function formatCodeExecutionOutput(output: unknown): string {
+  const record = asRecord(output)
+  const stdout = stringField(record, 'stdout') ?? ''
+  const stderr = stringField(record, 'stderr') ?? ''
+  const exitCode = numberField(record, 'exitCode')
+  const sections = [`Exit code: ${exitCode ?? 'unknown'}`]
+  if (stdout) sections.push(`Stdout:\n${stdout}`)
+  if (stderr) sections.push(`Stderr:\n${stderr}`)
+  if (!stdout && !stderr) sections.push('(no output)')
+  return sections.join('\n\n')
+}
+
+function formatReadFileOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const content = stringField(record, 'content') ?? ''
+  const hint = stringField(record, 'hint')
+  return hint ? `${content}\n\n${hint}` : content
+}
+
+function formatDownloadOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const displayName = stringField(record, 'display_name')
+  const filePath = stringField(record, 'file_path')
+  if (displayName && filePath) return `Status: download ready\nName: ${displayName}\nPath: ${filePath}`
+  return contentOrErrorText(output)
 }
 
 /**
@@ -168,6 +200,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         exitCode: result.exitCode,
       }
     },
+    toModelOutput: toTextModelOutput(formatCodeExecutionOutput),
   }
 
   const READ_FILE_MAX_LINES = 2000
@@ -280,6 +313,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
           : {}),
       }
     },
+    toModelOutput: toTextModelOutput(formatReadFileOutput, { emptyFallback: 'File is empty.' }),
   }
 
   const create_download: ToolSet[string] = {
@@ -348,6 +382,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         provider_type: provider.type,
       }
     },
+    toModelOutput: toTextModelOutput(formatDownloadOutput),
   }
 
   const description = `

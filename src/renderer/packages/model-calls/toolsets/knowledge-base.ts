@@ -1,5 +1,62 @@
 import { jsonSchema, type ToolSet } from 'ai'
 import platform from '@/platform'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
+
+function formatKnowledgeBaseArray(
+  output: unknown,
+  formatItem: (item: Record<string, unknown>, index: number) => string
+) {
+  if (typeof output === 'string') return output
+  if (!Array.isArray(output)) return contentOrErrorText(output)
+  if (output.length === 0) return 'No results found.'
+  return output
+    .map((item, index) => {
+      const record = asRecord(item)
+      return record ? formatItem(record, index) : String(item)
+    })
+    .join('\n\n')
+}
+
+function formatSearchResults(output: unknown): string {
+  return formatKnowledgeBaseArray(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? 'Unknown file'
+    const chunkIndex = numberField(item, 'chunkIndex')
+    const score = numberField(item, 'score')
+    const text = stringField(item, 'text') ?? ''
+    const lines = [`Result ${index + 1}`, `Source: ${filename}`]
+    if (chunkIndex !== undefined) lines.push(`Chunk: ${chunkIndex}`)
+    if (score !== undefined) lines.push(`Score: ${score.toFixed(3)}`)
+    lines.push('Text:', text)
+    return lines.join('\n')
+  })
+}
+
+function formatFileMeta(output: unknown): string {
+  return formatKnowledgeBaseArray(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? stringField(item, 'name') ?? `File ${index + 1}`
+    const id = numberField(item, 'id')
+    const chunks =
+      numberField(item, 'chunk_count') ?? numberField(item, 'chunkCount') ?? numberField(item, 'total_chunks')
+    const status = stringField(item, 'status')
+    const lines = [`File ${index + 1}`, `Name: ${filename}`]
+    if (id !== undefined) lines.push(`ID: ${id}`)
+    if (chunks !== undefined) lines.push(`Chunks: ${chunks}`)
+    if (status) lines.push(`Status: ${status}`)
+    return lines.join('\n')
+  })
+}
+
+function formatChunks(output: unknown): string {
+  return formatKnowledgeBaseArray(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? stringField(item, 'fileName') ?? 'Unknown file'
+    const chunkIndex = numberField(item, 'chunkIndex') ?? numberField(item, 'chunk_index')
+    const text = stringField(item, 'text') ?? stringField(item, 'content') ?? ''
+    const lines = [`Chunk ${index + 1}`, `Source: ${filename}`]
+    if (chunkIndex !== undefined) lines.push(`Chunk: ${chunkIndex}`)
+    lines.push('Content:', text)
+    return lines.join('\n')
+  })
+}
 
 export const queryKnowledgeBaseTool = (kbId: number): ToolSet[string] => {
   return {
@@ -22,6 +79,7 @@ Call this when the user's question is related to the attached documents and sear
       const knowledgeBaseController = platform.getKnowledgeBaseController()
       return await knowledgeBaseController.search(kbId, queryInput.query)
     },
+    toModelOutput: toTextModelOutput(formatSearchResults),
   }
 }
 
@@ -48,6 +106,7 @@ export function getFilesMetaTool(knowledgeBaseId: number): ToolSet[string] {
       const knowledgeBaseController = platform.getKnowledgeBaseController()
       return await knowledgeBaseController.getFilesMeta(knowledgeBaseId, metaInput.fileIds)
     },
+    toModelOutput: toTextModelOutput(formatFileMeta),
   }
 }
 
@@ -88,6 +147,7 @@ export function readFileChunksTool(knowledgeBaseId: number): ToolSet[string] {
       const knowledgeBaseController = platform.getKnowledgeBaseController()
       return await knowledgeBaseController.readFileChunks(knowledgeBaseId, chunksInput.chunks)
     },
+    toModelOutput: toTextModelOutput(formatChunks),
   }
 }
 
@@ -112,7 +172,11 @@ export function listFilesTool(knowledgeBaseId: number): ToolSet[string] {
     execute: async (input) => {
       const listInput = input as { page: number; pageSize: number }
       const knowledgeBaseController = platform.getKnowledgeBaseController()
-      const files = await knowledgeBaseController.listFilesPaginated(knowledgeBaseId, listInput.page, listInput.pageSize)
+      const files = await knowledgeBaseController.listFilesPaginated(
+        knowledgeBaseId,
+        listInput.page,
+        listInput.pageSize
+      )
       return files
         .filter((file) => file.status === 'done')
         .map((file) => ({
@@ -121,6 +185,7 @@ export function listFilesTool(knowledgeBaseId: number): ToolSet[string] {
           chunkCount: file.chunk_count || 0,
         }))
     },
+    toModelOutput: toTextModelOutput(formatFileMeta),
   }
 }
 async function getToolSetDescription(knowledgeBaseId: number, knowledgeBaseName: string) {

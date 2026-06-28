@@ -31,7 +31,7 @@ vi.mock('@/packages/web-search', () => ({
 }))
 
 // Import after mocks are registered
-import { parseLinkTool } from '@/packages/model-calls/toolsets/web-search'
+import { parseLinkTool, webSearchTool } from '@/packages/model-calls/toolsets/web-search'
 
 type ParseLinkInput = { url: string; maxLength?: number }
 
@@ -53,6 +53,26 @@ async function execParseLink(input: ParseLinkInput, abortSignal?: AbortSignal) {
   return await (parseLinkTool as unknown as ParseLinkToolLike).execute(input, { abortSignal })
 }
 
+async function toModelOutput(tool: unknown, output: unknown) {
+  const mapper = tool as {
+    toModelOutput: (options: { toolCallId: string; input: unknown; output: unknown }) => Promise<unknown> | unknown
+  }
+  return await mapper.toModelOutput({ toolCallId: 'tool-call-id', input: {}, output })
+}
+
+describe('webSearchTool', () => {
+  it('maps search results to readable model text', async () => {
+    await expect(
+      toModelOutput(webSearchTool, {
+        searchResults: [{ title: 'Result title', snippet: 'Short summary.', link: 'https://example.com/result' }],
+      })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Result 1\nTitle: Result title\nURL: https://example.com/result\nSnippet:\nShort summary.',
+    })
+  })
+})
+
 describe('parseLinkTool', () => {
   beforeEach(() => {
     getLicenseKeyMock.mockReset()
@@ -65,6 +85,21 @@ describe('parseLinkTool', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('maps parsed page content to readable model text', async () => {
+    await expect(
+      toModelOutput(parseLinkTool, {
+        url: 'https://example.com',
+        title: 'Example title',
+        content: 'Readable page body.',
+        originalLength: 19,
+        truncated: false,
+      })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Title: Example title\nURL: https://example.com\nContent:\nReadable page body.',
+    })
   })
 
   describe('build-in (Chatbox AI) provider', () => {

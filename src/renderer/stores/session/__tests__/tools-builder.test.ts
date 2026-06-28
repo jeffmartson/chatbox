@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const {
   discoverSkillsMock,
+  installFromSandboxMock,
   loadSkillMock,
   settingsState,
   getSettingsMock,
@@ -16,6 +17,7 @@ const {
   userExecMock,
 } = vi.hoisted(() => ({
   discoverSkillsMock: vi.fn(),
+  installFromSandboxMock: vi.fn(),
   loadSkillMock: vi.fn(),
   settingsState: {
     licenseKey: undefined as string | undefined,
@@ -67,6 +69,7 @@ vi.mock('@/packages/skills/controller', () => ({
   },
   skillsController: {
     discoverSkills: discoverSkillsMock,
+    installFromSandbox: installFromSandboxMock,
     loadSkill: loadSkillMock,
     userExec: userExecMock,
   },
@@ -190,6 +193,13 @@ function createMockSandboxProvider(): SandboxProvider {
   } as unknown as SandboxProvider
 }
 
+async function toModelOutput(tool: unknown, output: unknown) {
+  const mapper = tool as {
+    toModelOutput: (options: { toolCallId: string; input: unknown; output: unknown }) => Promise<unknown> | unknown
+  }
+  return await mapper.toModelOutput({ toolCallId: 'tool-call-id', input: {}, output })
+}
+
 const sandboxToolNames = [
   'sandbox_bash',
   'sandbox_read',
@@ -228,6 +238,7 @@ beforeEach(() => {
   })
   requestUserExecApprovalMock.mockResolvedValue(true)
   userExecMock.mockResolvedValue({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
+  installFromSandboxMock.mockResolvedValue({ success: true, skillName: 'new-skill' })
   discoverSkillsMock.mockResolvedValue([
     { name: 'test-skill', description: 'A test skill' },
     { name: 'chatbox-product-info', description: 'Chatbox product info' },
@@ -253,6 +264,7 @@ describe('buildToolsForSession', () => {
     expect(result.tools.user_exec).toBeUndefined()
     expect(result.instructions).not.toContain('## Skills')
     expect(result.instructions).not.toContain('Chatbox Account CLI')
+    expect(result.instructions).not.toContain('## Tool-use Communication')
     expect(discoverSkillsMock).not.toHaveBeenCalled()
     for (const name of sandboxToolNames) {
       expect(result.tools[name]).toBeUndefined()
@@ -331,6 +343,9 @@ describe('buildToolsForSession', () => {
 
     expect(result.tools.web_search).toBeDefined()
     expect(result.tools.parse_link).toBeDefined()
+    expect(result.instructions).toContain('## Tool-use Communication')
+    expect(result.instructions).toContain('one short visible sentence')
+    expect(result.instructions).toContain('trivial single-tool lookups')
     expect(result.instructions).toContain('## parse_link')
   })
 
@@ -370,6 +385,7 @@ describe('buildToolsForSession', () => {
     // But code execution tools are NOT present (no codeExecution option)
     expect(result.tools.code_execution).toBeUndefined()
     expect(result.tools.parse_file).toBeUndefined()
+    expect(result.instructions).toContain('## Tool-use Communication')
     expect(buildCodeExecutionToolsMock).not.toHaveBeenCalled()
   })
 
@@ -486,6 +502,34 @@ describe('load_skill tool', () => {
     const executeResult = await loadSkillTool.execute({ name: 'disabled-skill' }, {} as never)
     expect(executeResult).toHaveProperty('error')
     expect((executeResult as { error: string }).error).toContain('not enabled')
+  })
+
+  test('maps loaded instructions to readable model text', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+
+    await expect(toModelOutput(result.tools.load_skill, { instructions: '# Skill instructions' })).resolves.toEqual({
+      type: 'text',
+      value: '# Skill instructions',
+    })
+  })
+
+  test('maps empty loaded instructions to an empty-skill result', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+
+    await expect(toModelOutput(result.tools.load_skill, { instructions: '' })).resolves.toEqual({
+      type: 'text',
+      value: 'Skill instructions are empty.',
+    })
   })
 })
 
@@ -671,6 +715,52 @@ describe('install_skill tool', () => {
     expect(result.initialActiveTools).toBeDefined()
     expect(result.initialActiveTools).toContain('install_skill')
   })
+
+  test('maps installed skill result to readable model text', async () => {
+    const model = createMockModel()
+    const provider = createMockSandboxProvider()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      codeExecution: {
+        sessionId: 'session-1',
+        provider,
+        files: [],
+      },
+    })
+
+    await expect(
+      toModelOutput(result.tools.install_skill, {
+        success: true,
+        skillName: 'new-skill',
+        message: 'Skill "new-skill" installed and enabled.',
+      })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Status: success\nMessage: Skill "new-skill" installed and enabled.',
+    })
+  })
+
+  test('maps empty install message to a completed-install result', async () => {
+    const model = createMockModel()
+    const provider = createMockSandboxProvider()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      codeExecution: {
+        sessionId: 'session-1',
+        provider,
+        files: [],
+      },
+    })
+
+    await expect(toModelOutput(result.tools.install_skill, { message: '' })).resolves.toEqual({
+      type: 'text',
+      value: 'Skill installation completed.',
+    })
+  })
 })
 
 describe('user_exec tool', () => {
@@ -712,5 +802,37 @@ describe('user_exec tool', () => {
     const result = await buildToolsForSession(model, options)
     expect(result.tools.user_exec).toBeDefined()
     expect(result.initialActiveTools).not.toContain('user_exec')
+  })
+
+  test('maps command results to readable model text', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+
+    await expect(
+      toModelOutput(result.tools.user_exec, { success: true, exitCode: 0, stdout: 'ok\n', stderr: '' })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Exit code: 0\n\nStdout:\nok\n',
+    })
+  })
+
+  test('maps command success with no output to an explicit no-output result', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+
+    await expect(
+      toModelOutput(result.tools.user_exec, { success: true, exitCode: 0, stdout: '', stderr: '' })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Exit code: 0\n\n(no output)',
+    })
   })
 })

@@ -1,5 +1,6 @@
 import { jsonSchema, type ToolSet } from 'ai'
 import platform from '@/platform'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
 
 interface SandboxEditOperation {
   old_text: string
@@ -106,6 +107,19 @@ Use to locate files when you know part of the name but not the exact path.
 
 const DEFAULT_BASH_TIMEOUT = 120_000
 
+function formatSandboxBashOutput(output: unknown): string {
+  if (typeof output === 'string') return output
+  const record = asRecord(output)
+  const stdout = stringField(record, 'stdout') ?? ''
+  const stderr = stringField(record, 'stderr') ?? ''
+  const exitCode = numberField(record, 'exitCode')
+  const sections = [`Exit code: ${exitCode ?? 'unknown'}`]
+  if (stdout) sections.push(`Stdout:\n${stdout}`)
+  if (stderr) sections.push(`Stderr:\n${stderr}`)
+  if (!stdout && !stderr) sections.push('(no output)')
+  return sections.join('\n\n')
+}
+
 function abortableExec(
   execPromise: Promise<{ stdout: string; stderr: string; exitCode: number }>,
   abortSignal?: AbortSignal
@@ -165,6 +179,7 @@ const sandbox_bash: ToolSet[string] = {
       return `Error executing command: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(formatSandboxBashOutput),
 }
 
 const sandbox_read: ToolSet[string] = {
@@ -195,6 +210,7 @@ const sandbox_read: ToolSet[string] = {
       return `Error reading file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'File is empty.' }),
 }
 
 const sandbox_write: ToolSet[string] = {
@@ -224,11 +240,12 @@ const sandbox_write: ToolSet[string] = {
       if (!result.success) {
         return `Error writing file: ${result.error}`
       }
-      return `Successfully wrote to ${writeInput.file_path}`
+      return `Status: success\nAction: sandbox_write\nPath: ${writeInput.file_path}`
     } catch (error) {
       return `Error writing file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText),
 }
 
 const sandbox_edit: ToolSet[string] = {
@@ -251,11 +268,12 @@ const sandbox_edit: ToolSet[string] = {
       if (!result.success) {
         return `Error editing file: ${result.error}`
       }
-      return `Successfully applied ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${editInput.file_path}`
+      return `Status: success\nAction: sandbox_edit\nPath: ${editInput.file_path}\nEdits applied: ${edits.length}`
     } catch (error) {
       return `Error editing file: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText),
 }
 
 const sandbox_grep: ToolSet[string] = {
@@ -298,6 +316,7 @@ const sandbox_grep: ToolSet[string] = {
       return `Error searching: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'No matches found.' }),
 }
 
 const sandbox_ls: ToolSet[string] = {
@@ -327,6 +346,7 @@ const sandbox_ls: ToolSet[string] = {
       return `Error listing directory: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'Directory is empty.' }),
 }
 
 const sandbox_find: ToolSet[string] = {
@@ -360,6 +380,7 @@ const sandbox_find: ToolSet[string] = {
       return `Error finding files: ${error instanceof Error ? error.message : String(error)}`
     }
   },
+  toModelOutput: toTextModelOutput(contentOrErrorText, { emptyFallback: 'No files found.' }),
 }
 
 export default {

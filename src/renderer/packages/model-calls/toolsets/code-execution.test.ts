@@ -21,6 +21,13 @@ const createMockProvider = () => ({
   checkAvailability: vi.fn().mockResolvedValue({ available: true }),
 })
 
+async function toModelOutput(tool: unknown, output: unknown) {
+  const mapper = tool as {
+    toModelOutput: (options: { toolCallId: string; input: unknown; output: unknown }) => Promise<unknown> | unknown
+  }
+  return await mapper.toModelOutput({ toolCallId: 'tool-call-id', input: {}, output })
+}
+
 describe('buildCodeExecutionTools', () => {
   let mockProvider: ReturnType<typeof createMockProvider>
 
@@ -124,6 +131,47 @@ describe('buildCodeExecutionTools', () => {
     expect(result.exitCode).toBe(0)
   })
 
+  test('code_execution maps structured output to readable model text', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+
+    await expect(toModelOutput(tools.code_execution, { stdout: 'hello\n', stderr: '', exitCode: 0 })).resolves.toEqual({
+      type: 'text',
+      value: 'Exit code: 0\n\nStdout:\nhello\n',
+    })
+  })
+
+  test('code_execution maps success with no output to an explicit no-output result', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+
+    await expect(toModelOutput(tools.code_execution, { stdout: '', stderr: '', exitCode: 0 })).resolves.toEqual({
+      type: 'text',
+      value: 'Exit code: 0\n\n(no output)',
+    })
+  })
+
+  test('read_file maps content and pagination hint to readable model text', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+
+    await expect(
+      toModelOutput(tools.read_file, {
+        content: 'line one',
+        hint: '[Showing lines 1-1 of 2. Use offset=2 to continue.]',
+      })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'line one\n\n[Showing lines 1-1 of 2. Use offset=2 to continue.]',
+    })
+  })
+
+  test('read_file maps empty content to an empty-file result', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+
+    await expect(toModelOutput(tools.read_file, { content: '' })).resolves.toEqual({
+      type: 'text',
+      value: 'File is empty.',
+    })
+  })
+
   test('code_execution tool handles non-zero exit code', async () => {
     mockProvider.exec.mockResolvedValue({ stdout: '', stderr: 'ReferenceError: x is not defined', exitCode: 1 })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
@@ -184,6 +232,17 @@ describe('buildCodeExecutionTools', () => {
 
       expect(mockProvider.persistArtifact).toHaveBeenCalledWith('/tmp/report.pdf', 'Report')
       expect(result).toMatchObject({ downloadable: true, file_path: '/durable/report.pdf', display_name: 'Report' })
+    })
+
+    test('maps download metadata to readable model text', async () => {
+      const tool = getTool(mockProvider)
+
+      await expect(
+        toModelOutput(tool, { downloadable: true, file_path: '/durable/report.pdf', display_name: 'Report' })
+      ).resolves.toEqual({
+        type: 'text',
+        value: 'Status: download ready\nName: Report\nPath: /durable/report.pdf',
+      })
     })
 
     test('reports an error to the model when persisting fails (local provider)', async () => {

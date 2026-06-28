@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const queryMock = vi.fn()
 const getAttachmentsMock = vi.fn()
+const readParentsMock = vi.fn()
 const getSessionRagConfigMock = vi.fn()
 const getLicenseKeyMock = vi.fn()
 const getSettingsMock = vi.fn()
@@ -11,7 +12,7 @@ vi.mock('@/platform', () => ({
     getSessionAttachmentRagController: () => ({
       getAttachments: getAttachmentsMock,
       query: queryMock,
-      readParents: vi.fn(),
+      readParents: readParentsMock,
     }),
   },
 }))
@@ -29,6 +30,13 @@ vi.mock('@/stores/settingsStore', () => ({
     getState: getSettingsMock,
   },
 }))
+
+async function toModelOutput(tool: unknown, output: unknown) {
+  const mapper = tool as {
+    toModelOutput: (options: { toolCallId: string; input: unknown; output: unknown }) => Promise<unknown> | unknown
+  }
+  return await mapper.toModelOutput({ toolCallId: 'tool-call-id', input: {}, output })
+}
 
 describe('session attachment RAG toolset', () => {
   beforeEach(() => {
@@ -49,6 +57,7 @@ describe('session attachment RAG toolset', () => {
       },
     })
     queryMock.mockResolvedValue([])
+    readParentsMock.mockResolvedValue([])
   })
 
   test('uses local default rerank model when remote session RAG rerank model is unavailable', async () => {
@@ -112,5 +121,46 @@ describe('session attachment RAG toolset', () => {
         }),
       })
     )
+  })
+
+  test('query_session_attachment maps search results to readable model text', async () => {
+    const { getToolSet } = await import('./session-attachment-rag')
+    const toolset = await getToolSet([1])
+
+    await expect(
+      toModelOutput(toolset.tools.query_session_attachment, [
+        {
+          filename: 'large.pdf',
+          sectionPath: 'Section 2',
+          parentId: 42,
+          score: 0.81234,
+          text: 'Relevant attachment text.',
+        },
+      ])
+    ).resolves.toEqual({
+      type: 'text',
+      value:
+        'Result 1\nAttachment: large.pdf\nSection: Section 2\nParent ID: 42\nScore: 0.812\nText:\nRelevant attachment text.',
+    })
+  })
+
+  test('read_session_attachment_parents maps parent blocks to readable model text', async () => {
+    const { getToolSet } = await import('./session-attachment-rag')
+    const toolset = await getToolSet([1])
+
+    await expect(
+      toModelOutput(toolset.tools.read_session_attachment_parents, [
+        {
+          filename: 'large.pdf',
+          sectionPath: 'Appendix',
+          pageStart: 10,
+          pageEnd: 12,
+          text: 'Larger parent block.',
+        },
+      ])
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Parent block 1\nAttachment: large.pdf\nSection: Appendix\nPages: 10-12\nText:\nLarger parent block.',
+    })
   })
 })

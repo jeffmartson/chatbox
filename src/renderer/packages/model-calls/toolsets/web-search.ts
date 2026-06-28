@@ -5,6 +5,7 @@ import * as remote from '@/packages/remote'
 import { getParseLinkProvider, webSearchExecutor } from '@/packages/web-search'
 import platform from '@/platform'
 import * as settingActions from '@/stores/settingActions'
+import { asRecord, numberField, stringField, toTextModelOutput } from './model-output'
 
 const parseLinkDescription = `
 ## parse_link
@@ -34,6 +35,29 @@ function buildParseLinkResult(params: { url: string; title: string; content: str
     originalLength: content.length,
     truncated: content.length > truncatedContent.length,
   }
+}
+
+function formatParseLinkOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const title = stringField(record, 'title')
+  const url = stringField(record, 'url')
+  const content = stringField(record, 'content') ?? ''
+  const originalLength = numberField(record, 'originalLength')
+  const truncated = record?.truncated === true
+  const header = [
+    title ? `Title: ${title}` : undefined,
+    url ? `URL: ${url}` : undefined,
+    content ? 'Content:' : undefined,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const truncationHint =
+    truncated && originalLength !== undefined
+      ? `\n\n[Content truncated. Showing ${content.length} of ${originalLength} characters.]`
+      : ''
+  return `${header ? `${header}\n` : ''}${content}${truncationHint}`
 }
 
 export const parseLinkTool: ToolSet[string] = {
@@ -109,6 +133,7 @@ export const parseLinkTool: ToolSet[string] = {
       maxLength: normalizedMaxLength,
     })
   },
+  toModelOutput: toTextModelOutput(formatParseLinkOutput),
 }
 
 export default {

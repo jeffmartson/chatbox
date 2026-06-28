@@ -1,6 +1,7 @@
 import { jsonSchema, type ToolSet } from 'ai'
 import { MAX_INLINE_FILE_LINES, PREVIEW_LINES } from '@/packages/context-management/attachment-payload'
 import platform from '@/platform'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
 
 const DEFAULT_LINES = 200
 const MAX_LINES = MAX_INLINE_FILE_LINES
@@ -24,6 +25,40 @@ const formatLineWithNumber = (line: string, lineNumber: number) => {
 }
 
 const GREP_MAX_RESULTS = 100
+
+function formatUploadedFileReadOutput(output: unknown): string {
+  const content = contentOrErrorText(output)
+  const record = asRecord(output)
+  const linesRead = numberField(record, 'linesRead')
+  const totalLines = numberField(record, 'totalLines')
+  const lineOffset = numberField(record, 'lineOffset')
+  if (linesRead === undefined || totalLines === undefined || lineOffset === undefined) return content
+  const nextOffset = lineOffset + linesRead
+  return nextOffset < totalLines
+    ? `${content}\n\n[${totalLines - nextOffset} more lines. Use lineOffset=${nextOffset} to continue.]`
+    : content
+}
+
+function formatUploadedFileSearchOutput(output: unknown): string {
+  if (typeof output === 'string') return output
+  const record = asRecord(output)
+  const query = stringField(record, 'query')
+  const results = record?.results
+  if (!Array.isArray(results)) return contentOrErrorText(output)
+  if (results.length === 0) return query ? `No matches found for "${query}".` : 'No matches found.'
+  return results
+    .map((item) => {
+      const result = asRecord(item)
+      const lineNumber = numberField(result, 'lineNumber')
+      const lineContent = stringField(result, 'lineContent') ?? ''
+      const context = result?.context
+      if (Array.isArray(context) && context.every((line) => typeof line === 'string')) {
+        return `Line ${lineNumber ?? '?'}:\n${context.join('\n')}`
+      }
+      return `Line ${lineNumber ?? '?'}: ${lineContent}`
+    })
+    .join('\n\n')
+}
 
 async function readFileContentFromKey(fileKey: string): Promise<string | null> {
   if (fileKey.startsWith('local:')) {
@@ -104,6 +139,7 @@ const readFileTool: ToolSet[string] = {
       totalLines: lines.length,
     }
   },
+  toModelOutput: toTextModelOutput(formatUploadedFileReadOutput, { emptyFallback: 'File is empty.' }),
 }
 
 const searchFileTool: ToolSet[string] = {
@@ -178,6 +214,7 @@ const searchFileTool: ToolSet[string] = {
       totalMatches: results.length,
     }
   },
+  toModelOutput: toTextModelOutput(formatUploadedFileSearchOutput),
 }
 
 export default {

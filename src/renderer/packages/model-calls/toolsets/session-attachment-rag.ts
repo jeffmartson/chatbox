@@ -4,6 +4,64 @@ import * as remote from '@/packages/remote'
 import platform from '@/platform'
 import * as settingActions from '@/stores/settingActions'
 import { settingsStore } from '@/stores/settingsStore'
+import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
+
+function formatArrayOutput(output: unknown, formatItem: (item: Record<string, unknown>, index: number) => string) {
+  if (typeof output === 'string') return output
+  if (!Array.isArray(output)) return contentOrErrorText(output)
+  if (output.length === 0) return 'No results found.'
+  return output
+    .map((item, index) => {
+      const record = asRecord(item)
+      return record ? formatItem(record, index) : String(item)
+    })
+    .join('\n\n')
+}
+
+function formatAttachments(output: unknown): string {
+  return formatArrayOutput(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? `Attachment ${index + 1}`
+    const status = stringField(item, 'status') ?? stringField(item, 'indexStatus')
+    const id = numberField(item, 'id')
+    const chunks = numberField(item, 'chunkCount') ?? numberField(item, 'totalChunks')
+    const lines = [`Attachment ${index + 1}`, `Name: ${filename}`]
+    if (id !== undefined) lines.push(`ID: ${id}`)
+    if (status) lines.push(`Status: ${status}`)
+    if (chunks !== undefined) lines.push(`Chunks: ${chunks}`)
+    return lines.join('\n')
+  })
+}
+
+function formatSearchResults(output: unknown): string {
+  return formatArrayOutput(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? 'Unknown attachment'
+    const sectionPath = stringField(item, 'sectionPath')
+    const parentId = numberField(item, 'parentId')
+    const score = numberField(item, 'score')
+    const text = stringField(item, 'text') ?? ''
+    const lines = [`Result ${index + 1}`, `Attachment: ${filename}`]
+    if (sectionPath) lines.push(`Section: ${sectionPath}`)
+    if (parentId !== undefined) lines.push(`Parent ID: ${parentId}`)
+    if (score !== undefined) lines.push(`Score: ${score.toFixed(3)}`)
+    lines.push('Text:', text)
+    return lines.join('\n')
+  })
+}
+
+function formatParents(output: unknown): string {
+  return formatArrayOutput(output, (item, index) => {
+    const filename = stringField(item, 'filename') ?? 'Unknown attachment'
+    const sectionPath = stringField(item, 'sectionPath')
+    const pageStart = numberField(item, 'pageStart')
+    const pageEnd = numberField(item, 'pageEnd')
+    const text = stringField(item, 'text') ?? ''
+    const lines = [`Parent block ${index + 1}`, `Attachment: ${filename}`]
+    if (sectionPath) lines.push(`Section: ${sectionPath}`)
+    if (pageStart !== undefined && pageEnd !== undefined) lines.push(`Pages: ${pageStart}-${pageEnd}`)
+    lines.push('Text:', text)
+    return lines.join('\n')
+  })
+}
 
 export async function getToolSet(attachmentIds: number[]) {
   const controller = platform.getSessionAttachmentRagController()
@@ -54,6 +112,7 @@ export async function getToolSet(attachmentIds: number[]) {
         additionalProperties: false,
       }),
       execute: async () => controller.getAttachments(attachmentIds),
+      toModelOutput: toTextModelOutput(formatAttachments),
     },
     query_session_attachment: {
       description: 'Search across ready large uploaded attachments with a semantic query.',
@@ -74,7 +133,7 @@ export async function getToolSet(attachmentIds: number[]) {
         required: ['query'],
         additionalProperties: false,
       }),
-      execute: async (input) => {
+      execute: (input) => {
         const queryInput = input as { query: string; limit?: number }
         return controller.query({
           attachmentIds,
@@ -82,6 +141,7 @@ export async function getToolSet(attachmentIds: number[]) {
           plan: buildQueryPlan(queryInput.limit),
         })
       },
+      toModelOutput: toTextModelOutput(formatSearchResults),
     },
     read_session_attachment_parents: {
       description: 'Read parent blocks for search hits from large uploaded attachments.',
@@ -97,10 +157,11 @@ export async function getToolSet(attachmentIds: number[]) {
         required: ['parentIds'],
         additionalProperties: false,
       }),
-      execute: async (input) => {
+      execute: (input) => {
         const readInput = input as { parentIds: number[] }
         return controller.readParents({ parentIds: readInput.parentIds, attachmentIds })
       },
+      toModelOutput: toTextModelOutput(formatParents),
     },
   }
 

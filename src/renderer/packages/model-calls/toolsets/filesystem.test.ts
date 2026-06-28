@@ -41,6 +41,13 @@ async function execute(tool: unknown, input: unknown) {
   return await executable.execute(input, { toolCallId: 'tool-call-id', messages: [] })
 }
 
+async function toModelOutput(tool: unknown, output: unknown) {
+  const mapper = tool as {
+    toModelOutput: (options: { toolCallId: string; input: unknown; output: unknown }) => Promise<unknown> | unknown
+  }
+  return await mapper.toModelOutput({ toolCallId: 'tool-call-id', input: {}, output })
+}
+
 describe('filesystem write to sandbox-writable temp (/tmp)', () => {
   beforeEach(() => {
     fsWrite.mockClear()
@@ -57,6 +64,15 @@ describe('filesystem write to sandbox-writable temp (/tmp)', () => {
     expect(result).toEqual({ success: true, file_path: '/tmp/output.txt' })
   })
 
+  test('write_file maps structured results to readable model text', async () => {
+    await expect(
+      toModelOutput(getTools().write_file, { success: true, file_path: '/tmp/output.txt' })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Status: success\nAction: write_file\nPath: /tmp/output.txt',
+    })
+  })
+
   test('editing under /tmp goes through the sandbox without approval or real-fs edit', async () => {
     const result = await execute(getTools().edit_file, {
       file_path: '/tmp/output.txt',
@@ -67,6 +83,15 @@ describe('filesystem write to sandbox-writable temp (/tmp)', () => {
     expect(fsEdit).not.toHaveBeenCalled()
     expect(exec).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ success: true, file_path: '/tmp/output.txt', edits: 1 })
+  })
+
+  test('edit_file maps structured results to readable model text', async () => {
+    await expect(
+      toModelOutput(getTools().edit_file, { success: true, file_path: '/tmp/output.txt', edits: 2 })
+    ).resolves.toEqual({
+      type: 'text',
+      value: 'Status: success\nAction: edit_file\nPath: /tmp/output.txt\nEdits applied: 2',
+    })
   })
 
   test('a /tmp-prefixed sibling path is not treated as sandbox-writable', async () => {
@@ -201,5 +226,28 @@ describe('search_files sandbox grep command', () => {
   test('include filter is forwarded as --include', async () => {
     await execute(getTools().search_files, { path: '/tmp/project', query: 'x', include: '*.ts' })
     expect(lastGrepCode()).toContain("--include='*.ts'")
+  })
+
+  test('search_files maps content objects to plain model text', async () => {
+    await expect(toModelOutput(getTools().search_files, { content: 'src/a.ts:1:match' })).resolves.toEqual({
+      type: 'text',
+      value: 'src/a.ts:1:match',
+    })
+  })
+
+  test('search_files maps empty content to a no-matches result', async () => {
+    await expect(toModelOutput(getTools().search_files, { content: '' })).resolves.toEqual({
+      type: 'text',
+      value: 'No matches found.',
+    })
+  })
+})
+
+describe('list_files model output', () => {
+  test('list_files maps empty content to an empty-directory result', async () => {
+    await expect(toModelOutput(getTools().list_files, { content: '' })).resolves.toEqual({
+      type: 'text',
+      value: 'Directory is empty.',
+    })
   })
 })

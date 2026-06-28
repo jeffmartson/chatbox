@@ -10,6 +10,7 @@ import { buildCodeExecutionTools } from '@/packages/model-calls/toolsets/code-ex
 import fileToolSet from '@/packages/model-calls/toolsets/file'
 import { buildFilesystemTools } from '@/packages/model-calls/toolsets/filesystem'
 import { getToolSet as getKBToolSet } from '@/packages/model-calls/toolsets/knowledge-base'
+import { asRecord, numberField, stringField, toTextModelOutput } from '@/packages/model-calls/toolsets/model-output'
 import { remapPhantomHomePath } from '@/packages/model-calls/toolsets/sandbox-paths'
 import { getToolSet as getSessionAttachmentRagToolSet } from '@/packages/model-calls/toolsets/session-attachment-rag'
 import { getToolSetDescription, parseLinkTool, webSearchTool } from '@/packages/model-calls/toolsets/web-search'
@@ -89,6 +90,16 @@ ${dirLine}
 ${grantedDirsBlock}`
 }
 
+function buildToolUseCommunicationInstruction(): string {
+  return `
+## Tool-use Communication
+When you are about to call one or more tools, first include one short visible sentence explaining what you will do next and why.
+- Keep it action-oriented and concise.
+- If several tool calls are part of the same immediate action, one sentence for the batch is enough.
+- You may skip this sentence for trivial single-tool lookups such as reading, listing, or searching.
+`
+}
+
 function buildSkillToolsInstruction(
   enabledSkills: Array<{ name: string; description: string }>,
   agentFullAccess: boolean
@@ -127,6 +138,35 @@ You can install skills from any source:
 The skill will be auto-enabled after installation.
 `
   return instruction
+}
+
+function formatLoadSkillOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  return stringField(record, 'instructions') ?? JSON.stringify(output) ?? String(output)
+}
+
+function formatInstallSkillOutput(output: unknown): string {
+  const record = asRecord(output)
+  const error = stringField(record, 'error')
+  if (error) return `Error: ${error}`
+  const message = stringField(record, 'message')
+  if (message) return `Status: success\nMessage: ${message}`
+  if (stringField(record, 'message') === '') return 'Skill installation completed.'
+  return JSON.stringify(output) ?? String(output)
+}
+
+function formatUserExecOutput(output: unknown): string {
+  const record = asRecord(output)
+  const stdout = stringField(record, 'stdout') ?? ''
+  const stderr = stringField(record, 'stderr') ?? ''
+  const exitCode = numberField(record, 'exitCode')
+  const sections = [`Exit code: ${exitCode ?? 'unknown'}`]
+  if (stdout) sections.push(`Stdout:\n${stdout}`)
+  if (stderr) sections.push(`Stderr:\n${stderr}`)
+  if (!stdout && !stderr) sections.push('(no output)')
+  return sections.join('\n\n')
 }
 
 function getSessionAttachmentRagIds(messages: Message[]): number[] {
@@ -302,6 +342,10 @@ In long conversations, earlier tool call results may be automatically compressed
     initialActiveTools = allToolNames.filter((name) => !gatedTools.has(name))
   }
 
+  if (Object.keys(tools).length > 0) {
+    instructions = buildToolUseCommunicationInstruction() + instructions
+  }
+
   return { tools, instructions, initialActiveTools }
 }
 
@@ -344,6 +388,7 @@ function buildLoadSkillTool(options: BuildToolsOptions): ToolSet[string] {
 
       return { instructions: result.body }
     },
+    toModelOutput: toTextModelOutput(formatLoadSkillOutput, { emptyFallback: 'Skill instructions are empty.' }),
   }
 }
 
@@ -413,6 +458,7 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
         message: `Skill "${result.skillName}" installed and enabled. You can now use load_skill("${result.skillName}") to load it.`,
       }
     },
+    toModelOutput: toTextModelOutput(formatInstallSkillOutput, { emptyFallback: 'Skill installation completed.' }),
   }
 }
 
@@ -485,5 +531,6 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
         stderr: result.stderr,
       }
     },
+    toModelOutput: toTextModelOutput(formatUserExecOutput),
   }
 }
