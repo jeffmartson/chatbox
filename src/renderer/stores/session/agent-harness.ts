@@ -31,6 +31,11 @@ import { buildToolsForSession } from './tools-builder'
 const log = getLogger('agent-generation-harness')
 const RECENT_TOOL_CALL_CACHE_WINDOW_MS = 5 * 60 * 1000
 
+const GLOBAL_RESPONSE_LANGUAGE_INSTRUCTION = `
+## Response Language
+Unless the user requests otherwise, all visible assistant text must be in the same language as the user's latest message.
+`
+
 export interface AgentGenerationSideEffects {
   lockAgentMode?: (reason: Exclude<AgentModeLockReason, null>) => void
 }
@@ -278,7 +283,11 @@ export async function prepareAgentGenerationHarness(
         }
       : undefined
 
-  const { tools, instructions, initialActiveTools } = await buildToolsForSession(model, {
+  const {
+    tools,
+    instructions: toolInstructions,
+    initialActiveTools,
+  } = await buildToolsForSession(model, {
     webBrowsing,
     knowledgeBase,
     messages: promptMsgs,
@@ -289,6 +298,8 @@ export async function prepareAgentGenerationHarness(
       sideEffects?.lockAgentMode?.('load_skill')
     },
   })
+  const hasTools = Object.keys(tools).length > 0
+  const instructions = hasTools ? `${GLOBAL_RESPONSE_LANGUAGE_INSTRUCTION}${toolInstructions}` : toolInstructions
 
   let injectedMessages = injectModelSystemPrompt(
     model.modelId,

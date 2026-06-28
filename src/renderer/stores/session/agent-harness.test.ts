@@ -214,6 +214,8 @@ describe('prepareAgentGenerationHarness', () => {
     expect(sandboxProviderMock.checkAvailability).toHaveBeenCalled()
     expect(prepared.debug.effectiveAgentMode).toBe('on')
     expect(prepared.debug.canExecuteCode).toBe(true)
+    expect(prepared.debug.instructions).toContain('## Response Language')
+    expect(prepared.debug.instructions).toContain("same language as the user's latest message")
 
     expect(prepared.tools.code_execution).toBeDefined()
     expect(prepared.tools.read_file).toBeDefined()
@@ -231,6 +233,8 @@ describe('prepareAgentGenerationHarness', () => {
 
     const serializedCoreMessages = JSON.stringify(prepared.coreMessages)
     expect(serializedCoreMessages).toContain('Current model: test-model')
+    expect(serializedCoreMessages).toContain('## Response Language')
+    expect(serializedCoreMessages).toContain("same language as the user's latest message")
     expect(serializedCoreMessages).toContain('code_execution')
     expect(serializedCoreMessages).toContain('Available Skills')
 
@@ -268,9 +272,13 @@ describe('prepareAgentGenerationHarness', () => {
     })
 
     expect(prepared.debug.effectiveAgentMode).toBe('off')
+    expect(prepared.debug.instructions).not.toContain('## Response Language')
     expect(prepared.tools.code_execution).toBeUndefined()
     expect(prepared.tools.load_skill).toBeUndefined()
     expect(prepared.chatOptions.prepareStep).toBeUndefined()
+
+    const serializedCoreMessages = JSON.stringify(prepared.coreMessages)
+    expect(serializedCoreMessages).not.toContain('## Response Language')
   })
 
   test('keeps legacy auto mode on the plain chat path for a single simple file', async () => {

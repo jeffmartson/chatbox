@@ -94,6 +94,7 @@ function buildToolUseCommunicationInstruction(): string {
   return `
 ## Tool-use Communication
 When you are about to call one or more tools, first include one short visible sentence explaining what you will do next and why.
+- Use the user's language for this sentence.
 - Keep it action-oriented and concise.
 - If several tool calls are part of the same immediate action, one sentence for the batch is enough.
 - You may skip this sentence for trivial single-tool lookups such as reading, listing, or searching.

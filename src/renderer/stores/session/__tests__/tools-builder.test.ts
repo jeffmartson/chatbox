@@ -345,6 +345,7 @@ describe('buildToolsForSession', () => {
     expect(result.tools.parse_link).toBeDefined()
     expect(result.instructions).toContain('## Tool-use Communication')
     expect(result.instructions).toContain('one short visible sentence')
+    expect(result.instructions).toContain("Use the user's language for this sentence.")
     expect(result.instructions).toContain('trivial single-tool lookups')
     expect(result.instructions).toContain('## parse_link')
   })
