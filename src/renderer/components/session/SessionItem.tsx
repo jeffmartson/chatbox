@@ -253,12 +253,13 @@ function SessionItem(props: Props) {
 
   return (
     <ActionMenu
-      type="mobile"
+      type="contextual"
       trigger="manual"
-      title={session.name}
       items={mobileMenuItems}
       opened={mobileMenuOpened}
       onChange={handleMobileMenuChange}
+      position="bottom-end"
+      offset={0}
     >
       {content}
     </ActionMenu>
