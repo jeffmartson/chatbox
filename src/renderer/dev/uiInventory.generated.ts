@@ -4847,7 +4847,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'More Providers',
       'Nothing found...',
       'Popular',
-      'Quick Actions',
+      'Custom Additions',
       'Search providers...',
     ],
     stories: [],
