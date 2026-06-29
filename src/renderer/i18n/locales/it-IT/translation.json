@@ -217,6 +217,7 @@
   "Connected": "Connesso",
   "Connection failed": "Connessione fallita",
   "Connection failed!": "Connessione fallita!",
+  "Connection failed! Please make sure the API key was copied completely, has no extra spaces, has sufficient balance, matches the provider, and has not expired.": "Connessione fallita! Assicurati che la chiave API sia stata copiata completamente, non contenga spazi extra, abbia saldo sufficiente, corrisponda al provider e non sia scaduta.",
   "Connection successful": "Connessione riuscita",
   "Connection successful!": "Connessione riuscita!",
   "Connection to {{aiProvider}} failed. This typically occurs due to a temporary service issue. Please try again later or <buttonOpenSettings>check your settings</buttonOpenSettings>.": "Connessione a {{aiProvider}} fallita. Ciò si verifica solitamente a causa di un problema temporaneo del servizio. Riprova più tardi o <buttonOpenSettings>controlla le impostazioni</buttonOpenSettings>.",

@@ -217,6 +217,7 @@
   "Connected": "연결됨",
   "Connection failed": "연결 실패",
   "Connection failed!": "연결 실패!",
+  "Connection failed! Please make sure the API key was copied completely, has no extra spaces, has sufficient balance, matches the provider, and has not expired.": "연결에 실패했습니다! API 키가 완전히 복사되었는지, 불필요한 공백이 없는지, 잔액이 충분한지, 제공업체와 일치하는지, 만료되지 않았는지 확인하세요.",
   "Connection successful": "연결 성공",
   "Connection successful!": "연결 성공!",
   "Connection to {{aiProvider}} failed. This typically occurs due to a temporary service issue. Please try again later or <buttonOpenSettings>check your settings</buttonOpenSettings>.": "{{aiProvider}}에 연결하지 못했습니다. 이는 일시적인 서비스 문제로 인해 발생하는 경우가 많습니다. 나중에 다시 시도하거나 <buttonOpenSettings>설정을 확인</buttonOpenSettings>해 주세요.",

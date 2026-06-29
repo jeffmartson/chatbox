@@ -1,7 +1,9 @@
-import { Badge, Button, Card, Container, Group, Paper, Stack, Text, Title } from '@mantine/core'
-import { IconCode, IconExternalLink, IconEye } from '@tabler/icons-react'
+import { Badge, Box, Button, Card, Container, Group, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core'
+import { IconAdjustmentsHorizontal, IconCode, IconExternalLink, IconEye } from '@tabler/icons-react'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
+import { getShowGuideDevButtonsFlag, setShowGuideDevButtonsFlag } from '@/dev/devToolsFlags'
 
 export const Route = createFileRoute('/dev/')({
   component: DevIndexPage,
@@ -27,6 +29,12 @@ const devPages = [
     tags: ['Tool', 'Testing'],
   },
   {
+    path: '/dev/session-rag',
+    name: 'Session RAG Inspector',
+    description: 'Inspect local libsql state for session attachment RAG',
+    tags: ['Tool', 'RAG'],
+  },
+  {
     path: '/dev/ui-inventory',
     name: 'UI Inventory',
     description: 'Complete generated catalog of UI pages, components, states, text, and preview links',
@@ -34,17 +42,44 @@ const devPages = [
   },
 ]
 
+interface DevControl {
+  id: string
+  label: string
+  description: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}
+
 function DevIndexPage() {
+  const [showGuideDevButtons, setShowGuideDevButtons] = useState(getShowGuideDevButtonsFlag)
+  const devControls: DevControl[] = [
+    {
+      id: 'guide-dev-buttons',
+      label: 'Guide dev buttons',
+      description: 'Show guide debug actions on the Getting Started page.',
+      checked: showGuideDevButtons,
+      onChange: (checked) => {
+        setShowGuideDevButtonsFlag(checked)
+        setShowGuideDevButtons(checked)
+      },
+    },
+  ]
+
   return (
     <Container size="lg" py="xl">
       <Stack gap="xl">
         {/* Header */}
         <div>
-          <Group justify="space-between" align="center" mb="md">
-            <Title order={1}>Dev Tools</Title>
-            <Badge size="lg" variant="light" color="blue">
-              Development Mode
-            </Badge>
+          <Group justify="space-between" align="flex-start" gap="md" mb="md">
+            <div>
+              <Title order={1}>Dev Tools</Title>
+            </div>
+            <Stack align="flex-end" gap="xs">
+              <Badge size="lg" variant="light" color="blue">
+                Development Mode
+              </Badge>
+              <DevControlsStrip controls={devControls} />
+            </Stack>
           </Group>
           <Text c="dimmed">
             Component previews and development tools. These are available when running in development mode or when the
@@ -135,6 +170,33 @@ function DevIndexPage() {
         </Paper>
       </Stack>
     </Container>
+  )
+}
+
+function DevControlsStrip({ controls }: { controls: DevControl[] }) {
+  if (controls.length === 0) return null
+
+  return (
+    <Box className="border border-solid border-[var(--chatbox-border-primary)] rounded-md bg-[var(--chatbox-background-secondary)] px-2 py-1">
+      <Group gap="sm" wrap="wrap">
+        <Group gap={4}>
+          <ScalableIcon icon={IconAdjustmentsHorizontal} size={14} className="text-chatbox-tint-tertiary" />
+          <Text size="xs" fw={700} c="chatbox-tertiary" tt="uppercase" lh={1}>
+            Controls
+          </Text>
+        </Group>
+        {controls.map((control) => (
+          <Tooltip key={control.id} label={control.description} withArrow openDelay={400}>
+            <Switch
+              size="xs"
+              label={control.label}
+              checked={control.checked}
+              onChange={(event) => control.onChange(event.currentTarget.checked)}
+            />
+          </Tooltip>
+        ))}
+      </Group>
+    </Box>
   )
 }
 

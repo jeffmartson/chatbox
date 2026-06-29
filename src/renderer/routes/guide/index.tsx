@@ -16,9 +16,9 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core'
-import WindowControls from '@/components/layout/WindowControls'
 import type { Language } from '@shared/types'
 import {
+  IconArrowUp,
   IconBug,
   IconCheck,
   IconChevronRight,
@@ -27,17 +27,18 @@ import {
   IconMenu2,
   IconPlayerSkipForward,
   IconPlayerStopFilled,
-  IconArrowUp,
   IconRefresh,
   IconUserCheck,
 } from '@tabler/icons-react'
 import { createFileRoute, useBlocker } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Divider from '@/components/common/Divider'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import Disclaimer from '@/components/Disclaimer'
 import ProviderImageIcon from '@/components/icons/ProviderImageIcon'
+import WindowControls from '@/components/layout/WindowControls'
+import { getShowGuideDevButtonsFlag } from '@/dev/devToolsFlags'
 import useNeedRoomForWinControls from '@/hooks/useNeedRoomForWinControls'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { languageNameMap, languages } from '@/i18n/locales'
@@ -80,7 +81,7 @@ function GuidePage() {
 
   const { needRoomForMacWindowControls } = useNeedRoomForWinControls()
   const isSmallScreen = useIsSmallScreen()
-  const showDebug = useMemo(() => new URLSearchParams(window.location.search).get('debug') === 'true', [])
+  const showDebug = getShowGuideDevButtonsFlag()
   const showSidebar = useUIStore((s) => s.showSidebar)
   const setShowSidebar = useUIStore((s) => s.setShowSidebar)
 
@@ -270,7 +271,7 @@ function GuidePage() {
           {showDebug && (
             <Menu position="bottom-end" shadow="md">
               <Menu.Target>
-                <ActionIcon variant="subtle" size="sm" style={{ opacity: 0 }}>
+                <ActionIcon variant="subtle" size="sm" aria-label="Guide debug actions">
                   <ScalableIcon icon={IconBug} size={16} />
                 </ActionIcon>
               </Menu.Target>

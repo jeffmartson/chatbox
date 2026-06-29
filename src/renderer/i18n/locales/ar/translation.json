@@ -217,6 +217,7 @@
   "Connected": "متصل",
   "Connection failed": "فشل الاتصال",
   "Connection failed!": "فشل الاتصال!",
+  "Connection failed! Please make sure the API key was copied completely, has no extra spaces, has sufficient balance, matches the provider, and has not expired.": "فشل الاتصال! تأكد من نسخ مفتاح API بالكامل، ومن عدم وجود مسافات زائدة، وأن الرصيد كافٍ، وأنه يطابق المزوّد، وأنه لم تنتهِ صلاحيته.",
   "Connection successful": "تم الاتصال بنجاح",
   "Connection successful!": "تم الاتصال بنجاح!",
   "Connection to {{aiProvider}} failed. This typically occurs due to a temporary service issue. Please try again later or <buttonOpenSettings>check your settings</buttonOpenSettings>.": "فشل الاتصال بـ {{aiProvider}}. يحدث هذا عادةً بسبب مشكلة مؤقتة في الخدمة. يرجى المحاولة مرة أخرى لاحقًا أو <buttonOpenSettings>التحقق من إعداداتك</buttonOpenSettings>.",
