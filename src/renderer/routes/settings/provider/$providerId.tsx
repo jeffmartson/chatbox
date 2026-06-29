@@ -714,13 +714,12 @@ function ProviderSettings({ providerId }: { providerId: string }) {
             <Flex gap="xs" align="center">
               <TextInput
                 flex={1}
-                value={providerSettings?.apiHost}
-                placeholder={baseInfo.defaultSettings?.apiHost}
+                value={providerSettings?.apiHost || baseInfo.defaultSettings?.apiHost || ''}
                 onChange={handleApiHostChange}
               />
             </Flex>
             <Text span size="xs" flex="0 1 auto" c="chatbox-secondary">
-              {normalizedBuiltinApiHost.apiHost + normalizedBuiltinApiHost.apiPath}
+              {t('Preview')}: {normalizedBuiltinApiHost.apiHost + normalizedBuiltinApiHost.apiPath}
             </Text>
           </Stack>
         )}
@@ -763,6 +762,7 @@ function ProviderSettings({ providerId }: { providerId: string }) {
                 </Stack>
               </Flex>
               <Text span size="xs" flex="0 1 auto" c="chatbox-secondary">
+                {t('Preview')}:{' '}
                 {normalizeAPIHost(providerSettings, baseInfo.type).apiHost +
                   normalizeAPIHost(providerSettings, baseInfo.type).apiPath}
               </Text>

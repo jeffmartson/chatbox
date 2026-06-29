@@ -11176,6 +11176,7 @@ export const uiInventoryItems: UiInventoryItem[] = [
       'OpenAI API Compatible',
       'OpenAI Responses API Compatible',
       'Paste code here',
+      'Preview',
       'Provider not found',
       'Qwen Portal',
       'Reset',
