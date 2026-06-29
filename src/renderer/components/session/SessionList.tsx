@@ -18,18 +18,16 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
+import { Flex, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import type { SessionMetaRecord } from '@shared/types'
-import { IconArchive, IconLoader2, IconSearch } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 import { useRouterState } from '@tanstack/react-router'
 import { type CSSProperties, type MutableRefObject, useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 import { useSessionList } from '@/stores/chatStore'
 import { reorderSessions } from '@/stores/sessionActions'
-import { useUIStore } from '@/stores/uiStore'
 import SessionItem from './SessionItem'
 
 export interface Props {
@@ -52,7 +50,6 @@ export default function SessionList(props: Props) {
   const { t } = useTranslation()
   const { sessionMetaList: sortedSessions, fetchNextPage, hasNextPage, isFetchingNextPage } = useSessionList()
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const setOpenSearchDialog = useUIStore((s) => s.setOpenSearchDialog)
   const isSmallScreen = useMediaQuery('(max-width: 768px)')
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
@@ -138,85 +135,55 @@ export default function SessionList(props: Props) {
   )
 
   return (
-    <>
-      <Flex align="center" py="xs" px="md" gap={'xs'}>
-        <Text c="chatbox-tertiary" flex={1}>
-          {t('Chat')}
-        </Text>
-
-        <Tooltip label={t('Search')} openDelay={1000} withArrow>
-          <ActionIcon
-            variant="subtle"
-            color="chatbox-tertiary"
-            size={20}
-            onClick={() => setOpenSearchDialog(true, true)}
-          >
-            <IconSearch />
-          </ActionIcon>
-        </Tooltip>
-
-        <Tooltip label={t('Clear Conversation List')} openDelay={1000} withArrow>
-          <ActionIcon
-            variant="subtle"
-            color="chatbox-tertiary"
-            size={20}
-            onClick={() => NiceModal.show('clear-session-list')}
-          >
-            <IconArchive />
-          </ActionIcon>
-        </Tooltip>
-      </Flex>
-
-      <DndContext
-        modifiers={[restrictToVerticalAxis]}
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragCancel={onDragCancel}
-      >
-        {sortedSessions && (
-          <SortableContext items={sortableSessionIds} strategy={verticalListSortingStrategy}>
-            <Virtuoso
-              style={{ flex: 1 }}
-              data={displayItems}
-              computeItemKey={(_index, item) => item.id}
-              scrollerRef={(ref) => {
-                if (ref instanceof HTMLDivElement) {
-                  props.sessionListViewportRef.current = ref
-                }
-              }}
-              endReached={onEndReached}
-              components={virtuosoComponents}
-              itemContent={(_index, item) =>
-                item.type === 'section' ? (
-                  <Text px="md" pt="sm" pb={4} size="xs" fw={600} c="chatbox-tertiary">
-                    {item.label}
-                  </Text>
-                ) : (
-                  <SortableItem id={item.session.id}>
-                    <SessionItem
-                      selected={routerState.location.pathname === `/session/${item.session.id}`}
-                      session={item.session}
-                    />
-                  </SortableItem>
-                )
+    <DndContext
+      modifiers={[restrictToVerticalAxis]}
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
+      {sortedSessions && (
+        <SortableContext items={sortableSessionIds} strategy={verticalListSortingStrategy}>
+          <Virtuoso
+            style={{ flex: 1 }}
+            data={displayItems}
+            computeItemKey={(_index, item) => item.id}
+            scrollerRef={(ref) => {
+              if (ref instanceof HTMLDivElement) {
+                props.sessionListViewportRef.current = ref
               }
-            />
-            <DragOverlay>
-              {activeDragSession ? (
-                <div className="pointer-events-none">
+            }}
+            endReached={onEndReached}
+            components={virtuosoComponents}
+            itemContent={(_index, item) =>
+              item.type === 'section' ? (
+                <Text px="md" pt="sm" pb={4} size="xs" fw={600} c="chatbox-tertiary">
+                  {item.label}
+                </Text>
+              ) : (
+                <SortableItem id={item.session.id}>
                   <SessionItem
-                    selected={routerState.location.pathname === `/session/${activeDragSession.id}`}
-                    session={activeDragSession}
+                    selected={routerState.location.pathname === `/session/${item.session.id}`}
+                    session={item.session}
                   />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </SortableContext>
-        )}
-      </DndContext>
-    </>
+                </SortableItem>
+              )
+            }
+          />
+          <DragOverlay>
+            {activeDragSession ? (
+              <div className="pointer-events-none">
+                <SessionItem
+                  selected={routerState.location.pathname === `/session/${activeDragSession.id}`}
+                  session={activeDragSession}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </SortableContext>
+      )}
+    </DndContext>
   )
 }
 

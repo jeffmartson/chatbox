@@ -1,6 +1,8 @@
+import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Box, Button, Flex, Image, NavLink, Stack, Text, Tooltip } from '@mantine/core'
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
 import {
+  IconArchive,
   IconCirclePlus,
   IconCode,
   IconDownload,
@@ -9,6 +11,7 @@ import {
   IconLayoutSidebarLeftCollapse,
   IconMessageChatbot,
   IconPhotoPlus,
+  IconSearch,
   IconSettingsFilled,
 } from '@tabler/icons-react'
 import { useNavigate } from '@tanstack/react-router'
@@ -39,6 +42,7 @@ export default function Sidebar() {
   const showSidebar = useUIStore((s) => s.showSidebar)
   const setShowSidebar = useUIStore((s) => s.setShowSidebar)
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
+  const setOpenSearchDialog = useUIStore((s) => s.setOpenSearchDialog)
 
   const sessionListViewportRef = useRef<HTMLDivElement>(null)
 
@@ -138,14 +142,27 @@ export default function Sidebar() {
         className="relative"
       >
         {needRoomForMacWindowControls && <Box className="title-bar flex-[0_0_44px]" />}
-        <Flex align="center" justify="space-between" px="md" py="sm">
-          <Flex align="center" gap="sm">
-            <Flex align="center" gap="sm" onClick={() => navigate({ to: '/about' })} style={{ cursor: 'pointer' }}>
+        <Flex
+          align="center"
+          justify="space-between"
+          gap="xs"
+          px="md"
+          py="sm"
+          className="border-0 border-b border-solid border-chatbox-border-primary"
+        >
+          <Flex align="center" gap="sm" style={{ minWidth: 0, flex: 1 }}>
+            <Flex
+              align="center"
+              gap="sm"
+              onClick={() => navigate({ to: '/about' })}
+              style={{ cursor: 'pointer', minWidth: 0 }}
+            >
               <Image src={icon} w={20} h={20} />
-              <Text span c="chatbox-secondary" size="xl" lh={1.2} fw="700">
+              <Text span c="chatbox-secondary" size="xl" lh={1.2} fw="700" truncate>
                 Chatbox
               </Text>
-              {/\d/.test(versionHook.version) && (
+              {/* Desktop shows the version in the bottom About link, so only surface it here on mobile */}
+              {isSmallScreen && /\d/.test(versionHook.version) && (
                 <Text span c="chatbox-tertiary" size="sm">
                   {versionHook.version}
                 </Text>
@@ -154,11 +171,41 @@ export default function Sidebar() {
             {FORCE_ENABLE_DEV_PAGES && <ThemeSwitchButton size="xs" />}
           </Flex>
 
-          <Tooltip label={t('Collapse')} openDelay={1000} withArrow>
-            <ActionIcon variant="subtle" color="chatbox-tertiary" size={20} onClick={() => setShowSidebar(false)}>
-              <IconLayoutSidebarLeftCollapse />
-            </ActionIcon>
-          </Tooltip>
+          <Flex align="center" gap={2} style={{ flexShrink: 0 }}>
+            <Tooltip label={t('Search')} openDelay={1000} withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="chatbox-tertiary"
+                size={26}
+                radius="md"
+                onClick={() => setOpenSearchDialog(true, true)}
+              >
+                <IconSearch size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('Clear Conversation List')} openDelay={1000} withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="chatbox-tertiary"
+                size={26}
+                radius="md"
+                onClick={() => NiceModal.show('clear-session-list')}
+              >
+                <IconArchive size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('Collapse')} openDelay={1000} withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="chatbox-tertiary"
+                size={26}
+                radius="md"
+                onClick={() => setShowSidebar(false)}
+              >
+                <IconLayoutSidebarLeftCollapse size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Flex>
         </Flex>
 
         <SessionList sessionListViewportRef={sessionListViewportRef} />
