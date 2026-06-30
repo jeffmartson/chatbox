@@ -55,8 +55,6 @@ function Index() {
   const setSessionWebBrowsing = useUIStore((s) => s.setSessionWebBrowsing)
   const clearSessionWebBrowsing = useUIStore((s) => s.clearSessionWebBrowsing)
   const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
-  const setSessionAgentMode = useUIStore((s) => s.setSessionAgentMode)
-  const lockSessionAgentMode = useUIStore((s) => s.lockSessionAgentMode)
   const clearSessionAgentMode = useUIStore((s) => s.clearSessionAgentMode)
   const [session, setSession] = useState<Session>({
     id: 'new',
@@ -203,6 +201,7 @@ function Index() {
         settings: {
           ...session.settings,
           ...settingsPatch,
+          ...(sessionAgentModeMap.new ? { agentMode: sessionAgentModeMap.new } : {}),
           // Working directories bound while the chat was still "new" (not yet persisted).
           ...(newSessionState.workingDirectories?.length
             ? { workingDirectories: newSessionState.workingDirectories }
@@ -240,12 +239,7 @@ function Index() {
       }
 
       // Transfer agent mode setting from "new" session to the actual session
-      const newAgentMode = sessionAgentModeMap.new
-      if (newAgentMode) {
-        setSessionAgentMode(newSession.id, newAgentMode.value)
-        if (newAgentMode.locked) {
-          lockSessionAgentMode(newSession.id, newAgentMode.lockReason)
-        }
+      if (sessionAgentModeMap.new) {
         clearSessionAgentMode('new')
       }
 
@@ -269,8 +263,6 @@ function Index() {
       setSessionWebBrowsing,
       clearSessionWebBrowsing,
       sessionAgentModeMap,
-      setSessionAgentMode,
-      lockSessionAgentMode,
       clearSessionAgentMode,
     ]
   )

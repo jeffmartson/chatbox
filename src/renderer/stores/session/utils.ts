@@ -14,6 +14,7 @@ import { identity, pickBy } from 'lodash'
 import { getModelDisplayName } from '@/packages/model-setting-utils'
 import { trackEvent } from '@/utils/track'
 import { uiStore } from '../uiStore'
+import { createDefaultAgentModeEntry } from './agent-mode'
 
 /**
  * Get session-level web browsing setting
@@ -28,16 +29,10 @@ export function getSessionWebBrowsing(sessionId: string, provider: string | unde
   return provider === ModelProviderEnum.ChatboxAI
 }
 
-function createDefaultAgentModeEntry(): AgentModeEntry {
-  return {
-    value: uiStore.getState().agentModeSmartSwitchingDefault ? 'auto' : 'off',
-    locked: false,
-    lockReason: null,
-  }
-}
-
 /**
  * Get session-level agent mode setting
+ * Compatibility helper for non-React callers that do not have the session
+ * object. Prefer getSessionAgentModeEntry(sessionId, session) when possible.
  */
 export function getSessionAgentMode(sessionId: string): AgentModeEntry {
   return uiStore.getState().sessionAgentModeMap[sessionId] ?? createDefaultAgentModeEntry()

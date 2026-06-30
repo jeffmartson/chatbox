@@ -15,6 +15,14 @@
  */
 
 export { createAttachmentResolver } from './attachment-resolver'
+export {
+  createDefaultAgentModeEntry,
+  getSessionAgentModeEntry,
+  getSessionAgentModeFromSession,
+  lockSessionAgentMode,
+  setSessionAgentMode,
+  useSessionAgentMode,
+} from './agent-mode'
 // CRUD operations (8 functions)
 export {
   clear,

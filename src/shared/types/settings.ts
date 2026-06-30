@@ -31,6 +31,12 @@ export const DEFAULT_DOCUMENT_PARSER_CONFIG: DocumentParserConfig = {
   type: 'local',
 }
 
+export const AgentModeEntrySchema = z.object({
+  value: z.enum(['auto', 'on', 'off']),
+  locked: z.boolean(),
+  lockReason: z.enum(['file_upload', 'load_skill', 'message_sent']).nullable(),
+})
+
 export const ProviderModelInfoSchema = z.object({
   modelId: z.string(),
   // The provider id this model was resolved under (e.g. 'chatbox-ai', 'qwen').
@@ -196,6 +202,7 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
   workingDirectories: z.array(z.string()).optional().catch(undefined),
   // When enabled, Work Mode skips per-action approval for user_exec and real filesystem mutations.
   agentFullAccess: z.boolean().optional().catch(undefined),
+  agentMode: AgentModeEntrySchema.optional().catch(undefined),
 })
 
 const UnifiedTokenUsageDetailSchema = z.object({

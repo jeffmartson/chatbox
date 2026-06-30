@@ -414,6 +414,10 @@ export async function updateSessionCache(sessionId: string, updater: Updater<Ses
   if (!session) {
     throw new Error(`Session ${sessionId} not found`)
   }
+  updateSessionCacheSync(sessionId, updater)
+}
+
+export function updateSessionCacheSync(sessionId: string, updater: Updater<Session>) {
   queryClient.setQueryData(QueryKeys.ChatSession(sessionId), (old: Session | undefined | null) => {
     if (!old) {
       return old
@@ -521,6 +525,7 @@ export async function deleteSessions(ids: string[]) {
   for (const id of uniqueIds) {
     uiStore.getState().clearSessionWebBrowsing(id)
     uiStore.getState().removeSessionKnowledgeBase(id)
+    uiStore.getState().clearSessionAgentMode(id)
     cleanupSessionAtomCache(id)
     clearScrollPositionCache(id)
     delete sessionUpdateQueues[id]

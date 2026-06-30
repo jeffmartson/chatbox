@@ -1,4 +1,24 @@
+import type { Session } from '@shared/types'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+const { sessionsById, getSessionMock, updateSessionCacheSyncMock, updateSessionMock } = vi.hoisted(() => {
+  const sessions = new Map<string, Session>()
+  type SessionUpdater = Partial<Session> | ((session: Session) => Partial<Session>)
+  const applyUpdate = (sessionId: string, update: SessionUpdater) => {
+    const session = sessions.get(sessionId)
+    if (!session) return null
+    const patch = typeof update === 'function' ? update(session) : update
+    const next = { ...session, ...patch }
+    sessions.set(sessionId, next)
+    return next
+  }
+  return {
+    sessionsById: sessions,
+    getSessionMock: vi.fn(async (sessionId: string) => sessions.get(sessionId) ?? null),
+    updateSessionCacheSyncMock: vi.fn(applyUpdate),
+    updateSessionMock: vi.fn(applyUpdate),
+  }
+})
 
 vi.hoisted(() => {
   const storage = {
@@ -20,133 +40,170 @@ vi.mock('@/platform', () => ({
   default: { type: 'web' },
 }))
 
-import type { AgentModeEntry } from '@shared/types'
-import { uiStore } from '../../uiStore'
-import { getSessionAgentMode } from '../utils'
+vi.mock('../../chatStore', () => ({
+  getSession: getSessionMock,
+  updateSessionCacheSync: updateSessionCacheSyncMock,
+  updateSession: updateSessionMock,
+  useSession: () => ({ session: null }),
+}))
 
-const defaultEntry: AgentModeEntry = { value: 'auto', locked: false, lockReason: null }
+import { uiStore } from '../../uiStore'
+import { getSessionAgentModeEntry, lockSessionAgentMode, setSessionAgentMode } from '../agent-mode'
+
+const defaultEntry = { value: 'auto', locked: false, lockReason: null } as const
 
 beforeEach(() => {
-  // Reset agent mode map before each test
+  sessionsById.clear()
+  getSessionMock.mockClear()
+  updateSessionCacheSyncMock.mockClear()
+  updateSessionMock.mockClear()
   uiStore.setState({ sessionAgentModeMap: {}, agentModeSmartSwitchingDefault: true })
 })
 
 describe('setSessionAgentMode', () => {
-  test('sets value for a session', () => {
-    uiStore.getState().setSessionAgentMode('session-1', 'on')
-    const entry = uiStore.getState().sessionAgentModeMap['session-1']
-    expect(entry).toBeDefined()
-    expect(entry.value).toBe('on')
+  test('writes agent mode into session settings', async () => {
+    sessionsById.set('session-1', { id: 'session-1', name: 'Test', messages: [], settings: {} })
+
+    await setSessionAgentMode('session-1', 'on')
+
+    expect(updateSessionCacheSyncMock).toHaveBeenCalledTimes(1)
+    expect(updateSessionMock).toHaveBeenCalledTimes(1)
+    expect(sessionsById.get('session-1')?.settings?.agentMode).toEqual({
+      value: 'on',
+      locked: false,
+      lockReason: null,
+    })
   })
 
-  test('writing a value defaults locked/lockReason to false/null', () => {
-    // Before any explicit set, the map has no entry; getSessionAgentMode returns the default
-    const entry = uiStore.getState().sessionAgentModeMap['unknown-session']
-    expect(entry).toBeUndefined()
+  test('stores "auto" as-is for session settings', async () => {
+    sessionsById.set('session-1', { id: 'session-1', name: 'Test', messages: [], settings: {} })
 
-    // After setting a value, locked/lockReason default to false/null
-    uiStore.getState().setSessionAgentMode('new-session', 'off')
-    const created = uiStore.getState().sessionAgentModeMap['new-session']
-    expect(created).toEqual({ value: 'off', locked: false, lockReason: null })
+    await setSessionAgentMode('session-1', 'auto')
+
+    expect(sessionsById.get('session-1')?.settings?.agentMode).toEqual({
+      value: 'auto',
+      locked: false,
+      lockReason: null,
+    })
   })
 
-  test('stores "auto" as-is (auto runs the suggestion classifier)', () => {
-    uiStore.getState().setSessionAgentMode('new-session', 'auto')
-    const created = uiStore.getState().sessionAgentModeMap['new-session']
-    expect(created).toEqual({ value: 'auto', locked: false, lockReason: null })
+  test('blocks setting "off" when locked', async () => {
+    sessionsById.set('session-locked', {
+      id: 'session-locked',
+      name: 'Test',
+      messages: [],
+      settings: { agentMode: { value: 'on', locked: true, lockReason: 'message_sent' } },
+    })
+
+    await setSessionAgentMode('session-locked', 'off')
+
+    expect(updateSessionCacheSyncMock).not.toHaveBeenCalled()
+    expect(updateSessionMock).not.toHaveBeenCalled()
+    expect(sessionsById.get('session-locked')?.settings?.agentMode).toEqual({
+      value: 'on',
+      locked: true,
+      lockReason: 'message_sent',
+    })
   })
 
-  test('blocks setting "off" when locked', () => {
-    // Lock the session first
-    uiStore.getState().lockSessionAgentMode('session-locked', 'message_sent')
-    const before = uiStore.getState().sessionAgentModeMap['session-locked']
-    expect(before.value).toBe('on')
-    expect(before.locked).toBe(true)
+  test('uses the latest queued session state when checking locks', async () => {
+    getSessionMock.mockResolvedValueOnce({
+      id: 'session-race',
+      name: 'Test',
+      messages: [],
+      settings: { agentMode: { value: 'on', locked: false, lockReason: null } },
+    })
+    sessionsById.set('session-race', {
+      id: 'session-race',
+      name: 'Test',
+      messages: [],
+      settings: { agentMode: { value: 'on', locked: true, lockReason: 'message_sent' } },
+    })
 
-    // Try to set to 'off' — should be blocked
-    uiStore.getState().setSessionAgentMode('session-locked', 'off')
-    const after = uiStore.getState().sessionAgentModeMap['session-locked']
-    expect(after.value).toBe('on')
-    expect(after.locked).toBe(true)
+    await setSessionAgentMode('session-race', 'off')
+
+    expect(sessionsById.get('session-race')?.settings?.agentMode).toEqual({
+      value: 'on',
+      locked: true,
+      lockReason: 'message_sent',
+    })
   })
 
-  test('blocks setting "auto" when locked (Issue 2A fix)', () => {
-    uiStore.getState().lockSessionAgentMode('session-locked-2a', 'file_upload')
-    const before = uiStore.getState().sessionAgentModeMap['session-locked-2a']
-    expect(before.value).toBe('on')
+  test('keeps the transient map for the new session', async () => {
+    await setSessionAgentMode('new', 'off')
 
-    // Try to set to 'auto' — should be blocked
-    uiStore.getState().setSessionAgentMode('session-locked-2a', 'auto')
-    const after = uiStore.getState().sessionAgentModeMap['session-locked-2a']
-    expect(after.value).toBe('on')
-    expect(after.locked).toBe(true)
+    expect(updateSessionCacheSyncMock).not.toHaveBeenCalled()
+    expect(updateSessionMock).not.toHaveBeenCalled()
+    expect(uiStore.getState().sessionAgentModeMap.new).toEqual({ value: 'off', locked: false, lockReason: null })
   })
 
-  test('allows setting "on" when locked', () => {
-    uiStore.getState().lockSessionAgentMode('session-locked-on', 'load_skill')
+  test('preserves sibling session settings through functional updates', async () => {
+    sessionsById.set('session-1', {
+      id: 'session-1',
+      name: 'Test',
+      messages: [],
+      settings: { provider: 'openai', modelId: 'gpt-4.1' },
+    })
 
-    // Setting to 'on' should succeed even when locked
-    uiStore.getState().setSessionAgentMode('session-locked-on', 'on')
-    const after = uiStore.getState().sessionAgentModeMap['session-locked-on']
-    expect(after.value).toBe('on')
-    expect(after.locked).toBe(true)
+    await setSessionAgentMode('session-1', 'on')
+
+    expect(sessionsById.get('session-1')?.settings).toEqual({
+      provider: 'openai',
+      modelId: 'gpt-4.1',
+      agentMode: { value: 'on', locked: false, lockReason: null },
+    })
   })
 })
 
 describe('lockSessionAgentMode', () => {
-  test('sets value="on", locked=true, and lockReason', () => {
-    uiStore.getState().lockSessionAgentMode('session-lock', 'message_sent')
-    const entry = uiStore.getState().sessionAgentModeMap['session-lock']
-    expect(entry).toEqual({ value: 'on', locked: true, lockReason: 'message_sent' })
+  test('sets value="on", locked=true, and lockReason in session settings', async () => {
+    sessionsById.set('session-lock', { id: 'session-lock', name: 'Test', messages: [], settings: {} })
+
+    await lockSessionAgentMode('session-lock', 'message_sent')
+
+    expect(sessionsById.get('session-lock')?.settings?.agentMode).toEqual({
+      value: 'on',
+      locked: true,
+      lockReason: 'message_sent',
+    })
   })
 
-  test.each(['message_sent', 'file_upload', 'load_skill'] as const)('with reason type: %s', (reason) => {
-    uiStore.getState().lockSessionAgentMode(`session-${reason}`, reason)
-    const entry = uiStore.getState().sessionAgentModeMap[`session-${reason}`]
-    expect(entry.value).toBe('on')
-    expect(entry.locked).toBe(true)
-    expect(entry.lockReason).toBe(reason)
-  })
-})
+  test.each(['message_sent', 'file_upload', 'load_skill'] as const)('with reason type: %s', async (reason) => {
+    sessionsById.set(`session-${reason}`, { id: `session-${reason}`, name: 'Test', messages: [], settings: {} })
 
-describe('clearSessionAgentMode', () => {
-  test('removes single session entry', () => {
-    uiStore.getState().setSessionAgentMode('session-a', 'on')
-    uiStore.getState().setSessionAgentMode('session-b', 'auto')
+    await lockSessionAgentMode(`session-${reason}`, reason)
 
-    uiStore.getState().clearSessionAgentMode('session-a')
-
-    expect(uiStore.getState().sessionAgentModeMap['session-a']).toBeUndefined()
-    expect(uiStore.getState().sessionAgentModeMap['session-b']).toBeDefined()
-  })
-
-  test('clears all entries when called without sessionId', () => {
-    uiStore.getState().setSessionAgentMode('session-x', 'on')
-    uiStore.getState().setSessionAgentMode('session-y', 'off')
-
-    uiStore.getState().clearSessionAgentMode()
-
-    expect(uiStore.getState().sessionAgentModeMap).toEqual({})
+    expect(sessionsById.get(`session-${reason}`)?.settings?.agentMode).toEqual({
+      value: 'on',
+      locked: true,
+      lockReason: reason,
+    })
   })
 })
 
-describe('getSessionAgentMode (from utils.ts)', () => {
+describe('getSessionAgentModeEntry', () => {
   test('returns default for unknown session', () => {
-    const entry = getSessionAgentMode('nonexistent-session')
+    const entry = getSessionAgentModeEntry('nonexistent-session')
     expect(entry).toEqual(defaultEntry)
   })
 
   test('uses smart switching preference for unknown sessions', () => {
     uiStore.getState().setAgentModeSmartSwitchingDefault(false)
-    expect(getSessionAgentMode('new')).toEqual({ value: 'off', locked: false, lockReason: null })
+    expect(getSessionAgentModeEntry('new')).toEqual({ value: 'off', locked: false, lockReason: null })
 
     uiStore.getState().setAgentModeSmartSwitchingDefault(true)
-    expect(getSessionAgentMode('new')).toEqual(defaultEntry)
+    expect(getSessionAgentModeEntry('new')).toEqual(defaultEntry)
   })
 
-  test('returns stored entry for known session', () => {
+  test('prefers session settings over legacy uiStore map', () => {
     uiStore.getState().lockSessionAgentMode('known-session', 'file_upload')
-    const entry = getSessionAgentMode('known-session')
-    expect(entry).toEqual({ value: 'on', locked: true, lockReason: 'file_upload' })
+    const entry = getSessionAgentModeEntry('known-session', {
+      id: 'known-session',
+      name: 'Test',
+      messages: [],
+      settings: { agentMode: { value: 'off', locked: false, lockReason: null } },
+    })
+
+    expect(entry).toEqual({ value: 'off', locked: false, lockReason: null })
   })
 })

@@ -15,7 +15,7 @@ import {
 } from '@tabler/icons-react'
 import { Link } from '@tanstack/react-router'
 import { PlusIcon } from 'lucide-react'
-import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
@@ -28,7 +28,7 @@ import platform from '@/platform'
 import * as chatStore from '@/stores/chatStore'
 import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useAutoValidate } from '@/stores/premiumActions'
-import { getSessionAgentMode } from '@/stores/session/utils'
+import { setSessionAgentMode, useSessionAgentMode } from '@/stores/session/agent-mode'
 import { useMcpSettings, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { ScalableIcon } from '../common/ScalableIcon'
@@ -113,13 +113,8 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const { session: currentSession } = useSession(isNewSession ? null : sessionId)
 
   // Agent mode state
-  const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
-  const setSessionAgentMode = useUIStore((s) => s.setSessionAgentMode)
   const setAgentModeSmartSwitchingDefault = useUIStore((s) => s.setAgentModeSmartSwitchingDefault)
-  const entry = useMemo(
-    () => sessionAgentModeMap[sessionId] ?? getSessionAgentMode(sessionId),
-    [sessionAgentModeMap, sessionId]
-  )
+  const entry = useSessionAgentMode(sessionId)
   const agentModeUIState = useMemo(
     () => getAgentModeUIState(entry, modelSupportsAgentMode),
     [entry, modelSupportsAgentMode]
@@ -189,16 +184,16 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
 
   const handleModeChange = useCallback(
     (value: AgentModeValue) => {
-      setSessionAgentMode(sessionId, value)
+      void setSessionAgentMode(sessionId, value)
     },
-    [sessionId, setSessionAgentMode]
+    [sessionId]
   )
   const handleSmartSwitchingChange = useCallback(
     (enabled: boolean) => {
       setAgentModeSmartSwitchingDefault(enabled)
-      setSessionAgentMode(sessionId, enabled ? 'auto' : 'off')
+      void setSessionAgentMode(sessionId, enabled ? 'auto' : 'off')
     },
-    [sessionId, setAgentModeSmartSwitchingDefault, setSessionAgentMode]
+    [sessionId, setAgentModeSmartSwitchingDefault]
   )
 
   // Working directories (desktop only): real local dirs the sandbox may read/write freely.
@@ -734,7 +729,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             <Group justify="center" py="md">
               <Link
                 to="/settings/knowledge-base"
-                onClick={(e) => {
+                onClick={(e: MouseEvent<HTMLAnchorElement>) => {
                   if (capabilitiesDisabled) {
                     e.preventDefault()
                   }

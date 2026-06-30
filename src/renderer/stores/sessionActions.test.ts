@@ -663,6 +663,9 @@ describe('fork actions', () => {
           createdAt: 2,
         },
       },
+      settings: {
+        agentMode: { value: 'on', locked: true, lockReason: 'message_sent' },
+      },
     }
 
     getSessionMock.mockResolvedValue(session)
@@ -670,7 +673,6 @@ describe('fork actions', () => {
       ...newSession,
       id: 'new-session-copy',
     }))
-    sessionAgentModeMapMock[session.id] = { value: 'on', locked: true, lockReason: 'message_sent' }
 
     await sessionActions.copyAndSwitchSession({
       id: session.id,
@@ -692,8 +694,9 @@ describe('fork actions', () => {
     expect(newSession.messages.at(-1)?.id).toBe('copied-fork-marker')
     expect(newSession.messages.at(-1)?.isForkMarker).toBe(true)
     expect(newSession.messages.at(-1)?.forkedFromSessionId).toBe(session.id)
-    expect(setSessionAgentModeMock).toHaveBeenCalledWith('new-session-copy', 'on')
-    expect(lockSessionAgentModeMock).toHaveBeenCalledWith('new-session-copy', 'message_sent')
+    expect(newSession.settings?.agentMode).toEqual({ value: 'on', locked: true, lockReason: 'message_sent' })
+    expect(setSessionAgentModeMock).not.toHaveBeenCalled()
+    expect(lockSessionAgentModeMock).not.toHaveBeenCalled()
     expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-copy' })
   })
 })

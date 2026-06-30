@@ -287,7 +287,6 @@ export const uiStore = createStore(
         sidebarWidth: state.sidebarWidth,
         agentModeSmartSwitchingDefault: state.agentModeSmartSwitchingDefault,
         sessionWebBrowsingMap: state.sessionWebBrowsingMap,
-        sessionAgentModeMap: state.sessionAgentModeMap,
         sessionCodeExecutionMap: state.sessionCodeExecutionMap,
       }),
       storage: safeStorage,

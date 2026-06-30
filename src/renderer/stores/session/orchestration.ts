@@ -35,6 +35,7 @@ import {
   isFirstUserTurn,
   parseAgentModeSuggestionDecision,
 } from './agent-mode-suggestion'
+import { getSessionAgentModeEntry, lockSessionAgentMode, setSessionAgentMode } from './agent-mode'
 import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
@@ -42,7 +43,6 @@ import { createInitialState, processStreamChunk } from './stream-chunk-processor
 import { buildToolsForSession } from './tools-builder'
 import {
   findTargetMessageIndex,
-  getSessionAgentMode,
   getSessionWebBrowsing,
   handleGenerationError,
   initializeTargetMessage,
@@ -362,9 +362,9 @@ export async function orchestrateGeneration(
     const knowledgeBase = sessionKnowledgeBaseMap[sessionId]
     const webBrowsing = getSessionWebBrowsing(sessionId, settings.provider)
     const agentModeSupported = platform.type === 'desktop'
-    const { value: storedAgentModeValue } = getSessionAgentMode(sessionId)
+    const agentModeEntry = getSessionAgentModeEntry(sessionId, session)
+    const { value: storedAgentModeValue } = agentModeEntry
     const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
-    const agentModeEntry = uiStore.getState().sessionAgentModeMap[sessionId]
     const lastUserMessage = getLastUserMessage(messages, promptTargetMsgIx)
 
     if (
@@ -421,7 +421,7 @@ export async function orchestrateGeneration(
         return
       }
 
-      uiStore.getState().setSessionAgentMode(sessionId, 'off')
+      await setSessionAgentMode(sessionId, 'off')
     }
 
     const prepared = await prepareAgentGenerationHarness({
@@ -444,7 +444,7 @@ export async function orchestrateGeneration(
       isPro: settingActions.isPro,
       sideEffects: {
         lockAgentMode: (reason) => {
-          uiStore.getState().lockSessionAgentMode(sessionId, reason)
+          void lockSessionAgentMode(sessionId, reason)
         },
       },
     })
@@ -596,7 +596,7 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   const location = findTargetMessageIndex(session, targetMsg.id)
   const messagesBeforeTarget = location ? location.messages.slice(0, location.index) : session.messages
   const agentModeSupported = platform.type === 'desktop'
-  const { value: storedAgentModeValue } = getSessionAgentMode(session.id)
+  const { value: storedAgentModeValue } = getSessionAgentModeEntry(session.id, session)
   const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
   const effectiveAgentMode = agentModeSupported && agentModeValue === 'on' ? 'on' : 'off'
 
@@ -655,7 +655,7 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
     sessionSettings: settings,
     codeExecution: codeExecutionOption,
     onAgentModeActivated: () => {
-      uiStore.getState().lockSessionAgentMode(session.id, 'load_skill')
+      void lockSessionAgentMode(session.id, 'load_skill')
     },
   })
 

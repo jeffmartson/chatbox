@@ -15,7 +15,6 @@ import * as atoms from '../atoms'
 import * as chatStore from '../chatStore'
 import * as scrollActions from '../scrollActions'
 import { initEmptyChatSession, initEmptyPictureSession } from '../sessionHelpers'
-import { uiStore } from '../uiStore'
 
 /**
  * Create a new session and switch to it
@@ -127,21 +126,7 @@ async function copySession(
  */
 export async function copyAndSwitchSession(source: SessionMeta) {
   const newSession = await copySession(source, { appendForkMarker: true })
-  copySessionAgentMode(source.id, newSession.id)
   switchCurrentSession(newSession.id)
-}
-
-function copySessionAgentMode(sourceSessionId: string, targetSessionId: string) {
-  const store = uiStore.getState()
-  const sourceAgentMode = store.sessionAgentModeMap[sourceSessionId]
-  if (!sourceAgentMode) {
-    return
-  }
-
-  store.setSessionAgentMode(targetSessionId, sourceAgentMode.value)
-  if (sourceAgentMode.locked) {
-    store.lockSessionAgentMode(targetSessionId, sourceAgentMode.lockReason)
-  }
 }
 
 /**

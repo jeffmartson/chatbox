@@ -3,8 +3,7 @@ import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import { IconRobot } from '@tabler/icons-react'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getSessionAgentMode } from '@/stores/session/utils'
-import { useUIStore } from '@/stores/uiStore'
+import { useSessionAgentMode } from '@/stores/session/agent-mode'
 import AgentModePanel from './AgentModePanel'
 import { getAgentModeUIState } from './agentModeState'
 
@@ -39,14 +38,10 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   onSkillSelect,
 }) => {
   const { t } = useTranslation()
-  const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
   const [opened, setOpened] = useState(false)
   const openTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>()
-
-  const entry = useMemo(() => {
-    return sessionAgentModeMap[sessionId] ?? getSessionAgentMode(sessionId)
-  }, [sessionAgentModeMap, sessionId])
+  const entry = useSessionAgentMode(sessionId)
 
   const agentModeUIState = useMemo(
     () => getAgentModeUIState(entry, modelSupportsAgentMode),

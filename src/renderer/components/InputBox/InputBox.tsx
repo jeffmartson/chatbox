@@ -77,7 +77,7 @@ import * as atoms from '@/stores/atoms'
 import { compactionUIStateMapAtom } from '@/stores/atoms/compactionAtoms'
 import * as chatStore from '@/stores/chatStore'
 import { useSession, useSessionSettings } from '@/stores/chatStore'
-import { getSessionAgentMode } from '@/stores/session/utils'
+import { useSessionAgentMode } from '@/stores/session/agent-mode'
 import { settingsStore, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { delay } from '@/utils'
@@ -423,11 +423,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const { knowledgeBase, setKnowledgeBase } = useKnowledgeBase({ isNewSession })
 
     // Agent mode value for conditional toolbar rendering
-    const sessionAgentModeMap = useUIStore((s) => s.sessionAgentModeMap)
-    const agentModeEntry = useMemo(() => {
-      const entry = sessionAgentModeMap[currentSessionId || 'new']
-      return entry ?? getSessionAgentMode(currentSessionId || 'new')
-    }, [sessionAgentModeMap, currentSessionId])
+    const agentModeEntry = useSessionAgentMode(currentSessionId || 'new')
 
     const [showCompressionModal, setShowCompressionModal] = useState(false)
 
@@ -596,14 +592,12 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const agentModeDisabledMessage = t('This model does not support Agent Mode')
     const modelDisabledCheck = useCallback(
       (m: ProviderModelInfo) => {
-        const sid = currentSessionId || 'new'
-        const entry = getSessionAgentMode(sid)
-        if (entry.value !== 'on') return undefined
+        if (agentModeEntry.value !== 'on') return undefined
         if (!m.capabilities?.includes('tool_use')) return agentModeDisabledMessage
         if (isDeepSeekWeakToolUse(m.modelId, 'agent')) return agentModeDisabledMessage
         return undefined
       },
-      [currentSessionId, agentModeDisabledMessage]
+      [agentModeDisabledMessage, agentModeEntry.value]
     )
 
     // Check model tool use capabilities for agent mode and file handling.

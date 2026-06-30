@@ -70,6 +70,7 @@ import { copyToClipboard } from '@/packages/navigator'
 import { countWord } from '@/packages/word-count'
 import platform from '@/platform'
 import { getSession } from '@/stores/chatStore'
+import { lockSessionAgentMode, setSessionAgentMode } from '@/stores/session/agent-mode'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import '../../static/Block.css'
@@ -178,8 +179,6 @@ const _Message: FC<Props> = (props) => {
   const ref = useRef<HTMLDivElement>(null)
 
   const setQuote = useUIStore((state) => state.setQuote)
-  const lockSessionAgentMode = useUIStore((state) => state.lockSessionAgentMode)
-  const setSessionAgentMode = useUIStore((state) => state.setSessionAgentMode)
 
   const quoteMsg = useCallback(() => {
     let input = getMessageText(msg)
@@ -200,18 +199,18 @@ const _Message: FC<Props> = (props) => {
   }, [handleStop, sessionId, msg])
 
   const handleStartAgentModeResponse = useCallback(async () => {
-    lockSessionAgentMode(sessionId, 'message_sent')
+    await lockSessionAgentMode(sessionId, 'message_sent')
     const nextMsg = resetMessageForAgentModeResponse(msg)
     await modifyMessage(sessionId, nextMsg, true)
     await generate(sessionId, nextMsg, { operationType: 'send_message' })
-  }, [lockSessionAgentMode, msg, sessionId])
+  }, [msg, sessionId])
 
   const handleContinueNormalResponse = useCallback(async () => {
-    setSessionAgentMode(sessionId, 'off')
+    await setSessionAgentMode(sessionId, 'off')
     const nextMsg = resetMessageForAgentModeResponse(msg)
     await modifyMessage(sessionId, nextMsg, true)
     await generate(sessionId, nextMsg, { operationType: 'send_message', skipAgentModeSuggestion: true })
-  }, [msg, sessionId, setSessionAgentMode])
+  }, [msg, sessionId])
 
   const lastStepForRetry = useMemo(() => {
     for (let index = msg.contentParts.length - 1; index >= 0; index -= 1) {
