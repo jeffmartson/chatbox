@@ -1,9 +1,9 @@
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { MarketplaceSkill } from '@shared/types/skills'
-import { spawn } from 'child_process'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import fs from 'fs'
-import os from 'os'
-import path from 'path'
 import { getLogger } from '../util'
 import { discoverBuiltinSkills, ensureBuiltinSeeded, syncBuiltinSkills } from './builtin-sync'
 import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from './discovery'
@@ -84,7 +84,7 @@ export function registerSkillsHandlers() {
     }
   })
 
-  ipcMain.handle('skills:discover', async () => {
+  ipcMain.handle('skills:discover', () => {
     try {
       const builtinSkillInfos = discoverBuiltinSkills()
       const chatboxSkills = discoverSkills(getSkillsDir())
@@ -102,7 +102,7 @@ export function registerSkillsHandlers() {
     }
   })
 
-  ipcMain.handle('skills:load', async (_event, name: string) => {
+  ipcMain.handle('skills:load', (_event, name: string) => {
     try {
       if (!name || typeof name !== 'string') return null
       if (!isValidSkillName(name)) return null
@@ -111,7 +111,24 @@ export function registerSkillsHandlers() {
         const skillMdPath = path.join(skillPath, 'SKILL.md')
         if (!fs.existsSync(skillMdPath)) return null
         const parsed = parseSkillFile(skillMdPath)
-        return parsed ? { body: parsed.body, metadata: parsed.metadata } : null
+        if (!parsed) return null
+        const files: string[] = []
+        const walk = (dir: string) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const entryPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+              walk(entryPath)
+              continue
+            }
+            if (!entry.isFile()) continue
+            const relativePath = path.relative(skillPath, entryPath)
+            if (relativePath === 'SKILL.md' || relativePath === 'source.json') continue
+            files.push(relativePath.split(path.sep).join('/'))
+          }
+        }
+        walk(skillPath)
+        files.sort()
+        return { body: parsed.body, metadata: parsed.metadata, skillRoot: skillPath, files }
       }
 
       const cache = getOrBuildSkillCache()
@@ -133,7 +150,7 @@ export function registerSkillsHandlers() {
     }
   })
 
-  ipcMain.handle('skills:get-directory', async () => {
+  ipcMain.handle('skills:get-directory', () => {
     return getSkillsDir()
   })
 

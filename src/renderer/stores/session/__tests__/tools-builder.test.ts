@@ -244,7 +244,12 @@ beforeEach(() => {
     { name: 'chatbox-product-info', description: 'Chatbox product info' },
     { name: 'disabled-skill', description: 'Disabled' },
   ])
-  loadSkillMock.mockResolvedValue({ metadata: {}, body: '# Skill instructions' })
+  loadSkillMock.mockResolvedValue({
+    metadata: {},
+    body: '# Skill instructions',
+    skillRoot: '/mock/builtin-skills/test-skill',
+    files: ['references/checklist.md', 'scripts/validate.mjs'],
+  })
 })
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -486,6 +491,8 @@ describe('load_skill tool', () => {
     const executeResult = await loadSkillTool.execute({ name: 'test-skill' }, {} as never)
     expect(onAgentModeActivated).toHaveBeenCalledTimes(1)
     expect(executeResult).toHaveProperty('instructions', '# Skill instructions')
+    expect(executeResult).toHaveProperty('skillRoot', '/mock/builtin-skills/test-skill')
+    expect(executeResult).toHaveProperty('files', ['references/checklist.md', 'scripts/validate.mjs'])
   })
 
   test('returns error for non-enabled skill', async () => {
@@ -513,9 +520,19 @@ describe('load_skill tool', () => {
       agentMode: 'on',
     })
 
-    await expect(toModelOutput(result.tools.load_skill, { instructions: '# Skill instructions' })).resolves.toEqual({
+    await expect(
+      toModelOutput(result.tools.load_skill, {
+        instructions: '# Skill instructions',
+        skillRoot: '/mock/builtin-skills/test-skill',
+        files: ['references/checklist.md'],
+      })
+    ).resolves.toEqual({
       type: 'text',
-      value: '# Skill instructions',
+      value:
+        '# Skill instructions\n\n' +
+        'Skill root: /mock/builtin-skills/test-skill\n' +
+        'Replace <SKILL_ROOT> with this absolute path when using referenced files.\n\n' +
+        'Available skill files:\n- references/checklist.md',
     })
   })
 

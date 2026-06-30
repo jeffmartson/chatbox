@@ -40,7 +40,9 @@ export const skillsController = {
     return window.electronAPI.invoke('skills:discover')
   },
 
-  loadSkill(name: string): Promise<{ metadata: SkillMetadata; body: string } | null> {
+  loadSkill(
+    name: string
+  ): Promise<{ metadata: SkillMetadata; body: string; skillRoot?: string; files?: string[] } | null> {
     return window.electronAPI.invoke('skills:load', name)
   },
 

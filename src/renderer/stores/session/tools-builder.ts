@@ -145,7 +145,19 @@ function formatLoadSkillOutput(output: unknown): string {
   const record = asRecord(output)
   const error = stringField(record, 'error')
   if (error) return `Error: ${error}`
-  return stringField(record, 'instructions') ?? JSON.stringify(output) ?? String(output)
+  const instructions = stringField(record, 'instructions') ?? JSON.stringify(output) ?? String(output)
+  const skillRoot = stringField(record, 'skillRoot')
+  const filesValue = record?.files
+  const files = Array.isArray(filesValue) ? filesValue.filter((file): file is string => typeof file === 'string') : []
+
+  const sections = [instructions]
+  if (skillRoot) {
+    sections.push(`Skill root: ${skillRoot}\nReplace <SKILL_ROOT> with this absolute path when using referenced files.`)
+  }
+  if (files.length > 0) {
+    sections.push(`Available skill files:\n${files.map((file) => `- ${file}`).join('\n')}`)
+  }
+  return sections.join('\n\n')
 }
 
 function formatInstallSkillOutput(output: unknown): string {
@@ -387,7 +399,11 @@ function buildLoadSkillTool(options: BuildToolsOptions): ToolSet[string] {
         console.warn('onAgentModeActivated callback failed:', err)
       }
 
-      return { instructions: result.body }
+      return {
+        instructions: result.body,
+        skillRoot: result.skillRoot,
+        files: result.files ?? [],
+      }
     },
     toModelOutput: toTextModelOutput(formatLoadSkillOutput, { emptyFallback: 'Skill instructions are empty.' }),
   }

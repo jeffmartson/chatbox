@@ -1,8 +1,8 @@
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { SkillInfo, SkillMetadata } from '@shared/types/skills'
-import crypto from 'crypto'
 import { app } from 'electron'
-import fs from 'fs'
-import path from 'path'
 import { getLogger } from '../util'
 import { builtinSkills } from './builtin'
 import { parseSkillFile } from './parser'
@@ -37,11 +37,19 @@ interface RemoteSkillDetail {
   name: string
   description: string
   body: string
+  files?: RemoteSkillFile[]
   version: number
   hash: string
   allowed_tools?: string[]
   metadata?: Record<string, string>
   license?: string
+}
+
+interface RemoteSkillFile {
+  path: string
+  content: string
+  hash?: string
+  size?: number
 }
 
 /** 内置 skill 快照目录，与用户自定义 skill 目录（userData/skills）隔离，避免被当作可删除的自定义 skill。 */
@@ -56,6 +64,36 @@ function getManifestPath(): string {
 /** 与后端一致的内容 hash：sha256(trim(body))。 */
 function hashBody(body: string): string {
   return crypto.createHash('sha256').update(body.trim()).digest('hex')
+}
+
+function comparePathBytes(a: string, b: string): number {
+  const left = Buffer.from(a)
+  const right = Buffer.from(b)
+  const length = Math.min(left.length, right.length)
+  for (let i = 0; i < length; i += 1) {
+    const diff = left[i] - right[i]
+    if (diff !== 0) return diff
+  }
+  return left.length - right.length
+}
+
+/** 与后端一致的整体 hash：没有附属文件时沿用旧 body hash；有文件时覆盖 body + files。 */
+function hashSkillContent(body: string, files: RemoteSkillFile[] = []): string {
+  if (files.length === 0) return hashBody(body)
+
+  const normalized = files
+    .map((file) => ({
+      path: file.path,
+      content: file.content.replace(/\n+$/g, ''),
+      hash: file.hash ?? '',
+      size: file.size ?? 0,
+    }))
+    .sort((a, b) => comparePathBytes(a.path, b.path))
+
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify({ body: body.trim(), files: normalized }))
+    .digest('hex')
 }
 
 function getApiOrigin(): string {
@@ -106,9 +144,60 @@ function serializeFrontmatter(fm: Record<string, unknown>): string {
   return lines.join('\n')
 }
 
-/** 将 skill 内容写入快照目录的 SKILL.md（frontmatter + body），与 parser 的解析格式一致。 */
-function writeSnapshotSkill(name: string, metadata: SkillMetadata, body: string): void {
+interface SnapshotFileTarget {
+  file: RemoteSkillFile
+  target: string
+  normalizedPath: string
+}
+
+function resolveSnapshotFilePath(
+  skillDir: string,
+  relativePath: string
+): { target: string; normalizedPath: string } | null {
+  if (!relativePath || path.isAbsolute(relativePath)) return null
+  const normalized = path.normalize(relativePath)
+  if (normalized === '.' || normalized === 'SKILL.md' || normalized === 'source.json') return null
+  if (normalized.startsWith('..') || path.isAbsolute(normalized)) return null
+
+  const target = path.resolve(skillDir, normalized)
+  const root = path.resolve(skillDir)
+  if (target !== root && !target.startsWith(root + path.sep)) return null
+  return { target, normalizedPath: normalized.split(path.sep).join('/') }
+}
+
+function prepareSnapshotFiles(name: string, skillDir: string, files: RemoteSkillFile[]): SnapshotFileTarget[] {
+  const targets: SnapshotFileTarget[] = []
+  const seenPaths = new Set<string>()
+  for (const file of files) {
+    if (!file || typeof file.path !== 'string' || typeof file.content !== 'string') {
+      throw new Error(`invalid file entry for "${name}"`)
+    }
+    const resolved = resolveSnapshotFilePath(skillDir, file.path)
+    if (!resolved) {
+      throw new Error(`invalid file path for "${name}": ${file.path}`)
+    }
+    if (seenPaths.has(resolved.normalizedPath)) {
+      throw new Error(`duplicate file path for "${name}": ${resolved.normalizedPath}`)
+    }
+    seenPaths.add(resolved.normalizedPath)
+    targets.push({ file, target: resolved.target, normalizedPath: resolved.normalizedPath })
+  }
+  return targets
+}
+
+/** 将 skill 内容写入快照目录的 SKILL.md（frontmatter + body）和附属文件，与 parser 的解析格式一致。 */
+function writeSnapshotSkill(
+  name: string,
+  metadata: SkillMetadata,
+  body: string,
+  files: RemoteSkillFile[] = [],
+  options: { replaceDir?: boolean } = {}
+): void {
   const skillDir = path.join(getBuiltinSkillsDir(), name)
+  const fileTargets = prepareSnapshotFiles(name, skillDir, files)
+  if (options.replaceDir) {
+    fs.rmSync(skillDir, { recursive: true, force: true })
+  }
   fs.mkdirSync(skillDir, { recursive: true })
 
   const frontmatter: Record<string, unknown> = {
@@ -122,6 +211,11 @@ function writeSnapshotSkill(name: string, metadata: SkillMetadata, body: string)
 
   const content = `---\n${serializeFrontmatter(frontmatter)}\n---\n\n${body.trim()}\n`
   fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content, 'utf-8')
+
+  for (const { file, target } of fileTargets) {
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, file.content, 'utf-8')
+  }
 }
 
 /**
@@ -137,7 +231,7 @@ export function ensureBuiltinSeeded(): void {
     let changed = false
     for (const seed of builtinSkills) {
       const name = seed.metadata.name
-      const seedHash = hashBody(seed.body)
+      const seedHash = hashSkillContent(seed.body)
       const entry = manifest.skills[name]
       const skillMdPath = path.join(getBuiltinSkillsDir(), name, 'SKILL.md')
       const needsWrite = !entry || !fs.existsSync(skillMdPath) || (entry.origin === 'seed' && entry.hash !== seedHash)
@@ -226,10 +320,15 @@ export async function syncBuiltinSkills(lang?: string): Promise<boolean> {
     }
 
     try {
-      writeSnapshotSkill(item.name, buildMetadataFromDetail(detail), detail.body)
+      const files = Array.isArray(detail.files) ? detail.files : []
+      const localHash = hashSkillContent(detail.body, files)
+      if (detail.hash && detail.hash !== localHash) {
+        log.warn(`syncBuiltinSkills: hash mismatch for "${item.name}", remote=${detail.hash}, local=${localHash}`)
+      }
+      writeSnapshotSkill(item.name, buildMetadataFromDetail(detail), detail.body, files, { replaceDir: true })
       manifest.skills[item.name] = {
         version: detail.version ?? item.version ?? 1,
-        hash: hashBody(detail.body),
+        hash: detail.hash || localHash,
         updatedAt: Date.now(),
         origin: 'remote',
       }
