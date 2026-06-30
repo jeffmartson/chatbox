@@ -81,6 +81,11 @@ async function _listSessionsMetaPage(cursor: number): Promise<SessionMetaPage> {
   }
 }
 
+export async function listSessionsMetaPage(cursor: number, limit?: number): Promise<SessionMetaPage> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getPage(cursor, limit)
+}
+
 const listSessionsMetaQueryOptions = {
   queryKey: QueryKeys.ChatSessionsList,
   queryFn: ({ pageParam }: { pageParam: number }) => _listSessionsMetaPage(pageParam),
@@ -106,18 +111,34 @@ export async function listSessionsMeta(): Promise<SessionMetaRecord[]> {
 
 /** Get all session metas from storage, bypassing the paginated cache. */
 export async function listAllSessionsMeta(): Promise<SessionMetaRecord[]> {
-  const metaStorage = await getMetaStorage()
-  return await metaStorage.getAll()
-}
-
-async function _listArchivedSessionsMeta(): Promise<SessionMetaRecord[]> {
-  const metaStorage = await getMetaStorage()
-  return await metaStorage.getArchived()
+  const items: SessionMetaRecord[] = []
+  let cursor: number | null = 0
+  while (cursor !== null) {
+    const page = await listSessionsMetaPage(cursor)
+    items.push(...page.items)
+    cursor = page.nextCursor
+  }
+  return items
 }
 
 async function _listArchivedSessionsMetaPage(cursor: number): Promise<SessionMetaPage> {
   const metaStorage = await getMetaStorage()
   return await metaStorage.getArchivedPage(cursor)
+}
+
+export async function listArchivedSessionsMetaPage(cursor: number, limit?: number): Promise<SessionMetaPage> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getArchivedPage(cursor, limit)
+}
+
+export async function countSessionsMeta(): Promise<number> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getTotal()
+}
+
+export async function countArchivedSessionsMeta(): Promise<number> {
+  const metaStorage = await getMetaStorage()
+  return await metaStorage.getArchivedTotal()
 }
 
 const listArchivedSessionsMetaQueryOptions = {
@@ -129,7 +150,14 @@ const listArchivedSessionsMetaQueryOptions = {
 }
 
 export async function listArchivedSessionsMeta(): Promise<SessionMetaRecord[]> {
-  return await _listArchivedSessionsMeta()
+  const items: SessionMetaRecord[] = []
+  let cursor: number | null = 0
+  while (cursor !== null) {
+    const page = await listArchivedSessionsMetaPage(cursor)
+    items.push(...page.items)
+    cursor = page.nextCursor
+  }
+  return items
 }
 
 export function useSessionList() {

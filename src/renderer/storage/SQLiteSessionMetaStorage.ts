@@ -282,6 +282,18 @@ export class SQLiteSessionMetaStorage implements SessionMetaStorage {
     return (result.values?.[0]?.total as number) || 0
   }
 
+  async getAllTotal(): Promise<number> {
+    await this.initialize()
+    const result = await this.database.query('SELECT COUNT(*) as total FROM session_meta')
+    return (result.values?.[0]?.total as number) || 0
+  }
+
+  async getArchivedTotal(): Promise<number> {
+    await this.initialize()
+    const result = await this.database.query('SELECT COUNT(*) as total FROM session_meta WHERE archived_at IS NOT NULL')
+    return (result.values?.[0]?.total as number) || 0
+  }
+
   async clear(): Promise<void> {
     await this.initialize()
     await this.database.run('DELETE FROM session_meta')

@@ -22,7 +22,7 @@ class TestSessionMetaStorage extends IndexedDBSessionMetaStorage {
     // Override the private DB_NAME by re-implementing openDatabase
     ;(this as unknown as { openDatabase: () => Promise<void> }).openDatabase = () => {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1)
+        const request = indexedDB.open(dbName, 2)
         request.onerror = () => reject(request.error)
         request.onsuccess = () => {
           ;(this as unknown as { db: IDBDatabase }).db = request.result
@@ -34,6 +34,8 @@ class TestSessionMetaStorage extends IndexedDBSessionMetaStorage {
             const store = db.createObjectStore('records', { keyPath: 'id' })
             store.createIndex('sortOrder', 'sortOrder', { unique: false })
             store.createIndex('createdAt', 'createdAt', { unique: false })
+            store.createIndex('starredSortOrder', ['starred', 'sortOrder'], { unique: false })
+            store.createIndex('archivedAt', 'archivedAt', { unique: false })
           }
         }
       })
@@ -179,10 +181,23 @@ describe('IndexedDBSessionMetaStorage', () => {
     expect(await storage.getTotal()).toBe(0)
   })
 
-  it('getTotal counts all records including hidden', async () => {
+  it('getTotal counts visible records only', async () => {
     await storage.create(makeRecord({ id: 'a', sortOrder: 100 }))
     await storage.create(makeRecord({ id: 'b', sortOrder: 200, hidden: true }))
-    expect(await storage.getTotal()).toBe(2)
+    expect(await storage.getTotal()).toBe(1)
+  })
+
+  it('getAllTotal counts visible and hidden records', async () => {
+    await storage.create(makeRecord({ id: 'a', sortOrder: 100 }))
+    await storage.create(makeRecord({ id: 'b', sortOrder: 200, hidden: true }))
+    expect(await storage.getAllTotal()).toBe(2)
+  })
+
+  it('getArchivedTotal counts archived records only', async () => {
+    await storage.create(makeRecord({ id: 'a', sortOrder: 100 }))
+    await storage.create(makeRecord({ id: 'b', sortOrder: 200, hidden: true }))
+    await storage.create(makeRecord({ id: 'c', sortOrder: 300, hidden: true, archivedAt: 1000 }))
+    expect(await storage.getArchivedTotal()).toBe(1)
   })
 
   describe('getPage', () => {
@@ -243,6 +258,8 @@ describe('IndexedDBSessionMetaStorage', () => {
     expect(await storage.getTotal()).toBe(2)
     await storage.clear()
     expect(await storage.getTotal()).toBe(0)
+    expect(await storage.getAllTotal()).toBe(0)
+    expect(await storage.getArchivedTotal()).toBe(0)
     expect(await storage.getAll()).toEqual([])
   })
 })

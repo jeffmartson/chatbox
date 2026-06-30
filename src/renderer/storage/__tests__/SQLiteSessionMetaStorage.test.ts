@@ -18,6 +18,7 @@ const mockConnection = vi.hoisted(() => ({
 
 vi.mock('@capacitor-community/sqlite', () => ({
   CapacitorSQLite: {},
+  // biome-ignore lint/complexity/useArrowFunction: SQLiteConnection is constructed with new.
   SQLiteConnection: vi.fn(function () {
     return mockConnection
   }),
@@ -140,5 +141,29 @@ describe('SQLiteSessionMetaStorage', () => {
     expect(page.items.map((record) => record.id)).toEqual(['archived'])
     expect(page.nextCursor).toBeNull()
     expect(page.total).toBe(3)
+  })
+
+  it('getArchivedTotal counts archived rows directly', async () => {
+    const storage = new SQLiteSessionMetaStorage()
+    mockDatabase.query
+      .mockResolvedValueOnce({ values: [{ name: 'archived_at' }] })
+      .mockResolvedValueOnce({ values: [{ total: 7 }] })
+
+    await expect(storage.getArchivedTotal()).resolves.toBe(7)
+
+    expect(mockDatabase.query).toHaveBeenLastCalledWith(
+      'SELECT COUNT(*) as total FROM session_meta WHERE archived_at IS NOT NULL'
+    )
+  })
+
+  it('getAllTotal counts all rows directly', async () => {
+    const storage = new SQLiteSessionMetaStorage()
+    mockDatabase.query
+      .mockResolvedValueOnce({ values: [{ name: 'archived_at' }] })
+      .mockResolvedValueOnce({ values: [{ total: 9 }] })
+
+    await expect(storage.getAllTotal()).resolves.toBe(9)
+
+    expect(mockDatabase.query).toHaveBeenLastCalledWith('SELECT COUNT(*) as total FROM session_meta')
   })
 })

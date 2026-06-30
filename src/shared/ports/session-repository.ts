@@ -21,6 +21,8 @@ export interface SessionMetaRepositoryPort {
   getArchivedPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getTotal(): Promise<number>
+  getAllTotal(): Promise<number>
+  getArchivedTotal(): Promise<number>
   clear(): Promise<void>
 }
 

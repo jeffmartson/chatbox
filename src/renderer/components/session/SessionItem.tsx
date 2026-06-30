@@ -11,7 +11,7 @@ import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { navigateToSettings } from '@/modals/Settings'
 import platform from '@/platform'
 import { router } from '@/router'
-import { archiveSession, listArchivedSessionsMeta, updateSession as updateSessionStore } from '@/stores/chatStore'
+import { archiveSession, countArchivedSessionsMeta, updateSession as updateSessionStore } from '@/stores/chatStore'
 import { switchCurrentSession } from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
@@ -104,8 +104,8 @@ function SessionItem(props: Props) {
       if (selected) {
         await router.navigate({ to: '/', replace: true })
       }
-      const archivedSessions = await listArchivedSessionsMeta()
-      if (archivedSessions.length > ARCHIVED_SESSION_CLEANUP_THRESHOLD) {
+      const archivedSessionCount = await countArchivedSessionsMeta()
+      if (archivedSessionCount > ARCHIVED_SESSION_CLEANUP_THRESHOLD) {
         const confirmed = await NiceModal.show('confirm', {
           title: t('Too many archived chats'),
           message: t('You have archived more than {{count}} chats. Do you want to clean them up now?', {

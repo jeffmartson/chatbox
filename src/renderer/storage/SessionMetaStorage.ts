@@ -5,6 +5,7 @@ import { sortSessionRecords } from '@shared/utils/session-sort'
 const DB_NAME = 'chatbox-session-meta'
 const STORE_NAME = 'records'
 const DEFAULT_PAGE_SIZE = 50
+const DB_VERSION = 2
 
 export interface SessionMetaStorage extends SessionMetaRepositoryPort {
   initialize(): Promise<void>
@@ -20,6 +21,8 @@ export interface SessionMetaStorage extends SessionMetaRepositoryPort {
   getArchivedPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getPage(cursor: number, limit?: number): Promise<SessionMetaPage>
   getTotal(): Promise<number>
+  getAllTotal(): Promise<number>
+  getArchivedTotal(): Promise<number>
   clear(): Promise<void>
 }
 
@@ -46,7 +49,7 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   private openDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1)
+      const request = indexedDB.open(DB_NAME, DB_VERSION)
 
       request.onerror = () => reject(request.error)
 
@@ -57,10 +60,23 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+        const store = db.objectStoreNames.contains(STORE_NAME)
+          ? request.transaction?.objectStore(STORE_NAME)
+          : db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+        if (!store) {
+          return
+        }
+        if (!store.indexNames.contains('sortOrder')) {
           store.createIndex('sortOrder', 'sortOrder', { unique: false })
+        }
+        if (!store.indexNames.contains('createdAt')) {
           store.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+        if (!store.indexNames.contains('starredSortOrder')) {
+          store.createIndex('starredSortOrder', ['starred', 'sortOrder'], { unique: false })
+        }
+        if (!store.indexNames.contains('archivedAt')) {
+          store.createIndex('archivedAt', 'archivedAt', { unique: false })
         }
       }
     })
@@ -166,10 +182,18 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   async getArchivedPage(cursor: number = 0, limit: number = DEFAULT_PAGE_SIZE): Promise<SessionMetaPage> {
     await this.initialize()
-    const all = await this.getArchived()
-    const items = all.slice(cursor, cursor + limit)
-    const nextCursor = cursor + items.length < all.length ? cursor + items.length : null
-    return { items, nextCursor, total: all.length }
+    const [items, total] = await Promise.all([
+      this.getRecordsPage({
+        cursor,
+        limit,
+        indexName: 'archivedAt',
+        direction: 'prev',
+        filter: (record) => record.archivedAt !== undefined,
+      }),
+      this.getArchivedTotal(),
+    ])
+    const nextCursor = cursor + items.length < total ? cursor + items.length : null
+    return { items, nextCursor, total }
   }
 
   private getAllRecords(): Promise<SessionMetaRecord[]> {
@@ -186,18 +210,170 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   async getPage(cursor: number = 0, limit: number = DEFAULT_PAGE_SIZE): Promise<SessionMetaPage> {
     await this.initialize()
-    const all = await this.getAll()
-    const items = all.slice(cursor, cursor + limit)
-    const nextCursor = cursor + items.length < all.length ? cursor + items.length : null
-    return { items, nextCursor, total: all.length }
+    const [items, total] = await Promise.all([this.getVisibleRecordsPage(cursor, limit), this.getTotal()])
+    const nextCursor = cursor + items.length < total ? cursor + items.length : null
+    return { items, nextCursor, total }
   }
 
   async getTotal(): Promise<number> {
+    await this.initialize()
+    return await this.countRecords((record) => !record.hidden)
+  }
+
+  async getAllTotal(): Promise<number> {
     await this.initialize()
     return new Promise((resolve, reject) => {
       const store = this.getStore('readonly')
       const request = store.count()
       request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getArchivedTotal(): Promise<number> {
+    await this.initialize()
+    return await this.countRecords((record) => record.archivedAt !== undefined)
+  }
+
+  private async getVisibleRecordsPage(cursor: number, limit: number): Promise<SessionMetaRecord[]> {
+    const items: SessionMetaRecord[] = []
+    let skipped = 0
+
+    skipped = await this.collectRecordsPage({
+      items,
+      skipped,
+      cursor,
+      limit,
+      indexName: 'sortOrder',
+      direction: 'prev',
+      filter: (record) => !record.hidden && record.starred === true,
+    })
+
+    if (items.length < limit) {
+      await this.collectRecordsPage({
+        items,
+        skipped,
+        cursor,
+        limit,
+        indexName: 'sortOrder',
+        direction: 'prev',
+        filter: (record) => !record.hidden && record.starred !== true,
+      })
+    }
+
+    return items
+  }
+
+  private collectRecordsPage({
+    items,
+    skipped,
+    cursor,
+    limit,
+    indexName,
+    direction,
+    filter,
+  }: {
+    items: SessionMetaRecord[]
+    skipped: number
+    cursor: number
+    limit: number
+    indexName: string
+    direction: IDBCursorDirection
+    filter: (record: SessionMetaRecord) => boolean
+  }): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const store = this.getStore('readonly')
+      const source = store.indexNames.contains(indexName) ? store.index(indexName) : store
+      const request = source.openCursor(null, direction)
+      let skippedCount = skipped
+
+      request.onsuccess = () => {
+        const cursorResult = request.result
+        if (!cursorResult || items.length >= limit) {
+          resolve(skippedCount)
+          return
+        }
+
+        const record = cursorResult.value as SessionMetaRecord
+        if (!filter(record)) {
+          cursorResult.continue()
+          return
+        }
+        if (skippedCount < cursor) {
+          skippedCount += 1
+          cursorResult.continue()
+          return
+        }
+
+        items.push(record)
+        cursorResult.continue()
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  private getRecordsPage({
+    cursor,
+    limit,
+    indexName,
+    direction,
+    filter,
+  }: {
+    cursor: number
+    limit: number
+    indexName: string
+    direction: IDBCursorDirection
+    filter: (record: SessionMetaRecord) => boolean
+  }): Promise<SessionMetaRecord[]> {
+    return new Promise((resolve, reject) => {
+      const store = this.getStore('readonly')
+      const source = store.indexNames.contains(indexName) ? store.index(indexName) : store
+      const request = source.openCursor(null, direction)
+      const items: SessionMetaRecord[] = []
+      let skipped = 0
+
+      request.onsuccess = () => {
+        const cursorResult = request.result
+        if (!cursorResult || items.length >= limit) {
+          resolve(items)
+          return
+        }
+
+        const record = cursorResult.value as SessionMetaRecord
+        if (!filter(record)) {
+          cursorResult.continue()
+          return
+        }
+        if (skipped < cursor) {
+          skipped += 1
+          cursorResult.continue()
+          return
+        }
+
+        items.push(record)
+        cursorResult.continue()
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  private countRecords(filter: (record: SessionMetaRecord) => boolean): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const store = this.getStore('readonly')
+      const request = store.openCursor()
+      let total = 0
+
+      request.onsuccess = () => {
+        const cursorResult = request.result
+        if (!cursorResult) {
+          resolve(total)
+          return
+        }
+        if (filter(cursorResult.value as SessionMetaRecord)) {
+          total += 1
+        }
+        cursorResult.continue()
+      }
       request.onerror = () => reject(request.error)
     })
   }
