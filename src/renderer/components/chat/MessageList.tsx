@@ -2,6 +2,7 @@ import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Button, Flex, Stack, Text, Transition } from '@mantine/core'
 import { useThrottledCallback } from '@mantine/hooks'
 import type { Session, Message as SessionMessage, SessionThreadBrief } from '@shared/types'
+import { getMessageText } from '@shared/utils/message'
 import {
   IconAlignRight,
   IconArrowBarToUp,
@@ -52,6 +53,7 @@ import { ScalableIcon } from '../common/ScalableIcon'
 import { BlockCodeCollapsedStateProvider } from '../Markdown'
 import ForkMarkerMessage from './ForkMarkerMessage'
 import Message from './Message'
+import MessageMinimapRail, { type MessageMinimapAnchor } from './MessageMinimapRail'
 import MessageNavigation, { ScrollToBottomButton } from './MessageNavigation'
 import SummaryMessage from './SummaryMessage'
 
@@ -171,6 +173,20 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     return items
   }, [currentMessageList])
 
+  const userMessageAnchors = useMemo<MessageMinimapAnchor[]>(
+    () =>
+      renderItems.flatMap((item, itemIndex) =>
+        item.messages
+          .filter((message) => message.role === 'user' && !message.isSummary)
+          .map((message) => ({
+            messageId: message.id,
+            itemIndex,
+            text: getMessageText(message, true, false).trim(),
+          }))
+      ),
+    [renderItems]
+  )
+
   const virtuoso = useRef<VirtuosoHandle>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
   const [messageViewportHeight, setMessageViewportHeight] = useState(0)
@@ -189,6 +205,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
 
   const handleScrollToBottom = useCallback(() => {
     virtuoso.current?.scrollTo({ top: Infinity, behavior: 'smooth' })
+  }, [])
+
+  const handleMinimapJump = useCallback((anchor: MessageMinimapAnchor) => {
+    virtuoso.current?.scrollToIndex({ index: anchor.itemIndex, align: 'start', behavior: 'smooth' })
   }, [])
 
   const handleScrollToPrev = useCallback(() => {
@@ -469,6 +489,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
             atBottomStateChange={setAtBottom}
             onScroll={handleScroll}
           />
+
+          {!isSmallScreen && userMessageAnchors.length > 1 && (
+            <MessageMinimapRail anchors={userMessageAnchors} onJump={handleMinimapJump} />
+          )}
 
           {!isSmallScreen ? (
             <MessageNavigation
