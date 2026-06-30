@@ -3,6 +3,7 @@ import { ActionIcon, Button, Flex } from '@mantine/core'
 import {
   IconClearAll,
   IconCode,
+  IconCopy,
   IconDeviceFloppy,
   IconDots,
   IconHistory,
@@ -16,13 +17,13 @@ import { useIsLargeScreen, useIsSmallScreen } from '@/hooks/useScreenChange'
 import { router } from '@/router'
 import * as atoms from '@/stores/atoms'
 import { confirmSessionDeletion, deleteSession, getSession } from '@/stores/chatStore'
-import { clear as clearSession } from '@/stores/sessionActions'
+import { clear as clearSession, copyAndSwitchSession } from '@/stores/sessionActions'
 import { useUIStore } from '@/stores/uiStore'
 import ActionMenu from '../ActionMenu'
+import { ScalableIcon } from '../common/ScalableIcon'
 import Broom from '../icons/Broom'
 import LayoutExpand from '../icons/LayoutExpand'
 import LayoutShrink from '../icons/LayoutShrink'
-import { ScalableIcon } from '../common/ScalableIcon'
 
 /**
  * 顶部标题工具栏（右侧）
@@ -62,6 +63,13 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
       await NiceModal.show('json-viewer', { title: t('Session Raw JSON'), data: session })
     }
   }, [sessionId, t])
+
+  const handleCopySession = useCallback(async () => {
+    const session = await getSession(sessionId)
+    if (session) {
+      await copyAndSwitchSession(session)
+    }
+  }, [sessionId])
 
   return !isSmallScreen ? (
     <Flex align="center" gap="md" className="controls">
@@ -115,6 +123,11 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
       <ActionMenu
         position="bottom-end"
         items={[
+          {
+            text: t('Duplicate Conversation'),
+            icon: IconCopy,
+            onClick: handleCopySession,
+          },
           {
             text: t('Export Chat'),
             icon: IconDeviceFloppy,
@@ -170,7 +183,11 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
             icon: IconHistory,
             onClick: () => setThreadHistoryDrawerOpen(true),
           },
-
+          {
+            text: t('Duplicate Conversation'),
+            icon: IconCopy,
+            onClick: handleCopySession,
+          },
           {
             text: t('Export Chat'),
             icon: IconDeviceFloppy,

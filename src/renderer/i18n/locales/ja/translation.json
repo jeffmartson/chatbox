@@ -1108,5 +1108,7 @@
   "Your license has expired.": "ライセンスの有効期限が切れています。",
   "Your license has expired. Please check your subscription or purchase a new one.": "ライセンスが期限切れです。サブスクリプションを確認するか、新しいライセンスを購入してください。",
   "Your license has expired. You can continue using your expansion pack.": "ライセンスの有効期限が切れています。拡張パックは引き続きご利用いただけます。",
-  "Your rating on the App Store would help make Chatbox even better!": "App Storeでの評価は、Chatboxをさらに改善する助けになります！"
+  "Your rating on the App Store would help make Chatbox even better!": "App Storeでの評価は、Chatboxをさらに改善する助けになります！",
+  "Duplicate Conversation": "会話を複製",
+  "Forked from conversation": "会話からフォーク"
 }

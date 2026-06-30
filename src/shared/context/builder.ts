@@ -24,7 +24,7 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     return []
   }
 
-  const completedMessages = messages.filter((m) => !m.generating)
+  const completedMessages = messages.filter((m) => !m.generating && !m.isForkMarker)
 
   if (completedMessages.length === 0) {
     return []

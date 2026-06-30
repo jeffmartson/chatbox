@@ -1,9 +1,10 @@
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
-import type { SessionMeta } from '@shared/types'
+import type { SessionMetaRecord } from '@shared/types'
 import { IconArchive, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
+import dayjs from 'dayjs'
 import { type MouseEvent, memo, type PointerEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
@@ -24,6 +25,18 @@ const ARCHIVED_SESSION_CLEANUP_THRESHOLD = 600
 const MOBILE_LONG_PRESS_DELAY = 550
 const MOBILE_LONG_PRESS_MOVE_TOLERANCE = 10
 
+function formatSessionTime(createdAt: number) {
+  const created = dayjs(createdAt)
+  const now = dayjs()
+  if (created.isSame(now, 'day')) {
+    return created.format('HH:mm')
+  }
+  if (created.isSame(now, 'year')) {
+    return created.format('MM/DD')
+  }
+  return created.format('YY/MM/DD')
+}
+
 function triggerLongPressHaptic() {
   if (platform.type === 'mobile') {
     void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {
@@ -35,7 +48,7 @@ function triggerLongPressHaptic() {
 }
 
 export interface Props {
-  session: SessionMeta
+  session: SessionMetaRecord
   selected: boolean
 }
 
@@ -220,13 +233,22 @@ function SessionItem(props: Props) {
         {session.name}
       </Text>
 
-      <Flex gap={2} className={clsx(isSmallScreen ? 'hidden' : '')}>
+      {!isSmallScreen && (
+        <Text
+          span
+          c="chatbox-disabled"
+          className="shrink-0 text-[10px] tabular-nums opacity-50 group-hover/session-item:hidden"
+        >
+          {formatSessionTime(session.createdAt)}
+        </Text>
+      )}
+
+      <Flex gap={2} className={clsx(isSmallScreen ? 'hidden' : 'group-hover/session-item:flex hidden')}>
         <Tooltip label={session.starred ? t('Unpin') : t('Pin')} openDelay={1000} withArrow>
           <ActionIcon
             variant="transparent"
             size={20}
             color={session.starred ? 'chatbox-brand' : 'chatbox-tertiary'}
-            className={clsx(isSmallScreen ? '' : 'group-hover/session-item:visible invisible')}
             onPointerDown={stopItemClick}
             onClick={(event) => {
               stopItemClick(event)
@@ -247,7 +269,6 @@ function SessionItem(props: Props) {
             size={20}
             color="chatbox-tertiary"
             loading={archiving}
-            className={clsx(isSmallScreen ? '' : 'group-hover/session-item:visible invisible')}
             onPointerDown={stopItemClick}
             onClick={async (event) => {
               stopItemClick(event)

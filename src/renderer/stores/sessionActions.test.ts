@@ -21,6 +21,9 @@ const {
   useSessionMock,
   getSessionMock,
   routerNavigateMock,
+  sessionAgentModeMapMock,
+  setSessionAgentModeMock,
+  lockSessionAgentModeMock,
 } = vi.hoisted(() => ({
   updateSessionWithMessages: vi.fn(),
   updateSessionMock: vi.fn(),
@@ -28,6 +31,12 @@ const {
   useSessionMock: vi.fn(),
   getSessionMock: vi.fn(),
   routerNavigateMock: vi.fn(),
+  sessionAgentModeMapMock: {} as Record<
+    string,
+    { value: 'auto' | 'on' | 'off'; locked: boolean; lockReason: string | null }
+  >,
+  setSessionAgentModeMock: vi.fn(),
+  lockSessionAgentModeMock: vi.fn(),
 }))
 
 vi.hoisted(() => {
@@ -133,6 +142,9 @@ vi.mock('@/stores/uiStore', () => ({
     getState: () => ({
       widthFull: false,
       messageScrolling: null,
+      sessionAgentModeMap: sessionAgentModeMapMock,
+      setSessionAgentMode: setSessionAgentModeMock,
+      lockSessionAgentMode: lockSessionAgentModeMock,
       setMessageListElement: vi.fn(),
     }),
   },
@@ -168,6 +180,11 @@ beforeEach(() => {
   useSessionMock.mockReset()
   getSessionMock.mockReset()
   routerNavigateMock.mockReset()
+  for (const key of Object.keys(sessionAgentModeMapMock)) {
+    delete sessionAgentModeMapMock[key]
+  }
+  setSessionAgentModeMock.mockReset()
+  lockSessionAgentModeMock.mockReset()
 })
 
 describe('fork actions', () => {
@@ -602,10 +619,16 @@ describe('fork actions', () => {
       'copied-thread-list-0',
       'copied-thread-alt',
       'copied-thread-list-1',
-      'copied-thread-id'
+      'copied-thread-id',
+      'copied-fork-marker'
     )
     const rootPivot = makeMessage('root-pivot', 'user')
     const rootReply = makeMessage('root-reply', 'assistant')
+    const existingForkMarker = {
+      ...makeMessage('existing-fork-marker', 'assistant'),
+      isForkMarker: true,
+      forkedFromSessionId: 'original-session',
+    }
     const rootAlternative = makeMessage('root-alt', 'assistant')
     const threadPivot = makeMessage('thread-pivot', 'user')
     const threadReply = makeMessage('thread-reply', 'assistant')
@@ -613,7 +636,7 @@ describe('fork actions', () => {
     const session: Session = {
       id: 'session-copy',
       name: 'Source Session',
-      messages: [rootPivot, rootReply],
+      messages: [rootPivot, rootReply, existingForkMarker],
       threads: [
         {
           id: 'thread-1',
@@ -647,6 +670,7 @@ describe('fork actions', () => {
       ...newSession,
       id: 'new-session-copy',
     }))
+    sessionAgentModeMapMock[session.id] = { value: 'on', locked: true, lockReason: 'message_sent' }
 
     await sessionActions.copyAndSwitchSession({
       id: session.id,
@@ -664,6 +688,12 @@ describe('fork actions', () => {
     const copiedThreadPivotId = newSession.threads?.[0].messages[0].id
     expect(copiedThreadPivotId).toBeDefined()
     expect(newSession.messageForksHash?.[copiedThreadPivotId!]).toBeDefined()
+    expect(newSession.messages.filter((message) => message.isForkMarker)).toHaveLength(1)
+    expect(newSession.messages.at(-1)?.id).toBe('copied-fork-marker')
+    expect(newSession.messages.at(-1)?.isForkMarker).toBe(true)
+    expect(newSession.messages.at(-1)?.forkedFromSessionId).toBe(session.id)
+    expect(setSessionAgentModeMock).toHaveBeenCalledWith('new-session-copy', 'on')
+    expect(lockSessionAgentModeMock).toHaveBeenCalledWith('new-session-copy', 'message_sent')
     expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-copy' })
   })
 })

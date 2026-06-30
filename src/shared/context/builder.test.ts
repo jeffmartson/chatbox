@@ -31,6 +31,18 @@ describe('buildContext', () => {
       expect(result[0].id).toBe('1')
     })
 
+    it('should filter out fork marker messages', async () => {
+      const messages: Message[] = [
+        createMessage({ id: '1', role: 'user', contentParts: [{ type: 'text', text: 'Hi' }] }),
+        createMessage({ id: 'fork-marker', role: 'assistant', isForkMarker: true }),
+        createMessage({ id: '2', role: 'assistant', contentParts: [{ type: 'text', text: 'Hello' }] }),
+      ]
+
+      const result = await buildContext(messages, { attachmentResolver: createMockResolver() })
+
+      expect(result.map((m) => m.id)).toEqual(['1', '2'])
+    })
+
     it('should return empty array for empty messages', async () => {
       const result = await buildContext([], { attachmentResolver: createMockResolver() })
 

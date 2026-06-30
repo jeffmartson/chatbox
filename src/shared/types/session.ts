@@ -279,6 +279,8 @@ export const MessageSchema = z.object({
   tokenCalculatedAt: TokenCalculatedAtSchema,
   updatedAt: z.number().optional(),
   isSummary: z.boolean().optional(), // Marks message as a compaction summary
+  isForkMarker: z.boolean().optional(), // Marks a UI-only fork boundary message
+  forkedFromSessionId: z.string().optional(),
 })
 
 // Compaction point schema (for context management)

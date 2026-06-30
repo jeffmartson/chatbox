@@ -50,6 +50,7 @@ import ActionMenu from '../ActionMenu'
 import { ErrorBoundary } from '../common/ErrorBoundary'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { BlockCodeCollapsedStateProvider } from '../Markdown'
+import ForkMarkerMessage from './ForkMarkerMessage'
 import Message from './Message'
 import MessageNavigation, { ScrollToBottomButton } from './MessageNavigation'
 import SummaryMessage from './SummaryMessage'
@@ -136,7 +137,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
       latestUserIndex >= 0 &&
       (latestUserIndex === currentMessageList.length - 1 ||
         (latestUserIndex + 1 < currentMessageList.length &&
-          currentMessageList[latestUserIndex + 1].role === 'assistant'))
+          currentMessageList[latestUserIndex + 1].role === 'assistant' &&
+          !currentMessageList[latestUserIndex + 1].isForkMarker))
 
     const items: MessageRenderItem[] = []
 
@@ -367,7 +369,12 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
             <ThreadLabel thread={currentThreadHash[msg.id]} sessionId={currentSession.id} />
           )}
           <ErrorBoundary name={`message-item`}>
-            {msg.isSummary ? (
+            {msg.isForkMarker ? (
+              <ForkMarkerMessage
+                sourceSessionId={msg.forkedFromSessionId}
+                className={options.isFirstItem ? 'pt-4' : options.isLastItem ? '!pb-4' : ''}
+              />
+            ) : msg.isSummary ? (
               <SummaryMessage
                 msg={msg}
                 className={options.isFirstItem ? 'pt-4' : options.isLastItem ? '!pb-4' : ''}

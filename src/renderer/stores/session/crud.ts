@@ -2,18 +2,20 @@ import {
   copyMessageForksWithMapping,
   copyMessagesWithMapping,
   copyThreadsWithMapping,
+  createMessage,
   type Session,
   type SessionMeta,
 } from '@shared/types'
 import { getDefaultStore } from 'jotai'
 import { omit } from 'lodash'
-import { router } from '@/router'
 import platform from '@/platform'
+import { router } from '@/router'
 import { sortSessionRecords } from '@/storage/SessionMetaStorage'
 import * as atoms from '../atoms'
 import * as chatStore from '../chatStore'
 import * as scrollActions from '../scrollActions'
 import { initEmptyChatSession, initEmptyPictureSession } from '../sessionHelpers'
+import { uiStore } from '../uiStore'
 
 /**
  * Create a new session and switch to it
@@ -53,6 +55,9 @@ async function copySession(
     threadName?: Session['threadName']
     messageForksHash?: Session['messageForksHash']
     compactionPoints?: Session['compactionPoints']
+  },
+  options?: {
+    appendForkMarker?: boolean
   }
 ) {
   const source = await chatStore.getSession(sourceMeta.id)
@@ -60,10 +65,13 @@ async function copySession(
     throw new Error(`Session ${sourceMeta.id} not found`)
   }
 
+  const sourceMessages = sourceMeta.messages ?? source.messages
+  const messagesToCopy = options?.appendForkMarker
+    ? sourceMessages.filter((message) => !message.isForkMarker)
+    : sourceMessages
+
   // Copy messages and get ID mapping
-  const { messages: newMessages, idMapping } = sourceMeta.messages
-    ? copyMessagesWithMapping(sourceMeta.messages)
-    : copyMessagesWithMapping(source.messages)
+  const { messages: newMessages, idMapping } = copyMessagesWithMapping(messagesToCopy)
 
   // Use sourceMeta.compactionPoints if explicitly provided (e.g., from thread),
   // otherwise fall back to source session's compactionPoints
@@ -93,10 +101,19 @@ async function copySession(
     'messageForksHash' in sourceMeta ? sourceMeta.messageForksHash : source.messageForksHash
   const newMessageForksHash = copyMessageForksWithMapping(sourceMessageForksHash, combinedIdMapping)
 
+  const copiedMessages = [...newMessages]
+  if (options?.appendForkMarker) {
+    copiedMessages.push({
+      ...createMessage('assistant'),
+      isForkMarker: true,
+      forkedFromSessionId: source.id,
+    })
+  }
+
   const newSession = {
     ...omit(source, 'id', 'messages', 'threads', 'messageForksHash', 'compactionPoints'),
     ...(sourceMeta.name ? { name: sourceMeta.name } : {}),
-    messages: newMessages,
+    messages: copiedMessages,
     threads: newThreads,
     messageForksHash: newMessageForksHash,
     compactionPoints: newCompactionPoints?.length ? newCompactionPoints : undefined,
@@ -109,8 +126,22 @@ async function copySession(
  * Copy session and switch to it
  */
 export async function copyAndSwitchSession(source: SessionMeta) {
-  const newSession = await copySession(source)
+  const newSession = await copySession(source, { appendForkMarker: true })
+  copySessionAgentMode(source.id, newSession.id)
   switchCurrentSession(newSession.id)
+}
+
+function copySessionAgentMode(sourceSessionId: string, targetSessionId: string) {
+  const store = uiStore.getState()
+  const sourceAgentMode = store.sessionAgentModeMap[sourceSessionId]
+  if (!sourceAgentMode) {
+    return
+  }
+
+  store.setSessionAgentMode(targetSessionId, sourceAgentMode.value)
+  if (sourceAgentMode.locked) {
+    store.lockSessionAgentMode(targetSessionId, sourceAgentMode.lockReason)
+  }
 }
 
 /**
