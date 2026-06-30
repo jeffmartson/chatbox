@@ -1,14 +1,16 @@
-import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
+import NiceModal from '@ebay/nice-modal-react'
+import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
 import type { SessionMeta } from '@shared/types'
 import { IconArchive, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
-import { memo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { type MouseEvent, memo, type PointerEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import { navigateToSettings } from '@/modals/Settings'
 import platform from '@/platform'
 import { router } from '@/router'
-import { archiveSession, updateSession as updateSessionStore } from '@/stores/chatStore'
+import { archiveSession, listArchivedSessionsMeta, updateSession as updateSessionStore } from '@/stores/chatStore'
 import { switchCurrentSession } from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
@@ -18,6 +20,7 @@ import { ScalableIcon } from '../common/ScalableIcon'
 
 const ARCHIVE_TIP_STORAGE_KEY = 'chatbox:lastArchiveSessionTipAt'
 const ARCHIVE_TIP_INTERVAL = 24 * 60 * 60 * 1000
+const ARCHIVED_SESSION_CLEANUP_THRESHOLD = 600
 const MOBILE_LONG_PRESS_DELAY = 550
 const MOBILE_LONG_PRESS_MOVE_TOLERANCE = 10
 
@@ -85,9 +88,23 @@ function SessionItem(props: Props) {
     setArchiving(true)
     try {
       await archiveSession(session.id)
-      showArchiveTipOncePerDay()
       if (selected) {
-        router.navigate({ to: '/', replace: true })
+        await router.navigate({ to: '/', replace: true })
+      }
+      const archivedSessions = await listArchivedSessionsMeta()
+      if (archivedSessions.length > ARCHIVED_SESSION_CLEANUP_THRESHOLD) {
+        const confirmed = await NiceModal.show('confirm', {
+          title: t('Too many archived chats'),
+          message: t('You have archived more than {{count}} chats. Do you want to clean them up now?', {
+            count: ARCHIVED_SESSION_CLEANUP_THRESHOLD,
+          }),
+          confirmText: t('Clean up'),
+        })
+        if (confirmed === true) {
+          navigateToSettings('/archive')
+        }
+      } else {
+        showArchiveTipOncePerDay()
       }
     } catch (error) {
       console.error('Failed to archive session:', error)
