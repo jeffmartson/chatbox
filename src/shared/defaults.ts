@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import { type Config, ModelProviderEnum, type SessionSettings, type Settings, Theme } from './types'
+import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES } from './types/skills'
 
 export function settings(): Settings {
   return {
@@ -153,9 +154,10 @@ export function settings(): Settings {
       enabledBuiltinServers: [],
     },
     skills: {
-      enabledSkillNames: ['chatbox-product-info'],
+      enabledSkillNames: [...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES],
       translationEnabled: true,
       builtinDefaultsInitialized: true,
+      appliedDefaultBuiltinSkillNames: [...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES],
     },
   }
 }

@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/suspicious/noFallthroughSwitchClause: migrate */
 
 import * as defaults from '@shared/defaults'
-import { type ProviderSettings, type Settings, SettingsSchema } from '@shared/types'
+import { type Settings, SettingsSchema } from '@shared/types'
 import type { DocumentParserConfig } from '@shared/types/settings'
 import deepmerge from 'deepmerge'
 import type { WritableDraft } from 'immer'

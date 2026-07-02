@@ -57,7 +57,7 @@ export const ModalRegistryStates: StoryObj = {
         <Text size="sm" c="dimmed">
           Registered modal ids include welcome, file-parse-error, content-viewer, session-settings, app-store-rating,
           artifact-preview, clear-session-list, export-chat, message-edit, json-viewer, report-content, model-edit,
-          thread-name-edit, edgeone-deploy-success, and copilot-settings.
+          thread-name-edit, vibedrop-publish, and copilot-settings.
         </Text>
       </Paper>
     </Stack>
@@ -168,19 +168,19 @@ export const JsonViewerStates: StoryObj = {
   ),
 }
 
-export const EdgeOneDeploySuccessStates: StoryObj = {
-  name: 'EdgeOne deploy success modal link copy and open states',
+export const VibedropPublishStates: StoryObj = {
+  name: 'VibeDrop publish modal visibility and success states',
   parameters: {
-    uiInventoryTargets: ['src/renderer/modals/EdgeOneDeploySuccess'],
+    uiInventoryTargets: ['src/renderer/modals/VibedropPublish'],
   },
   render: () => (
     <ModalPreview
-      title="EdgeOneDeploySuccess"
-      description="Actual deploy success modal with published URL input, copy affordance, open link action, and close action."
+      title="VibedropPublish"
+      description="VibeDrop publish modal: visibility choice (link-only/public) and the published URL success state with copy and open actions."
     >
       <OpenModal
-        loadModal={() => import('@/modals/EdgeOneDeploySuccess').then((module) => module.default)}
-        props={{ url: 'https://example.edgeone.app/chatbox-demo' }}
+        loadModal={() => import('@/modals/VibedropPublish').then((module) => module.default)}
+        props={{ html: '<!doctype html><title>Chatbox demo</title><h1>Hello</h1>', uniqueId: 'story-demo' }}
       />
     </ModalPreview>
   ),

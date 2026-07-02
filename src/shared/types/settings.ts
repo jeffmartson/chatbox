@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ModelProviderEnum, ModelProviderType } from './provider'
-import { SkillSettingsSchema } from './skills'
+import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES, SkillSettingsSchema } from './skills'
 
 // Re-export for backward compatibility
 export { ModelProviderType } from './provider'
@@ -436,6 +436,14 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   memorizedManualLicenseKey: z.string().optional(),
   chatboxAIDesktopPromptDismissed: z.boolean().default(false),
 
+  // VibeDrop HTML artifact publishing
+  // Cached publish key issued by chatbox-backend, bound to the account email it
+  // was issued for so it is never reused across accounts. Cleared on logout.
+  vibedropPublishKey: z.object({ email: z.string(), key: z.string() }).optional().catch(undefined),
+  // Maps a code block's uniqueId → its published VibeDrop slug, so re-publishing
+  // the same artifact updates the same site (stable URL) instead of creating new.
+  vibedropSlugs: z.record(z.string(), z.string()).optional().catch(undefined),
+
   // chat settings
   showWordCount: z.boolean().optional().catch(undefined),
   showTokenCount: z.boolean().optional().catch(undefined),
@@ -505,9 +513,10 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   extension: ExtensionSettingsSchema,
   mcp: MCPSettingsSchema,
   skills: SkillSettingsSchema.catch({
-    enabledSkillNames: ['chatbox-product-info'],
+    enabledSkillNames: [...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES],
     translationEnabled: true,
     builtinDefaultsInitialized: true,
+    appliedDefaultBuiltinSkillNames: [...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES],
   }),
 })
 

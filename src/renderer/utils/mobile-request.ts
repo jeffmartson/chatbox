@@ -67,7 +67,7 @@ export async function handleMobileRequest(
   const rawData = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
   // Treat status 0 or < 200 as errors, in addition to >= 400
   if (response.status === 0 || response.status < 200 || response.status >= 400) {
-    throw new ApiError(`Status Code ${response.status}`, rawData)
+    throw new ApiError(`Status Code ${response.status}`, rawData, response.status)
   }
   const responseData = rawData
 

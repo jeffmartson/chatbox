@@ -16,7 +16,6 @@ import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { Modal } from '@/components/layout/Overlay'
 import { inlineSandboxHtmlAssets } from '@/components/message-parts/html-artifact-assets'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
-import { deployHtmlToEdgeOne } from '@/packages/edgeone'
 import platform from '@/platform'
 import * as toastActions from '@/stores/toastActions'
 
@@ -24,6 +23,7 @@ export interface ArtifactPreviewProps {
   htmlCode: string
   previewUrl?: string
   sandboxPath?: string
+  uniqueId?: string
 }
 
 function decodeBase64Utf8(base64: string): string {
@@ -48,7 +48,7 @@ async function readSandboxHtml(sandboxPath: string): Promise<string> {
   })
 }
 
-const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl, sandboxPath }: ArtifactPreviewProps) => {
+const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl, sandboxPath, uniqueId }: ArtifactPreviewProps) => {
   const modal = useModal()
   const { t } = useTranslation()
   const [reloadSign, setReloadSign] = useState(0)
@@ -75,15 +75,14 @@ const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl, sandboxPath }:
     }
     setDeploying(true)
     try {
-      const deployHtml = htmlCode.trim() ? htmlCode : await readSandboxHtml(sandboxPath || '')
-      const url = await deployHtmlToEdgeOne(deployHtml)
-      await NiceModal.show('edgeone-deploy-success', { url })
+      const publishHtml = htmlCode.trim() ? htmlCode : await readSandboxHtml(sandboxPath || '')
+      NiceModal.show('vibedrop-publish', { html: publishHtml, uniqueId }).catch(() => null)
     } catch (error) {
       toastActions.add((error as Error)?.message || t('Publish failed'))
     } finally {
       setDeploying(false)
     }
-  }, [canPublish, htmlCode, sandboxPath, t])
+  }, [canPublish, htmlCode, sandboxPath, uniqueId, t])
   const isSmallScreen = useIsSmallScreen()
   const showFullscreen = isSmallScreen || isFullscreen
   const showLabeledActions = !isSmallScreen

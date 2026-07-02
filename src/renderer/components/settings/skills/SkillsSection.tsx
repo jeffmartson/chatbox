@@ -12,7 +12,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core'
-import type { SkillInfo } from '@shared/types/skills'
+import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES, type SkillInfo } from '@shared/types/skills'
 import {
   IconBrandGithub,
   IconDots,
@@ -213,13 +213,30 @@ export const SkillsSection: FC = () => {
     try {
       const discovered = await skillsController.discoverSkills()
       const defaultEnabledBuiltinSkillNames = discovered
-        .filter((skill) => skill.isBuiltin && skill.name === 'chatbox-product-info')
+        .filter(
+          (skill) =>
+            skill.isBuiltin &&
+            DEFAULT_ENABLED_BUILTIN_SKILL_NAMES.includes(
+              skill.name as (typeof DEFAULT_ENABLED_BUILTIN_SKILL_NAMES)[number]
+            )
+        )
         .map((skill) => skill.name)
       const discoveredNames = new Set(discovered.map((skill) => skill.name))
       const currentSkillSettings = settingsStore.getState().skills
-      const enabledSkillNames = currentSkillSettings.builtinDefaultsInitialized
-        ? currentSkillSettings.enabledSkillNames
-        : [...new Set([...currentSkillSettings.enabledSkillNames, ...defaultEnabledBuiltinSkillNames])]
+      const appliedDefaultBuiltinSkillNames =
+        currentSkillSettings.appliedDefaultBuiltinSkillNames ??
+        (currentSkillSettings.builtinDefaultsInitialized ? ['chatbox-product-info'] : [])
+      const newlyAddedDefaultSkillNames = defaultEnabledBuiltinSkillNames.filter(
+        (name) => !appliedDefaultBuiltinSkillNames.includes(name)
+      )
+      const enabledSkillNames = [
+        ...new Set([
+          ...currentSkillSettings.enabledSkillNames,
+          ...(currentSkillSettings.builtinDefaultsInitialized
+            ? newlyAddedDefaultSkillNames
+            : defaultEnabledBuiltinSkillNames),
+        ]),
+      ]
       const enabledNameSet = new Set(enabledSkillNames)
       const originalIndexByName = new Map(discovered.map((skill, index) => [skill.name, index]))
       const sortedDiscovered = [...discovered].sort((a, b) => {
@@ -232,15 +249,26 @@ export const SkillsSection: FC = () => {
       })
       setSkills(sortedDiscovered)
       settingsStore.setState((state) => {
+        const appliedDefaultBuiltinSkillNames =
+          state.skills.appliedDefaultBuiltinSkillNames ??
+          (state.skills.builtinDefaultsInitialized ? ['chatbox-product-info'] : [])
+        const newlyAddedDefaultSkillNames = defaultEnabledBuiltinSkillNames.filter(
+          (name) => !appliedDefaultBuiltinSkillNames.includes(name)
+        )
         const enabledSkillNames = (
           state.skills.builtinDefaultsInitialized
-            ? state.skills.enabledSkillNames
+            ? [...new Set([...state.skills.enabledSkillNames, ...newlyAddedDefaultSkillNames])]
             : [...new Set([...state.skills.enabledSkillNames, ...defaultEnabledBuiltinSkillNames])]
         ).filter((name) => discoveredNames.has(name))
+        const nextAppliedDefaultBuiltinSkillNames = [
+          ...new Set([...appliedDefaultBuiltinSkillNames, ...defaultEnabledBuiltinSkillNames]),
+        ]
         if (
           state.skills.builtinDefaultsInitialized &&
           enabledSkillNames.length === state.skills.enabledSkillNames.length &&
-          enabledSkillNames.every((name, index) => name === state.skills.enabledSkillNames[index])
+          enabledSkillNames.every((name, index) => name === state.skills.enabledSkillNames[index]) &&
+          nextAppliedDefaultBuiltinSkillNames.length === appliedDefaultBuiltinSkillNames.length &&
+          nextAppliedDefaultBuiltinSkillNames.every((name, index) => name === appliedDefaultBuiltinSkillNames[index])
         ) {
           return state
         }
@@ -249,6 +277,7 @@ export const SkillsSection: FC = () => {
             ...state.skills,
             enabledSkillNames,
             builtinDefaultsInitialized: true,
+            appliedDefaultBuiltinSkillNames: nextAppliedDefaultBuiltinSkillNames,
           },
         }
       })

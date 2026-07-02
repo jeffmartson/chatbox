@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const DEFAULT_ENABLED_BUILTIN_SKILL_NAMES = ['chatbox-product-info', 'vibedrop'] as const
+
 // ===== Skill Source Types =====
 
 /**
@@ -80,11 +82,13 @@ export interface SkillInfo extends SkillMetadata {
  * - enabledSkillNames: Array of custom skill names to enable
  * - translationEnabled: Whether translation feature is enabled for skills
  * - builtinDefaultsInitialized: Whether one-time default built-in skills have been applied
+ * - appliedDefaultBuiltinSkillNames: Built-in defaults that have already been auto-enabled
  */
 export const SkillSettingsSchema = z.object({
-  enabledSkillNames: z.array(z.string()).default(['chatbox-product-info']),
+  enabledSkillNames: z.array(z.string()).default([...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES]),
   translationEnabled: z.boolean().default(true),
   builtinDefaultsInitialized: z.boolean().default(false),
+  appliedDefaultBuiltinSkillNames: z.array(z.string()).default([...DEFAULT_ENABLED_BUILTIN_SKILL_NAMES]),
 })
 
 // ===== Type Exports =====

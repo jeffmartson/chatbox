@@ -6,6 +6,7 @@ describe('builtinSkills', () => {
     expect(builtinSkills.map((item) => item.metadata.name)).toEqual([
       'data-analysis',
       'chatbox-product-info',
+      'vibedrop',
       'frontend-design',
     ])
   })
@@ -27,5 +28,14 @@ describe('builtinSkills', () => {
     expect(skill?.body).toContain('Node.js or Bash')
     expect(skill?.body).toContain('create_download')
     expect(skill?.body).toContain('Python, pandas, matplotlib, R, and system package managers are not available')
+  })
+
+  it('includes VibeDrop static hosting skill', () => {
+    const skill = builtinSkills.find((item) => item.metadata.name === 'vibedrop')
+
+    expect(skill).toBeDefined()
+    expect(skill?.metadata.description).toContain('Deploy any static site')
+    expect(skill?.body).toContain('vibedrop deploy ./dist')
+    expect(skill?.body).toContain('https://app.vibedrop.cc/claim')
   })
 })
