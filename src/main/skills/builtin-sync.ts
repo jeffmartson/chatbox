@@ -156,7 +156,10 @@ function resolveSnapshotFilePath(
 ): { target: string; normalizedPath: string } | null {
   if (!relativePath || path.isAbsolute(relativePath)) return null
   const normalized = path.normalize(relativePath)
-  if (normalized === '.' || normalized === 'SKILL.md' || normalized === 'source.json') return null
+  // 顶层保留文件大小写不敏感比较：case-insensitive 文件系统（macOS/Windows）上
+  // "skill.md" 与生成的 "SKILL.md" 指向同一文件，若放行会覆盖 frontmatter+body。
+  const lower = normalized.toLowerCase()
+  if (normalized === '.' || lower === 'skill.md' || lower === 'source.json') return null
   if (normalized.startsWith('..') || path.isAbsolute(normalized)) return null
 
   const target = path.resolve(skillDir, normalized)

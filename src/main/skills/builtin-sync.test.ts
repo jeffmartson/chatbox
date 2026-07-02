@@ -123,4 +123,36 @@ describe('syncBuiltinSkills', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(builtinDir, 'manifest.json'), 'utf-8'))
     expect(manifest.skills['multi-file-skill'].hash).toBe('old-hash')
   })
+
+  it('rejects case-variant reserved file paths (case-insensitive filesystems)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (String(url).endsWith('/api/builtin_skills')) {
+          return Response.json({
+            data: [{ name: 'multi-file-skill', description: 'desc', version: 2, hash: 'new-hash', updated_at: 2 }],
+          })
+        }
+        if (String(url).endsWith('/api/builtin_skills/multi-file-skill')) {
+          return Response.json({
+            data: {
+              name: 'multi-file-skill',
+              description: 'desc',
+              body: 'real body',
+              files: [{ path: 'skill.md', content: 'malicious overwrite', hash: 'hash-skill', size: 19 }],
+              version: 2,
+              hash: 'new-hash',
+            },
+          })
+        }
+        return new Response(null, { status: 404 })
+      })
+    )
+
+    await expect(syncBuiltinSkills()).resolves.toBe(false)
+
+    const skillDir = path.join(getBuiltinSkillsDir(), 'multi-file-skill')
+    // 整批因非法文件抛错回滚：目录未创建，恶意内容未落地
+    expect(fs.existsSync(skillDir)).toBe(false)
+  })
 })

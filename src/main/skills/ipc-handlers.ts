@@ -16,6 +16,7 @@ import {
   installSkillFromSandbox,
 } from './installer'
 import { parseSkillFile } from './parser'
+import { collectSkillFiles, MAX_SKILL_FILES } from './skill-files'
 import { isValidSkillName } from './validation'
 
 const log = getLogger('skills:ipc-handlers')
@@ -112,22 +113,10 @@ export function registerSkillsHandlers() {
         if (!fs.existsSync(skillMdPath)) return null
         const parsed = parseSkillFile(skillMdPath)
         if (!parsed) return null
-        const files: string[] = []
-        const walk = (dir: string) => {
-          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            const entryPath = path.join(dir, entry.name)
-            if (entry.isDirectory()) {
-              walk(entryPath)
-              continue
-            }
-            if (!entry.isFile()) continue
-            const relativePath = path.relative(skillPath, entryPath)
-            if (relativePath === 'SKILL.md' || relativePath === 'source.json') continue
-            files.push(relativePath.split(path.sep).join('/'))
-          }
+        const { files, truncated } = collectSkillFiles(skillPath)
+        if (truncated) {
+          log.warn(`skills:load: file list for "${name}" truncated to ${MAX_SKILL_FILES} entries`)
         }
-        walk(skillPath)
-        files.sort()
         return { body: parsed.body, metadata: parsed.metadata, skillRoot: skillPath, files }
       }
 
