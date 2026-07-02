@@ -17,9 +17,11 @@ import type {
   ModelInterface,
   ModelStreamPart,
 } from '../../../models/types'
+import { getRegistryModelMeta } from '../../../model-registry'
 import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
-import type { ChatboxAILicenseDetail, ProviderModelInfo, StreamTextResult, ToolUseScope } from '../../../types'
+import { type ChatboxAILicenseDetail, ModelProviderEnum, type ProviderModelInfo } from '../../../types'
+import type { StreamTextResult, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import { getLegacyOpenAICompatibleThinkingType } from '../../../utils/reasoning-control'
 import { buildGeminiImageConfig } from '../gemini-types'
@@ -41,6 +43,25 @@ interface Options {
 
 interface Config {
   uuid: string
+}
+
+const DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS = 8192
+
+/**
+ * Default max_tokens for ChatboxAI Anthropic models when the user has not set one.
+ * Capped by the model's real output limit: the gateway serves upstream Anthropic
+ * model ids, but the manifest carries no maxOutput and ChatboxAI is excluded from
+ * registry enrichment, so we consult the claude registry section directly. Without
+ * the cap, models with limits below the default (e.g. claude-3-opus: 4096) would be
+ * rejected upstream — @ai-sdk/anthropic only clamps overshoot for model ids it knows.
+ */
+function getDefaultAnthropicMaxOutputTokens(model: ProviderModelInfo): number {
+  const registryMaxOutput = getRegistryModelMeta(ModelProviderEnum.Claude, model.modelId)?.maxOutput
+  const modelLimit = model.maxOutput ?? registryMaxOutput
+  if (modelLimit && modelLimit > 0) {
+    return Math.min(DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS, modelLimit)
+  }
+  return DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS
 }
 
 // 将chatboxAIFetch移到类内部作为私有方法
@@ -139,7 +160,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       // Anthropic API requires only one of temperature or topP
       const callSettings: CallSettings = {
         providerOptions,
-        maxOutputTokens: this.options.maxOutputTokens,
+        maxOutputTokens: this.options.maxOutputTokens ?? getDefaultAnthropicMaxOutputTokens(this.options.model),
       }
       if (this.options.temperature !== undefined) {
         callSettings.temperature = this.options.temperature
