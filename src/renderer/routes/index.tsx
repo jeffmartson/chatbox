@@ -1,6 +1,13 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Avatar, Box, Divider, Flex, ScrollArea, Space, Stack, Text } from '@mantine/core'
-import type { CopilotDetail, ImageSource, Session } from '@shared/types'
+import {
+  createMessage,
+  type AgentModeEntry,
+  type CopilotDetail,
+  type ImageSource,
+  type Session,
+  type SessionSettings,
+} from '@shared/types'
 import { IconChevronLeft, IconChevronRight, IconMessageCircle2Filled, IconX } from '@tabler/icons-react'
 import { createFileRoute, useRouterState } from '@tanstack/react-router'
 import { zodValidator } from '@tanstack/zod-adapter'
@@ -16,6 +23,7 @@ import { ImageInStorage } from '@/components/Image'
 import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
 import HomepageIcon from '@/components/icons/HomepageIcon'
 import Page from '@/components/layout/Page'
+import { getForceShowNewUserScenarioCardsFlag } from '@/dev/devToolsFlags'
 import { useMyCopilots, useRemoteCopilotsByCursor } from '@/hooks/useCopilots'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
@@ -25,11 +33,20 @@ import { router } from '@/router'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
 import { createSession as createSessionStore } from '@/stores/chatStore'
 import { resolveChatboxLicenseDefaultModel } from '@/stores/defaultChatModel'
+import { getHasCompletedFirstSuccessfulChat } from '@/stores/firstSuccessfulChat'
 import { submitNewUserMessage, switchCurrentSession } from '@/stores/sessionActions'
 import { initEmptyChatSession } from '@/stores/sessionHelpers'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { getHomeWelcomeCardMode } from '@/utils/homeWelcomeCard'
+import { NewUserScenarioGrid } from './-new-user-scenarios/NewUserScenarioGrid'
+import { type NewUserScenario, newUserScenarios } from './-new-user-scenarios/scenarios'
+
+const scenarioAgentModeOff = {
+  value: 'off',
+  locked: false,
+  lockReason: null,
+} satisfies AgentModeEntry
 
 export const Route = createFileRoute('/')({
   component: Index,
@@ -60,6 +77,10 @@ function Index() {
     id: 'new',
     ...initEmptyChatSession(),
   })
+  const [hasCompletedFirstSuccessfulChat, setHasCompletedFirstSuccessfulChat] = useState<boolean | null>(null)
+  const [forceShowNewUserScenarioCards, setForceShowNewUserScenarioCards] = useState(
+    getForceShowNewUserScenarioCardsFlag
+  )
 
   const { providers } = useProviders()
   const defaultChatModel = useSettingsStore((s) => s.defaultChatModel)
@@ -90,6 +111,29 @@ function Index() {
       }
     }
   }, [session.settings?.provider, session.settings?.modelId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    setForceShowNewUserScenarioCards(getForceShowNewUserScenarioCardsFlag())
+
+    getHasCompletedFirstSuccessfulChat()
+      .then((completed) => {
+        if (!cancelled) {
+          setHasCompletedFirstSuccessfulChat(completed)
+        }
+      })
+      .catch((error) => {
+        console.warn('[new-user-scenarios] failed to resolve first successful chat state:', error)
+        if (!cancelled) {
+          setHasCompletedFirstSuccessfulChat(true)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     setSession((old) => {
@@ -188,25 +232,33 @@ function Index() {
     }
   }, [routerState.location.search])
 
-  const handleSubmit = useCallback(
-    async ({ constructedMessage, needGenerating = true, onUserMessageReady, settingsPatch }: InputBoxPayload) => {
+  const createPersistedChatSession = useCallback(
+    async (options?: {
+      name?: string
+      threadName?: string
+      messages?: Session['messages']
+      settingsPatch?: Partial<SessionSettings>
+      settingsOverride?: Partial<SessionSettings>
+    }) => {
       const newSession = await createSessionStore({
-        name: session.name,
+        name: options?.name ?? session.name,
         type: 'chat',
         assistantAvatarKey: session.assistantAvatarKey,
         picUrl: session.picUrl,
         backgroundImage: session.backgroundImage,
-        messages: session.messages,
+        messages: options?.messages ?? session.messages,
         copilotId: session.copilotId,
+        threadName: options?.threadName,
         settings: {
           ...session.settings,
-          ...settingsPatch,
+          ...options?.settingsPatch,
           ...(sessionAgentModeMap.new ? { agentMode: sessionAgentModeMap.new } : {}),
           // Working directories bound while the chat was still "new" (not yet persisted).
           ...(newSessionState.workingDirectories?.length
             ? { workingDirectories: newSessionState.workingDirectories }
             : {}),
           ...(newSessionState.agentFullAccess ? { agentFullAccess: true } : {}),
+          ...options?.settingsOverride,
         },
       })
 
@@ -246,11 +298,7 @@ function Index() {
       switchCurrentSession(newSession.id)
       localStorage.removeItem('new-chat')
 
-      void submitNewUserMessage(newSession.id, {
-        newUserMsg: constructedMessage,
-        needGenerating,
-        onUserMessageReady,
-      })
+      return newSession
     },
     [
       session,
@@ -265,6 +313,36 @@ function Index() {
       sessionAgentModeMap,
       clearSessionAgentMode,
     ]
+  )
+
+  const handleSubmit = useCallback(
+    async ({ constructedMessage, needGenerating = true, onUserMessageReady, settingsPatch }: InputBoxPayload) => {
+      const newSession = await createPersistedChatSession({ settingsPatch })
+
+      void submitNewUserMessage(newSession.id, {
+        newUserMsg: constructedMessage,
+        needGenerating,
+        onUserMessageReady,
+      })
+    },
+    [createPersistedChatSession]
+  )
+
+  const handleScenarioSelect = useCallback(
+    async (scenario: NewUserScenario) => {
+      const newSession = await createPersistedChatSession({
+        name: scenario.sessionTitle,
+        threadName: scenario.sessionTitle,
+        messages: [createMessage('system', scenario.systemPrompt)],
+        settingsOverride: { agentMode: scenarioAgentModeOff },
+      })
+
+      void submitNewUserMessage(newSession.id, {
+        newUserMsg: createMessage('user', scenario.firstUserMessage),
+        needGenerating: true,
+      })
+    },
+    [createPersistedChatSession]
   )
 
   const onSelectModel = useCallback((p: string, m: string) => {
@@ -292,15 +370,24 @@ function Index() {
     return true
   }, [session])
 
+  const showNewUserScenarios =
+    (forceShowNewUserScenarioCards || hasCompletedFirstSuccessfulChat === false) && !session.copilotId
+
   return (
     <Page title="">
       <div className="p-0 flex flex-col h-full">
-        <Stack align="center" justify="center" gap="sm" flex={1}>
-          <HomepageIcon className="h-8" />
-          <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
-            {t('What can I help you with today?')}
-          </Text>
-        </Stack>
+        {showNewUserScenarios ? (
+          <Stack justify="center" flex={1} py="xl">
+            <NewUserScenarioGrid scenarios={newUserScenarios} onSelect={handleScenarioSelect} />
+          </Stack>
+        ) : (
+          <Stack align="center" justify="center" gap="sm" flex={1}>
+            <HomepageIcon className="h-8" />
+            <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
+              {t('What can I help you with today?')}
+            </Text>
+          </Stack>
+        )}
 
         {welcomeCardMode !== 'none' && (
           <Box px="sm">

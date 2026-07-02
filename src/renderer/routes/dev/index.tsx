@@ -1,9 +1,14 @@
-import { Badge, Box, Button, Card, Container, Group, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core'
+import { Badge, Button, Card, Container, Group, Paper, SimpleGrid, Stack, Switch, Text, Title } from '@mantine/core'
 import { IconAdjustmentsHorizontal, IconCode, IconExternalLink, IconEye } from '@tabler/icons-react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
-import { getShowGuideDevButtonsFlag, setShowGuideDevButtonsFlag } from '@/dev/devToolsFlags'
+import {
+  getForceShowNewUserScenarioCardsFlag,
+  getShowGuideDevButtonsFlag,
+  setForceShowNewUserScenarioCardsFlag,
+  setShowGuideDevButtonsFlag,
+} from '@/dev/devToolsFlags'
 
 export const Route = createFileRoute('/dev/')({
   component: DevIndexPage,
@@ -52,6 +57,9 @@ interface DevControl {
 
 function DevIndexPage() {
   const [showGuideDevButtons, setShowGuideDevButtons] = useState(getShowGuideDevButtonsFlag)
+  const [forceShowNewUserScenarioCards, setForceShowNewUserScenarioCards] = useState(
+    getForceShowNewUserScenarioCardsFlag
+  )
   const devControls: DevControl[] = [
     {
       id: 'guide-dev-buttons',
@@ -61,6 +69,16 @@ function DevIndexPage() {
       onChange: (checked) => {
         setShowGuideDevButtonsFlag(checked)
         setShowGuideDevButtons(checked)
+      },
+    },
+    {
+      id: 'new-user-scenario-cards',
+      label: 'New user scenario cards',
+      description: 'Force the New Chat page to show onboarding scenario cards.',
+      checked: forceShowNewUserScenarioCards,
+      onChange: (checked) => {
+        setForceShowNewUserScenarioCardsFlag(checked)
+        setForceShowNewUserScenarioCards(checked)
       },
     },
   ]
@@ -74,18 +92,17 @@ function DevIndexPage() {
             <div>
               <Title order={1}>Dev Tools</Title>
             </div>
-            <Stack align="flex-end" gap="xs">
-              <Badge size="lg" variant="light" color="blue">
-                Development Mode
-              </Badge>
-              <DevControlsStrip controls={devControls} />
-            </Stack>
+            <Badge size="lg" variant="light" color="blue">
+              Development Mode
+            </Badge>
           </Group>
           <Text c="dimmed">
             Component previews and development tools. These are available when running in development mode or when the
             dev tools override is enabled.
           </Text>
         </div>
+
+        <DevControlsPanel controls={devControls} />
 
         {/* Available Pages */}
         <Paper shadow="xs" p="lg" radius="md">
@@ -173,30 +190,77 @@ function DevIndexPage() {
   )
 }
 
-function DevControlsStrip({ controls }: { controls: DevControl[] }) {
+function DevControlsPanel({ controls }: { controls: DevControl[] }) {
   if (controls.length === 0) return null
 
+  const enabledCount = controls.filter((control) => control.checked).length
+
   return (
-    <Box className="border border-solid border-[var(--chatbox-border-primary)] rounded-md bg-[var(--chatbox-background-secondary)] px-2 py-1">
-      <Group gap="sm" wrap="wrap">
-        <Group gap={4}>
-          <ScalableIcon icon={IconAdjustmentsHorizontal} size={14} className="text-chatbox-tint-tertiary" />
-          <Text size="xs" fw={700} c="chatbox-tertiary" tt="uppercase" lh={1}>
-            Controls
-          </Text>
+    <Paper
+      shadow="xs"
+      p="lg"
+      radius="md"
+      className="border border-solid border-[var(--chatbox-border-primary)] bg-chatbox-background-primary"
+    >
+      <Stack gap="md">
+        <Group justify="space-between" align="flex-start" gap="md">
+          <Group gap="sm" align="flex-start">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md border border-solid border-[var(--chatbox-border-primary)] bg-chatbox-background-secondary text-chatbox-tint-brand">
+              <ScalableIcon icon={IconAdjustmentsHorizontal} size={18} />
+            </div>
+            <div>
+              <Title order={3} fz="md" lh={1.25}>
+                Runtime Controls
+              </Title>
+              <Text size="sm" c="dimmed" mt={3}>
+                Persistent local toggles for testing app flows without changing production defaults.
+              </Text>
+            </div>
+          </Group>
+          <Badge variant={enabledCount > 0 ? 'filled' : 'light'} color={enabledCount > 0 ? 'blue' : 'gray'}>
+            {enabledCount} active
+          </Badge>
         </Group>
-        {controls.map((control) => (
-          <Tooltip key={control.id} label={control.description} withArrow openDelay={400}>
-            <Switch
-              size="xs"
-              label={control.label}
-              checked={control.checked}
-              onChange={(event) => control.onChange(event.currentTarget.checked)}
-            />
-          </Tooltip>
-        ))}
-      </Group>
-    </Box>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          {controls.map((control) => (
+            <Paper
+              key={control.id}
+              withBorder
+              radius="md"
+              p="md"
+              className="transition-colors hover:bg-chatbox-background-secondary"
+            >
+              <Group justify="space-between" align="flex-start" gap="md" wrap="nowrap">
+                <Stack gap={5} className="min-w-0">
+                  <Group gap="xs" wrap="nowrap">
+                    <Text fw={650} size="sm" className="truncate text-chatbox-tint-primary">
+                      {control.label}
+                    </Text>
+                    <Badge
+                      size="xs"
+                      variant={control.checked ? 'light' : 'outline'}
+                      color={control.checked ? 'blue' : 'gray'}
+                    >
+                      {control.checked ? 'On' : 'Off'}
+                    </Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed" lh={1.45}>
+                    {control.description}
+                  </Text>
+                </Stack>
+                <Switch
+                  size="sm"
+                  checked={control.checked}
+                  aria-label={control.label}
+                  onChange={(event) => control.onChange(event.currentTarget.checked)}
+                />
+              </Group>
+            </Paper>
+          ))}
+        </SimpleGrid>
+      </Stack>
+    </Paper>
   )
 }
 

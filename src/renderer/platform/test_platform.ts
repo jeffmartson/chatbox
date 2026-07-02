@@ -207,6 +207,10 @@ export default class TestPlatform implements Platform {
     return () => {}
   }
 
+  public async isWindowFocused(): Promise<boolean> {
+    return true
+  }
+
   public onUpdateDownloaded(callback: () => void): () => void {
     return () => {}
   }

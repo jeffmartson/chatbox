@@ -338,6 +338,7 @@ export async function createSession(newSession: Omit<Session, 'id'>, previousId?
     createdAt: Date.now(),
   }
   await metaStorage.create(record)
+  _setSessionCache(session.id, session)
 
   updateSessionListData((items) => sortSessionRecords([...items, record]))
 

@@ -104,7 +104,48 @@ export default class MobilePlatform extends MobileSQLiteStorage implements Platf
     return () => null
   }
   public onWindowFocused(callback: () => void): () => void {
-    return () => null
+    let cancelled = false
+    let removeAppStateListener: (() => void) | undefined
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        callback()
+      }
+    }
+
+    App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive && !cancelled) {
+        callback()
+      }
+    })
+      .then((handle) => {
+        if (cancelled) {
+          void handle.remove()
+          return
+        }
+        removeAppStateListener = () => {
+          void handle.remove()
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to listen appStateChange:', error)
+      })
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      cancelled = true
+      removeAppStateListener?.()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }
+  public async isWindowFocused(): Promise<boolean> {
+    try {
+      const state = await App.getState()
+      return state.isActive && document.visibilityState === 'visible'
+    } catch {
+      return document.visibilityState === 'visible'
+    }
   }
   public onUpdateDownloaded(callback: () => void): () => void {
     return () => null

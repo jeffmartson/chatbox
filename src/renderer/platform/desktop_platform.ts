@@ -61,6 +61,9 @@ export default class DesktopPlatform implements Platform {
   public onWindowFocused(callback: () => void): () => void {
     return this.ipc.onWindowFocused(callback)
   }
+  public async isWindowFocused(): Promise<boolean> {
+    return this.ipc.invoke('window:is-focused')
+  }
   public onUpdateDownloaded(callback: () => void): () => void {
     return this.ipc.onUpdateDownloaded(callback)
   }

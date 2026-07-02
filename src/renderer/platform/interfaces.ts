@@ -30,7 +30,17 @@ export interface Platform extends Storage {
   shouldUseDarkColors(): Promise<boolean>
   onSystemThemeChange(callback: () => void): () => void
   onWindowShow(callback: () => void): () => void
+  /**
+   * Fires when the app surface becomes active enough for the user to see and interact with it.
+   * Desktop maps this to Electron BrowserWindow focus; Web maps to window focus / visible tab;
+   * Mobile maps to Capacitor app active / visible WebView.
+   */
   onWindowFocused(callback: () => void): () => void
+  /**
+   * Returns whether the current app surface is active enough to start user-visible UI work.
+   * This is a product-level visibility/focus signal, not a strict DOM document focus guarantee.
+   */
+  isWindowFocused(): Promise<boolean>
   onUpdateDownloaded(callback: () => void): () => void
   onUpdaterChecking?(callback: () => void): () => void
   onUpdaterAvailable?(callback: (data: { version: string }) => void): () => void

@@ -52,7 +52,7 @@ export default function useShortcut() {
         dom.focusMessageInput()
       }
     }
-    const cancelOnFocus = platform.onWindowFocused(focusMessageInput)
+    const cancelOnFocus = platform.type === 'desktop' ? platform.onWindowFocused(focusMessageInput) : () => {}
     const cancelOnShow = platform.onWindowShow(focusMessageInput)
     window.addEventListener('keydown', handleKeyDown)
     return () => {

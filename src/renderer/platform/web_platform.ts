@@ -49,7 +49,21 @@ export default class WebPlatform extends IndexedDBStorage implements Platform {
     return () => null
   }
   public onWindowFocused(callback: () => void): () => void {
-    return () => null
+    const onFocus = () => callback()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        callback()
+      }
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }
+  public async isWindowFocused(): Promise<boolean> {
+    return document.visibilityState === 'visible' && document.hasFocus()
   }
   public onUpdateDownloaded(callback: () => void): () => void {
     return () => null

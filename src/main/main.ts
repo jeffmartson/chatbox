@@ -678,6 +678,9 @@ ipcMain.handle('getLocale', () => {
 ipcMain.handle('openLink', (event, link) => {
   return shell.openExternal(link)
 })
+ipcMain.handle('window:is-focused', () => {
+  return Boolean(mainWindow?.isFocused())
+})
 ipcMain.handle('ensureShortcutConfig', (event, json) => {
   const config: ShortcutSetting = JSON.parse(json)
   unregisterShortcuts()
