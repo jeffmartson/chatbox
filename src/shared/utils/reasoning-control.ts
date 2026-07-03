@@ -56,6 +56,10 @@ const QWEN_THINKING_BUDGET_BY_LEVEL: Record<Exclude<ReasoningControlLevel, 'off'
 }
 
 const GPT_EFFORT_MODELS = [/(?:^|\/)gpt-5(?:[.-]|$)/i, /(?:^|\/)gpt-oss(?:[.-]|$)/i]
+// Chat-tuned gpt-5 variants (gpt-5-chat-latest, gpt-5.1-chat, gpt-5.2-chat-latest, ...)
+// are non-reasoning models; sending reasoning_effort to them is rejected upstream
+// ("Unrecognized request argument supplied: reasoning_effort").
+const GPT_NON_REASONING_CHAT_MODELS = [/(?:^|\/)gpt-5[\w.-]*[.-]chat(?:[.-]|$)/i]
 const OPENAI_NONE_EFFORT_MODELS = [/(?:^|\/)gpt-5\.(?:1|2|5)(?:[.-]|$)/i]
 const CLAUDE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-5/i]
 const CLAUDE_ADAPTIVE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-(?:7|8)/i]
@@ -75,6 +79,10 @@ const GROK_REASONING_EFFORT_MODELS = [
 
 function matchesAny(modelId: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(modelId))
+}
+
+function isGptEffortModel(modelId: string): boolean {
+  return matchesAny(modelId, GPT_EFFORT_MODELS) && !matchesAny(modelId, GPT_NON_REASONING_CHAT_MODELS)
 }
 
 /**
@@ -140,9 +148,7 @@ function usesModelApiStyleForReasoning(provider: ModelProvider | undefined): boo
   // so for both we resolve the effective provider from the model's API style rather than
   // the provider id itself.
   return (
-    provider === ModelProviderEnum.ChatboxAI ||
-    provider === ModelProviderEnum.Custom ||
-    isCustomProviderId(provider)
+    provider === ModelProviderEnum.ChatboxAI || provider === ModelProviderEnum.Custom || isCustomProviderId(provider)
   )
 }
 
@@ -191,7 +197,7 @@ export function getReasoningControlCapabilities(
   if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
     return { supported: true, kind: 'toggle' }
   }
-  if (isOpenAIStyleEffectiveProvider(effectiveProvider) && matchesAny(modelId, GPT_EFFORT_MODELS)) {
+  if (isOpenAIStyleEffectiveProvider(effectiveProvider) && isGptEffortModel(modelId)) {
     return { supported: true, kind: 'openai-effort' }
   }
   if (
@@ -232,7 +238,7 @@ function getApiStyleDisabledReason(
     }
   }
 
-  if (matchesAny(modelId, GPT_EFFORT_MODELS) && !isOpenAIStyleEffectiveProvider(effectiveProvider)) {
+  if (isGptEffortModel(modelId) && !isOpenAIStyleEffectiveProvider(effectiveProvider)) {
     return 'requires-openai-api-style'
   }
 
@@ -455,11 +461,11 @@ function getGoogleOffThinkingConfig(modelId: string): NonNullable<ProviderOption
 function isOpenRouterReasoningModel(model: ProviderModelInfo | null | undefined): boolean {
   if (!model?.modelId) return false
   if (isDeepSeekReasoningModel(model.modelId)) return true
+  if (isGptEffortModel(model.modelId)) return true
   return matchesAny(model.modelId, [
     ...CLAUDE_ADAPTIVE_EFFORT_MODELS,
     ...CLAUDE_EFFORT_MODELS,
     ...CLAUDE_BUDGET_MODELS,
-    ...GPT_EFFORT_MODELS,
     ...QWEN_THINKING_MODELS,
     ...GROK_REASONING_EFFORT_MODELS,
     /(?:^|\/)o[1-9](?:[.-]|$)/i,

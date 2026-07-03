@@ -5,6 +5,7 @@ import type { SentryScope } from '@shared/utils/sentry_adapter'
 import { describe, expect, it, vi } from 'vitest'
 import Claude from './claude'
 import DeepSeek from './deepseek'
+import OpenAI from './openai'
 import OpenRouter from './openrouter'
 import Qwen from './qwen'
 
@@ -345,6 +346,73 @@ describe('reasoning request options', () => {
       Qwen: {
         enable_thinking: true,
         thinking_budget: 8192,
+      },
+    })
+  })
+
+  it('strips stale OpenAI reasoning effort for non-reasoning gpt-5-chat models', () => {
+    // gpt-5-chat* are non-reasoning models; @ai-sdk/openai forwards reasoningEffort
+    // as reasoning_effort unconditionally and upstream rejects it ("Unrecognized
+    // request argument supplied: reasoning_effort"). The request edge must strip
+    // options persisted before the capability turned off.
+    const openai = new OpenAI(
+      {
+        apiKey: 'test-key',
+        apiHost: 'https://api.openai.com/v1',
+        model: {
+          modelId: 'gpt-5-chat-latest',
+          type: 'chat',
+          capabilities: ['reasoning'], // registry metadata is wrong for this model; the gate must ignore it
+          providerId: 'openai',
+        },
+        dalleStyle: 'vivid',
+        injectDefaultMetadata: false,
+        useProxy: false,
+      },
+      createDependencies()
+    )
+
+    const settings = (openai as unknown as ResolveCallSettingsHarness).resolveCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'medium',
+          forceReasoning: true,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toBeUndefined()
+  })
+
+  it('keeps OpenAI reasoning effort for GPT-5 reasoning models', () => {
+    const openai = new OpenAI(
+      {
+        apiKey: 'test-key',
+        apiHost: 'https://api.openai.com/v1',
+        model: {
+          modelId: 'gpt-5.5',
+          type: 'chat',
+          capabilities: ['reasoning'],
+          providerId: 'openai',
+        },
+        dalleStyle: 'vivid',
+        injectDefaultMetadata: false,
+        useProxy: false,
+      },
+      createDependencies()
+    )
+
+    const settings = (openai as unknown as ResolveCallSettingsHarness).resolveCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'medium',
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openai: {
+        reasoningEffort: 'medium',
       },
     })
   })

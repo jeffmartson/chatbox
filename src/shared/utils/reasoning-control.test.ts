@@ -36,6 +36,34 @@ describe('reasoning-control', () => {
     expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAIResponses, model('gpt-5.1')).supported).toBe(true)
   })
 
+  it('does not offer reasoning controls for non-reasoning GPT-5 chat models', () => {
+    const openaiCapabilities = getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5-chat-latest'))
+    expect(openaiCapabilities.supported).toBe(false)
+    expect(openaiCapabilities.disabledReason).toBeUndefined()
+    expect(getReasoningControlCapabilities(ModelProviderEnum.ChatboxAI, model('gpt-5-chat', 'openai')).supported).toBe(
+      false
+    )
+    expect(getReasoningControlCapabilities('my-openai-proxy', model('openai/gpt-5-chat', 'openai')).supported).toBe(
+      false
+    )
+    // Versioned chat variants ship in the registry too (gpt-5.1-chat, gpt-5.2-chat-latest).
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5.1-chat-latest')).supported).toBe(
+      false
+    )
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5.2-chat')).supported).toBe(false)
+    expect(
+      getReasoningControlCapabilities(ModelProviderEnum.ChatboxAI, model('gpt-5.2-chat', 'openai')).supported
+    ).toBe(false)
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenRouter, model('openai/gpt-5.1-chat')).supported).toBe(
+      false
+    )
+    expect(getReasoningProviderOptions(ModelProviderEnum.OpenAI, model('gpt-5-chat-latest'), 'medium')).toBeUndefined()
+    // Real GPT-5 reasoning models keep effort controls.
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5.5')).supported).toBe(true)
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5-mini')).supported).toBe(true)
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5')).supported).toBe(true)
+  })
+
   it('maps Gemini budget and level models differently', () => {
     const budgetOptions = getReasoningProviderOptions(ModelProviderEnum.Gemini, model('gemini-2.5-flash'), 'low')
     const levelOptions = getReasoningProviderOptions(ModelProviderEnum.Gemini, model('gemini-3-pro-preview'), 'high')
@@ -260,7 +288,10 @@ describe('reasoning-control', () => {
     // Reasoning support must still resolve via its API style (provider type) + model id.
     const customOpenAIGpt5 = getReasoningControlCapabilities('my-openai-proxy', model('gpt-5.1', 'openai'))
     const customAnthropicClaude = getReasoningControlCapabilities('acme-llm', model('claude-opus-4-8', 'anthropic'))
-    const customOpenAIDeepSeek = getReasoningControlCapabilities('my-openai-proxy', model('deepseek-reasoner', 'openai'))
+    const customOpenAIDeepSeek = getReasoningControlCapabilities(
+      'my-openai-proxy',
+      model('deepseek-reasoner', 'openai')
+    )
     const customOpenAIPlainChat = getReasoningControlCapabilities('my-openai-proxy', model('some-chat-model', 'openai'))
     const customAnthropicMismatch = getReasoningControlCapabilities('acme-llm', model('claude-opus-4-8', 'openai'))
 

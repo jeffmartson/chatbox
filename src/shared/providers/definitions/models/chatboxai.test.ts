@@ -241,6 +241,108 @@ describe('ChatboxAI openai-responses models', () => {
     })
   })
 
+  it('drops @ai-sdk/openai-only flags from the OpenAI-compatible gateway mapping', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    // Reasoning "off" writes reasoningEffort + forceReasoning; forceReasoning is an
+    // @ai-sdk/openai flag with no chat-completions wire mapping, and the compatible
+    // provider would otherwise send it verbatim (upstream rejects unknown params).
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'none',
+          forceReasoning: true,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: {
+        reasoningEffort: 'none',
+      },
+      ChatboxAI: {
+        reasoningEffort: 'none',
+      },
+    })
+  })
+
+  it('ignores stale openaiCompatible options and keeps the current reasoning effort', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    // A session that previously used a Qwen model can retain openaiCompatible thinking
+    // options; those keys must not reach the GPT gateway body, and the freshly set
+    // reasoning effort must not be dropped by namespace precedence.
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 4096,
+        },
+        openai: {
+          reasoningEffort: 'medium',
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: {
+        reasoningEffort: 'medium',
+      },
+      ChatboxAI: {
+        reasoningEffort: 'medium',
+      },
+    })
+  })
+
+  it('sends no gateway extra body when only stale non-effort openaiCompatible options remain', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 4096,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toBeUndefined()
+  })
+
+  it('sends no gateway extra body when OpenAI options carry no reasoning effort', () => {
+    const model = createModel({
+      modelId: 'gpt-5.5',
+      type: 'chat',
+      apiStyle: 'openai',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        openai: {
+          forceReasoning: true,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toBeUndefined()
+  })
+
   it('maps DeepSeek thinking through ChatboxAI gateway with native thinking options', () => {
     const model = createModel({
       modelId: 'deepseek-v4-pro',

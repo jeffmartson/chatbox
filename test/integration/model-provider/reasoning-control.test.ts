@@ -393,6 +393,20 @@ const CALL_CASES: ThinkingCallCase[] = [
     prompt: REASONING_PROMPT,
   },
   {
+    // Regression: reasoning "off" writes forceReasoning alongside reasoningEffort.
+    // The OpenAI-compatible gateway path used to forward it verbatim and most
+    // gateway upstreams reject it (400 "Unknown parameter: 'forceReasoning'").
+    name: 'ChatboxAI GPT 5.5 off keeps chat completions usable without gateway-only flags',
+    provider: ModelProviderEnum.ChatboxAI,
+    apiKeyEnv: 'CHATBOX_LICENSE_KEY',
+    modelId: 'gpt-5.5',
+    apiStyle: 'openai',
+    level: 'off',
+    expectedProviderOptions: { openai: { reasoningEffort: 'none', forceReasoning: true } },
+    maxTokens: 1024,
+    prompt: REASONING_PROMPT,
+  },
+  {
     name: 'ChatboxAI DeepSeek V4 Pro off maps to gateway DeepSeek thinking disable',
     provider: ModelProviderEnum.ChatboxAI,
     apiKeyEnv: 'CHATBOX_LICENSE_KEY',
