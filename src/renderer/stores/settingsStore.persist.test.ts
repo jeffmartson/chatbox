@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type PersistedSettings = Record<string, unknown> | null
+type MockPlatformType = 'desktop' | 'web' | 'mobile'
 
-async function loadSettingsStoreModule(persistedSettings: PersistedSettings = null) {
+async function loadSettingsStoreModule(
+  persistedSettings: PersistedSettings = null,
+  platformType: MockPlatformType = 'desktop'
+) {
   vi.resetModules()
 
   const mockStorage = {
@@ -18,7 +22,7 @@ async function loadSettingsStoreModule(persistedSettings: PersistedSettings = nu
 
   vi.doMock('@/platform', () => ({
     default: {
-      type: 'desktop',
+      type: platformType,
       ensureShortcutConfig: vi.fn(),
       ensureProxyConfig: vi.fn(),
       ensureAutoLaunch: vi.fn(),
@@ -145,7 +149,38 @@ describe('settingsStore persistence', () => {
           apiHost: 'https://api.openai.com',
         },
       },
-      __version: 4,
+      __version: 5,
     })
+  })
+
+  it('migrates legacy Text Only document parser to Chatbox AI on web and mobile', async () => {
+    const persistedSettings = {
+      extension: {
+        documentParser: { type: 'none' },
+      },
+      __version: 4,
+    }
+
+    const webStore = await loadSettingsStoreModule(persistedSettings, 'web')
+    const webSettings = await webStore.initSettingsStore()
+    expect(webSettings.extension?.documentParser?.type).toBe('chatbox-ai')
+
+    const mobileStore = await loadSettingsStoreModule(persistedSettings, 'mobile')
+    const mobileSettings = await mobileStore.initSettingsStore()
+    expect(mobileSettings.extension?.documentParser?.type).toBe('chatbox-ai')
+  })
+
+  it('keeps desktop default document parser local', async () => {
+    const { getPlatformDefaultDocumentParser } = await loadSettingsStoreModule(null, 'desktop')
+
+    expect(getPlatformDefaultDocumentParser()).toEqual({ type: 'local' })
+  })
+
+  it('uses Chatbox AI as the default document parser on web and mobile', async () => {
+    const webStore = await loadSettingsStoreModule(null, 'web')
+    expect(webStore.getPlatformDefaultDocumentParser()).toEqual({ type: 'chatbox-ai' })
+
+    const mobileStore = await loadSettingsStoreModule(null, 'mobile')
+    expect(mobileStore.getPlatformDefaultDocumentParser()).toEqual({ type: 'chatbox-ai' })
   })
 })

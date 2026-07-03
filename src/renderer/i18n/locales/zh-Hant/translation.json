@@ -1149,5 +1149,7 @@
   "Webpage Builder": "網頁製作",
   "Turn an idea into an interactive webpage": "把想法變成可互動的網頁",
   "Interactive Story": "文遊模擬",
-  "Choose a world and role to start an interactive adventure": "選擇世界觀和角色，開始一場文字互動冒險"
+  "Choose a world and role to start an interactive adventure": "選擇世界觀和角色，開始一場文字互動冒險",
+  "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "優先使用本機解析，不消耗點數。如果本機解析失敗，將使用 Chatbox AI 雲端解析，並消耗點數。",
+  "No points consumed": "不消耗點數"
 }

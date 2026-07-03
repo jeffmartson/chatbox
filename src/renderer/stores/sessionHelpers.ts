@@ -1,5 +1,6 @@
-import { NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES } from '@shared/file-parse-errors'
 import { isSessionAttachmentRagSupportedFilePath, isSupportedFile, isTextFilePath } from '@shared/file-extensions'
+import { NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES } from '@shared/file-parse-errors'
+import { searchSessionMessages } from '@shared/services/native-session-search'
 import type {
   ExportChatFormat,
   ExportChatScope,
@@ -16,7 +17,6 @@ import { pick } from 'lodash'
 import i18n from '@/i18n'
 import { formatChatAsHtml, formatChatAsMarkdown, formatChatAsTxt } from '@/lib/format-chat'
 import { getLogger } from '@/lib/utils'
-import { searchSessionMessages } from '@shared/services/native-session-search'
 import { PREVIEW_LINES } from '@/packages/context-management/attachment-payload'
 import * as localParser from '@/packages/local-parser'
 import * as remote from '@/packages/remote'
@@ -278,11 +278,12 @@ async function fallbackToChatboxAIParser(
 
 async function parseFileWithLocalFallback(
   file: File,
-  uniqKey: string
+  uniqKey: string,
+  options: { forceChatboxAIFallback?: boolean } = {}
 ): Promise<{ content: string; storageKey: string; tokenCountMap: Record<string, number>; parserType: string }> {
   try {
     const result = await parseFileWithLocalParser(file, uniqKey)
-    if (!hasParsedText(result.content) && canFallbackToChatboxAI()) {
+    if (!hasParsedText(result.content) && (options.forceChatboxAIFallback || canFallbackToChatboxAI())) {
       return await fallbackToChatboxAIParser(file, uniqKey, 'empty_content')
     }
     return result
@@ -296,7 +297,7 @@ async function parseFileWithLocalFallback(
       throw error
     }
 
-    if (canFallbackToChatboxAI()) {
+    if (options.forceChatboxAIFallback || canFallbackToChatboxAI()) {
       return await fallbackToChatboxAIParser(file, uniqKey, 'local_parser_failed')
     }
 
@@ -484,12 +485,7 @@ export async function prepareFileAttachment(
         }
 
         case 'chatbox-ai': {
-          try {
-            result = await parseFileWithChatboxAI(file, uniqKey)
-          } catch (error) {
-            log.error(`Chatbox AI parsing failed for "${file.name}":`, error)
-            throw new Error('chatbox_ai_parser_failed')
-          }
+          result = await parseFileWithLocalFallback(file, uniqKey, { forceChatboxAIFallback: true })
           break
         }
 

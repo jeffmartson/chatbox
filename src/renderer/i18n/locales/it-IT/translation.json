@@ -1149,5 +1149,7 @@
   "Webpage Builder": "Creazione di pagine web",
   "Turn an idea into an interactive webpage": "Trasforma un’idea in una pagina web interattiva",
   "Interactive Story": "Storia interattiva",
-  "Choose a world and role to start an interactive adventure": "Scegli un mondo e un ruolo per iniziare un’avventura interattiva"
+  "Choose a world and role to start an interactive adventure": "Scegli un mondo e un ruolo per iniziare un’avventura interattiva",
+  "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "Prova prima l'analisi locale senza consumare punti. Se l'analisi locale non riesce, verrà usata l'analisi cloud di Chatbox AI e verranno consumati punti.",
+  "No points consumed": "Nessun punto consumato"
 }

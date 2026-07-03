@@ -159,9 +159,9 @@ function _otherI18nKeys(t: (key: string) => string) {
   t('Current thread')
 
   // src/renderer/components/settings/DocumentParserSettings.tsx
-  t('Text Only')
   t('Local')
   t('MinerU')
+  t('No points consumed')
   t(
     'Only supports basic text files (.txt, .md, .json, code files, etc.). For PDF and Office files, please switch to Chatbox AI.'
   )
@@ -170,6 +170,9 @@ function _otherI18nKeys(t: (key: string) => string) {
   )
   t(
     'Cloud-based document parsing service, supports PDF, Office files, EPUB and many other file types. Consumes compute points.'
+  )
+  t(
+    'Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.'
   )
   t('Third-party cloud parsing service, supports PDF and most Office files. Requires API token.')
 

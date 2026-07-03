@@ -19,10 +19,10 @@ const log = getLogger('settings-store')
 /**
  * Returns platform-specific default document parser configuration.
  * - Desktop: 'local' (has full Node.js environment for local parsing)
- * - Mobile/Web: 'none' (only basic text file support by default, user can enable chatbox-ai)
+ * - Mobile/Web: 'chatbox-ai' (local-first parsing with Chatbox AI cloud fallback)
  */
 export function getPlatformDefaultDocumentParser(): DocumentParserConfig {
-  return platform.type === 'desktop' ? { type: 'local' } : { type: 'none' }
+  return platform.type === 'desktop' ? { type: 'local' } : { type: 'chatbox-ai' }
 }
 
 type Action = {
@@ -62,7 +62,7 @@ export const settingsStore = createStore<Settings & Action>()(
           },
           removeItem: async (name) => await storage.removeItem(name),
         })),
-        version: 4,
+        version: 5,
         partialize: (state) => {
           try {
             return SettingsSchema.parse(state)
@@ -95,6 +95,11 @@ export const settingsStore = createStore<Settings & Action>()(
                 settings.skills = defaults.settings().skills
               } else if (settings.skills.translationEnabled === undefined) {
                 settings.skills.translationEnabled = true
+              }
+            case 3:
+            case 4:
+              if (platform.type !== 'desktop' && settings.extension?.documentParser?.type === 'none') {
+                settings.extension.documentParser.type = 'chatbox-ai'
               }
             default:
               break

@@ -12,7 +12,7 @@ import type { SessionAttachmentRagController } from './session-attachment-rag/in
 import { IndexedDBStorage } from './storages'
 import WebExporter from './web_exporter'
 import webLogger from './web_logger'
-import { parseTextFileLocally } from './web_platform_utils'
+import { parseFileLocallyInBrowser } from './web_platform_utils'
 
 export default class WebPlatform extends IndexedDBStorage implements Platform {
   public type: PlatformType = 'web'
@@ -166,10 +166,10 @@ export default class WebPlatform extends IndexedDBStorage implements Platform {
     return
   }
 
-  async parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean }> {
-    const result = await parseTextFileLocally(file)
+  async parseFileLocally(file: File): Promise<{ key?: string; isSupported: boolean; errorCode?: string }> {
+    const result = await parseFileLocallyInBrowser(file)
     if (!result.isSupported) {
-      return { isSupported: false }
+      return { isSupported: false, errorCode: result.errorCode }
     }
     const key = `parseFile-` + uuidv4()
     await this.setStoreBlob(key, result.text)

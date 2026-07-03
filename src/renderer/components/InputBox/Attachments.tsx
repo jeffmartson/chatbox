@@ -134,8 +134,10 @@ export function FileMiniCard(props: {
 
   // 获取翻译后的错误消息
   const translatedError = getTranslatedErrorMessage(errorMessage, t)
-  // 解析完成后展示使用的解析器（local/chatbox-ai/mineru）；处理中/错误时优先展示状态文案
-  const parserLabel = getParserTypeLabel(parserType, t)
+  // 解析完成后展示解析结果和点数消耗提示；处理中/错误时优先展示状态文案
+  const miniCardParserLabel = getParserDisplayName(parserType, t)
+  const parserCostLabel = getParserCostLabel(parserType, t)
+  const parserLabel = [miniCardParserLabel, parserCostLabel].filter(Boolean).join('\n')
   const displayedStatusText =
     status === 'error'
       ? getErrorStatusLabel(errorMessage, t)
@@ -176,8 +178,15 @@ export function FileMiniCard(props: {
                       ? 'min-w-0 text-amber-600 text-center'
                       : 'min-w-0 text-gray-500 text-center'
                 }
-                noWrap
-                sx={{ fontSize: '11px', lineHeight: 1.2 }}
+                sx={{
+                  fontSize: '11px',
+                  lineHeight: 1.15,
+                  whiteSpace: 'pre-line',
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitBoxOrient: 'vertical',
+                  WebkitLineClamp: 2,
+                }}
               >
                 {displayedStatusText}
               </Typography>
@@ -230,9 +239,9 @@ function getFileTypeLabel(filename: string, fileType?: string): string {
   return ''
 }
 
-// 展示文档使用了哪个解析器解析（local/chatbox-ai/mineru），带“解析器:”前缀以表意清晰。
+// 展示文档使用的解析器和点数消耗提示。
 // 'sandbox-raw'（Agent 模式原文件）、'none' 及未知值不展示。
-export function getParserTypeLabel(
+export function getParserDisplayName(
   parserType: string | undefined,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string | undefined {
@@ -246,6 +255,27 @@ export function getParserTypeLabel(
     default:
       return undefined
   }
+}
+
+function getParserCostLabel(
+  parserType: string | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string | undefined {
+  switch (parserType) {
+    case 'local':
+      return t('No points consumed')
+    default:
+      return undefined
+  }
+}
+
+export function getParserTypeLabel(
+  parserType: string | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string | undefined {
+  const parserName = getParserDisplayName(parserType, t)
+  const costLabel = getParserCostLabel(parserType, t)
+  return [parserName, costLabel].filter(Boolean).join(' · ') || undefined
 }
 
 function getIndexingStageLabel(stage: SessionAttachmentIndexingStage | undefined, t: (key: string) => string) {
