@@ -26,7 +26,7 @@ export function NewUserScenarioGrid({ scenarios, onSelect }: NewUserScenarioGrid
   const { t } = useTranslation()
 
   return (
-    <Stack gap="lg" className="w-full max-w-5xl mx-auto px-md sm:gap-xl">
+    <Stack gap="lg" className="w-full max-w-5xl mx-auto px-md md:px-[60px] sm:gap-xl">
       <Stack gap={6}>
         <Text
           fw={700}
