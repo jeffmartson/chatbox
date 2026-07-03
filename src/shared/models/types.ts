@@ -2,6 +2,7 @@ import type { ModelMessage, PrepareStepFunction, TextStreamPart, ToolSet } from 
 import {
   type MessageContentParts,
   type MessageStatus,
+  type ProviderModelInfo,
   type ProviderOptions,
   ProviderOptionsSchema,
   type StreamTextResult,
@@ -12,6 +13,11 @@ import { z } from 'zod'
 export interface ModelInterface {
   name: string
   modelId: string
+  /**
+   * Resolved API family of this model instance. getModel() stamps it from the provider
+   * type (builtin/custom providers) or the per-model remote config (ChatboxAI).
+   */
+  readonly apiStyle?: ProviderModelInfo['apiStyle']
   isSupportVision(): boolean
   isSupportToolUse(scope?: ToolUseScope): boolean
   isSupportSystemMessage(): boolean

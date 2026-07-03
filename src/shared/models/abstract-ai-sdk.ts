@@ -8,12 +8,12 @@ import {
   type JSONValue,
   type LanguageModelUsage,
   type ModelMessage,
-  type ProviderMetadata,
+  type PrepareStepFunction,
   type Provider,
+  type ProviderMetadata,
   simulateStreamingMiddleware,
   stepCountIs,
   streamText,
-  type PrepareStepFunction,
   type TextStreamPart,
   type ToolCallRepairFunction,
   type ToolSet,
@@ -148,6 +148,10 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
   public name = 'AI SDK Model'
   public injectDefaultMetadata = true
   public modelId = ''
+
+  public get apiStyle(): ProviderModelInfo['apiStyle'] {
+    return this.options.model.apiStyle
+  }
 
   public isSupportToolUse() {
     return this.options.model.capabilities?.includes('tool_use') || false

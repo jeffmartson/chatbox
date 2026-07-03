@@ -2,7 +2,7 @@ import type { JSONValue } from '@ai-sdk/provider'
 import type { ReasoningPart } from '@ai-sdk/provider-utils'
 import type { FilePart, ImagePart, ModelMessage, TextPart, ToolCallPart } from 'ai'
 import { compact } from 'lodash'
-import type { Message, MessageContentParts, MessageToolCallPart } from '../types'
+import type { Message, MessageContentParts, MessageContentToolCallPart } from '../types'
 import { getMessageText } from '../utils/message'
 
 /**
@@ -15,7 +15,10 @@ export type ModelImageResolver = (storageKey: string) => Promise<string | null>
 export interface ConvertToModelMessagesOptions {
   modelSupportVision: boolean
   preserveReasoning?: boolean
+  ensureGoogleFunctionCallSignatures?: boolean
 }
+
+const GOOGLE_THOUGHT_SIGNATURE_VALIDATOR_BYPASS = 'skip_thought_signature_validator'
 
 async function resolveImageData(
   storageKey: string,
@@ -96,6 +99,36 @@ function toToolCallInput(args: unknown): unknown {
     /* malformed JSON — fall through to an empty object */
   }
   return {}
+}
+
+function hasGoogleThoughtSignature(part: MessageContentToolCallPart): boolean {
+  const google = part.providerMetadata?.google
+  return Boolean(
+    google && typeof google === 'object' && 'thoughtSignature' in google && typeof google.thoughtSignature === 'string'
+  )
+}
+
+function withGoogleThoughtSignatureBypass(part: MessageContentToolCallPart): MessageContentToolCallPart {
+  return {
+    ...part,
+    providerMetadata: {
+      ...part.providerMetadata,
+      google: {
+        ...part.providerMetadata?.google,
+        thoughtSignature: GOOGLE_THOUGHT_SIGNATURE_VALIDATOR_BYPASS,
+      },
+    },
+  }
+}
+
+function isCompletedToolCall(part: MessageContentParts[number]): part is MessageContentToolCallPart {
+  return part.type === 'tool-call' && (part.state === 'result' || part.state === 'error')
+}
+
+function isSameToolCallBatch(first: MessageContentToolCallPart, next: MessageContentToolCallPart): boolean {
+  // stepIndex is the provider-level step boundary; parts without one (legacy messages)
+  // keep the old one-call-per-batch serialization.
+  return first.stepIndex !== undefined && first.stepIndex === next.stepIndex
 }
 
 async function convertContentParts<T extends TextPart | ImagePart | FilePart>(
@@ -183,62 +216,70 @@ async function emitAssistantMessages(
   contentParts: MessageContentParts,
   resolveImage: ModelImageResolver,
   output: ModelMessage[],
-  options?: { preserveReasoning?: boolean }
+  options?: { preserveReasoning?: boolean; ensureGoogleFunctionCallSignatures?: boolean }
 ): Promise<void> {
-  const toolCallIndices = contentParts
-    .map((c, i) => (c.type === 'tool-call' && (c.state === 'result' || c.state === 'error') ? i : -1))
-    .filter((i) => i !== -1)
-
-  if (toolCallIndices.length === 0) {
-    const converted = await convertAssistantContentParts(contentParts, resolveImage, options)
-    if (converted.length > 0) {
-      output.push({ role: 'assistant' as const, content: converted })
-    }
-    return
-  }
-
   let cursor = 0
-  for (const tcIdx of toolCallIndices) {
-    const segment = contentParts.slice(cursor, tcIdx + 1)
+  while (cursor < contentParts.length) {
+    const tcIdx = contentParts.findIndex((part, index) => index >= cursor && isCompletedToolCall(part))
+    if (tcIdx === -1) break
+
+    // Collect the contiguous run of completed tool calls that belong to the same batch.
+    const toolCallParts: MessageContentToolCallPart[] = []
+    for (let index = tcIdx; index < contentParts.length; index += 1) {
+      const part = contentParts[index]
+      if (!isCompletedToolCall(part)) break
+      if (toolCallParts.length > 0 && !isSameToolCallBatch(toolCallParts[0], part)) break
+      toolCallParts.push(part)
+    }
+    const batchEnd = tcIdx + toolCallParts.length
+
+    // Gemini 3 signs only the first functionCall of a batch, so a missing signature on the
+    // batch head is the only case that needs the validator bypass.
+    if (options?.ensureGoogleFunctionCallSignatures && !hasGoogleThoughtSignature(toolCallParts[0])) {
+      toolCallParts[0] = withGoogleThoughtSignatureBypass(toolCallParts[0])
+    }
+
+    const segment = [...contentParts.slice(cursor, tcIdx), ...toolCallParts]
     const converted = await convertAssistantContentParts(segment, resolveImage, options)
     if (converted.length > 0) {
       output.push({ role: 'assistant' as const, content: converted })
     }
 
-    const tc = contentParts[tcIdx] as MessageToolCallPart
-    let toolOutput: { type: 'error-text'; value: string } | { type: 'json'; value: JSONValue }
-    if (tc.state === 'error') {
-      toolOutput = { type: 'error-text' as const, value: stringifyErrorResult(tc.result) }
-    } else if (tc.resultStorageKey) {
-      // The full result was offloaded to blob storage — send the preview + a hint.
-      // tc.result is always a plain string here (truncated from the serialized form).
-      const preview = String(tc.result ?? '')
-      toolOutput = {
-        type: 'json' as const,
-        value: {
-          _truncated: true,
-          preview,
-          fullResultFileKey: tc.resultStorageKey,
-          hint: 'Result was too large and has been truncated. Use the read_file tool with the fullResultFileKey above to read the complete result.',
-        } as JSONValue,
+    const toolResults = toolCallParts.map((tc) => {
+      let toolOutput: { type: 'error-text'; value: string } | { type: 'json'; value: JSONValue }
+      if (tc.state === 'error') {
+        toolOutput = { type: 'error-text' as const, value: stringifyErrorResult(tc.result) }
+      } else if (tc.resultStorageKey) {
+        // The full result was offloaded to blob storage — send the preview + a hint.
+        // tc.result is always a plain string here (truncated from the serialized form).
+        const preview = String(tc.result ?? '')
+        toolOutput = {
+          type: 'json' as const,
+          value: {
+            _truncated: true,
+            preview,
+            fullResultFileKey: tc.resultStorageKey,
+            hint: 'Result was too large and has been truncated. Use the read_file tool with the fullResultFileKey above to read the complete result.',
+          } as JSONValue,
+        }
+      } else {
+        toolOutput = { type: 'json' as const, value: toSafeJSONValue(tc.result) }
       }
-    } else {
-      toolOutput = { type: 'json' as const, value: toSafeJSONValue(tc.result) }
-    }
-    output.push({
-      role: 'tool' as const,
-      content: [
-        {
-          type: 'tool-result' as const,
-          toolCallId: tc.toolCallId,
-          toolName: tc.toolName,
-          output: toolOutput,
-          providerOptions: tc.resultProviderMetadata,
-        },
-      ],
+      return {
+        type: 'tool-result' as const,
+        toolCallId: tc.toolCallId,
+        toolName: tc.toolName,
+        output: toolOutput,
+        providerOptions: tc.resultProviderMetadata,
+      }
     })
 
-    cursor = tcIdx + 1
+    output.push({
+      role: 'tool' as const,
+      content: toolResults,
+    })
+
+    cursor = batchEnd
   }
 
   if (cursor < contentParts.length) {
@@ -286,6 +327,7 @@ export async function convertToModelMessages(
       case 'assistant':
         await emitAssistantMessages(m.contentParts || [], resolveImage, output, {
           preserveReasoning: options?.preserveReasoning,
+          ensureGoogleFunctionCallSignatures: options?.ensureGoogleFunctionCallSignatures,
         })
         break
       case 'tool':

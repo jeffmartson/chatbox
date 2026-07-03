@@ -324,6 +324,175 @@ describe('processStreamChunk', () => {
     })
   })
 
+  it('preserves provider metadata from tool input start when the tool-call chunk omits it', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-from-start' } }
+    const start = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc1', toolName: 'search', providerMetadata }),
+      createInitialState(),
+      callbacks
+    )
+    const result = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'test' } }),
+      start.state,
+      callbacks
+    )
+
+    expect(result.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      providerMetadata,
+    })
+  })
+
+  it('preserves provider metadata from tool input delta when the tool-call chunk omits it', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-from-delta' } }
+    const start = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc1', toolName: 'search' }),
+      createInitialState(),
+      callbacks
+    )
+    const delta = await processStreamChunk(
+      chunk('tool-input-delta', { id: 'tc1', delta: '{"q":"test"}', providerMetadata }),
+      start.state,
+      callbacks
+    )
+    const result = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'test' } }),
+      delta.state,
+      callbacks
+    )
+
+    expect(result.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      providerMetadata,
+    })
+  })
+
+  it('preserves provider metadata from tool input end when the tool-call chunk omits it', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-from-end' } }
+    const start = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc1', toolName: 'search' }),
+      createInitialState(),
+      callbacks
+    )
+    const end = await processStreamChunk(
+      chunk('tool-input-end', { id: 'tc1', providerMetadata }),
+      start.state,
+      callbacks
+    )
+    const result = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'test' } }),
+      end.state,
+      callbacks
+    )
+
+    expect(result.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      providerMetadata,
+    })
+  })
+
+  it("does not stamp a still-streaming sibling call's provider metadata onto an interleaved tool-result", async () => {
+    const siblingMetadata = { google: { thoughtSignature: 'signature-of-tc2' } }
+    // tc1's tool-call chunk arrives without metadata, then tc2's input starts streaming
+    // (carrying tc2's signature) while tc1 executes; tc1's result interleaves before tc2's tool-call.
+    const firstCall = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'one' } }),
+      createInitialState(),
+      callbacks
+    )
+    const siblingInputStart = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc2', toolName: 'search', providerMetadata: siblingMetadata }),
+      firstCall.state,
+      callbacks
+    )
+    const firstResult = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: { data: 'one' } }),
+      siblingInputStart.state,
+      callbacks
+    )
+    const secondCall = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc2', toolName: 'search', args: { q: 'two' } }),
+      firstResult.state,
+      callbacks
+    )
+
+    const [firstPart, secondPart] = secondCall.state.contentParts as Array<{
+      providerMetadata?: Record<string, unknown>
+    }>
+    // tc1 must not inherit tc2's signature, and tc2's pending metadata must survive tc1's result.
+    expect(firstPart.providerMetadata).toBeUndefined()
+    expect(secondPart.providerMetadata).toEqual(siblingMetadata)
+  })
+
+  it('stamps tool calls in the same generation step with the same step index', async () => {
+    const state = createInitialState()
+    const first = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'one' } }),
+      state,
+      callbacks
+    )
+    const second = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc2', toolName: 'search', args: { q: 'two' } }),
+      first.state,
+      callbacks
+    )
+
+    const [firstPart, secondPart] = second.state.contentParts as Array<{ stepIndex?: number }>
+    expect(firstPart.stepIndex).toBe(0)
+    expect(secondPart.stepIndex).toBe(0)
+  })
+
+  it('keeps one step index when a fast tool-result interleaves before a sibling tool-call', async () => {
+    // A fast tc1 result can arrive before tc2's tool-call chunk; without a finish-step
+    // in between they are still one parallel batch and must share a step index.
+    const firstCall = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'one' } }),
+      createInitialState(),
+      callbacks
+    )
+    const firstResult = await processStreamChunk(
+      chunk('tool-result', { toolCallId: 'tc1', result: { data: 'one' } }),
+      firstCall.state,
+      callbacks
+    )
+    const secondCall = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc2', toolName: 'search', args: { q: 'two' } }),
+      firstResult.state,
+      callbacks
+    )
+
+    const [firstPart, secondPart] = secondCall.state.contentParts as Array<{ stepIndex?: number }>
+    expect(firstPart.stepIndex).toBe(0)
+    expect(secondPart.stepIndex).toBe(0)
+  })
+
+  it('increments step index after finish-step and resumes after persisted step indices', async () => {
+    const first = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'one' } }),
+      createInitialState(),
+      callbacks
+    )
+    const nextStep = await processStreamChunk(chunk('finish-step', {}), first.state, callbacks)
+    const second = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc2', toolName: 'search', args: { q: 'two' } }),
+      nextStep.state,
+      callbacks
+    )
+
+    const [firstPart, secondPart] = second.state.contentParts as Array<{ stepIndex?: number }>
+    expect(firstPart.stepIndex).toBe(0)
+    expect(secondPart.stepIndex).toBe(1)
+
+    const resumed = createInitialState(second.state.contentParts)
+    const third = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc3', toolName: 'search', args: { q: 'three' } }),
+      resumed,
+      callbacks
+    )
+    const thirdPart = third.state.contentParts[2] as { stepIndex?: number }
+    expect(thirdPart.stepIndex).toBe(2)
+  })
+
   it('records startTime on tool-call and duration on tool-result', async () => {
     const state = createInitialState()
     const r1 = await processStreamChunk(
@@ -390,7 +559,8 @@ describe('processStreamChunk', () => {
       r1.state,
       callbacks
     )
-    const part = r2.state.contentParts[0] as { resultProviderMetadata?: unknown }
+    const part = r2.state.contentParts[0] as { providerMetadata?: unknown; resultProviderMetadata?: unknown }
+    expect(part.providerMetadata).toBeUndefined()
     expect(part.resultProviderMetadata).toEqual(providerMetadata)
   })
 
@@ -429,6 +599,32 @@ describe('processStreamChunk', () => {
       )
     ).rejects.toBe(error)
     expect((r1.state.contentParts[0] as { state: string }).state).toBe('call')
+  })
+
+  it('preserves provider metadata when a tool-call limit pause arrives as tool-error without a tool-call chunk', async () => {
+    const providerMetadata = { google: { thoughtSignature: 'signature-before-pause' } }
+    const start = await processStreamChunk(
+      chunk('tool-input-start', { id: 'tc1', toolName: 'code_execution', providerMetadata }),
+      createInitialState(),
+      callbacks
+    )
+    const error = new Error('Tool call limit reached before executing code_execution')
+    error.name = 'ToolCallLimitPausedError'
+
+    await expect(
+      processStreamChunk(
+        chunk('tool-error', { toolCallId: 'tc1', error, input: { code: '1' }, toolName: 'code_execution' }),
+        start.state,
+        callbacks
+      )
+    ).rejects.toBe(error)
+
+    expect(start.state.contentParts[0]).toMatchObject({
+      type: 'tool-call',
+      state: 'call',
+      toolCallId: 'tc1',
+      providerMetadata,
+    })
   })
 
   it.each(['UserExecApprovalPausedError', 'FileMutationApprovalPausedError'])(

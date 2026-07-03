@@ -1398,8 +1398,13 @@ const TimelineRail: FC<{
 )
 
 const TimelineToolCallStep: FC<
-  { part: MessageToolCallPart; isFirst: boolean; isLast: boolean } & ToolCallActionContext
-> = ({ part, isFirst, isLast, sessionId, messageId }) => {
+  {
+    part: MessageToolCallPart
+    isFirst: boolean
+    isLast: boolean
+    showPausedActionDetails?: boolean
+  } & ToolCallActionContext
+> = ({ part, isFirst, isLast, sessionId, messageId, showPausedActionDetails = true }) => {
   const { t } = useTranslation()
   const pendingApproval = usePendingApproval(part.toolCallId)
   const isWaitingApproval = !!pendingApproval
@@ -1457,7 +1462,7 @@ const TimelineToolCallStep: FC<
           ? t('Failed')
           : truncateSummary(argSummary || resultSummary || t('Completed'))
 
-  const hasDetail = isWaitingApproval || isPaused || part.state !== 'call'
+  const hasDetail = isWaitingApproval || (isPaused ? showPausedActionDetails : part.state !== 'call')
 
   return (
     <Box pos="relative" pl={32} style={{ minHeight: 28, overflow: 'visible' }}>
@@ -1533,6 +1538,27 @@ type CopyReasoningHandler = (content: string) => (e: React.MouseEvent<HTMLButton
 // Renders an intermediate assistant text block as a timeline node. Markdown
 // rendering is delegated to the caller (Message owns the settings/uniqueId).
 type RenderStepText = (part: MessageTextPart, index: number) => ReactNode
+
+// tool_call_limit pauses freeze a whole parallel batch, but the Continue/Stop affordance
+// should render once per batch — on the batch's first paused part (parts without a
+// stepIndex each count as their own batch).
+function makeShouldShowPausedActions(parts: StepTimelinePart[]): (part: MessageToolCallPart) => boolean {
+  const actionIds = new Set<string>()
+  const seenStepIndexes = new Set<number>()
+
+  for (const part of parts) {
+    if (part.type !== 'tool-call') continue
+    if (part.state !== 'paused' || part.pauseReason?.type !== 'tool_call_limit') continue
+    if (part.stepIndex !== undefined) {
+      if (seenStepIndexes.has(part.stepIndex)) continue
+      seenStepIndexes.add(part.stepIndex)
+    }
+    actionIds.add(part.toolCallId)
+  }
+
+  return (part) =>
+    part.state !== 'paused' || part.pauseReason?.type !== 'tool_call_limit' || actionIds.has(part.toolCallId)
+}
 
 const TimelineTextStep: FC<{ children: ReactNode; isFirst: boolean; isLast: boolean }> = ({
   children,
@@ -1694,6 +1720,8 @@ export const StepTimelineUI: FC<
     renderText?: RenderStepText
   } & ToolCallActionContext
 > = ({ parts, message, sessionId, messageId, onCopyReasoningContent, renderText }) => {
+  const shouldShowPausedActions = makeShouldShowPausedActions(parts)
+
   return (
     <Box pos="relative" my={8} mb={12}>
       <Stack gap={TIMELINE_STACK_GAP}>
@@ -1733,6 +1761,7 @@ export const StepTimelineUI: FC<
               isLast={isLast}
               sessionId={sessionId}
               messageId={messageId}
+              showPausedActionDetails={shouldShowPausedActions(part)}
             />
           )
         })}

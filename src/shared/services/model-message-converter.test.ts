@@ -113,6 +113,227 @@ describe('convertToModelMessages — tool result sanitization', () => {
     expect(() => modelMessageSchema.parse(assistantMsg)).not.toThrow()
   })
 
+  it('keeps parallel Gemini tool calls in one assistant turn with one matching tool-result turn', async () => {
+    const firstProviderMetadata = { google: { thoughtSignature: 'signature-1' } }
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            providerMetadata: firstProviderMetadata,
+            stepIndex: 0,
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-2',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(2)', language: 'node' },
+            stepIndex: 0,
+            result: { stdout: '2\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+
+    expect(output).toHaveLength(2)
+    expect(output[0].role).toBe('assistant')
+    expect(output[1].role).toBe('tool')
+
+    const assistantParts = output[0].content as Array<{ type: string; providerOptions?: unknown }>
+    expect(assistantParts).toHaveLength(2)
+    expect(assistantParts[0].providerOptions).toEqual(firstProviderMetadata)
+    expect(assistantParts[1].providerOptions).toBeUndefined()
+
+    const toolParts = output[1].content as Array<{ type: string; toolCallId: string }>
+    expect(toolParts.map((part) => part.toolCallId)).toEqual(['call-1', 'call-2'])
+    for (const msg of output) {
+      expect(() => modelMessageSchema.parse(msg)).not.toThrow()
+    }
+  })
+
+  it('adds the documented Google validator bypass to a missing sequential function-call signature', async () => {
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage, {
+      modelSupportVision: true,
+      ensureGoogleFunctionCallSignatures: true,
+    })
+
+    const assistantParts = output[0].content as Array<{ type: string; providerOptions?: unknown }>
+    expect(assistantParts[0].providerOptions).toEqual({
+      google: { thoughtSignature: 'skip_thought_signature_validator' },
+    })
+    expect(() => modelMessageSchema.parse(output[0])).not.toThrow()
+  })
+
+  it('keeps later parallel calls unsigned when the first call has a signature', async () => {
+    const firstProviderMetadata = { google: { thoughtSignature: 'signature-1' } }
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            providerMetadata: firstProviderMetadata,
+            stepIndex: 0,
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-2',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(2)', language: 'node' },
+            stepIndex: 0,
+            result: { stdout: '2\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage, {
+      modelSupportVision: true,
+      ensureGoogleFunctionCallSignatures: true,
+    })
+
+    const assistantParts = output[0].content as Array<{ type: string; providerOptions?: unknown }>
+    expect(assistantParts[0].providerOptions).toEqual(firstProviderMetadata)
+    expect(assistantParts[1].providerOptions).toBeUndefined()
+  })
+
+  it('keeps tool calls with the same step index in one assistant turn', async () => {
+    const firstProviderMetadata = { google: { thoughtSignature: 'signature-1' } }
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            providerMetadata: firstProviderMetadata,
+            stepIndex: 0,
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-2',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(2)', language: 'node' },
+            stepIndex: 0,
+            result: { stdout: '2\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+
+    expect(output.map((message) => message.role)).toEqual(['assistant', 'tool'])
+    expect(output[0].content).toHaveLength(2)
+    expect(output[1].content).toHaveLength(2)
+  })
+
+  it('keeps different step indices as serial history', async () => {
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            stepIndex: 0,
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-2',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(2)', language: 'node' },
+            stepIndex: 1,
+            result: { stdout: '2\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+
+    expect(output.map((message) => message.role)).toEqual(['assistant', 'tool', 'assistant', 'tool'])
+  })
+
+  it('keeps ungrouped consecutive tool calls as serial history', async () => {
+    const messages: Message[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-1',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(1)', language: 'node' },
+            result: { stdout: '1\n', stderr: '', exitCode: 0 },
+          },
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'call-2',
+            toolName: 'default_api:code_execution',
+            args: { code: 'console.log(2)', language: 'node' },
+            result: { stdout: '2\n', stderr: '', exitCode: 0 },
+          },
+        ],
+      },
+    ]
+
+    const output = await convertToModelMessages(messages, noImage)
+
+    expect(output.map((message) => message.role)).toEqual(['assistant', 'tool', 'assistant', 'tool'])
+    expect((output[0].content as Array<{ toolCallId?: string }>)[0].toolCallId).toBe('call-1')
+    expect((output[2].content as Array<{ toolCallId?: string }>)[0].toolCallId).toBe('call-2')
+  })
+
   it('preserves provider metadata on tool results', async () => {
     const resultProviderMetadata = { openai: { itemId: 'result-item-1' } }
     const messages: Message[] = [

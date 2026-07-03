@@ -320,6 +320,10 @@ export async function prepareAgentGenerationHarness(
   const coreMessages = await convertToModelMessages(injectedMessages, {
     modelSupportVision: model.isSupportVision(),
     preserveReasoning: settings.provider === ModelProviderEnum.DeepSeek,
+    // getModel() stamps apiStyle from the provider type (builtin/custom Gemini providers)
+    // or the per-model remote config (ChatboxAI google-routed models), so it is the single
+    // signal for "this request speaks the Gemini function-call protocol".
+    ensureGoogleFunctionCallSignatures: model.apiStyle === 'google',
   })
 
   const chatOptions: ChatStreamOptions = {

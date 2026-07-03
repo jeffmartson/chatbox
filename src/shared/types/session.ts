@@ -140,6 +140,11 @@ export const MessageToolCallPartSchema = z.object({
   providerMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
   resultProviderMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
   providerExecuted: z.boolean().optional(),
+  /**
+   * Generation step this call was emitted in. Tool calls sharing a stepIndex are one
+   * provider-level parallel batch (Gemini 3 signs only the first functionCall of a batch).
+   */
+  stepIndex: z.number().optional().catch(undefined),
   result: z.unknown().optional(),
   /** Timestamp (ms) when this tool call started executing. */
   startTime: z.number().optional(),
@@ -389,6 +394,8 @@ export type MessageToolCallPart<Args = unknown, Result = unknown> = Omit<
   resultStorageKey?: string
 }
 export type MessageContentParts = z.infer<typeof MessageContentPartsSchema>
+/** The tool-call member of the content-part union, as stored inside MessageContentParts. */
+export type MessageContentToolCallPart = Extract<MessageContentParts[number], { type: 'tool-call' }>
 export type StreamTextResult = z.infer<typeof StreamTextResultSchema>
 export type ToolUseScope = z.infer<typeof ToolUseScopeSchema>
 export type ModelProvider = z.infer<typeof ModelProviderSchema>

@@ -3,6 +3,7 @@ import type { ModelInterface, ModelStreamPart } from '@shared/models/types'
 import type {
   Message,
   MessageContentParts,
+  MessageContentToolCallPart,
   MessageToolCallPart,
   ModelProvider,
   Session,
@@ -28,6 +29,7 @@ import * as settingActions from '../settingActions'
 import { settingsStore } from '../settingsStore'
 import { uiStore } from '../uiStore'
 import { prepareAgentGenerationHarness, refreshSessionAttachmentStatuses } from './agent-harness'
+import { getSessionAgentModeEntry, lockSessionAgentMode, setSessionAgentMode } from './agent-mode'
 import {
   AGENT_MODE_SUGGESTION_PROMPT,
   type AgentModeSuggestionDecision,
@@ -36,7 +38,6 @@ import {
   isFirstUserTurn,
   parseAgentModeSuggestionDecision,
 } from './agent-mode-suggestion'
-import { getSessionAgentModeEntry, lockSessionAgentMode, setSessionAgentMode } from './agent-mode'
 import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
@@ -248,8 +249,12 @@ function markToolCallPaused(
   toolCallId: string,
   pauseReason: MessageToolCallPart['pauseReason']
 ): MessageContentParts {
+  // A tool_call_limit pause freezes the whole in-flight batch, not just the call that
+  // tripped the limit; other pause reasons target only the named call.
+  const pausesBatch = pauseReason?.type === 'tool_call_limit'
   return contentParts.map((part) => {
-    if (part.type !== 'tool-call' || part.toolCallId !== toolCallId) return part
+    if (part.type !== 'tool-call') return part
+    if (part.toolCallId !== toolCallId && !(pausesBatch && part.state === 'call')) return part
     return {
       ...part,
       state: 'paused',
@@ -258,24 +263,62 @@ function markToolCallPaused(
   })
 }
 
-function updateToolCallPart(
+/** Rewrites every tool-call part matching the predicate; other parts pass through untouched. */
+function updateToolCallParts(
   message: Message,
-  toolCallId: string,
-  updater: (part: MessageToolCallPart) => MessageToolCallPart
+  shouldUpdate: (part: MessageContentToolCallPart) => boolean,
+  updater: (part: MessageContentToolCallPart) => MessageContentToolCallPart
 ): Message {
   return {
     ...message,
-    contentParts: message.contentParts.map((part) => {
-      if (part.type !== 'tool-call' || part.toolCallId !== toolCallId) return part
-      return updater(part as MessageToolCallPart)
-    }),
+    contentParts: message.contentParts.map((part) =>
+      part.type === 'tool-call' && shouldUpdate(part) ? updater(part) : part
+    ),
   }
 }
 
-function findToolCallPart(message: Message, toolCallId: string): MessageToolCallPart | undefined {
+function updateToolCallPart(
+  message: Message,
+  toolCallId: string,
+  updater: (part: MessageContentToolCallPart) => MessageContentToolCallPart
+): Message {
+  return updateToolCallParts(message, (part) => part.toolCallId === toolCallId, updater)
+}
+
+function findToolCallPart(message: Message, toolCallId: string): MessageContentToolCallPart | undefined {
   return message.contentParts.find(
-    (part): part is MessageToolCallPart => part.type === 'tool-call' && part.toolCallId === toolCallId
+    (part): part is MessageContentToolCallPart => part.type === 'tool-call' && part.toolCallId === toolCallId
   )
+}
+
+function findPausedToolCallLimitBatch(message: Message, toolCallId: string): MessageContentToolCallPart[] {
+  const selected = findToolCallPart(message, toolCallId)
+  if (selected?.pauseReason?.type !== 'tool_call_limit') return []
+  return message.contentParts.filter(
+    (part): part is MessageContentToolCallPart =>
+      part.type === 'tool-call' && part.state === 'paused' && part.pauseReason?.type === 'tool_call_limit'
+  )
+}
+
+function isApprovalPauseReason(pauseReason: MessageContentToolCallPart['pauseReason']): boolean {
+  return pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval'
+}
+
+function findPausedApprovalBatch(message: Message, toolCallId: string): MessageContentToolCallPart[] {
+  const selected = findToolCallPart(message, toolCallId)
+  if (!selected || selected.state !== 'paused' || !isApprovalPauseReason(selected.pauseReason)) return []
+  if (selected.stepIndex === undefined) return [selected]
+  return message.contentParts.filter(
+    (part): part is MessageContentToolCallPart =>
+      part.type === 'tool-call' &&
+      part.state === 'paused' &&
+      part.stepIndex === selected.stepIndex &&
+      isApprovalPauseReason(part.pauseReason)
+  )
+}
+
+function hasPausedToolCallPart(message: Message): boolean {
+  return message.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')
 }
 
 function findLastRetryableToolCallPart(message: Message): MessageToolCallPart | undefined {
@@ -675,37 +718,65 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
   const part = findToolCallPart(message, toolCallId)
   if (!part || part.state !== 'paused') return
 
-  if (part.pauseReason?.type === 'user_exec_approval' || part.pauseReason?.type === 'file_mutation_approval') {
+  const pauseReason = part.pauseReason
+  if (pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval') {
     const deniedResult =
-      part.pauseReason.type === 'user_exec_approval'
+      pauseReason.type === 'user_exec_approval'
         ? { success: false, exitCode: null, stdout: '', stderr: 'Command denied by user.' }
         : { success: false, error: 'File mutation denied by user.' }
-    const nextMessage = updateToolCallPart(message, toolCallId, (toolPart) => ({
-      ...toolPart,
-      state: 'result',
-      pauseReason: undefined,
-      result: deniedResult,
-      // Denied without executing — no meaningful duration to report.
-      startTime: undefined,
-      duration: undefined,
-    }))
-    await modifyMessage(sessionId, nextMessage, true)
-    await orchestrateGeneration(
-      sessionId,
-      { ...nextMessage, generating: true },
-      { operationType: 'regenerate', appendToMessage: true }
+    // Denying one call intentionally denies its whole parallel batch: the model should see
+    // one consistent refusal and react once, not a mix of denied and still-pending siblings.
+    // Approving stays per-call (each approval is reviewed individually in continuePausedToolCall).
+    const approvalBatchIds = new Set(
+      findPausedApprovalBatch(message, toolCallId).map((batchPart) => batchPart.toolCallId)
     )
+    const nextMessage = updateToolCallParts(
+      message,
+      (batchPart) => approvalBatchIds.has(batchPart.toolCallId),
+      (batchPart) => ({
+        ...batchPart,
+        state: 'error',
+        pauseReason: undefined,
+        result: batchPart.toolCallId === toolCallId ? deniedResult : { error: 'Approval denied by user.' },
+        // Denied without executing — no meaningful duration to report.
+        startTime: undefined,
+        duration: undefined,
+      })
+    )
+    await modifyMessage(sessionId, nextMessage, true)
+    // Send the denial back to the model so it can react (mirrors the pre-batch behavior),
+    // unless other tool calls in this message are still awaiting resolution.
+    if (!hasPausedToolCallPart(nextMessage)) {
+      await orchestrateGeneration(
+        sessionId,
+        { ...nextMessage, generating: true },
+        { operationType: 'regenerate', appendToMessage: true }
+      )
+    }
     return
   }
 
+  // tool_call_limit pauses are batch-scoped (markToolCallPaused pauses the whole in-flight
+  // batch), so Stop must clear the whole batch too — otherwise the remaining paused parts
+  // keep re-surfacing a Stop/Continue affordance one part at a time.
+  const stopBatchIds = new Set(
+    findPausedToolCallLimitBatch(message, toolCallId).map((batchPart) => batchPart.toolCallId)
+  )
+  if (stopBatchIds.size === 0) {
+    stopBatchIds.add(toolCallId)
+  }
   await modifyMessage(
     sessionId,
-    updateToolCallPart(message, toolCallId, (toolPart) => ({
-      ...toolPart,
-      state: 'error',
-      pauseReason: undefined,
-      result: { error: 'Tool execution stopped by user.' },
-    })),
+    updateToolCallParts(
+      message,
+      (batchPart) => stopBatchIds.has(batchPart.toolCallId),
+      (batchPart) => ({
+        ...batchPart,
+        state: 'error',
+        pauseReason: undefined,
+        result: { error: 'Tool execution stopped by user.' },
+      })
+    ),
     true
   )
 }
@@ -721,36 +792,83 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
   const part = findToolCallPart(message, toolCallId)
   if (!part || part.state !== 'paused') return
 
-  message = updateToolCallPart(message, toolCallId, (toolPart) => ({
-    ...toolPart,
-    state: 'call',
-    pauseReason: undefined,
-    result: undefined,
-    resultStorageKey: undefined,
-    // Restart the timer at continuation so the reported duration excludes the
-    // time spent waiting for user approval / manual continuation.
-    startTime: Date.now(),
-    duration: undefined,
-  }))
+  // A tool_call_limit continue resumes the whole paused batch; an approval continue targets
+  // exactly the clicked call. Either way it's the same flow — a batch of one or many.
+  const toolCallLimitBatch = findPausedToolCallLimitBatch(message, toolCallId)
+  const isLimitContinue = toolCallLimitBatch.length > 0
+  const batch = isLimitContinue ? toolCallLimitBatch : [part]
+  const batchIds = new Set(batch.map((batchPart) => batchPart.toolCallId))
+
+  message = updateToolCallParts(
+    message,
+    (batchPart) => batchIds.has(batchPart.toolCallId),
+    (batchPart) => ({
+      ...batchPart,
+      state: 'call',
+      pauseReason: undefined,
+      result: undefined,
+      resultStorageKey: undefined,
+      // Restart the timer at continuation so the reported duration excludes the
+      // time spent waiting for user approval / manual continuation.
+      startTime: Date.now(),
+      duration: undefined,
+    })
+  )
   await modifyMessage(sessionId, message, false)
 
   try {
     const { tools } = await buildToolsForPausedToolCall(session, settings, message)
-    const toolValue = (tools as Record<string, unknown>)[part.toolName]
-    const executableTool = toolValue && typeof toolValue === 'object' ? (toolValue as ExecutableTool) : undefined
-    if (typeof executableTool?.execute !== 'function') {
-      throw new Error(`Tool "${part.toolName}" is not available`)
+    for (const batchPart of batch) {
+      const toolValue = (tools as Record<string, unknown>)[batchPart.toolName]
+      const executableTool = toolValue && typeof toolValue === 'object' ? (toolValue as ExecutableTool) : undefined
+      if (typeof executableTool?.execute !== 'function') {
+        throw new Error(`Tool "${batchPart.toolName}" is not available`)
+      }
+
+      try {
+        // Only an approval continue carries approved:true (the user just reviewed that exact
+        // call). Limit-paused calls were never reviewed, so their own approval gates must run.
+        const result = await executableTool.execute(batchPart.args, {
+          toolCallId: batchPart.toolCallId,
+          approved: !isLimitContinue,
+        })
+        message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) => ({
+          ...toolPart,
+          state: 'result',
+          result,
+          duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
+        }))
+      } catch (error) {
+        const pause = getToolCallPause(error)
+        message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) =>
+          pause
+            ? {
+                // The tool re-paused itself (e.g. exec/file-mutation approval) — surface the
+                // approval UI instead of recording an error, same as the streaming path.
+                ...toolPart,
+                state: 'paused',
+                pauseReason: pause.pauseReason,
+                result: undefined,
+                startTime: undefined,
+                duration: undefined,
+              }
+            : {
+                ...toolPart,
+                state: 'error',
+                result: { error: error instanceof Error ? error.message : String(error) },
+                duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
+              }
+        )
+      }
+      // Cache-only progress tick; the single persist happens once after the loop.
+      await modifyMessage(sessionId, message, false, true)
     }
 
-    const result = await executableTool.execute(part.args, { toolCallId, approved: true })
-    message = updateToolCallPart(message, toolCallId, (toolPart) => ({
-      ...toolPart,
-      state: 'result',
-      result,
-      duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
-    }))
     await modifyMessage(sessionId, message, true)
-
+    if (hasPausedToolCallPart(message)) {
+      // Some calls are still awaiting user approval — generation resumes once they resolve.
+      return
+    }
     await orchestrateGeneration(
       sessionId,
       { ...message, generating: true },
@@ -760,11 +878,16 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
     const errorMessage = error instanceof Error ? error.message : String(error)
     await modifyMessage(
       sessionId,
-      updateToolCallPart(message, toolCallId, (toolPart) => ({
-        ...toolPart,
-        state: 'error',
-        result: { error: errorMessage },
-      })),
+      updateToolCallParts(
+        message,
+        (batchPart) => batchIds.has(batchPart.toolCallId) && batchPart.state === 'call',
+        (batchPart) => ({
+          ...batchPart,
+          state: 'error',
+          result: { error: errorMessage },
+          duration: batchPart.startTime ? Date.now() - batchPart.startTime : undefined,
+        })
+      ),
       true
     )
   }

@@ -3,12 +3,13 @@ import type { ModelStreamPart } from '@shared/models/types'
 import type {
   Message,
   MessageContentParts,
+  MessageContentToolCallPart,
   MessageReasoningPart,
   MessageStatus,
   MessageTextPart,
   MessageToolCallPart,
 } from '@shared/types'
-import { parsePartialJson, type ToolSet } from 'ai'
+import { type ProviderMetadata, parsePartialJson, type ToolSet } from 'ai'
 
 /** Maximum serialized size (in characters) before a tool result is offloaded to blob storage. */
 export const TOOL_RESULT_SIZE_LIMIT = 30_000
@@ -34,11 +35,18 @@ export interface StreamProcessorState {
   preparingToolInput: PreparingToolInputState | undefined
   usage: Message['usage']
   finishReason: string | undefined
+  /**
+   * Current generation step index. Tool calls emitted in the same step are a
+   * provider-level parallel batch; Gemini 3 signs only the first functionCall
+   * in such a batch.
+   */
+  stepIndex: number
 }
 
 interface PreparingToolInputState {
   toolCallId?: string
   toolName?: string
+  providerMetadata?: ProviderMetadata
   inputText: string
   startedAt: number
   progress?: PreparingToolCallProgress
@@ -50,6 +58,13 @@ type PreparingToolCallProgress = Extract<
 >
 
 export function createInitialState(initialParts?: MessageContentParts): StreamProcessorState {
+  let stepIndex = 0
+  for (const part of initialParts ?? []) {
+    if (part.type === 'tool-call' && part.stepIndex !== undefined && part.stepIndex >= stepIndex) {
+      stepIndex = part.stepIndex + 1
+    }
+  }
+
   return {
     contentParts: initialParts ? [...initialParts] : [],
     currentTextPart: undefined,
@@ -57,6 +72,7 @@ export function createInitialState(initialParts?: MessageContentParts): StreamPr
     preparingToolInput: undefined,
     usage: undefined,
     finishReason: undefined,
+    stepIndex,
   }
 }
 
@@ -78,7 +94,7 @@ export async function processStreamChunk(
   callbacks: StreamProcessorCallbacks
 ): Promise<{ state: StreamProcessorState; skipUpdate: boolean; statusChunk?: ModelStreamPart<ToolSet> }> {
   const { contentParts } = state
-  let { currentTextPart, currentReasoningPart, preparingToolInput, usage, finishReason } = state
+  let { currentTextPart, currentReasoningPart, preparingToolInput, usage, finishReason, stepIndex } = state
 
   const nextState = (): StreamProcessorState => ({
     contentParts,
@@ -87,6 +103,7 @@ export async function processStreamChunk(
     preparingToolInput,
     usage,
     finishReason,
+    stepIndex,
   })
 
   switch (chunk.type) {
@@ -138,6 +155,7 @@ export async function processStreamChunk(
       preparingToolInput = {
         toolCallId: getToolInputId(chunk),
         toolName: chunk.toolName,
+        providerMetadata: chunk.providerMetadata,
         inputText: '',
         startedAt: Date.now(),
       }
@@ -156,8 +174,14 @@ export async function processStreamChunk(
       currentReasoningPart = undefined
       const delta = getToolInputDelta(chunk)
       if (!preparingToolInput) {
-        preparingToolInput = { toolCallId: getToolInputId(chunk), inputText: '', startedAt: Date.now() }
+        preparingToolInput = {
+          toolCallId: getToolInputId(chunk),
+          providerMetadata: chunk.providerMetadata,
+          inputText: '',
+          startedAt: Date.now(),
+        }
       }
+      preparingToolInput.providerMetadata = preparingToolInput.providerMetadata ?? chunk.providerMetadata
       preparingToolInput.inputText += delta
       const progress = await getPreparingToolCallProgress(
         preparingToolInput.toolName,
@@ -188,6 +212,9 @@ export async function processStreamChunk(
       finalizeReasoningDuration(currentReasoningPart)
       currentTextPart = undefined
       currentReasoningPart = undefined
+      if (preparingToolInput) {
+        preparingToolInput.providerMetadata = preparingToolInput.providerMetadata ?? chunk.providerMetadata
+      }
       return {
         state: nextState(),
         skipUpdate: true,
@@ -197,27 +224,44 @@ export async function processStreamChunk(
       finalizeReasoningDuration(currentReasoningPart)
       currentTextPart = undefined
       currentReasoningPart = undefined
-      preparingToolInput = undefined
+      // preparingToolInput is single-slot state: with parallel tool calls it may belong to a
+      // different, still-streaming call, so only consume it when the toolCallId matches (or when
+      // it's the anonymous placeholder created at reasoning-end, which carries no metadata).
+      const ownsPreparingToolInput = preparingToolInput?.toolCallId === chunk.toolCallId
+      const providerMetadata =
+        chunk.providerMetadata ?? (ownsPreparingToolInput ? preparingToolInput?.providerMetadata : undefined)
+      if (ownsPreparingToolInput || !preparingToolInput?.toolCallId) {
+        preparingToolInput = undefined
+      }
       const args = 'args' in chunk ? chunk.args : chunk.input
-      const toolCallPart: MessageToolCallPart = {
+      const toolCallPart: MessageContentToolCallPart = {
         type: 'tool-call',
         state: 'call',
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
         args,
-        providerMetadata: chunk.providerMetadata,
+        providerMetadata,
         providerExecuted: 'providerExecuted' in chunk ? chunk.providerExecuted : undefined,
+        stepIndex,
         startTime: Date.now(),
       }
       contentParts.push(toolCallPart)
       break
     }
     case 'tool-result': {
-      const existing = contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId) as
-        | MessageToolCallPart
-        | undefined
+      // A tool-result can interleave while another call's input is still streaming — only touch
+      // preparingToolInput when it belongs to this toolCallId, otherwise a sibling call's
+      // thoughtSignature would be stamped onto this part and the sibling's pending metadata wiped.
+      const ownsPreparingToolInput = preparingToolInput?.toolCallId === chunk.toolCallId
+      const providerMetadata = ownsPreparingToolInput ? preparingToolInput?.providerMetadata : undefined
+      const existing = contentParts.find(
+        (part): part is MessageContentToolCallPart => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId
+      )
       if (existing) {
-        preparingToolInput = undefined
+        if (ownsPreparingToolInput) {
+          preparingToolInput = undefined
+        }
+        existing.providerMetadata = existing.providerMetadata ?? providerMetadata
         existing.state = 'result'
         finalizeToolCallDuration(existing)
         const rawResult = 'result' in chunk ? chunk.result : chunk.output
@@ -250,16 +294,18 @@ export async function processStreamChunk(
     }
     case 'tool-error': {
       finalizeReasoningDuration(currentReasoningPart)
-      preparingToolInput = undefined
-      if (isPersistentToolCallPauseError(chunk.error)) {
-        throw chunk.error
+      // Same single-slot caveat as tool-result: only consume preparingToolInput for this call.
+      const ownsPreparingToolInput = preparingToolInput?.toolCallId === chunk.toolCallId
+      const preparedProviderMetadata = ownsPreparingToolInput ? preparingToolInput?.providerMetadata : undefined
+      if (ownsPreparingToolInput) {
+        preparingToolInput = undefined
       }
-      const existing = contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId) as
-        | MessageToolCallPart
-        | undefined
+      const existing = contentParts.find(
+        (part): part is MessageContentToolCallPart => part.type === 'tool-call' && part.toolCallId === chunk.toolCallId
+      )
       // Input-parse failures (formerly the dedicated `tool-input-error` chunk, removed in AI SDK v6)
       // now arrive here without a preceding `tool-call`, so create the part if it's missing.
-      const toolCallPart: MessageToolCallPart =
+      const toolCallPart: MessageContentToolCallPart =
         existing ??
         ({
           type: 'tool-call',
@@ -267,9 +313,22 @@ export async function processStreamChunk(
           toolCallId: chunk.toolCallId,
           toolName: chunk.toolName,
           args: chunk.input,
-          providerMetadata: chunk.providerMetadata,
+          providerMetadata: chunk.providerMetadata ?? preparedProviderMetadata,
           providerExecuted: 'providerExecuted' in chunk ? chunk.providerExecuted : undefined,
-        } satisfies MessageToolCallPart)
+          stepIndex,
+        } satisfies MessageContentToolCallPart)
+      if (existing) {
+        // Existing parts only backfill call metadata captured while this call's input streamed;
+        // the error chunk's own metadata is result-side and stored after the pause check below.
+        existing.providerMetadata = existing.providerMetadata ?? preparedProviderMetadata
+      } else {
+        currentTextPart = undefined
+        currentReasoningPart = undefined
+        contentParts.push(toolCallPart)
+      }
+      if (isPersistentToolCallPauseError(chunk.error)) {
+        throw chunk.error
+      }
       toolCallPart.state = 'error'
       finalizeToolCallDuration(toolCallPart)
       toolCallPart.result = {
@@ -278,10 +337,8 @@ export async function processStreamChunk(
         input: chunk.input,
         toolName: chunk.toolName,
       }
-      if (!existing) {
-        currentTextPart = undefined
-        currentReasoningPart = undefined
-        contentParts.push(toolCallPart)
+      if (existing) {
+        toolCallPart.resultProviderMetadata = chunk.providerMetadata
       }
       break
     }
@@ -301,6 +358,13 @@ export async function processStreamChunk(
         state: nextState(),
         skipUpdate: true,
         statusChunk: chunk,
+      }
+    }
+    case 'finish-step': {
+      stepIndex += 1
+      return {
+        state: nextState(),
+        skipUpdate: true,
       }
     }
     case 'finish': {
