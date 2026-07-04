@@ -23,11 +23,17 @@ import {
   type SessionSettings,
 } from '@shared/types'
 import {
+  canDisableGoogleThinking,
   type GoogleThinkingLevel,
   getDefaultGoogleThinkingLevel,
   getGoogleThinkingMode,
   getSupportedGoogleThinkingLevels,
 } from '@shared/utils/google-thinking'
+import {
+  getOpenAIReasoningEffort,
+  getReasoningControlCapabilities,
+  usesClaudeEffortControl,
+} from '@shared/utils/reasoning-control'
 import { THINKING_BUDGET_PRESETS } from '@shared/utils/thinking-budget'
 import { IconInfoCircle, IconTrash, IconUpload } from '@tabler/icons-react'
 import { pick } from 'lodash'
@@ -376,6 +382,9 @@ interface ThinkingBudgetConfigProps {
   tooltipText: string
   minValue?: number
   maxValue?: number
+  // Models with a minimum thinking budget (e.g. Gemini 2.5 Pro) reject budget 0,
+  // so the explicit Disabled option must not be offered for them.
+  allowDisabled?: boolean
 }
 
 function ThinkingBudgetConfig({
@@ -385,6 +394,7 @@ function ThinkingBudgetConfig({
   tooltipText,
   minValue = 1024,
   maxValue = 10000,
+  allowDisabled = true,
 }: ThinkingBudgetConfigProps) {
   const { t } = useTranslation()
 
@@ -393,13 +403,13 @@ function ThinkingBudgetConfig({
 
   const thinkingBudgetOptions = useMemo(
     () => [
-      { label: t('Disabled'), value: 'disabled' },
+      ...(allowDisabled ? [{ label: t('Disabled'), value: 'disabled' }] : []),
       { label: `${t('Low')} (2K)`, value: PRESET_VALUES[0].toString() },
       { label: `${t('Medium')} (5K)`, value: PRESET_VALUES[1].toString() },
       { label: `${t('High')} (10K)`, value: PRESET_VALUES[2].toString() },
       { label: t('Custom'), value: 'custom' },
     ],
-    [t, PRESET_VALUES]
+    [t, PRESET_VALUES, allowDisabled]
   )
 
   // Add state to track custom mode selection
@@ -577,6 +587,29 @@ function ClaudeProviderConfig({
 }) {
   const { t } = useTranslation()
   const providerOptions = settings?.providerOptions?.claude
+  const modelId = settings?.modelId || ''
+
+  const effortOptions = useMemo(
+    () => [
+      // 'null' sends no reasoning params at all — the model decides how much to think.
+      { label: t('Default'), value: 'null' },
+      { label: t('Low'), value: 'low' },
+      { label: t('Medium'), value: 'medium' },
+      { label: t('High'), value: 'high' },
+    ],
+    [t]
+  )
+
+  const handleEffortChange = useCallback(
+    (value: string) => {
+      onSettingsChange({
+        providerOptions: {
+          claude: value === 'null' ? undefined : { effort: value as 'low' | 'medium' | 'high' },
+        },
+      })
+    },
+    [onSettingsChange]
+  )
 
   const handleConfigChange = (config: { budgetTokens: number; enabled: boolean }) => {
     onSettingsChange({
@@ -589,6 +622,36 @@ function ClaudeProviderConfig({
         },
       },
     })
+  }
+
+  // Opus 4.5+ models control thinking through the effort request param; a token budget
+  // config is not accepted for them (and is dropped at the request edge).
+  if (usesClaudeEffortControl(modelId)) {
+    return (
+      <Stack gap="md" style={{ minWidth: 0 }}>
+        <Flex align="center" gap="xs">
+          <Text size="sm" fw="600">
+            {t('Thinking Effort')}
+          </Text>
+          <Tooltip
+            label={t('Thinking Effort only works for Claude Opus 4.5 or later models')}
+            withArrow={true}
+            maw={320}
+            className="!whitespace-normal"
+            zIndex={3000}
+            events={{ hover: true, focus: true, touch: true }}
+          >
+            <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
+          </Tooltip>
+        </Flex>
+        <SegmentedControl
+          key="claude-effort-control"
+          value={providerOptions?.effort || 'null'}
+          onChange={handleEffortChange}
+          data={effortOptions}
+        />
+      </Stack>
+    )
   }
 
   return (
@@ -612,34 +675,55 @@ function OpenAIProviderConfig({
 }) {
   const { t } = useTranslation()
   const providerOptions = settings?.providerOptions?.openai
+  const modelId = settings?.modelId || ''
 
-  // Memoize options to prevent recreation on every render
+  // GPT-5 family models can force-disable reasoning (minimal/none); o-series models
+  // only accept low/medium/high, so they get no Off option.
+  const supportsOff = useMemo(
+    () => getReasoningControlCapabilities(ModelProviderEnum.OpenAI, { modelId }).supported,
+    [modelId]
+  )
+
   const reasoningEffortOptions = useMemo(
     () => [
-      { label: t('Disabled'), value: 'null' },
+      // 'null' sends no reasoning params at all — the provider's server default applies.
+      { label: t('Default'), value: 'null' },
+      ...(supportsOff ? [{ label: t('Off'), value: 'off' }] : []),
       { label: t('Low'), value: 'low' },
       { label: t('Medium'), value: 'medium' },
       { label: t('High'), value: 'high' },
     ],
-    [t]
+    [t, supportsOff]
   )
 
   const handleReasoningEffortChange = useCallback(
     (value: string) => {
-      const reasoningEffort = value === 'null' ? undefined : (value as 'low' | 'medium' | 'high')
+      if (value === 'null') {
+        onSettingsChange({ providerOptions: { openai: { reasoningEffort: undefined } } })
+        return
+      }
+      if (value === 'off') {
+        onSettingsChange({
+          providerOptions: {
+            openai: { reasoningEffort: getOpenAIReasoningEffort(modelId, 'off'), forceReasoning: true },
+          },
+        })
+        return
+      }
       onSettingsChange({
         providerOptions: {
-          openai: { reasoningEffort },
+          openai: { reasoningEffort: value as 'low' | 'medium' | 'high' },
         },
       })
     },
-    [onSettingsChange]
+    [onSettingsChange, modelId]
   )
 
-  // Simplify value calculation to avoid instability
   const currentValue = useMemo(() => {
     const effort = providerOptions?.reasoningEffort
-    return effort === undefined ? 'null' : effort
+    if (effort === undefined) return 'null'
+    if (effort === 'minimal' || effort === 'none') return 'off'
+    return effort
   }, [providerOptions?.reasoningEffort])
 
   return (
@@ -731,14 +815,19 @@ function GoogleProviderConfig({
     return null
   }
 
+  // Gemini 2.5 Pro enforces a minimum thinking budget — budget 0 is rejected upstream,
+  // so the Disabled option is not offered for it.
+  const allowDisabled = canDisableGoogleThinking(modelId)
+
   return (
     <ThinkingBudgetConfig
       currentBudgetTokens={providerOptions?.thinkingConfig?.thinkingBudget || 0}
       isEnabled={(providerOptions?.thinkingConfig?.thinkingBudget || 0) > 0}
       onConfigChange={handleBudgetConfigChange}
       tooltipText={t('Thinking Budget only works for Gemini 2.5 models')}
-      minValue={0}
+      minValue={allowDisabled ? 0 : 128}
       maxValue={10000}
+      allowDisabled={allowDisabled}
     />
   )
 }

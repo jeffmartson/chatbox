@@ -8,6 +8,7 @@ import {
 import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { type ModelMessage, streamText, type ToolSet } from 'ai'
+import { getRegistryModelMeta } from '../../../model-registry'
 import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-ai-sdk'
 import { addAnthropicCacheControl } from '../../../models/anthropic-cache'
 import { getOpenAICompatibleProviderOptionsKey } from '../../../models/openai-compatible'
@@ -17,18 +18,20 @@ import type {
   ModelInterface,
   ModelStreamPart,
 } from '../../../models/types'
-import { getRegistryModelMeta } from '../../../model-registry'
 import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
+import type { StreamTextResult, ToolUseScope } from '../../../types'
 import {
   type ChatboxAILicenseDetail,
   ModelProviderEnum,
   type ProviderModelInfo,
   type ProviderOptions,
 } from '../../../types'
-import type { StreamTextResult, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
-import { getLegacyOpenAICompatibleThinkingType } from '../../../utils/reasoning-control'
+import {
+  getLegacyOpenAICompatibleThinkingType,
+  normalizeClaudeReasoningOptions,
+} from '../../../utils/reasoning-control'
 import { buildGeminiImageConfig } from '../gemini-types'
 
 interface Options {
@@ -175,9 +178,10 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
     if (this.options.model.apiStyle === 'anthropic') {
       let providerOptions = {} as { anthropic: AnthropicProviderOptions }
-      if (options.providerOptions?.claude) {
+      const claudeOptions = normalizeClaudeReasoningOptions(this.options.model.modelId, options.providerOptions?.claude)
+      if (claudeOptions) {
         providerOptions = {
-          anthropic: { ...options.providerOptions.claude },
+          anthropic: { ...claudeOptions },
         }
       }
       // Anthropic API requires only one of temperature or topP

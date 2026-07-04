@@ -7,7 +7,7 @@ import type { CallChatCompletionOptions, ChatStreamOptions, ModelStreamPart } fr
 import type { ProviderModelInfo, StreamTextResult } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import { normalizeClaudeHost } from '../../../utils/llm_utils'
-import { isClaudeAdaptiveThinkingModel } from '../../../utils/reasoning-control'
+import { isClaudeAdaptiveThinkingModel, normalizeClaudeReasoningOptions } from '../../../utils/reasoning-control'
 
 interface Options {
   claudeApiKey: string
@@ -104,7 +104,7 @@ export default class Claude extends AbstractAISDKModel {
     if (isModelSupportReasoning) {
       providerOptions = {
         anthropic: {
-          ...(options.providerOptions?.claude || {}),
+          ...(normalizeClaudeReasoningOptions(this.options.model.modelId, options.providerOptions?.claude) || {}),
         },
       }
     }

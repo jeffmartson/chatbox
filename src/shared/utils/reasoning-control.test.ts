@@ -3,12 +3,15 @@ import { isDeepSeekReasoningModel } from '../models/utils/deepseek'
 import { ModelProviderEnum, type ProviderModelInfo } from '../types'
 import {
   getLegacyOpenAICompatibleThinkingType,
+  getOpenAIReasoningEffort,
   getReasoningControlCapabilities,
   getReasoningControlLevel,
   getReasoningControlOptions,
   getReasoningProviderOptions,
   isClaudeAdaptiveThinkingModel,
+  normalizeClaudeReasoningOptions,
   stripReasoningProviderOptions,
+  usesClaudeEffortControl,
 } from './reasoning-control'
 
 const model = (modelId: string, apiStyle?: ProviderModelInfo['apiStyle']): ProviderModelInfo => ({
@@ -101,15 +104,165 @@ describe('reasoning-control', () => {
 
   it('adapts selectable levels to the model thinking format', () => {
     expect(getReasoningControlOptions(ModelProviderEnum.DeepSeek, model('deepseek-reasoner'))).toEqual([
+      { level: 'default', label: 'default' },
       { level: 'off', label: 'off' },
       { level: 'high', label: 'on' },
     ])
     expect(getReasoningControlOptions(ModelProviderEnum.OpenAIResponses, model('gpt-5.5'))).toEqual([
+      { level: 'default', label: 'default' },
       { level: 'off', label: 'off' },
       { level: 'low', label: 'low' },
       { level: 'medium', label: 'medium' },
       { level: 'high', label: 'high' },
     ])
+  })
+
+  it('omits the off option for models whose thinking cannot be force-disabled', () => {
+    // Gemini 2.5 Pro rejects thinkingBudget: 0 (minimum budget is 128).
+    expect(getReasoningControlOptions(ModelProviderEnum.Gemini, model('gemini-2.5-pro'))).toEqual([
+      { level: 'default', label: 'default' },
+      { level: 'low', label: 'low' },
+      { level: 'medium', label: 'medium' },
+      { level: 'high', label: 'high' },
+    ])
+    // Claude effort/adaptive models are controlled via the effort param only; an explicit
+    // thinking disable never reaches the wire, so no off option is offered.
+    expect(getReasoningControlOptions(ModelProviderEnum.Claude, model('claude-opus-4-5'))).toEqual([
+      { level: 'default', label: 'default' },
+      { level: 'low', label: 'low' },
+      { level: 'medium', label: 'medium' },
+      { level: 'high', label: 'high' },
+    ])
+    expect(getReasoningControlOptions(ModelProviderEnum.Claude, model('claude-opus-4-8'))).toEqual([
+      { level: 'default', label: 'default' },
+      { level: 'low', label: 'low' },
+      { level: 'medium', label: 'medium' },
+      { level: 'high', label: 'high' },
+    ])
+    // Budget-style Claude and Gemini Flash keep their explicit off.
+    expect(getReasoningControlOptions(ModelProviderEnum.Claude, model('claude-sonnet-4-6'))[1]).toEqual({
+      level: 'off',
+      label: 'off',
+    })
+    expect(getReasoningControlOptions(ModelProviderEnum.Gemini, model('gemini-2.5-flash'))[1]).toEqual({
+      level: 'off',
+      label: 'off',
+    })
+    // Registry id variants and proxied google apiStyle must also lose the off option.
+    for (const id of ['gemini-2.5-pro-preview-06-05', 'models/gemini-2.5-pro']) {
+      const levels = getReasoningControlOptions(ModelProviderEnum.Gemini, model(id)).map((o) => o.level)
+      expect(levels).not.toContain('off')
+    }
+    const proxied = getReasoningControlOptions(ModelProviderEnum.ChatboxAI, model('gemini-2.5-pro', 'google'))
+    expect(proxied.map((o) => o.level)).not.toContain('off')
+  })
+
+  it('reads stale off-style options as default on models without an off option', () => {
+    // Old versions offered off for Gemini 2.5 Pro and persisted thinkingBudget: 0;
+    // the displayed level must remain one of the offered options.
+    const staleGoogle = { google: { thinkingConfig: { thinkingBudget: 0, includeThoughts: false } } }
+    const geminiPro = model('gemini-2.5-pro')
+    const level = getReasoningControlLevel(ModelProviderEnum.Gemini, geminiPro, staleGoogle)
+    expect(level).toBe('default')
+    expect(getReasoningControlOptions(ModelProviderEnum.Gemini, geminiPro).map((o) => o.level)).toContain(level)
+    // Gemini Flash keeps reading the same options as an explicit off.
+    expect(getReasoningControlLevel(ModelProviderEnum.Gemini, model('gemini-2.5-flash'), staleGoogle)).toBe('off')
+  })
+
+  it('reads explicit disable options as off across providers', () => {
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.Qwen, model('qwen3.7-max'), {
+        openaiCompatible: { enable_thinking: false },
+      })
+    ).toBe('off')
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.DeepSeek, model('deepseek-reasoner'), {
+        deepseek: { thinking: { type: 'disabled' } },
+      })
+    ).toBe('off')
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.ChatboxAI, model('deepseek-v4-pro', 'openai'), {
+        openaiCompatible: { reasoning: { enabled: false } },
+      })
+    ).toBe('off')
+    expect(getReasoningControlLevel(ModelProviderEnum.XAI, model('grok-4.3'), undefined)).toBe('default')
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.XAI, model('grok-4.3'), {
+        openai: { reasoningEffort: 'none', forceReasoning: true },
+      })
+    ).toBe('off')
+  })
+
+  it('drops mismatched-generation Claude options at the request edge', () => {
+    // Budget-style thinking persisted under a Sonnet session must not be sent to an
+    // adaptive effort model after a model switch (and vice versa).
+    expect(
+      normalizeClaudeReasoningOptions('claude-opus-4-8', { thinking: { type: 'enabled', budgetTokens: 8192 } })
+    ).toBeUndefined()
+    expect(normalizeClaudeReasoningOptions('claude-opus-4-5', { effort: 'high' })).toEqual({ effort: 'high' })
+    expect(
+      normalizeClaudeReasoningOptions('claude-opus-4-7', {
+        effort: 'low',
+        thinking: { type: 'enabled', budgetTokens: 1024 },
+      })
+    ).toEqual({ effort: 'low' })
+    expect(normalizeClaudeReasoningOptions('claude-sonnet-4-6', { effort: 'high' })).toBeUndefined()
+    expect(
+      normalizeClaudeReasoningOptions('claude-sonnet-4-6', { thinking: { type: 'disabled', budgetTokens: 0 } })
+    ).toEqual({ thinking: { type: 'disabled', budgetTokens: 0 } })
+    expect(normalizeClaudeReasoningOptions('claude-sonnet-4-6', undefined)).toBeUndefined()
+    expect(usesClaudeEffortControl('claude-opus-4-5')).toBe(true)
+    expect(usesClaudeEffortControl('claude-opus-4-8')).toBe(true)
+    expect(usesClaudeEffortControl('claude-sonnet-4-6')).toBe(false)
+  })
+
+  it('sends none-style off effort for all dotted gpt-5.x generations', () => {
+    for (const id of ['gpt-5.1', 'gpt-5.2', 'gpt-5.3', 'gpt-5.4', 'gpt-5.5', 'gpt-5.10']) {
+      expect(getOpenAIReasoningEffort(id, 'off')).toBe('none')
+    }
+    expect(getOpenAIReasoningEffort('gpt-5', 'off')).toBe('minimal')
+    expect(getOpenAIReasoningEffort('gpt-5-mini', 'off')).toBe('minimal')
+  })
+
+  it('treats missing reasoning options as the default level and strips them on selection', () => {
+    // No persisted options → default (nothing is sent, the provider default applies).
+    expect(getReasoningControlLevel(ModelProviderEnum.OpenAIResponses, model('gpt-5.1'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.Claude, model('claude-sonnet-4-6'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.Claude, model('claude-opus-4-8'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.Gemini, model('gemini-2.5-flash'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.DeepSeek, model('deepseek-reasoner'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.Qwen, model('qwen3.7-max'), undefined)).toBe('default')
+    expect(getReasoningControlLevel(ModelProviderEnum.OpenRouter, model('deepseek/deepseek-v4-pro'), undefined)).toBe(
+      'default'
+    )
+    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, model('deepseek-v4-pro', 'openai'), undefined)).toBe(
+      'default'
+    )
+
+    // Selecting default removes every reasoning namespace but keeps nothing else behind.
+    expect(
+      getReasoningProviderOptions(ModelProviderEnum.OpenAIResponses, model('gpt-5.1'), 'default', {
+        openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
+      })
+    ).toBeUndefined()
+    expect(
+      getReasoningProviderOptions(ModelProviderEnum.Claude, model('claude-sonnet-4-6'), 'default', {
+        claude: { thinking: { type: 'enabled', budgetTokens: 4096 } },
+      })
+    ).toBeUndefined()
+    expect(getReasoningProviderOptions(ModelProviderEnum.Gemini, model('gemini-2.5-flash'), 'default')).toBeUndefined()
+
+    // Explicit off states still read back as off, not default.
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.OpenAIResponses, model('gpt-5.1'), {
+        openai: { reasoningEffort: 'none', forceReasoning: true },
+      })
+    ).toBe('off')
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.Claude, model('claude-sonnet-4-6'), {
+        claude: { thinking: { type: 'disabled', budgetTokens: 0 } },
+      })
+    ).toBe('off')
   })
 
   it('maps off to explicit disable or minimum reasoning parameters per provider', () => {
@@ -167,6 +320,7 @@ describe('reasoning-control', () => {
       kind: 'toggle',
     })
     expect(getReasoningControlOptions(ModelProviderEnum.DeepSeek, v4)).toEqual([
+      { level: 'default', label: 'default' },
       { level: 'off', label: 'off' },
       { level: 'high', label: 'on' },
     ])
@@ -186,6 +340,7 @@ describe('reasoning-control', () => {
       kind: 'toggle',
     })
     expect(getReasoningControlOptions(ModelProviderEnum.ChatboxAI, modelInfo)).toEqual([
+      { level: 'default', label: 'default' },
       { level: 'off', label: 'off' },
       { level: 'high', label: 'on' },
     ])
@@ -341,31 +496,43 @@ describe('reasoning-control', () => {
     const claudeAdaptiveModel = model('claude-opus-4-8')
     const gptModel = model('gpt-5.5')
 
+    // Options written for a different model format are not interpreted as a level;
+    // they read back as the untouched default state.
     expect(
       getReasoningControlLevel(ModelProviderEnum.Claude, claudeBudgetModel, {
         claude: { effort: 'high' },
       })
-    ).toBe('off')
+    ).toBe('default')
     expect(
       getReasoningControlLevel(ModelProviderEnum.Claude, claudeAdaptiveModel, {
         claude: { thinking: { type: 'enabled', budgetTokens: 8192 } },
       })
-    ).toBe('off')
+    ).toBe('default')
     expect(
       getReasoningControlLevel(ModelProviderEnum.OpenAIResponses, gptModel, {
         claude: { thinking: { type: 'enabled', budgetTokens: 8192 } },
       })
-    ).toBe('off')
+    ).toBe('default')
   })
 
-  it('keeps effort-style Claude off as an off state', () => {
+  it('falls back to stripping options when off is requested for effort-style Claude', () => {
     const modelInfo = model('claude-opus-4-8')
     const options = getReasoningProviderOptions(ModelProviderEnum.Claude, modelInfo, 'off', {
       claude: { effort: 'high' },
     })
 
     expect(options?.claude).toBeUndefined()
-    expect(getReasoningControlLevel(ModelProviderEnum.Claude, modelInfo, options)).toBe('off')
+    expect(getReasoningControlLevel(ModelProviderEnum.Claude, modelInfo, options)).toBe('default')
+  })
+
+  it('falls back to stripping options when off is requested for Gemini 2.5 Pro', () => {
+    const modelInfo = model('gemini-2.5-pro')
+    const options = getReasoningProviderOptions(ModelProviderEnum.Gemini, modelInfo, 'off', {
+      google: { thinkingConfig: { thinkingBudget: 8192, includeThoughts: true } },
+    })
+
+    expect(options).toBeUndefined()
+    expect(getReasoningControlLevel(ModelProviderEnum.Gemini, modelInfo, options)).toBe('default')
   })
 
   it('treats Azure like other OpenAI-style providers', () => {

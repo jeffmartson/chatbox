@@ -1,9 +1,16 @@
 import { isDeepSeekReasoningModel } from '../models/utils/deepseek'
 import type { ModelProvider, ProviderModelInfo, ProviderOptions } from '../types'
 import { ModelProviderEnum } from '../types'
-import { type GoogleThinkingLevel, getGoogleThinkingMode, getSupportedGoogleThinkingLevels } from './google-thinking'
+import {
+  canDisableGoogleThinking,
+  type GoogleThinkingLevel,
+  getGoogleThinkingMode,
+  getSupportedGoogleThinkingLevels,
+} from './google-thinking'
 
-export type ReasoningControlLevel = 'off' | 'low' | 'medium' | 'high'
+// 'default' sends no reasoning-related parameters at all (the provider's server-side
+// default applies); 'off' force-sends the provider's explicit disable parameters.
+export type ReasoningControlLevel = 'default' | 'off' | 'low' | 'medium' | 'high'
 
 export type ReasoningControlDisabledReason =
   | 'requires-anthropic-api-style'
@@ -29,7 +36,7 @@ export interface ReasoningControlCapabilities {
 
 export interface ReasoningControlOption {
   level: ReasoningControlLevel
-  label: 'off' | 'on' | 'low' | 'medium' | 'high'
+  label: 'default' | 'off' | 'on' | 'low' | 'medium' | 'high'
 }
 
 const DEFAULT_CAPABILITIES: ReasoningControlCapabilities = {
@@ -37,19 +44,21 @@ const DEFAULT_CAPABILITIES: ReasoningControlCapabilities = {
   kind: 'toggle',
 }
 
-const CLAUDE_BUDGET_BY_LEVEL: Record<Exclude<ReasoningControlLevel, 'off'>, number> = {
+type ReasoningEffortLevel = Exclude<ReasoningControlLevel, 'default' | 'off'>
+
+const CLAUDE_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   low: 1024,
   medium: 4096,
   high: 8192,
 }
 
-const GEMINI_BUDGET_BY_LEVEL: Record<Exclude<ReasoningControlLevel, 'off'>, number> = {
+const GEMINI_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   low: 1024,
   medium: 8192,
   high: 24576,
 }
 
-const QWEN_THINKING_BUDGET_BY_LEVEL: Record<Exclude<ReasoningControlLevel, 'off'>, number> = {
+const QWEN_THINKING_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   low: 1024,
   medium: 4096,
   high: 8192,
@@ -60,7 +69,9 @@ const GPT_EFFORT_MODELS = [/(?:^|\/)gpt-5(?:[.-]|$)/i, /(?:^|\/)gpt-oss(?:[.-]|$
 // are non-reasoning models; sending reasoning_effort to them is rejected upstream
 // ("Unrecognized request argument supplied: reasoning_effort").
 const GPT_NON_REASONING_CHAT_MODELS = [/(?:^|\/)gpt-5[\w.-]*[.-]chat(?:[.-]|$)/i]
-const OPENAI_NONE_EFFORT_MODELS = [/(?:^|\/)gpt-5\.(?:1|2|5)(?:[.-]|$)/i]
+// gpt-5.1 and later accept reasoning_effort: 'none'; the original gpt-5 only goes
+// down to 'minimal'. Match any dotted gpt-5.x so future versions default to 'none'.
+const OPENAI_NONE_EFFORT_MODELS = [/(?:^|\/)gpt-5\.[1-9]\d*(?:[.-]|$)/i]
 const CLAUDE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-5/i]
 const CLAUDE_ADAPTIVE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-(?:7|8)/i]
 const CLAUDE_BUDGET_MODELS = [
@@ -81,6 +92,25 @@ function matchesAny(modelId: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(modelId))
 }
 
+// Models whose thinking cannot be force-disabled do not get an 'off' option; selecting
+// 'off' for them falls back to 'default' (send nothing). Claude effort/adaptive models
+// are only controlled via the effort request param — the AI SDK never emits
+// `thinking: {type: 'disabled'}`, so an explicit off cannot be expressed on the wire.
+// Gemini 2.5 Pro enforces a minimum thinking budget, so thinkingBudget: 0 is rejected.
+function supportsExplicitDisable(
+  kind: ReasoningControlCapabilities['kind'],
+  effectiveProvider: ModelProvider | undefined,
+  modelId: string
+): boolean {
+  if (effectiveProvider === ModelProviderEnum.Gemini && !canDisableGoogleThinking(modelId)) {
+    return false
+  }
+  if (kind === 'anthropic-adaptive-effort' || kind === 'anthropic-effort') {
+    return false
+  }
+  return true
+}
+
 function isGptEffortModel(modelId: string): boolean {
   return matchesAny(modelId, GPT_EFFORT_MODELS) && !matchesAny(modelId, GPT_NON_REASONING_CHAT_MODELS)
 }
@@ -92,6 +122,32 @@ function isGptEffortModel(modelId: string): boolean {
  */
 export function isClaudeAdaptiveThinkingModel(modelId: string): boolean {
   return matchesAny(modelId, CLAUDE_ADAPTIVE_EFFORT_MODELS)
+}
+
+/**
+ * Claude models whose thinking is controlled by the effort request param
+ * (Opus 4.5 and the adaptive 4.7/4.8 generation) rather than a token budget.
+ */
+export function usesClaudeEffortControl(modelId: string): boolean {
+  return matchesAny(modelId, [...CLAUDE_EFFORT_MODELS, ...CLAUDE_ADAPTIVE_EFFORT_MODELS])
+}
+
+/**
+ * Drops Claude reasoning options written for a different model generation so they are
+ * never sent on the wire: effort/adaptive models only accept the effort param, while
+ * budget-style models only accept the thinking config. Without this, options persisted
+ * on a session leak through model switches (e.g. a Sonnet thinking budget sent to an
+ * adaptive Opus model) and contradict the 'default' (send nothing) level readback.
+ */
+export function normalizeClaudeReasoningOptions(
+  modelId: string,
+  claude: ProviderOptions['claude']
+): ProviderOptions['claude'] {
+  if (!claude) return undefined
+  if (usesClaudeEffortControl(modelId)) {
+    return claude.effort ? { effort: claude.effort } : undefined
+  }
+  return claude.thinking ? { thinking: claude.thinking } : undefined
 }
 
 function isOpenAIStyleEffectiveProvider(provider: ModelProvider | undefined): boolean {
@@ -270,8 +326,23 @@ export function getReasoningControlLevel(
   model: ProviderModelInfo | null | undefined,
   providerOptions?: ProviderOptions
 ): ReasoningControlLevel {
+  const level = deriveReasoningControlLevel(provider, model, providerOptions)
+  if (level !== 'off') return level
+  // Stale options (written by older versions or under another model) can read back as
+  // 'off' on a model that no longer offers an off option; report them as 'default' so
+  // the displayed level always exists in getReasoningControlOptions.
   const capabilities = getReasoningControlCapabilities(provider, model)
-  if (!capabilities.supported) return 'off'
+  const effectiveProvider = getEffectiveProvider(provider, model)
+  return supportsExplicitDisable(capabilities.kind, effectiveProvider, model?.modelId || '') ? 'off' : 'default'
+}
+
+function deriveReasoningControlLevel(
+  provider: ModelProvider | undefined,
+  model: ProviderModelInfo | null | undefined,
+  providerOptions?: ProviderOptions
+): ReasoningControlLevel {
+  const capabilities = getReasoningControlCapabilities(provider, model)
+  if (!capabilities.supported) return 'default'
 
   const effectiveProvider = getEffectiveProvider(provider, model)
   if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
@@ -280,14 +351,17 @@ export function getReasoningControlLevel(
       return deepseekThinking.type === 'enabled' ? 'high' : 'off'
     }
     const legacyType = getLegacyOpenAICompatibleThinkingType(providerOptions?.openaiCompatible?.reasoning)
-    return legacyType === 'enabled' ? 'high' : 'off'
+    if (legacyType === 'enabled') return 'high'
+    if (legacyType === 'disabled') return 'off'
+    return 'default'
   }
   if (effectiveProvider === ModelProviderEnum.Claude) {
     if (capabilities.kind === 'anthropic-adaptive-effort' || capabilities.kind === 'anthropic-effort') {
-      return providerOptions?.claude?.effort || 'off'
+      return providerOptions?.claude?.effort || 'default'
     }
     const thinking = providerOptions?.claude?.thinking
-    if (thinking?.type !== 'enabled') return 'off'
+    if (!thinking) return 'default'
+    if (thinking.type !== 'enabled') return 'off'
     const budget = thinking.budgetTokens
     if (budget >= CLAUDE_BUDGET_BY_LEVEL.high) return 'high'
     if (budget >= CLAUDE_BUDGET_BY_LEVEL.medium) return 'medium'
@@ -302,11 +376,15 @@ export function getReasoningControlLevel(
     return normalizeEffortToLevel(effort)
   }
   if (effectiveProvider === ModelProviderEnum.OpenRouter) {
-    return normalizeEffortToLevel(providerOptions?.openrouter?.reasoning?.effort)
+    const reasoning = providerOptions?.openrouter?.reasoning
+    if (!reasoning) return 'default'
+    if (reasoning.enabled === false) return 'off'
+    return normalizeEffortToLevel(reasoning.effort)
   }
   if (effectiveProvider === ModelProviderEnum.Gemini) {
     const config = providerOptions?.google?.thinkingConfig
-    if (!config || config.includeThoughts === false) return 'off'
+    if (!config) return 'default'
+    if (config.includeThoughts === false) return 'off'
     if (config.thinkingLevel && config.thinkingLevel !== 'minimal') return config.thinkingLevel
     const budget = config.thinkingBudget
     if (budget === undefined || budget <= 0) return 'off'
@@ -316,17 +394,19 @@ export function getReasoningControlLevel(
   }
   if (effectiveProvider === ModelProviderEnum.DeepSeek) {
     const thinking = providerOptions?.deepseek?.thinking
-    return thinking?.type === 'enabled' ? 'high' : 'off'
+    if (!thinking) return 'default'
+    return thinking.type === 'enabled' ? 'high' : 'off'
   }
   if (effectiveProvider === ModelProviderEnum.Qwen || effectiveProvider === ModelProviderEnum.QwenPortal) {
     const openaiCompatible = providerOptions?.openaiCompatible
-    if (openaiCompatible?.enable_thinking !== true) return 'off'
+    if (openaiCompatible?.enable_thinking === false) return 'off'
+    if (openaiCompatible?.enable_thinking !== true) return 'default'
     const budget = openaiCompatible.thinking_budget
     if (budget !== undefined && budget >= QWEN_THINKING_BUDGET_BY_LEVEL.high) return 'high'
     if (budget !== undefined && budget >= QWEN_THINKING_BUDGET_BY_LEVEL.medium) return 'medium'
     return 'low'
   }
-  return 'off'
+  return 'default'
 }
 
 export function getReasoningControlOptions(
@@ -336,15 +416,21 @@ export function getReasoningControlOptions(
   const capabilities = getReasoningControlCapabilities(provider, model)
   if (!capabilities.supported) return []
 
+  const offOption: ReasoningControlOption[] = supportsExplicitDisable(
+    capabilities.kind,
+    getEffectiveProvider(provider, model),
+    model?.modelId || ''
+  )
+    ? [{ level: 'off', label: 'off' }]
+    : []
+
   if (capabilities.kind === 'toggle') {
-    return [
-      { level: 'off', label: 'off' },
-      { level: 'high', label: 'on' },
-    ]
+    return [{ level: 'default', label: 'default' }, ...offOption, { level: 'high', label: 'on' }]
   }
 
   return [
-    { level: 'off', label: 'off' },
+    { level: 'default', label: 'default' },
+    ...offOption,
     { level: 'low', label: 'low' },
     { level: 'medium', label: 'medium' },
     { level: 'high', label: 'high' },
@@ -361,15 +447,22 @@ export function getReasoningProviderOptions(
   if (!capabilities.supported) return previous
 
   const effectiveProvider = getEffectiveProvider(provider, model)
+
+  // 'default' means "send no reasoning parameters": drop every reasoning namespace so the
+  // provider's server-side default applies. Also the fallback for 'off' on models whose
+  // thinking cannot be explicitly disabled.
+  if (
+    level === 'default' ||
+    (level === 'off' && !supportsExplicitDisable(capabilities.kind, effectiveProvider, model?.modelId || ''))
+  ) {
+    return stripReasoningProviderOptions(previous)
+  }
+
   const next: ProviderOptions = { ...(previous || {}) }
 
   if (level === 'off') {
     if (effectiveProvider === ModelProviderEnum.Claude) {
-      if (capabilities.kind === 'anthropic-adaptive-effort' || capabilities.kind === 'anthropic-effort') {
-        delete next.claude
-      } else {
-        next.claude = { thinking: { type: 'disabled', budgetTokens: 0 } }
-      }
+      next.claude = { thinking: { type: 'disabled', budgetTokens: 0 } }
     } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
       next.deepseek = { thinking: { type: 'disabled' } }
     } else if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
@@ -472,9 +565,9 @@ function isOpenRouterReasoningModel(model: ProviderModelInfo | null | undefined)
   ])
 }
 
-function getOpenAIReasoningEffort(
+export function getOpenAIReasoningEffort(
   modelId: string,
-  level: ReasoningControlLevel
+  level: Exclude<ReasoningControlLevel, 'default'>
 ): NonNullable<ProviderOptions['openai']>['reasoningEffort'] {
   if (level === 'off') {
     return matchesAny(modelId, OPENAI_NONE_EFFORT_MODELS) ? 'none' : 'minimal'
@@ -483,7 +576,8 @@ function getOpenAIReasoningEffort(
 }
 
 function normalizeEffortToLevel(effort: string | undefined): ReasoningControlLevel {
-  if (effort === 'none' || effort === 'minimal' || !effort) return 'off'
+  if (!effort) return 'default'
+  if (effort === 'none' || effort === 'minimal') return 'off'
   if (effort === 'low' || effort === 'medium' || effort === 'high') return effort
   return 'high'
 }
@@ -514,7 +608,9 @@ const REASONING_PROVIDER_OPTION_KEYS = [
  * Removes reasoning/thinking provider options so they are never sent to a model
  * that does not support reasoning control. This guards against stale options
  * persisted on a session (e.g. set on a reasoning-capable model, then carried
- * over after switching to a model without reasoning support).
+ * over after switching to a model without reasoning support). It also implements
+ * the 'default' reasoning level (send no reasoning parameters) and the fallback
+ * when 'off' is requested for a model whose thinking cannot be force-disabled.
  */
 export function stripReasoningProviderOptions(
   providerOptions: ProviderOptions | undefined

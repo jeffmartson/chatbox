@@ -35,6 +35,15 @@ export function getGoogleThinkingMode(modelId: string): GoogleThinkingMode {
   return 'none'
 }
 
+// Gemini 2.5 Pro enforces a minimum thinking budget (128): thinkingBudget: 0 is
+// rejected upstream, so thinking cannot be explicitly disabled for these models.
+const GOOGLE_NO_DISABLE_MODELS = [/(?:^|\/)gemini-2\.5[\w.-]*-pro/i]
+
+export function canDisableGoogleThinking(modelId: string): boolean {
+  const normalizedModelId = modelId.split('/').at(-1) || modelId
+  return !GOOGLE_NO_DISABLE_MODELS.some((pattern) => pattern.test(normalizedModelId))
+}
+
 export function getSupportedGoogleThinkingLevels(modelId: string): GoogleThinkingLevel[] {
   if (getGoogleThinkingMode(modelId) !== 'level') {
     return []

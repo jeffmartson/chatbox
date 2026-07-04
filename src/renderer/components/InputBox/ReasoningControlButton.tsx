@@ -21,6 +21,7 @@ interface ReasoningControlButtonProps {
 }
 
 const LEVEL_COLORS: Record<ReasoningControlLevel, string> = {
+  default: 'var(--chatbox-tint-tertiary)',
   off: 'var(--chatbox-tint-tertiary)',
   low: 'var(--chatbox-tint-secondary)',
   medium: 'var(--chatbox-tint-brand)',
@@ -136,6 +137,8 @@ function getOptionLabel(option: ReasoningControlOption, t: (key: string) => stri
 
 function getLevelLabel(level: ReasoningControlLevel, t: (key: string) => string): string {
   switch (level) {
+    case 'default':
+      return t('Default')
     case 'off':
       return t('Off')
     case 'low':
