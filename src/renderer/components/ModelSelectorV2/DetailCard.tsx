@@ -241,12 +241,10 @@ function PricingBlock({
 function CostLevelIndicator({
   costLevel,
   costLabel,
-  pricingLink,
   t,
 }: {
   costLevel?: string
   costLabel: string
-  pricingLink?: string
   t: (key: string) => string
 }) {
   const filledBarCount = getCostLevelBarCount(costLevel)
@@ -273,15 +271,12 @@ function CostLevelIndicator({
         {bars}
       </Flex>
       {costLabel && (
-        <UnstyledButton
-          className="self-start flex items-center gap-1.5 text-chatbox-tint-warning"
-          onClick={() => pricingLink && platform.openLink(pricingLink)}
-        >
+        <Flex align="center" gap={6} className="self-start text-chatbox-tint-warning">
           <ScalableIcon icon={IconDatabase} size={13} className="text-inherit" />
           <Text span size="sm" c="inherit">
             {costLabel}
           </Text>
-        </UnstyledButton>
+        </Flex>
       )}
     </Stack>
   )
@@ -289,7 +284,6 @@ function CostLevelIndicator({
 
 export function DetailCard({
   model,
-  pricingLink,
   upgradeLink,
   onClose,
   onUpgradeClick,
@@ -328,7 +322,7 @@ export function DetailCard({
           {model.description}
         </Text>
       )}
-      <CostLevelIndicator costLevel={model.costLevel} costLabel={costLabel} pricingLink={pricingLink} t={t} />
+      <CostLevelIndicator costLevel={model.costLevel} costLabel={costLabel} t={t} />
       {/* Temporarily hide model pricing information. */}
       {showPricing && <PricingBlock model={model} mobile={mobile} t={t} isCN={isCN} />}
       <Stack gap="xs" mt="sm">

@@ -1,5 +1,6 @@
 import { Button, Flex, Text } from '@mantine/core'
 import type { ProviderModelInfo } from '@shared/types'
+import { ModelProviderEnum } from '@shared/types'
 import { IconChevronDown } from '@tabler/icons-react'
 import clsx from 'clsx'
 import type { Dispatch, SetStateAction } from 'react'
@@ -86,6 +87,9 @@ export function ChatboxProviderRows({
   pageName?: string
 }) {
   const { t } = useTranslation()
+  const selectedProviderMatches =
+    selectedProviderId === provider.id ||
+    (provider.name === 'Chatbox AI' && selectedProviderId === ModelProviderEnum.ChatboxAI)
   const favoriteSet = new Set(
     (favorites || []).filter((favorite) => favorite.provider === provider.id).map((favorite) => favorite.model)
   )
@@ -144,7 +148,7 @@ export function ChatboxProviderRows({
             key={detailKey}
             detail={detail}
             providerModel={providerModel}
-            selected={selectedProviderId === provider.id && selectedModelId === modelId}
+            selected={selectedProviderMatches && selectedModelId === modelId}
             favorited={isFavorited(provider.id, modelId)}
             locked={locked}
             mobile={isMobile}
