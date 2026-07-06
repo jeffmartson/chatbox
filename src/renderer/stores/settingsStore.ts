@@ -30,6 +30,16 @@ type Action = {
   getSettings: () => Settings
 }
 
+function mergeWithDefaultSettings(persisted: unknown): Settings {
+  const persistedSettings =
+    persisted && typeof persisted === 'object' && !Array.isArray(persisted) ? (persisted as Partial<Settings>) : {}
+  const mergedSettings = deepmerge<Settings, Partial<Settings>>(defaults.settings(), persistedSettings, {
+    arrayMerge: (_target, source) => source,
+  })
+  const parsedSettings = SettingsSchema.safeParse(mergedSettings)
+  return parsedSettings.success ? parsedSettings.data : mergedSettings
+}
+
 export const settingsStore = createStore<Settings & Action>()(
   subscribeWithSelector(
     persist(
@@ -70,6 +80,10 @@ export const settingsStore = createStore<Settings & Action>()(
             return state
           }
         },
+        merge: (persisted, current) => ({
+          ...current,
+          ...mergeWithDefaultSettings(persisted),
+        }),
         migrate: (persisted: any, version) => {
           // merge the newly added fields in defaults.settings() into the persisted values (deep merge).
           const settings: any = deepmerge(defaults.settings(), persisted, {
