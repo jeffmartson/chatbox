@@ -1144,6 +1144,8 @@
   "Turn an idea into an interactive webpage": "Превратите идею в интерактивную веб-страницу",
   "Interactive Story": "Интерактивная история",
   "Choose a world and role to start an interactive adventure": "Выберите мир и роль, чтобы начать интерактивное приключение",
+  "Story Creation": "Создание историй",
+  "Generate worlds, plot branches, character profiles, and dialogue": "Создавайте миры, сюжетные ветки, профили персонажей и диалоги",
   "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "Сначала выполняется локальная обработка без расхода баллов. Если локальная обработка не удастся, будет использована облачная обработка Chatbox AI, и баллы будут списаны.",
   "No points consumed": "Баллы не списаны"
 }

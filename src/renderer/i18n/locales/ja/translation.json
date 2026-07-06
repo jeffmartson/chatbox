@@ -1144,6 +1144,8 @@
   "Turn an idea into an interactive webpage": "アイデアをインタラクティブな Web ページに変換",
   "Interactive Story": "インタラクティブストーリー",
   "Choose a world and role to start an interactive adventure": "世界観と役割を選んで、対話型の冒険を開始",
+  "Story Creation": "ストーリー作成",
+  "Generate worlds, plot branches, character profiles, and dialogue": "世界観、分岐するプロット、キャラクター設定、セリフを生成",
   "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "まずローカル解析を試みます。この場合、ポイントは消費されません。ローカル解析に失敗した場合は、Chatbox AI のクラウド解析を使用し、ポイントが消費されます。",
   "No points consumed": "ポイント未消費"
 }

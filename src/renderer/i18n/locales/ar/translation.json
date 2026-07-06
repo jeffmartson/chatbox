@@ -1144,6 +1144,8 @@
   "Turn an idea into an interactive webpage": "حوّل فكرة إلى صفحة ويب تفاعلية",
   "Interactive Story": "قصة تفاعلية",
   "Choose a world and role to start an interactive adventure": "اختر عالماً ودوراً لبدء مغامرة تفاعلية",
+  "Story Creation": "إنشاء القصص",
+  "Generate worlds, plot branches, character profiles, and dialogue": "أنشئ عوالم وفروع حبكة وملفات شخصيات وحوارات",
   "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "يحاول التحليل المحلي أولًا دون استهلاك النقاط. إذا فشل التحليل المحلي، فسيتم استخدام التحليل السحابي من Chatbox AI وسيتم استهلاك النقاط.",
   "No points consumed": "لم تُستهلك أي نقاط"
 }

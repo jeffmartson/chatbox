@@ -1144,6 +1144,8 @@
   "Turn an idea into an interactive webpage": "Gjør en idé om til en interaktiv nettside",
   "Interactive Story": "Interaktiv fortelling",
   "Choose a world and role to start an interactive adventure": "Velg en verden og rolle for å starte et interaktivt eventyr",
+  "Story Creation": "Historieutvikling",
+  "Generate worlds, plot branches, character profiles, and dialogue": "Generer verdener, handlingsforgreninger, karakterprofiler og dialog",
   "Tries local parsing first without consuming compute points. If local parsing fails, Chatbox AI cloud parsing will be used and compute points will be consumed.": "Prøver lokal analyse først uten å bruke poeng. Hvis lokal analyse mislykkes, brukes Chatbox AI sin skyanalyse, og poeng forbrukes.",
   "No points consumed": "Ingen poeng brukt"
 }
