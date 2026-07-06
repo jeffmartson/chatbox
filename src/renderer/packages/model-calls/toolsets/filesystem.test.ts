@@ -17,6 +17,11 @@ vi.mock('@/packages/user-exec-approval', () => ({
   requestFileMutationApproval: (...args: unknown[]) => requestFileMutationApproval(...args),
 }))
 
+const trackAgentModeFullAccessBypass = vi.fn()
+vi.mock('@/analytics/agent-mode', () => ({
+  trackAgentModeFullAccessBypass: (...args: unknown[]) => trackAgentModeFullAccessBypass(...args),
+}))
+
 import { buildFilesystemTools } from './filesystem'
 
 const exec = vi.fn(async (..._args: unknown[]) => ({ stdout: '', stderr: '', exitCode: 0 }))
@@ -136,6 +141,7 @@ describe('user-granted working directories (like /tmp)', () => {
     fsWrite.mockClear()
     exec.mockClear()
     requestFileMutationApproval.mockClear()
+    trackAgentModeFullAccessBypass.mockClear()
   })
 
   function toolsWithWorkingDir() {
@@ -182,6 +188,7 @@ describe('user-granted working directories (like /tmp)', () => {
     expect(exec).not.toHaveBeenCalled()
     expect(requestFileMutationApproval).not.toHaveBeenCalled()
     expect(fsWrite).toHaveBeenCalledTimes(1)
+    expect(trackAgentModeFullAccessBypass).toHaveBeenCalledWith({ tool: 'write_file' })
   })
 
   test('full access edits absolute paths without approval', async () => {
@@ -190,6 +197,36 @@ describe('user-granted working directories (like /tmp)', () => {
     expect(exec).not.toHaveBeenCalled()
     expect(requestFileMutationApproval).not.toHaveBeenCalled()
     expect(fsEdit).toHaveBeenCalledTimes(1)
+    expect(trackAgentModeFullAccessBypass).toHaveBeenCalledWith({ tool: 'edit_file' })
+  })
+
+  test('full access bypass is tracked even when the write fails', async () => {
+    fsWrite.mockResolvedValueOnce({ success: false, error: 'permission denied' } as never)
+    const tools = buildFilesystemTools({ sessionId: 'session-id', provider, fullAccess: true }).tools
+    await execute(tools.write_file, { file_path: '/etc/hosts', content: 'x' })
+    expect(trackAgentModeFullAccessBypass).toHaveBeenCalledWith({ tool: 'write_file' })
+  })
+
+  test('bypass is not tracked for pre-approved calls or working-directory writes', async () => {
+    const approvedTools = buildFilesystemTools({ sessionId: 'session-id', provider, fullAccess: true }).tools
+    const executable = approvedTools.write_file as {
+      execute: (input: unknown, options: { toolCallId: string; messages: []; approved?: boolean }) => Promise<unknown>
+    }
+    await executable.execute(
+      { file_path: '/Users/me/project/out.txt', content: 'x' },
+      { toolCallId: 'tool-call-id', messages: [], approved: true }
+    )
+    expect(trackAgentModeFullAccessBypass).not.toHaveBeenCalled()
+
+    // Working-directory paths are sandbox-routed before the bypass check.
+    const wdTools = buildFilesystemTools({
+      sessionId: 'session-id',
+      provider,
+      fullAccess: true,
+      userWorkingDirectories: ['/Users/me/granted'],
+    }).tools
+    await execute(wdTools.write_file, { file_path: '/Users/me/granted/out.txt', content: 'x' })
+    expect(trackAgentModeFullAccessBypass).not.toHaveBeenCalled()
   })
 })
 

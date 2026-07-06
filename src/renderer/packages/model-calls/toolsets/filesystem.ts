@@ -2,6 +2,7 @@ import type { SandboxProvider } from '@shared/sandbox-provider'
 import { SEARCH_EXCLUDE_DIRS, TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
 import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
+import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
@@ -387,6 +388,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       const pathError = requireAbsoluteRealPath(writeInput.file_path)
       if (pathError) return pathError
       if (!platform.fsWrite) return { error: 'Filesystem access is not available on this platform' }
+      const fullAccessBypassedApproval = !alreadyApproved && context.fullAccess === true
       const approved =
         alreadyApproved ||
         context.fullAccess ||
@@ -396,6 +398,11 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
           previewContent(writeInput.content)
         ))
       if (!approved) return { success: false, error: 'File write denied by user.' }
+      // Track when Full Access skipped an approval, regardless of whether the
+      // write later succeeds — failed bypassed attempts are the audit signal.
+      if (fullAccessBypassedApproval) {
+        trackAgentModeFullAccessBypass({ tool: 'write_file' })
+      }
       const result = await platform.fsWrite({ filePath: writeInput.file_path, content: writeInput.content })
       return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
     },
@@ -422,6 +429,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
       const pathError = requireAbsoluteRealPath(editInput.file_path)
       if (pathError) return pathError
       if (!platform.fsEdit) return { error: 'Filesystem access is not available on this platform' }
+      const fullAccessBypassedApproval = !alreadyApproved && context.fullAccess === true
       const approved =
         alreadyApproved ||
         context.fullAccess ||
@@ -433,6 +441,9 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
           previewEdits(edits)
         ))
       if (!approved) return { success: false, error: 'File edit denied by user.' }
+      if (fullAccessBypassedApproval) {
+        trackAgentModeFullAccessBypass({ tool: 'edit_file' })
+      }
       const result = await platform.fsEdit({
         filePath: editInput.file_path,
         edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),

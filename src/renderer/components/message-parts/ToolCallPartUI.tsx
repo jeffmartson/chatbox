@@ -47,7 +47,6 @@ import {
 import clsx from 'clsx'
 import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hooks/useThinkingTimer'

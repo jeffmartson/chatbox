@@ -56,6 +56,11 @@ vi.mock('@/platform', () => ({
   default: { type: 'web' },
 }))
 
+const trackAgentModeFullAccessBypassMock = vi.fn()
+vi.mock('@/analytics/agent-mode', () => ({
+  trackAgentModeFullAccessBypass: (...args: unknown[]) => trackAgentModeFullAccessBypassMock(...args),
+}))
+
 vi.mock('@/packages/mcp/controller', () => ({
   mcpController: {
     getAvailableTools: () => ({}),
@@ -444,6 +449,7 @@ describe('buildToolsForSession', () => {
     expect(requestUserExecApprovalMock).not.toHaveBeenCalled()
     expect(userExecMock).toHaveBeenCalledWith('touch /tmp/full-access')
     expect(executeResult).toMatchObject({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
+    expect(trackAgentModeFullAccessBypassMock).toHaveBeenCalledWith({ tool: 'user_exec' })
   })
 
   test('agentFullAccess=false requests user_exec approval', async () => {
@@ -467,6 +473,7 @@ describe('buildToolsForSession', () => {
       expect.any(Object)
     )
     expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval')
+    expect(trackAgentModeFullAccessBypassMock).not.toHaveBeenCalled()
   })
 })
 

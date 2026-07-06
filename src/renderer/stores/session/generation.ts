@@ -1,6 +1,7 @@
 import { buildContext } from '@shared/context'
 import type { AttachmentResolver } from '@shared/context/types'
 import { type CompactionPoint, createMessage, type Message, type SessionSettings } from '@shared/types'
+import type { AgentModeEntrySource } from '@/analytics/agent-mode'
 import * as chatStore from '../chatStore'
 import { createAttachmentResolver } from './attachment-resolver'
 import { createNewFork, findMessageLocation } from './forks'
@@ -11,7 +12,11 @@ import { orchestratePictureGeneration } from './pictures'
 export async function generate(
   sessionId: string,
   targetMsg: Message,
-  options?: { operationType?: 'send_message' | 'regenerate'; skipAgentModeSuggestion?: boolean }
+  options?: {
+    operationType?: 'send_message' | 'regenerate'
+    skipAgentModeSuggestion?: boolean
+    agentModeEntrySource?: AgentModeEntrySource
+  }
 ) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)

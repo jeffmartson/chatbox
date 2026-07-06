@@ -12,6 +12,7 @@ import {
   Tooltip as Tooltip1,
 } from '@mantine/core'
 import { Box, Grid, useTheme } from '@mui/material'
+import { findMessageLocation } from '@shared/session/message-forks'
 import type {
   Message,
   MessagePicture,
@@ -58,6 +59,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gallery, Item as GalleryItem } from 'react-photoswipe-gallery'
+import { trackAgentModeSuggestionAction } from '@/analytics/agent-mode'
 import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import Markdown from '@/components/Markdown'
@@ -198,19 +200,61 @@ const _Message: FC<Props> = (props) => {
     regenerateInNewFork(sessionId, msg)
   }, [handleStop, sessionId, msg])
 
+  // Tracking is best-effort and must never block or break the accept/decline
+  // action, so this fetches the session on its own and swallows failures.
+  const trackAgentModeSuggestionActionAsync = useCallback(
+    (action: 'accept' | 'decline') => {
+      void getSession(sessionId)
+        .then((session) => {
+          let fileCount = 0
+          const location = session ? findMessageLocation(session, msg.id) : null
+          if (location) {
+            for (let index = location.index - 1; index >= 0; index -= 1) {
+              const message = location.list[index]
+              if (message.role === 'user') {
+                fileCount = message.files?.length ?? 0
+                break
+              }
+            }
+          }
+          trackAgentModeSuggestionAction({ action, hasFiles: fileCount > 0, fileCount })
+        })
+        .catch(() => {})
+    },
+    [msg.id, sessionId]
+  )
+
+  const agentModeSuggestionHandledRef = useRef(false)
+
   const handleStartAgentModeResponse = useCallback(async () => {
-    await lockSessionAgentMode(sessionId, 'message_sent')
-    const nextMsg = resetMessageForAgentModeResponse(msg)
-    await modifyMessage(sessionId, nextMsg, true)
-    await generate(sessionId, nextMsg, { operationType: 'send_message' })
-  }, [msg, sessionId])
+    if (agentModeSuggestionHandledRef.current) return
+    agentModeSuggestionHandledRef.current = true
+    trackAgentModeSuggestionActionAsync('accept')
+    try {
+      await lockSessionAgentMode(sessionId, 'message_sent')
+      const nextMsg = resetMessageForAgentModeResponse(msg)
+      await modifyMessage(sessionId, nextMsg, true)
+      await generate(sessionId, nextMsg, { operationType: 'send_message', agentModeEntrySource: 'suggestion_accept' })
+    } catch (error) {
+      agentModeSuggestionHandledRef.current = false
+      throw error
+    }
+  }, [trackAgentModeSuggestionActionAsync, msg, sessionId])
 
   const handleContinueNormalResponse = useCallback(async () => {
-    await setSessionAgentMode(sessionId, 'off')
-    const nextMsg = resetMessageForAgentModeResponse(msg)
-    await modifyMessage(sessionId, nextMsg, true)
-    await generate(sessionId, nextMsg, { operationType: 'send_message', skipAgentModeSuggestion: true })
-  }, [msg, sessionId])
+    if (agentModeSuggestionHandledRef.current) return
+    agentModeSuggestionHandledRef.current = true
+    trackAgentModeSuggestionActionAsync('decline')
+    try {
+      await setSessionAgentMode(sessionId, 'off')
+      const nextMsg = resetMessageForAgentModeResponse(msg)
+      await modifyMessage(sessionId, nextMsg, true)
+      await generate(sessionId, nextMsg, { operationType: 'send_message', skipAgentModeSuggestion: true })
+    } catch (error) {
+      agentModeSuggestionHandledRef.current = false
+      throw error
+    }
+  }, [trackAgentModeSuggestionActionAsync, msg, sessionId])
 
   const lastStepForRetry = useMemo(() => {
     for (let index = msg.contentParts.length - 1; index >= 0; index -= 1) {

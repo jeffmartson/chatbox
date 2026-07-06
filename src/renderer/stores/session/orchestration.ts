@@ -12,6 +12,12 @@ import type {
 import { getMessageText } from '@shared/utils/message'
 import type { ModelMessage, ToolSet } from 'ai'
 import { createModel, createModelDependencies } from '@/adapters'
+import {
+  type AgentModeEntrySource,
+  captureAgentModeException,
+  trackAgentModePauseAction,
+  trackAgentModeSuggested,
+} from '@/analytics/agent-mode'
 import * as appleAppStore from '@/packages/apple_app_store'
 import { estimateTokensFromMessages } from '@/packages/token'
 import {
@@ -178,7 +184,14 @@ async function shouldSuggestAgentMode(options: {
     const text = getMessageText({ id: 'agent-mode-decision', role: 'assistant', contentParts: result.contentParts })
     return parseAgentModeSuggestionDecision(text) ?? { suggest: false }
   } catch (error) {
+    if (signal.aborted) {
+      return { suggest: false }
+    }
     console.warn('Agent mode suggestion decision failed:', error)
+    captureAgentModeException(error, {
+      operation: 'suggestion',
+      model: model.modelId,
+    })
     return { suggest: false }
   }
 }
@@ -203,6 +216,11 @@ async function createAgentModeSuggestionModel(
     )
   } catch (error) {
     console.warn('Failed to create fast model for agent mode suggestion, falling back to current model:', error)
+    captureAgentModeException(error, {
+      operation: 'suggestion_model',
+      provider: namingModel.provider,
+      model: namingModel.model,
+    })
     return fallbackModel
   }
 }
@@ -361,6 +379,7 @@ export async function orchestrateGeneration(
     operationType?: 'send_message' | 'regenerate'
     appendToMessage?: boolean
     skipAgentModeSuggestion?: boolean
+    agentModeEntrySource?: AgentModeEntrySource
   }
 ) {
   const session = await chatStore.getSession(sessionId)
@@ -448,6 +467,10 @@ export async function orchestrateGeneration(
       }
 
       if (decision.suggest) {
+        trackAgentModeSuggested({
+          hasFiles: Boolean(lastUserMessage.files?.length),
+          fileCount: lastUserMessage.files?.length ?? 0,
+        })
         targetMsg = {
           ...targetMsg,
           generating: false,
@@ -632,7 +655,10 @@ export async function orchestrateGeneration(
     }
 
     denyAllPendingApprovals()
-    targetMsg = handleGenerationError(err, targetMsg, settings)
+    targetMsg = handleGenerationError(err, targetMsg, settings, {
+      agentMode: getSessionAgentModeEntry(sessionId, session).value,
+      operationType: options?.operationType,
+    })
     await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
   }
 }
@@ -718,6 +744,12 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
   const part = findToolCallPart(message, toolCallId)
   if (!part || part.state !== 'paused') return
 
+  const isApproval = isApprovalPauseReason(part.pauseReason)
+  trackAgentModePauseAction({
+    type: isApproval ? 'approval' : 'tool_limit',
+    action: isApproval ? 'deny' : 'stop',
+  })
+
   const pauseReason = part.pauseReason
   if (pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval') {
     const deniedResult =
@@ -791,6 +823,12 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
   if (!message) return
   const part = findToolCallPart(message, toolCallId)
   if (!part || part.state !== 'paused') return
+
+  const isApproval = isApprovalPauseReason(part.pauseReason)
+  trackAgentModePauseAction({
+    type: isApproval ? 'approval' : 'tool_limit',
+    action: isApproval ? 'approve' : 'continue',
+  })
 
   // A tool_call_limit continue resumes the whole paused batch; an approval continue targets
   // exactly the clicked call. Either way it's the same flow — a batch of one or many.
@@ -875,6 +913,15 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
       { operationType: 'regenerate', appendToMessage: true }
     )
   } catch (error) {
+    captureAgentModeException(error, {
+      operation: 'tool_pause_continue',
+      provider: settings.provider,
+      model: settings.modelId,
+      agentMode: getSessionAgentModeEntry(sessionId, session).value,
+      fullAccess: settings.agentFullAccess === true,
+      toolName: part.toolName,
+      pauseType: part.pauseReason?.type,
+    })
     const errorMessage = error instanceof Error ? error.message : String(error)
     await modifyMessage(
       sessionId,
@@ -953,6 +1000,14 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
         { operationType: 'regenerate', appendToMessage: true }
       )
     } catch (error) {
+      captureAgentModeException(error, {
+        operation: 'tool_retry',
+        provider: settings.provider,
+        model: settings.modelId,
+        agentMode: getSessionAgentModeEntry(sessionId, session).value,
+        fullAccess: settings.agentFullAccess === true,
+        toolName: part.toolName,
+      })
       const errorMessage = error instanceof Error ? error.message : String(error)
       await modifyMessage(
         sessionId,
