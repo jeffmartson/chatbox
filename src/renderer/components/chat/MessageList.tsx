@@ -438,7 +438,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     <div className={cn('w-full h-full mx-auto', props.className)}>
       <BlockCodeCollapsedStateProvider defaultCollapsed={!!settingsStore.getState().autoCollapseCodeBlock}>
         <div
-          className={cn('overflow-hidden h-full pl-1 sm:pl-0 relative', showMinimap ? 'pr-[36px]' : 'pr-0')}
+          className={cn('overflow-hidden h-full pr-0 relative', showMinimap ? 'pl-[28px]' : 'pl-1 sm:pl-0')}
           ref={messageListRef}
         >
           <Virtuoso
