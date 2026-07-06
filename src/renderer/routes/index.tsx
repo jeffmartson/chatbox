@@ -1,9 +1,9 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Avatar, Box, Divider, Flex, ScrollArea, Space, Stack, Text } from '@mantine/core'
 import {
-  createMessage,
   type AgentModeEntry,
   type CopilotDetail,
+  createMessage,
   type ImageSource,
   type Session,
   type SessionSettings,
@@ -34,13 +34,13 @@ import { useAuthInfoStore } from '@/stores/authInfoStore'
 import { createSession as createSessionStore } from '@/stores/chatStore'
 import { resolveChatboxLicenseDefaultModel } from '@/stores/defaultChatModel'
 import { getHasCompletedFirstSuccessfulChat } from '@/stores/firstSuccessfulChat'
-import { submitNewUserMessage, switchCurrentSession } from '@/stores/sessionActions'
+import { generate, submitNewUserMessage, switchCurrentSession } from '@/stores/sessionActions'
 import { initEmptyChatSession } from '@/stores/sessionHelpers'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { getHomeWelcomeCardMode } from '@/utils/homeWelcomeCard'
 import { NewUserScenarioGrid } from './-new-user-scenarios/NewUserScenarioGrid'
-import { type NewUserScenario, newUserScenarios } from './-new-user-scenarios/scenarios'
+import { type NewUserScenario, newUserScenarios, resolveNewUserScenarioContent } from './-new-user-scenarios/scenarios'
 
 const scenarioAgentModeOff = {
   value: 'off',
@@ -60,7 +60,7 @@ export const Route = createFileRoute('/')({
 })
 
 function Index() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
 
   const newSessionState = useUIStore((s) => s.newSessionState)
@@ -330,19 +330,23 @@ function Index() {
 
   const handleScenarioSelect = useCallback(
     async (scenario: NewUserScenario) => {
+      const scenarioContent = resolveNewUserScenarioContent(scenario, i18n.language)
+      const assistantMessage = createMessage('assistant', '')
+      assistantMessage.generating = true
       const newSession = await createPersistedChatSession({
-        name: scenario.sessionTitle,
-        threadName: scenario.sessionTitle,
-        messages: [createMessage('system', scenario.systemPrompt)],
+        name: scenarioContent.sessionTitle,
+        threadName: scenarioContent.sessionTitle,
+        messages: [
+          createMessage('system', scenarioContent.systemPrompt),
+          createMessage('user', scenarioContent.firstUserMessage),
+          assistantMessage,
+        ],
         settingsOverride: { agentMode: scenarioAgentModeOff },
       })
 
-      void submitNewUserMessage(newSession.id, {
-        newUserMsg: createMessage('user', scenario.firstUserMessage),
-        needGenerating: true,
-      })
+      void generate(newSession.id, assistantMessage, { operationType: 'send_message' })
     },
-    [createPersistedChatSession]
+    [createPersistedChatSession, i18n.language]
   )
 
   const onSelectModel = useCallback((p: string, m: string) => {
