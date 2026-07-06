@@ -5,7 +5,6 @@ import { sortSessionRecords } from '@shared/utils/session-sort'
 const DB_NAME = 'chatbox-session-meta'
 const STORE_NAME = 'records'
 const DEFAULT_PAGE_SIZE = 50
-const DB_VERSION = 2
 
 export interface SessionMetaStorage extends SessionMetaRepositoryPort {
   initialize(): Promise<void>
@@ -49,7 +48,9 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   private openDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION)
+      // 这些索引只是性能优化，没有很强的 schema 迁移理由，去掉了强制指定version
+      // bump 后用户回退版本会因 VersionError 打不开 session meta DB，导致降级使用失败
+      const request = indexedDB.open(DB_NAME)
 
       request.onerror = () => reject(request.error)
 
@@ -182,6 +183,13 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
 
   async getArchivedPage(cursor: number = 0, limit: number = DEFAULT_PAGE_SIZE): Promise<SessionMetaPage> {
     await this.initialize()
+    if (!this.hasIndex('archivedAt')) {
+      const all = await this.getArchived()
+      const items = all.slice(cursor, cursor + limit)
+      const nextCursor = cursor + items.length < all.length ? cursor + items.length : null
+      return { items, nextCursor, total: all.length }
+    }
+
     const [items, total] = await Promise.all([
       this.getRecordsPage({
         cursor,
@@ -194,6 +202,11 @@ export class IndexedDBSessionMetaStorage implements SessionMetaStorage {
     ])
     const nextCursor = cursor + items.length < total ? cursor + items.length : null
     return { items, nextCursor, total }
+  }
+
+  private hasIndex(indexName: string): boolean {
+    const store = this.getStore('readonly')
+    return store.indexNames.contains(indexName)
   }
 
   private getAllRecords(): Promise<SessionMetaRecord[]> {
