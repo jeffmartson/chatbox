@@ -186,6 +186,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
       ),
     [renderItems]
   )
+  const showMinimap = !isSmallScreen && userMessageAnchors.length > 1
 
   const virtuoso = useRef<VirtuosoHandle>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
@@ -436,7 +437,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   return (
     <div className={cn('w-full h-full mx-auto', props.className)}>
       <BlockCodeCollapsedStateProvider defaultCollapsed={!!settingsStore.getState().autoCollapseCodeBlock}>
-        <div className="overflow-hidden h-full pr-0 pl-1 sm:pl-0 relative" ref={messageListRef}>
+        <div
+          className={cn('overflow-hidden h-full pl-1 sm:pl-0 relative', showMinimap ? 'pr-[36px]' : 'pr-0')}
+          ref={messageListRef}
+        >
           <Virtuoso
             style={{ scrollbarGutter: 'stable' }}
             className={platformType === 'win32' ? 'scrollbar-custom' : ''}
@@ -490,9 +494,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
             onScroll={handleScroll}
           />
 
-          {!isSmallScreen && userMessageAnchors.length > 1 && (
-            <MessageMinimapRail anchors={userMessageAnchors} onJump={handleMinimapJump} />
-          )}
+          {showMinimap && <MessageMinimapRail anchors={userMessageAnchors} onJump={handleMinimapJump} />}
 
           {!isSmallScreen ? (
             <MessageNavigation

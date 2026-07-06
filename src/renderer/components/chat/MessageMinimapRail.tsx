@@ -57,6 +57,7 @@ const edgeFadeBlurStyle: CSSProperties = {
 const MessageMinimapRail = ({ anchors, className, onJump }: MessageMinimapRailProps) => {
   const { t } = useTranslation()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const hasScrolledToInitialEndRef = useRef(false)
   const contentHeight = anchors.length * ITEM_HEIGHT
 
   const [pointerContentY, setPointerContentY] = useState<number | null>(null)
@@ -156,9 +157,35 @@ const MessageMinimapRail = ({ anchors, className, onJump }: MessageMinimapRailPr
       return
     }
 
-    setViewportHeight(scrollArea.clientHeight)
-    setScrollHeight(scrollArea.scrollHeight)
-    setScrollTop(scrollArea.scrollTop)
+    const syncScrollMetrics = () => {
+      setViewportHeight(scrollArea.clientHeight)
+      setScrollHeight(scrollArea.scrollHeight)
+      setScrollTop(scrollArea.scrollTop)
+    }
+
+    syncScrollMetrics()
+
+    if (hasScrolledToInitialEndRef.current) {
+      return
+    }
+
+    const scrollToInitialEnd = () => {
+      hasScrolledToInitialEndRef.current = true
+      const maxScrollTop = Math.max(0, scrollArea.scrollHeight - scrollArea.clientHeight)
+      scrollArea.scrollTop = maxScrollTop
+      syncScrollMetrics()
+    }
+
+    if (typeof requestAnimationFrame === 'undefined') {
+      scrollToInitialEnd()
+      return
+    }
+
+    const animationFrameId = requestAnimationFrame(scrollToInitialEnd)
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
   }, [contentHeight])
 
   if (anchors.length === 0) {
