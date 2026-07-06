@@ -30,7 +30,9 @@ import {
 import type { ModelDependencies } from '../../../types/adapters'
 import {
   getLegacyOpenAICompatibleThinkingType,
+  isOpenAIReasoningEffortSupported,
   normalizeClaudeReasoningOptions,
+  normalizeOpenAIReasoningOptions,
 } from '../../../utils/reasoning-control'
 import { buildGeminiImageConfig } from '../gemini-types'
 
@@ -80,13 +82,16 @@ function getDefaultAnthropicMaxOutputTokens(model: ProviderModelInfo): number {
  * can retain a stale openaiCompatible namespace written for a previously selected
  * model (e.g. Qwen enable_thinking/thinking_budget). Only reasoningEffort — which maps
  * to the reasoning_effort wire param — may pass through, and the current openai-style
- * value wins over a legacy openaiCompatible one.
+ * value wins over a legacy openaiCompatible one. Efforts the target model rejects
+ * (o-series with minimal/none, o1-preview/o1-mini with any) are dropped entirely.
  */
 function pickOpenAICompatibleReasoningOptions(
+  modelId: string,
   providerOptions: ProviderOptions | undefined
 ): ProviderOptions['openaiCompatible'] {
   const reasoningEffort = providerOptions?.openai?.reasoningEffort ?? providerOptions?.openaiCompatible?.reasoningEffort
   if (reasoningEffort === undefined) return undefined
+  if (!isOpenAIReasoningEffortSupported(modelId, reasoningEffort)) return undefined
   return { reasoningEffort }
 }
 
@@ -217,13 +222,16 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
         maxOutputTokens: this.options.maxOutputTokens,
         providerOptions: {
           openai: {
-            ...options.providerOptions?.openai,
+            ...normalizeOpenAIReasoningOptions(this.options.model.modelId, options.providerOptions?.openai),
             store: false,
           },
         },
       }
     }
-    const openAICompatibleOptions = pickOpenAICompatibleReasoningOptions(options.providerOptions)
+    const openAICompatibleOptions = pickOpenAICompatibleReasoningOptions(
+      this.options.model.modelId,
+      options.providerOptions
+    )
     if (isDeepSeekReasoningModel(this.options.model.modelId)) {
       const thinkingType =
         options.providerOptions?.deepseek?.thinking?.type ??

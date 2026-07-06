@@ -9,7 +9,9 @@ import {
   getReasoningControlOptions,
   getReasoningProviderOptions,
   isClaudeAdaptiveThinkingModel,
+  isOpenAIReasoningEffortSupported,
   normalizeClaudeReasoningOptions,
+  normalizeOpenAIReasoningOptions,
   stripReasoningProviderOptions,
   usesClaudeEffortControl,
 } from './reasoning-control'
@@ -214,6 +216,104 @@ describe('reasoning-control', () => {
     expect(usesClaudeEffortControl('claude-opus-4-5')).toBe(true)
     expect(usesClaudeEffortControl('claude-opus-4-8')).toBe(true)
     expect(usesClaudeEffortControl('claude-sonnet-4-6')).toBe(false)
+  })
+
+  it('offers effort controls for OpenAI o-series models without an off option', () => {
+    for (const provider of [ModelProviderEnum.OpenAI, ModelProviderEnum.OpenAIResponses, ModelProviderEnum.Azure]) {
+      expect(getReasoningControlCapabilities(provider, model('o3'))).toEqual({
+        supported: true,
+        kind: 'openai-effort',
+      })
+    }
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('o4-mini')).supported).toBe(true)
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('o1')).supported).toBe(true)
+    // o1-preview/o1-mini predate reasoning_effort — the API rejects the parameter, so
+    // they must not get effort controls (and no disabledReason: they are simply unsupported).
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('o1-preview'))).toEqual({
+      supported: false,
+      kind: 'toggle',
+    })
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('o1-mini')).supported).toBe(false)
+    // o-series only accepts low/medium/high — no minimal/none, so no off option.
+    expect(getReasoningControlOptions(ModelProviderEnum.OpenAI, model('o3')).map((o) => o.level)).toEqual([
+      'default',
+      'low',
+      'medium',
+      'high',
+    ])
+    // ChatboxAI / custom providers route o-series by API style.
+    expect(getReasoningControlCapabilities(ModelProviderEnum.ChatboxAI, model('o3', 'openai')).kind).toBe(
+      'openai-effort'
+    )
+    expect(getReasoningControlCapabilities('my-openai-proxy', model('o3', 'openai-responses')).supported).toBe(true)
+    expect(getReasoningControlCapabilities('acme-llm', model('o3', 'anthropic')).supported).toBe(false)
+    // Requesting off falls back to stripping; levels map to plain reasoning effort.
+    expect(
+      getReasoningProviderOptions(ModelProviderEnum.OpenAI, model('o3'), 'off', {
+        openai: { reasoningEffort: 'high' },
+      })
+    ).toBeUndefined()
+    expect(getReasoningProviderOptions(ModelProviderEnum.OpenAI, model('o3'), 'medium')?.openai?.reasoningEffort).toBe(
+      'medium'
+    )
+    // A stale minimal effort reads back as default (off is not representable).
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.OpenAI, model('o3'), { openai: { reasoningEffort: 'minimal' } })
+    ).toBe('default')
+    // gpt-4o must not be classified as an o-series reasoning model.
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-4o')).supported).toBe(false)
+    // OpenRouter keeps its off state for o-series (reasoning.enabled=false works there),
+    // and o1-preview stays reasoning-capable there (OpenRouter maps params per model).
+    expect(getReasoningControlOptions(ModelProviderEnum.OpenRouter, model('openai/o3')).map((o) => o.level)).toContain(
+      'off'
+    )
+    expect(getReasoningControlCapabilities(ModelProviderEnum.OpenRouter, model('openai/o1-preview')).supported).toBe(
+      true
+    )
+  })
+
+  it('strips reasoning efforts the target OpenAI model rejects at the request edge', () => {
+    // Stale GPT-5 off state (minimal/none) carried onto o-series via a model switch.
+    expect(normalizeOpenAIReasoningOptions('o3', { reasoningEffort: 'minimal', forceReasoning: true })).toBeUndefined()
+    expect(normalizeOpenAIReasoningOptions('o4-mini', { reasoningEffort: 'none' })).toBeUndefined()
+    // Valid efforts pass through untouched for o-series and GPT-5 models.
+    expect(normalizeOpenAIReasoningOptions('o3', { reasoningEffort: 'medium' })).toEqual({ reasoningEffort: 'medium' })
+    expect(normalizeOpenAIReasoningOptions('gpt-5', { reasoningEffort: 'minimal', forceReasoning: true })).toEqual({
+      reasoningEffort: 'minimal',
+      forceReasoning: true,
+    })
+    // o1-preview/o1-mini reject the parameter entirely — everything is dropped.
+    expect(normalizeOpenAIReasoningOptions('o1-preview', { reasoningEffort: 'medium' })).toBeUndefined()
+    expect(normalizeOpenAIReasoningOptions('o1-mini', { reasoningSummary: 'auto' })).toBeUndefined()
+    expect(normalizeOpenAIReasoningOptions('o1', { reasoningEffort: 'high' })).toEqual({ reasoningEffort: 'high' })
+    expect(normalizeOpenAIReasoningOptions('gpt-5.1', undefined)).toBeUndefined()
+    expect(isOpenAIReasoningEffortSupported('o3', 'minimal')).toBe(false)
+    expect(isOpenAIReasoningEffortSupported('o3', 'high')).toBe(true)
+    expect(isOpenAIReasoningEffortSupported('o1-preview', 'high')).toBe(false)
+    expect(isOpenAIReasoningEffortSupported('gpt-5.1', 'none')).toBe(true)
+  })
+
+  it('reads legacy session-settings modal budgets back as the originally chosen level', () => {
+    // The deleted modal wrote presets 2048/5120/10240 for Gemini; the readback
+    // boundaries must map them to Low/Medium/High, same as the new 1024/8192/24576.
+    const geminiLevel = (budget: number) =>
+      getReasoningControlLevel(ModelProviderEnum.Gemini, model('gemini-2.5-flash'), {
+        google: { thinkingConfig: { thinkingBudget: budget, includeThoughts: true } },
+      })
+    expect(geminiLevel(2048)).toBe('low')
+    expect(geminiLevel(5120)).toBe('medium')
+    expect(geminiLevel(10240)).toBe('high')
+    expect(geminiLevel(1024)).toBe('low')
+    expect(geminiLevel(8192)).toBe('medium')
+    expect(geminiLevel(24576)).toBe('high')
+    // Claude thresholds (1024/4096/8192) already map the legacy presets correctly.
+    const claudeLevel = (budget: number) =>
+      getReasoningControlLevel(ModelProviderEnum.Claude, model('claude-sonnet-4-6'), {
+        claude: { thinking: { type: 'enabled', budgetTokens: budget } },
+      })
+    expect(claudeLevel(2048)).toBe('low')
+    expect(claudeLevel(5120)).toBe('medium')
+    expect(claudeLevel(10240)).toBe('high')
   })
 
   it('sends none-style off effort for all dotted gpt-5.x generations', () => {

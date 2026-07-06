@@ -58,17 +58,31 @@ const GEMINI_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   high: 24576,
 }
 
+// Readback boundaries accept both the level budgets above (1024/8192/24576) and the
+// presets written by the legacy session-settings modal (2048/5120/10240), so upgraded
+// sessions keep displaying the level the user originally chose.
+const GEMINI_LEVEL_READBACK_MIN: Record<Exclude<ReasoningEffortLevel, 'low'>, number> = {
+  medium: 4096,
+  high: 10240,
+}
+
 const QWEN_THINKING_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   low: 1024,
   medium: 4096,
   high: 8192,
 }
 
-const GPT_EFFORT_MODELS = [/(?:^|\/)gpt-5(?:[.-]|$)/i, /(?:^|\/)gpt-oss(?:[.-]|$)/i]
+const GPT_EFFORT_MODELS = [/(?:^|\/)gpt-5(?:[.-]|$)/i, /(?:^|\/)gpt-oss(?:[.-]|$)/i, /(?:^|\/)o[1-9](?:[.-]|$)/i]
+// o-series models only accept reasoning_effort low/medium/high — there is no
+// minimal/none, so reasoning cannot be turned off for them.
+const OPENAI_NO_DISABLE_MODELS = [/(?:^|\/)o[1-9](?:[.-]|$)/i]
 // Chat-tuned gpt-5 variants (gpt-5-chat-latest, gpt-5.1-chat, gpt-5.2-chat-latest, ...)
 // are non-reasoning models; sending reasoning_effort to them is rejected upstream
 // ("Unrecognized request argument supplied: reasoning_effort").
 const GPT_NON_REASONING_CHAT_MODELS = [/(?:^|\/)gpt-5[\w.-]*[.-]chat(?:[.-]|$)/i]
+// o1-preview and o1-mini predate the reasoning_effort parameter — the API rejects it
+// for them entirely, so they must not get effort controls at all.
+const OPENAI_NO_EFFORT_PARAM_MODELS = [/(?:^|\/)o1-(?:preview|mini)(?:[.-]|$)/i]
 // gpt-5.1 and later accept reasoning_effort: 'none'; the original gpt-5 only goes
 // down to 'minimal'. Match any dotted gpt-5.x so future versions default to 'none'.
 const OPENAI_NONE_EFFORT_MODELS = [/(?:^|\/)gpt-5\.[1-9]\d*(?:[.-]|$)/i]
@@ -108,11 +122,18 @@ function supportsExplicitDisable(
   if (kind === 'anthropic-adaptive-effort' || kind === 'anthropic-effort') {
     return false
   }
+  if (isOpenAIStyleEffectiveProvider(effectiveProvider) && matchesAny(modelId, OPENAI_NO_DISABLE_MODELS)) {
+    return false
+  }
   return true
 }
 
 function isGptEffortModel(modelId: string): boolean {
-  return matchesAny(modelId, GPT_EFFORT_MODELS) && !matchesAny(modelId, GPT_NON_REASONING_CHAT_MODELS)
+  return (
+    matchesAny(modelId, GPT_EFFORT_MODELS) &&
+    !matchesAny(modelId, GPT_NON_REASONING_CHAT_MODELS) &&
+    !matchesAny(modelId, OPENAI_NO_EFFORT_PARAM_MODELS)
+  )
 }
 
 /**
@@ -148,6 +169,37 @@ export function normalizeClaudeReasoningOptions(
     return claude.effort ? { effort: claude.effort } : undefined
   }
   return claude.thinking ? { thinking: claude.thinking } : undefined
+}
+
+/**
+ * Whether a reasoning_effort value can be sent to the given OpenAI-style model:
+ * o1-preview/o1-mini reject the parameter entirely, and the other o-series models
+ * reject the minimal/none off values.
+ */
+export function isOpenAIReasoningEffortSupported(modelId: string, effort: string): boolean {
+  if (matchesAny(modelId, OPENAI_NO_EFFORT_PARAM_MODELS)) return false
+  if (matchesAny(modelId, OPENAI_NO_DISABLE_MODELS) && (effort === 'minimal' || effort === 'none')) return false
+  return true
+}
+
+/**
+ * Drops OpenAI reasoning options the target model cannot accept (see
+ * isOpenAIReasoningEffortSupported) — a stale off effort persisted under a GPT-5
+ * session must not survive a switch to an o-series model. Returns undefined when the
+ * options are invalid for the model, dropping the whole (reasoning-only) namespace.
+ */
+export function normalizeOpenAIReasoningOptions(
+  modelId: string,
+  openai: ProviderOptions['openai']
+): ProviderOptions['openai'] {
+  if (!openai) return undefined
+  if (matchesAny(modelId, OPENAI_NO_EFFORT_PARAM_MODELS)) {
+    return undefined
+  }
+  if (openai.reasoningEffort !== undefined && !isOpenAIReasoningEffortSupported(modelId, openai.reasoningEffort)) {
+    return undefined
+  }
+  return openai
 }
 
 function isOpenAIStyleEffectiveProvider(provider: ModelProvider | undefined): boolean {
@@ -388,8 +440,8 @@ function deriveReasoningControlLevel(
     if (config.thinkingLevel && config.thinkingLevel !== 'minimal') return config.thinkingLevel
     const budget = config.thinkingBudget
     if (budget === undefined || budget <= 0) return 'off'
-    if (budget >= GEMINI_BUDGET_BY_LEVEL.high) return 'high'
-    if (budget >= GEMINI_BUDGET_BY_LEVEL.medium) return 'medium'
+    if (budget >= GEMINI_LEVEL_READBACK_MIN.high) return 'high'
+    if (budget >= GEMINI_LEVEL_READBACK_MIN.medium) return 'medium'
     return 'low'
   }
   if (effectiveProvider === ModelProviderEnum.DeepSeek) {
@@ -561,7 +613,9 @@ function isOpenRouterReasoningModel(model: ProviderModelInfo | null | undefined)
     ...CLAUDE_BUDGET_MODELS,
     ...QWEN_THINKING_MODELS,
     ...GROK_REASONING_EFFORT_MODELS,
-    /(?:^|\/)o[1-9](?:[.-]|$)/i,
+    // o1-preview/o1-mini reject the direct reasoning_effort param, but OpenRouter maps
+    // its own reasoning options per model, so they keep reasoning controls there.
+    ...OPENAI_NO_EFFORT_PARAM_MODELS,
   ])
 }
 

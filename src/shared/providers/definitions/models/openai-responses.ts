@@ -7,6 +7,7 @@ import { createFetchWithProxy } from '../../../models/utils/fetch-proxy'
 import type { ProviderModelInfo } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import { normalizeOpenAIResponsesHostAndPath } from '../../../utils/llm_utils'
+import { normalizeOpenAIReasoningOptions } from '../../../utils/reasoning-control'
 
 interface Options {
   apiKey: string
@@ -39,7 +40,10 @@ export default class OpenAIResponses extends AbstractAISDKModel {
   }
 
   protected getCallSettings(options: CallChatCompletionOptions) {
-    const openaiProviderOptions = options.providerOptions?.openai
+    const openaiProviderOptions = normalizeOpenAIReasoningOptions(
+      this.options.model.modelId,
+      options.providerOptions?.openai
+    )
 
     return {
       temperature: this.options.temperature,

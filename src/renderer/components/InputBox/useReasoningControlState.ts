@@ -43,6 +43,22 @@ function findProviderModelInfo(model: SelectedModel | undefined, providerInfo: P
   return foundModel ? withProviderApiStyleFallback(foundModel, providerInfo?.type) : undefined
 }
 
+/**
+ * Resolves the model info used for reasoning-control decisions (capabilities, level,
+ * request options). Falls back to a synthetic info carrying the provider's API style
+ * when the model is not in the provider's model list. Shared with the session
+ * settings modal so both surfaces classify models identically.
+ */
+export function resolveReasoningModelInfo(
+  model: SelectedModel | undefined,
+  providerInfo: ProviderInfo | undefined
+): ProviderModelInfo | null {
+  if (!model) return null
+  const found = findProviderModelInfo(model, providerInfo)
+  if (found) return found
+  return withProviderApiStyleFallback({ modelId: model.modelId }, providerInfo?.type)
+}
+
 export function useReasoningControlState({
   currentSessionId,
   isNewSession,

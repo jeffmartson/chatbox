@@ -7,6 +7,7 @@ import { createFetchWithProxy } from '../../../models/utils/fetch-proxy'
 import type { ProviderModelInfo } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import { normalizeOpenAIResponsesHostAndPath } from '../../../utils/llm_utils'
+import { normalizeOpenAIReasoningOptions } from '../../../utils/reasoning-control'
 
 interface Options {
   apiKey: string
@@ -46,7 +47,7 @@ export default class CustomOpenAIResponses extends AbstractAISDKModel {
       // history and avoids tool-call / item id mismatches (see issue #3728).
       providerOptions: {
         openai: {
-          ...options.providerOptions?.openai,
+          ...normalizeOpenAIReasoningOptions(this.options.model.modelId, options.providerOptions?.openai),
           store: false,
         },
       },
