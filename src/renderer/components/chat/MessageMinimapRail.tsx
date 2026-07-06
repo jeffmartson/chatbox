@@ -12,15 +12,17 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 const ITEM_HEIGHT = 12
-const BASE_LINE_WIDTH = 10
-const MAX_LINE_WIDTH = 32
-const HOVER_DISTANCE = 72
+const BASE_LINE_WIDTH = 6
+const MAX_LINE_WIDTH = 26
+const HOVER_DISTANCE = 60
+const HOVER_FALLOFF_POWER = 2
 const PREVIEW_MARGIN = 28
 
 export type MessageMinimapAnchor = {
   messageId: string
   itemIndex: number
   text: string
+  assistantText?: string
 }
 
 export type MessageMinimapRailProps = {
@@ -194,6 +196,9 @@ const MessageMinimapRail = ({ anchors, className, onJump }: MessageMinimapRailPr
 
   const previewFallback = String(t('Attachment message'))
   const hoveredPreviewText = hoveredAnchor ? normalizePreviewText(hoveredAnchor.anchor.text, previewFallback) : ''
+  const hoveredAssistantText = hoveredAnchor?.anchor.assistantText
+    ? normalizePreviewText(hoveredAnchor.anchor.assistantText, '')
+    : ''
   const contentOffset = viewportHeight > contentHeight ? (viewportHeight - contentHeight) / 2 : 0
   const hasScrollableOverflow = scrollHeight > viewportHeight + 1
   const showTopFade = hasScrollableOverflow && scrollTop > 1
@@ -229,9 +234,11 @@ const MessageMinimapRail = ({ anchors, className, onJump }: MessageMinimapRailPr
         <div style={{ height: contentHeight, transform: `translateY(${contentOffset}px)` }}>
           {anchors.map((anchor, index) => {
             const centerY = index * ITEM_HEIGHT + ITEM_HEIGHT / 2
+            const influenceCenterY =
+              hoveredAnchor !== null ? hoveredAnchor.index * ITEM_HEIGHT + ITEM_HEIGHT / 2 : pointerContentY
             const rawInfluence =
-              pointerContentY === null ? 0 : Math.max(0, 1 - Math.abs(centerY - pointerContentY) / HOVER_DISTANCE)
-            const influence = smoothstep(rawInfluence)
+              influenceCenterY === null ? 0 : Math.max(0, 1 - Math.abs(centerY - influenceCenterY) / HOVER_DISTANCE)
+            const influence = smoothstep(rawInfluence) ** HOVER_FALLOFF_POWER
             const hovered = hoveredAnchor?.anchor.messageId === anchor.messageId
             const lineWidth = Math.min(MAX_LINE_WIDTH, BASE_LINE_WIDTH + influence * (MAX_LINE_WIDTH - BASE_LINE_WIDTH))
             const opacity = hovered ? 0.95 : 0.3
@@ -299,9 +306,9 @@ const MessageMinimapRail = ({ anchors, className, onJump }: MessageMinimapRailPr
           <div className="text-sm leading-snug text-chatbox-tint-primary" style={previewTextStyle}>
             {hoveredPreviewText}
           </div>
-          <div className="mt-1 text-xs leading-tight text-chatbox-tint-tertiary">
-            {t('Message {{index}}', { index: hoveredAnchor.index + 1 })}
-          </div>
+          {hoveredAssistantText && (
+            <div className="mt-1 truncate text-xs leading-tight text-chatbox-tint-tertiary">{hoveredAssistantText}</div>
+          )}
         </div>
       )}
     </div>

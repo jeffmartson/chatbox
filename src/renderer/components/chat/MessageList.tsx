@@ -173,20 +173,39 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     return items
   }, [currentMessageList])
 
-  const userMessageAnchors = useMemo<MessageMinimapAnchor[]>(
-    () =>
-      renderItems.flatMap((item, itemIndex) =>
-        item.messages
-          .filter((message) => message.role === 'user' && !message.isSummary)
-          .map((message) => ({
-            messageId: message.id,
-            itemIndex,
-            text: getMessageText(message, true, false).trim(),
-          }))
-      ),
-    [renderItems]
-  )
-  const showMinimap = !isSmallScreen && userMessageAnchors.length > 1
+  const userMessageAnchors = useMemo<MessageMinimapAnchor[]>(() => {
+    const assistantTextByUserId = new Map<string, string>()
+
+    for (let i = 0; i < currentMessageList.length; i++) {
+      const message = currentMessageList[i]
+      if (message.role !== 'user' || message.isSummary) {
+        continue
+      }
+
+      for (let j = i + 1; j < currentMessageList.length; j++) {
+        const nextMessage = currentMessageList[j]
+        if (nextMessage.role === 'user') {
+          break
+        }
+        if (nextMessage.role === 'assistant' && !nextMessage.isSummary && !nextMessage.isForkMarker) {
+          assistantTextByUserId.set(message.id, getMessageText(nextMessage, true, false).trim())
+          break
+        }
+      }
+    }
+
+    return renderItems.flatMap((item, itemIndex) =>
+      item.messages
+        .filter((message) => message.role === 'user' && !message.isSummary)
+        .map((message) => ({
+          messageId: message.id,
+          itemIndex,
+          text: getMessageText(message, true, false).trim(),
+          assistantText: assistantTextByUserId.get(message.id),
+        }))
+    )
+  }, [currentMessageList, renderItems])
+  const showMinimap = !isSmallScreen && userMessageAnchors.length > 0
 
   const virtuoso = useRef<VirtuosoHandle>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
