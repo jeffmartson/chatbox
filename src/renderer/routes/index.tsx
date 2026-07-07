@@ -379,31 +379,25 @@ function Index() {
 
   return (
     <Page title="">
-      <div className="p-0 flex flex-col h-full">
-        {showNewUserScenarios ? (
-          <Stack justify="center" flex={1} py="xl">
-            <NewUserScenarioGrid scenarios={newUserScenarios} onSelect={handleScenarioSelect} />
-          </Stack>
-        ) : (
-          <Stack align="center" justify="center" gap="sm" flex={1}>
-            <HomepageIcon className="h-8" />
-            <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
-              {t('What can I help you with today?')}
-            </Text>
-          </Stack>
-        )}
+      <div className="p-0 flex flex-col h-full min-h-0 overflow-hidden">
+        <div
+          className={clsx('min-h-0 flex-1 overflow-y-auto', welcomeCardMode !== 'none' ? 'pb-36 sm:pb-32' : 'pb-md')}
+        >
+          {showNewUserScenarios ? (
+            <Stack justify="center" className="min-h-full" py="xl">
+              <NewUserScenarioGrid scenarios={newUserScenarios} onSelect={handleScenarioSelect} />
+            </Stack>
+          ) : (
+            <Stack align="center" justify="center" gap="sm" className="min-h-full">
+              <HomepageIcon className="h-8" />
+              <Text fw="600" size={isSmallScreen ? 'sm' : 'md'}>
+                {t('What can I help you with today?')}
+              </Text>
+            </Stack>
+          )}
+        </div>
 
-        {welcomeCardMode !== 'none' && (
-          <Box px="sm">
-            <ChatboxWelcomeCard
-              mode={welcomeCardMode}
-              pageName={JK_PAGE_NAMES.CHAT_PAGE}
-              className={clsx('mb-md', widthFull ? 'w-full' : 'w-full max-w-4xl mx-auto')}
-            />
-          </Box>
-        )}
-
-        <Stack gap="sm">
+        <Stack gap="sm" className="shrink-0">
           {session.copilotId ? (
             <Box px="md">
               <Stack gap="sm" className={widthFull ? 'w-full' : 'w-full max-w-4xl mx-auto'}>
@@ -442,15 +436,34 @@ function Index() {
             )
           )}
 
-          <InputBox
-            sessionType="chat"
-            sessionId="new"
-            model={selectedModel}
-            // fullWidth
-            onSelectModel={onSelectModel}
-            onClickSessionSettings={onClickSessionSettings}
-            onSubmit={handleSubmit}
-          />
+          <Box className="relative">
+            {welcomeCardMode !== 'none' && (
+              <Box
+                className="pointer-events-none absolute left-0 right-0 z-10"
+                style={{ bottom: '100%' }}
+                px="sm"
+                mb="sm"
+              >
+                <Box className={widthFull ? 'w-full' : 'w-full max-w-4xl mx-auto'}>
+                  <ChatboxWelcomeCard
+                    mode={welcomeCardMode}
+                    pageName={JK_PAGE_NAMES.CHAT_PAGE}
+                    className="pointer-events-auto w-full"
+                  />
+                </Box>
+              </Box>
+            )}
+
+            <InputBox
+              sessionType="chat"
+              sessionId="new"
+              model={selectedModel}
+              // fullWidth
+              onSelectModel={onSelectModel}
+              onClickSessionSettings={onClickSessionSettings}
+              onSubmit={handleSubmit}
+            />
+          </Box>
         </Stack>
       </div>
     </Page>
