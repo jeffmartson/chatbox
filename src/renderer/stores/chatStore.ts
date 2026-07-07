@@ -455,38 +455,78 @@ export async function confirmSessionDeletion(id: string): Promise<boolean> {
   }
 }
 
-export async function deleteSession(id: string) {
-  console.debug('chatStore', 'deleteSession', id)
-  if (platform.type === 'desktop') {
+async function cleanupSessionAttachmentRagEntries(ids: string[], operation: string) {
+  if (platform.type !== 'desktop') {
+    return
+  }
+  await runInChunks(ids, 10, async (id) => {
     try {
       await platform.getSessionAttachmentRagController().deleteSessionAttachments(id)
     } catch (error) {
-      console.warn('Failed to cleanup session attachment RAG entries for session deletion:', error)
+      console.warn(`Failed to cleanup session attachment RAG entries for ${operation}:`, error)
     }
-  }
-  await storage.removeItem(StorageKeyGenerator.session(id))
+  })
+}
+
+function cleanupDeletedSessionRuntimeState(id: string) {
   _setSessionCache(id, null)
-  const metaStorage = await getMetaStorage()
-  await metaStorage.delete(id)
-  updateSessionListData((items) => items.filter((session) => session.id !== id))
-  updateArchivedSessionListData((items) => items.filter((session) => session.id !== id))
-  // Clean up UI state and caches to prevent memory leaks
   uiStore.getState().clearSessionWebBrowsing(id)
   uiStore.getState().removeSessionKnowledgeBase(id)
   uiStore.getState().clearSessionAgentMode(id)
   cleanupSessionAtomCache(id)
   clearScrollPositionCache(id)
   delete sessionUpdateQueues[id]
-  // Stop running sandbox processes and clear in-memory session state (best-effort, non-blocking).
-  // The transient temp dir is reaped by the 7-day startup cleanup; persisted download artifacts
-  // live under userData and would otherwise leak forever once the session is gone, so remove them
-  // here (the session — and its download UI — no longer exists).
+  // Remove persisted download artifacts so deleted session references do not leak files on disk.
   platform.sandboxReset?.({ sessionId: id }).catch(() => {})
   platform.sandboxRemoveArtifacts?.({ sessionId: id }).catch(() => {})
 }
 
+export async function deleteSession(id: string) {
+  console.debug('chatStore', 'deleteSession', id)
+  await cleanupSessionAttachmentRagEntries([id], 'session deletion')
+  await storage.removeItem(StorageKeyGenerator.session(id))
+  const metaStorage = await getMetaStorage()
+  await metaStorage.delete(id)
+  updateSessionListData((items) => items.filter((session) => session.id !== id))
+  updateArchivedSessionListData((items) => items.filter((session) => session.id !== id))
+  cleanupDeletedSessionRuntimeState(id)
+}
+
 export async function archiveSession(id: string) {
   await updateSession(id, { hidden: true, archivedAt: Date.now() })
+  await refreshArchivedSessionListCache()
+}
+
+// 这里刻意逐个走 updateSession，保证完整 session 存储和 meta 存储一致。
+// 该实现不针对超大批量归档做性能优化。
+export async function archiveSessions(ids: string[]) {
+  const uniqueIds = [...new Set(ids)]
+  if (uniqueIds.length === 0) return
+
+  const archivedAt = Date.now()
+  const missingSessionIds: string[] = []
+  await runInChunks(uniqueIds, 20, async (id) => {
+    try {
+      await updateSession(id, { hidden: true, archivedAt })
+    } catch (error) {
+      if (error instanceof Error && error.message === `Session ${id} not found`) {
+        missingSessionIds.push(id)
+        return
+      }
+      throw error
+    }
+  })
+
+  if (missingSessionIds.length > 0) {
+    await cleanupSessionAttachmentRagEntries(missingSessionIds, 'stale session meta cleanup')
+    const metaStorage = await getMetaStorage()
+    await metaStorage.deleteMany(missingSessionIds)
+    for (const id of missingSessionIds) {
+      cleanupDeletedSessionRuntimeState(id)
+    }
+  }
+
+  await refreshSessionListCache()
   await refreshArchivedSessionListCache()
 }
 
@@ -500,23 +540,11 @@ export async function deleteSessions(ids: string[]) {
   const uniqueIds = [...new Set(ids)]
   if (uniqueIds.length === 0) return
 
-  if (platform.type === 'desktop') {
-    await runInChunks(uniqueIds, 10, async (id) => {
-      try {
-        await platform.getSessionAttachmentRagController().deleteSessionAttachments(id)
-      } catch (error) {
-        console.warn('Failed to cleanup session attachment RAG entries for session deletion:', error)
-      }
-    })
-  }
+  await cleanupSessionAttachmentRagEntries(uniqueIds, 'session deletion')
 
   await runInChunks(uniqueIds, 20, async (id) => {
     await storage.removeItem(StorageKeyGenerator.session(id))
   })
-
-  for (const id of uniqueIds) {
-    _setSessionCache(id, null)
-  }
 
   const metaStorage = await getMetaStorage()
   await metaStorage.deleteMany(uniqueIds)
@@ -524,15 +552,7 @@ export async function deleteSessions(ids: string[]) {
   updateArchivedSessionListData((items) => items.filter((session) => !uniqueIds.includes(session.id)))
 
   for (const id of uniqueIds) {
-    uiStore.getState().clearSessionWebBrowsing(id)
-    uiStore.getState().removeSessionKnowledgeBase(id)
-    uiStore.getState().clearSessionAgentMode(id)
-    cleanupSessionAtomCache(id)
-    clearScrollPositionCache(id)
-    delete sessionUpdateQueues[id]
-    // Remove persisted download artifacts so deleted sessions don't leak files on disk.
-    platform.sandboxReset?.({ sessionId: id }).catch(() => {})
-    platform.sandboxRemoveArtifacts?.({ sessionId: id }).catch(() => {})
+    cleanupDeletedSessionRuntimeState(id)
   }
 }
 

@@ -509,7 +509,7 @@
   "It only takes a few seconds and helps a lot.": "Det tar bare noen få sekunder og hjelper mye.",
   "iWork files (Pages, Keynote) are not supported. Please export to PDF or Office format.": "iWork-filer (Pages, Keynote) støttes ikke. Vennligst eksporter til PDF- eller Office-format.",
   "Jump to message {{index}}": "Gå til melding {{index}}",
-  "Keep only the Top <input /> Conversations in List and Permanently Delete the Rest": "Behold kun de øverste <input /> samtalene i listen og slett resten permanent",
+  "Keep only the Top <input /> Conversations in List and Archive the Rest": "Behold kun de øverste <input /> samtalene i listen og arkiver resten",
   "Keyboard Shortcuts": "Tastatursnarveier",
   "Knowledge Base": "Kunnskapsbase",
   "Knowledge Base documents must be {{limit}} or smaller.": "Kunnskapsbasdokumenter må være {{limit}} eller mindre.",

@@ -509,7 +509,7 @@
   "It only takes a few seconds and helps a lot.": "Solo lleva unos segundos y ayuda mucho.",
   "iWork files (Pages, Keynote) are not supported. Please export to PDF or Office format.": "Los archivos de iWork (Pages, Keynote) no son compatibles. Por favor, expórtelos a PDF o a un formato de Office.",
   "Jump to message {{index}}": "Ir al mensaje {{index}}",
-  "Keep only the Top <input /> Conversations in List and Permanently Delete the Rest": "Mantener solo las <input /> conversaciones principales en la lista y eliminar permanentemente el resto",
+  "Keep only the Top <input /> Conversations in List and Archive the Rest": "Mantener solo las <input /> conversaciones principales en la lista y archivar el resto",
   "Keyboard Shortcuts": "Atajos de teclado",
   "Knowledge Base": "Base de conocimientos",
   "Knowledge Base documents must be {{limit}} or smaller.": "Los documentos de la base de conocimientos deben ser de {{limit}} o menores.",

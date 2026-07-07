@@ -506,9 +506,9 @@ This inventory is code-derived from `src/renderer/routes`, `src/renderer/compone
 - Platform notes: None detected
 - Preview modes: None detected
 - Preview links: [Storybook: Clear session list modal numeric retention state](http://localhost:6006/?path=/story/real-components-modals--clear-session-list-modal-numeric-retention-state)
-- States: `cleaning`, `error`, `loading`, `opened`, `value`, `visible`
-- Variants: `color:chatbox-error`
-- Text: `clean it up`, `Clear Conversation List`, `Keep only the Top <input /> Conversations in List and Permanently Delete the Rest`
+- States: `cleaning`, `loading`, `opened`, `value`, `visible`
+- Variants: None detected
+- Text: `Archive`, `Clear Conversation List`, `Keep only the Top <input /> Conversations in List and Archive the Rest`
 
 ### modals/ConfirmModal
 
@@ -2983,4 +2983,3 @@ This inventory is code-derived from `src/renderer/routes`, `src/renderer/compone
 - States: `error`, `isStreamingMode`
 - Variants: `size:sm`
 - Text: `Code Search — Success`, `Knowledge Base — Loading`, `Multiple Tool Calls`, `Multiple tool calls in a single message:`, `Parse Link — Loading`, `Read File — Success`, `Step Timeline — Interleaved Text`, `Step Timeline — Reasoning + Tools`, `Step Timeline — Running`, `Terminal — Success`, `Web Search — Error`, `Web Search — Loading`, `Web Search — Success`
-

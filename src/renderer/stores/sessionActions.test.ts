@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { Message, Session, SessionThread } from '../../shared/types'
+import type { Message, Session, SessionMetaRecord, SessionThread } from '../../shared/types'
 
 import * as sessionActions from './sessionActions'
 
@@ -20,6 +20,9 @@ const {
   createSessionMock,
   useSessionMock,
   getSessionMock,
+  listAllSessionsMetaMock,
+  archiveSessionsMock,
+  deleteSessionsMock,
   routerNavigateMock,
   sessionAgentModeMapMock,
   setSessionAgentModeMock,
@@ -30,6 +33,9 @@ const {
   createSessionMock: vi.fn(),
   useSessionMock: vi.fn(),
   getSessionMock: vi.fn(),
+  listAllSessionsMetaMock: vi.fn(),
+  archiveSessionsMock: vi.fn(),
+  deleteSessionsMock: vi.fn(),
   routerNavigateMock: vi.fn(),
   sessionAgentModeMapMock: {} as Record<
     string,
@@ -78,6 +84,9 @@ vi.mock('./chatStore', () => ({
   createSession: createSessionMock,
   getSession: getSessionMock,
   useSession: useSessionMock,
+  listAllSessionsMeta: listAllSessionsMetaMock,
+  archiveSessions: archiveSessionsMock,
+  deleteSessions: deleteSessionsMock,
 }))
 
 vi.mock('../platform', () => ({
@@ -171,6 +180,15 @@ function cloneSession(session: Session): Session {
   return JSON.parse(JSON.stringify(session)) as Session
 }
 
+function makeSessionMeta(id: string, sortOrder: number): SessionMetaRecord {
+  return {
+    id,
+    name: id,
+    sortOrder,
+    createdAt: sortOrder,
+  }
+}
+
 beforeEach(() => {
   uuidQueue.length = 0
   uuidv4Mock.mockClear()
@@ -179,12 +197,32 @@ beforeEach(() => {
   createSessionMock.mockReset()
   useSessionMock.mockReset()
   getSessionMock.mockReset()
+  listAllSessionsMetaMock.mockReset()
+  archiveSessionsMock.mockReset()
+  deleteSessionsMock.mockReset()
   routerNavigateMock.mockReset()
   for (const key of Object.keys(sessionAgentModeMapMock)) {
     delete sessionAgentModeMapMock[key]
   }
   setSessionAgentModeMock.mockReset()
   lockSessionAgentModeMock.mockReset()
+})
+
+describe('conversation list cleanup', () => {
+  test('archives sessions outside the kept range instead of deleting them', async () => {
+    listAllSessionsMetaMock.mockResolvedValue([
+      makeSessionMeta('keep-1', 300),
+      makeSessionMeta('keep-2', 200),
+      makeSessionMeta('archive-1', 100),
+      makeSessionMeta('archive-2', 0),
+    ])
+
+    await sessionActions.clearConversationList(2)
+
+    expect(archiveSessionsMock).toHaveBeenCalledTimes(1)
+    expect(archiveSessionsMock).toHaveBeenCalledWith(['archive-1', 'archive-2'])
+    expect(deleteSessionsMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('fork actions', () => {
