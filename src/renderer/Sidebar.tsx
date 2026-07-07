@@ -1,3 +1,4 @@
+import { registerPlugin } from '@capacitor/core'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Box, Button, Flex, Image, NavLink, Stack, Text, Tooltip } from '@mantine/core'
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
@@ -33,6 +34,22 @@ import { useLanguage } from './stores/settingsStore'
 import { useUIStore } from './stores/uiStore'
 import { installUpdate, useUpdateStore } from './stores/updateStore'
 import { CHATBOX_BUILD_PLATFORM, CHATBOX_BUILD_TARGET } from './variables'
+
+interface ChatboxWebViewPlugin {
+  setTextInteractionEnabled(options: { enabled: boolean }): Promise<void>
+}
+
+const ChatboxWebView = registerPlugin<ChatboxWebViewPlugin>('ChatboxWebView')
+
+function setIosTextInteractionEnabled(enabled: boolean) {
+  if (CHATBOX_BUILD_TARGET !== 'mobile_app' || CHATBOX_BUILD_PLATFORM !== 'ios') {
+    return
+  }
+
+  void ChatboxWebView.setTextInteractionEnabled({ enabled }).catch((error: unknown) => {
+    console.warn('Failed to update iOS text interaction:', error)
+  })
+}
 
 export default function Sidebar() {
   const { t } = useTranslation()
@@ -107,6 +124,14 @@ export default function Sidebar() {
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isResizing, language, setSidebarWidth])
+
+  useEffect(() => {
+    setIosTextInteractionEnabled(!(isSmallScreen && showSidebar))
+
+    return () => {
+      setIosTextInteractionEnabled(true)
+    }
+  }, [isSmallScreen, showSidebar])
 
   return (
     <SwipeableDrawer
