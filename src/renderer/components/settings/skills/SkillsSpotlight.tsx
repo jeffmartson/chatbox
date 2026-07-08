@@ -50,6 +50,106 @@ function getEntryUniqueKey(entry: SkillRegistryEntry | MarketplaceSkill): string
   return `${entry.source}/${entry.name}`
 }
 
+function getLastPathSegment(value: string): string {
+  const segments = value.split('/').filter(Boolean)
+  return segments[segments.length - 1] ?? ''
+}
+
+function pushUniqueSkillName(names: string[], value?: string): void {
+  const trimmed = value?.trim()
+  if (trimmed && !names.includes(trimmed)) {
+    names.push(trimmed)
+  }
+}
+
+export function getEntrySkillNameCandidates(entry: SkillRegistryEntry | MarketplaceSkill): string[] {
+  const names: string[] = []
+  pushUniqueSkillName(names, entry.name)
+
+  if ('skillId' in entry) {
+    pushUniqueSkillName(names, entry.skillId)
+  }
+  if ('homepage' in entry && entry.homepage) {
+    pushUniqueSkillName(names, getLastPathSegment(entry.homepage))
+  }
+  if ('id' in entry && entry.id) {
+    pushUniqueSkillName(names, getLastPathSegment(entry.id))
+  }
+
+  return names
+}
+
+function getPrimarySkillKey(entry: SkillRegistryEntry | MarketplaceSkill): string {
+  if ('skillId' in entry && entry.skillId) {
+    return entry.skillId
+  }
+  if ('homepage' in entry && entry.homepage) {
+    const fromHomepage = getLastPathSegment(entry.homepage)
+    if (fromHomepage) {
+      return fromHomepage
+    }
+  }
+  if ('id' in entry && entry.id) {
+    const fromId = getLastPathSegment(entry.id)
+    if (fromId) {
+      return fromId
+    }
+  }
+  return entry.name
+}
+
+export function normalizeSkillSource(source?: string): string {
+  const trimmed = source?.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  const githubMatch = trimmed.match(/github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?(?:[/?#]|$)/i)
+  if (githubMatch) {
+    return `${githubMatch[1]}/${githubMatch[2]}`.toLowerCase()
+  }
+
+  const repoMatch = trimmed.match(/^([^/\s]+)\/([^/\s]+?)(?:\.git)?(?:[/?#]|$)/)
+  if (repoMatch) {
+    return `${repoMatch[1]}/${repoMatch[2]}`.toLowerCase()
+  }
+
+  return trimmed.replace(/\/+$/, '').toLowerCase()
+}
+
+function getMatchingInstalledSkill(
+  installedSkills: SkillInfo[],
+  entry: SkillRegistryEntry | MarketplaceSkill,
+  sourcePredicate: (installedSource: string, entrySource: string) => boolean
+): SkillInfo | undefined {
+  const entryNames = new Set(getEntrySkillNameCandidates(entry))
+  const entrySource = normalizeSkillSource(entry.source)
+  return installedSkills.find((skill) => {
+    if (!entryNames.has(skill.name)) {
+      return false
+    }
+    return sourcePredicate(normalizeSkillSource(skill.source?.repo), entrySource)
+  })
+}
+
+export function isSkillEntryInstalled(
+  installedSkills: SkillInfo[],
+  entry: SkillRegistryEntry | MarketplaceSkill
+): boolean {
+  return !!getMatchingInstalledSkill(installedSkills, entry, (installedSource, entrySource) => {
+    return installedSource === entrySource
+  })
+}
+
+export function getConflictingInstalledSkill(
+  installedSkills: SkillInfo[],
+  entry: SkillRegistryEntry | MarketplaceSkill
+): SkillInfo | undefined {
+  return getMatchingInstalledSkill(installedSkills, entry, (installedSource, entrySource) => {
+    return installedSource !== entrySource
+  })
+}
+
 const SkillsSpotlight: FC<{
   installedSkills: SkillInfo[]
   onInstallComplete: () => void
@@ -268,41 +368,18 @@ const SkillsSpotlight: FC<{
     }
   }, [debouncedSearchQuery, fetchNextPage, hasNextPage, isFetchingNextPage, opened])
 
-  const getPrimarySkillKey = useCallback((entry: SkillRegistryEntry | MarketplaceSkill): string => {
-    if ('skillId' in entry && entry.skillId) {
-      return entry.skillId
-    }
-    if ('homepage' in entry && entry.homepage) {
-      const fromHomepage = entry.homepage.split('/').pop()
-      if (fromHomepage) {
-        return fromHomepage
-      }
-    }
-    if ('id' in entry && entry.id) {
-      const fromId = entry.id.split('/').pop()
-      if (fromId) {
-        return fromId
-      }
-    }
-    return entry.name
-  }, [])
-
   const isInstalled = useCallback(
     (entry: SkillRegistryEntry | MarketplaceSkill): boolean => {
-      const key = getPrimarySkillKey(entry)
-      const entrySource = entry.source
-      return props.installedSkills.some((s) => s.name === key && s.source?.repo === entrySource)
+      return isSkillEntryInstalled(props.installedSkills, entry)
     },
-    [getPrimarySkillKey, props.installedSkills]
+    [props.installedSkills]
   )
 
   const getConflictingSkill = useCallback(
     (entry: SkillRegistryEntry | MarketplaceSkill): SkillInfo | undefined => {
-      const key = getPrimarySkillKey(entry)
-      const entrySource = entry.source
-      return props.installedSkills.find((s) => s.name === key && s.source?.repo !== entrySource)
+      return getConflictingInstalledSkill(props.installedSkills, entry)
     },
-    [getPrimarySkillKey, props.installedSkills]
+    [props.installedSkills]
   )
 
   const handleInstall = useCallback(
@@ -313,16 +390,18 @@ const SkillsSpotlight: FC<{
 
       const conflicting = getConflictingSkill(entry)
       if (conflicting) {
-        const confirmReplace = window.confirm(
+        const unknownSourceLabel = String(t('unknown source'))
+        const confirmMessage = String(
           t(
             'Skill "{{name}}" is already installed from {{existingSource}}. Replace with the version from {{newSource}}?',
             {
               name: getPrimarySkillKey(entry),
-              existingSource: conflicting.source?.repo ?? t('unknown source'),
+              existingSource: conflicting.source?.repo ?? unknownSourceLabel,
               newSource: entry.source,
             }
           )
         )
+        const confirmReplace = window.confirm(confirmMessage)
         if (!confirmReplace) return
       }
 
@@ -365,7 +444,7 @@ const SkillsSpotlight: FC<{
         setInstalling(null)
       }
     },
-    [getConflictingSkill, getPrimarySkillKey, isInstalled, props.onInstallComplete, t]
+    [getConflictingSkill, isInstalled, props.onInstallComplete, t]
   )
 
   const buildRightSection = useCallback(
@@ -530,7 +609,6 @@ const SkillsSpotlight: FC<{
     return groups
   }, [
     buildRightSection,
-    getPrimarySkillKey,
     handleInstall,
     isInstalled,
     handleLoadMore,
