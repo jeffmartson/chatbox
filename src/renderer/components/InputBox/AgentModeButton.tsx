@@ -1,6 +1,7 @@
 import { Popover, UnstyledButton } from '@mantine/core'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import { IconRobot } from '@tabler/icons-react'
+import { useLocation } from '@tanstack/react-router'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSessionAgentMode } from '@/stores/session/agent-mode'
@@ -38,10 +39,13 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   onSkillSelect,
 }) => {
   const { t } = useTranslation()
+  const location = useLocation()
   const [opened, setOpened] = useState(false)
   const openTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const entry = useSessionAgentMode(sessionId)
+  const settingsOpened =
+    Boolean((location.search as Record<string, unknown>)?.settings) || location.pathname.startsWith('/settings')
 
   const agentModeUIState = useMemo(
     () => getAgentModeUIState(entry, modelSupportsAgentMode),
@@ -74,6 +78,8 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   }, [])
 
   const handleClose = useCallback(() => {
+    clearTimeout(openTimerRef.current)
+    clearTimeout(closeTimerRef.current)
     setOpened(false)
   }, [])
 
@@ -84,12 +90,18 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
     }
   }, [])
 
+  useEffect(() => {
+    if (settingsOpened) {
+      handleClose()
+    }
+  }, [settingsOpened, handleClose])
+
   return (
     <Popover
       position="top-start"
       withArrow
       shadow="md"
-      opened={opened}
+      opened={opened && !settingsOpened}
       onChange={setOpened}
       keepMounted
       transitionProps={{ transition: 'pop', duration: 200 }}
