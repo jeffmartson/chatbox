@@ -23,7 +23,7 @@ import { navigateToSettings } from '@/modals/Settings'
 import { BUILTIN_MCP_SERVERS } from '@/packages/mcp/builtin'
 import { getOS } from '@/packages/navigator'
 import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
-import { WEB_SEARCH_PROVIDERS } from '@/packages/web-search/constants'
+import { WEB_SEARCH_PROVIDERS, type WebSearchProviderValue } from '@/packages/web-search/constants'
 import platform from '@/platform'
 import * as chatStore from '@/stores/chatStore'
 import { useSession, useSessionSettings } from '@/stores/chatStore'
@@ -126,16 +126,20 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const setSettings = useSettingsStore((s) => s.setSettings)
   const licenseKey = useSettingsStore((s) => s.licenseKey)
   const tavilyApiKey = useSettingsStore((s) => s.extension.webSearch.tavilyApiKey)
+  const bochaApiKey = useSettingsStore((s) => s.extension.webSearch.bochaApiKey)
+  const queritApiKey = useSettingsStore((s) => s.extension.webSearch.queritApiKey)
   const webSearchProviderLabel =
     WEB_SEARCH_PROVIDERS.find((p) => p.value === webSearchProvider)?.label ?? webSearchProvider
 
   const isProviderAvailable = useCallback(
-    (provider: string) => {
+    (provider: WebSearchProviderValue) => {
       if (provider === 'build-in') return !!licenseKey
       if (provider === 'tavily') return !!tavilyApiKey
+      if (provider === 'bocha') return !!bochaApiKey
+      if (provider === 'querit') return !!queritApiKey
       return true
     },
-    [licenseKey, tavilyApiKey]
+    [bochaApiKey, licenseKey, queritApiKey, tavilyApiKey]
   )
 
   // MCP state
@@ -457,9 +461,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   )
 
   const handleWebSearchProviderChange = useCallback(
-    (provider: string) => {
+    (provider: WebSearchProviderValue) => {
       setSettings((draft) => {
-        draft.extension.webSearch.provider = provider as 'build-in' | 'bing' | 'tavily'
+        draft.extension.webSearch.provider = provider
       })
     },
     [setSettings]
