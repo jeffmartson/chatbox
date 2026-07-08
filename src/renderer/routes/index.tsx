@@ -374,8 +374,11 @@ function Index() {
     return true
   }, [session])
 
+  const hasConfiguredProvider = providers.length > 0
   const showNewUserScenarios =
-    (forceShowNewUserScenarioCards || hasCompletedFirstSuccessfulChat === false) && !session.copilotId
+    (forceShowNewUserScenarioCards ||
+      (hasCompletedFirstSuccessfulChat === false && (isLoggedIn || hasConfiguredProvider))) &&
+    !session.copilotId
 
   return (
     <Page title="">
