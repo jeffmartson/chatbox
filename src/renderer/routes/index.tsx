@@ -5,6 +5,7 @@ import {
   type CopilotDetail,
   createMessage,
   type ImageSource,
+  ModelProviderEnum,
   type Session,
   type SessionSettings,
 } from '@shared/types'
@@ -48,6 +49,11 @@ const scenarioAgentModeOff = {
   lockReason: null,
 } satisfies AgentModeEntry
 
+const firstChatScenarioDefaultModel = {
+  provider: ModelProviderEnum.ChatboxAI,
+  modelId: 'chatboxai-3.5',
+} satisfies Pick<SessionSettings, 'provider' | 'modelId'>
+
 export const Route = createFileRoute('/')({
   component: Index,
   validateSearch: zodValidator(
@@ -81,6 +87,7 @@ function Index() {
   const [forceShowNewUserScenarioCards, setForceShowNewUserScenarioCards] = useState(
     getForceShowNewUserScenarioCardsFlag
   )
+  const hasUserSelectedModelRef = useRef(false)
 
   const { providers } = useProviders()
   const defaultChatModel = useSettingsStore((s) => s.defaultChatModel)
@@ -137,6 +144,26 @@ function Index() {
 
   useEffect(() => {
     setSession((old) => {
+      if (
+        hasCompletedFirstSuccessfulChat === false &&
+        isLoggedIn &&
+        !session.copilotId &&
+        !hasUserSelectedModelRef.current
+      ) {
+        if (
+          old.settings?.provider === firstChatScenarioDefaultModel.provider &&
+          old.settings?.modelId === firstChatScenarioDefaultModel.modelId
+        ) {
+          return old
+        }
+        return {
+          ...old,
+          settings: {
+            ...(old.settings || {}),
+            ...firstChatScenarioDefaultModel,
+          },
+        }
+      }
       if (old.settings?.provider && old.settings?.modelId) {
         return old
       }
@@ -162,7 +189,16 @@ function Index() {
         },
       }
     })
-  }, [defaultChatModel, hasExpiredLicense, licenseDetail, licenseKey, licensePlanName])
+  }, [
+    defaultChatModel,
+    hasCompletedFirstSuccessfulChat,
+    hasExpiredLicense,
+    isLoggedIn,
+    licenseDetail,
+    licenseKey,
+    licensePlanName,
+    session.copilotId,
+  ])
 
   const { copilots: myCopilots } = useMyCopilots()
   const { copilots: remoteCopilots } = useRemoteCopilotsByCursor({ limit: 10 })
@@ -350,6 +386,7 @@ function Index() {
   )
 
   const onSelectModel = useCallback((p: string, m: string) => {
+    hasUserSelectedModelRef.current = true
     setSession((old) => ({
       ...old,
       settings: {
