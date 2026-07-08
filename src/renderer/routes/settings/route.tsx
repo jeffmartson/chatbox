@@ -137,12 +137,7 @@ export function RouteComponent() {
       }
     >
       <SettingsRoot />
-      <Toaster
-        richColors
-        position="bottom-center"
-        style={{ zIndex: 2147483647 }}
-        toastOptions={{ style: { zIndex: 2147483647 } }}
-      />
+      <Toaster richColors position="bottom-center" style={{ zIndex: 2147483647 }} />
     </Page>
   )
 }

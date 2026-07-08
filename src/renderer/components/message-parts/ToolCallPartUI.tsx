@@ -753,32 +753,34 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
         radius="md"
         p="xs"
         bg="var(--chatbox-background-gray-secondary)"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}
       >
-        <IconFile size={18} color="var(--chatbox-tint-brand)" />
-        <Text size="sm" fw={500}>
+        <IconFile size={18} color="var(--chatbox-tint-brand)" style={{ flexShrink: 0 }} />
+        <Text size="sm" fw={500} style={{ flex: '1 1 0', minWidth: 0, overflowWrap: 'anywhere' }}>
           {fileName}
         </Text>
-        {canPreviewHtml && (
+        <Group gap={8} wrap="nowrap" style={{ flexShrink: 0 }}>
+          {canPreviewHtml && (
+            <Button
+              variant="light"
+              size="compact-xs"
+              leftSection={<IconEye size={14} />}
+              loading={previewing}
+              onClick={handlePreviewHtml}
+            >
+              {t('Preview')}
+            </Button>
+          )}
           <Button
             variant="light"
             size="compact-xs"
-            leftSection={<IconEye size={14} />}
-            loading={previewing}
-            onClick={handlePreviewHtml}
+            leftSection={<IconDeviceFloppy size={14} />}
+            loading={saving}
+            onClick={handleSave}
           >
-            {t('Preview')}
+            {t('Save')}
           </Button>
-        )}
-        <Button
-          variant="light"
-          size="compact-xs"
-          leftSection={<IconDeviceFloppy size={14} />}
-          loading={saving}
-          onClick={handleSave}
-        >
-          {t('Save')}
-        </Button>
+        </Group>
       </Paper>
       {saveError && (
         <Text size="xs" c="red">

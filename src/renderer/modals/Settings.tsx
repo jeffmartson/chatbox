@@ -19,9 +19,9 @@ import { Modal } from '@/components/layout/Overlay'
 import { getThemeDesign } from '@/hooks/useAppTheme'
 import useNeedRoomForWinControls from '@/hooks/useNeedRoomForWinControls'
 import { router } from '@/router'
+import { RouteComponent as SettingsArchiveRouteComponent } from '@/routes/settings/archive'
 import { RouteComponent as SettingsChatRouteComponent } from '@/routes/settings/chat'
 import { RouteComponent as SettingsChatboxAiRouteComponent } from '@/routes/settings/chatbox-ai'
-import { RouteComponent as SettingsArchiveRouteComponent } from '@/routes/settings/archive'
 import { RouteComponent as SettingsDefaultModelsRouteComponent } from '@/routes/settings/default-models'
 import { RouteComponent as SettingsDocumentParserRouteComponent } from '@/routes/settings/document-parser'
 import { RouteComponent as SettingsGeneralRouteComponent } from '@/routes/settings/general'
@@ -105,12 +105,7 @@ export const SettingsModal: FC<SettingsModalProps> = (props) => {
       <Box flex={1} w="100%" maw={1200} mx="auto" className="overflow-auto">
         <RouterProvider router={modalRouter} />
       </Box>
-      <Toaster
-        richColors
-        position="bottom-center"
-        style={{ zIndex: 2147483647 }}
-        toastOptions={{ style: { zIndex: 2147483647 } }}
-      />
+      <Toaster richColors position="bottom-center" style={{ zIndex: 2147483647 }} />
     </Modal>
   )
 }
