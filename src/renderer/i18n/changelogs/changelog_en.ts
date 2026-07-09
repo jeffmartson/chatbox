@@ -1,4 +1,14 @@
 const changelog = `
+## v1.22.0 - 2026.07.09
+1. Added Work Mode: the AI can run code, use tools, and work with files and folders on your computer to get tasks done on its own
+2. Added Skills: install and manage reusable AI abilities, with a regularly updated built-in library
+3. Redesigned the model picker with search and per-model thinking depth
+4. Added a conversation minimap for navigating long chats
+5. Refreshed onboarding with ready-to-use examples
+6. Added chat archiving, conversation duplication, and creation time in the sidebar
+7. Added PDF support on mobile
+8. Various bug fixes and stability improvements
+
 ## v1.21.1 - 2026.06.12
 1. Fixed an issue where the send button could stay disabled after uploading files
 2. Updated the Android app icon
