@@ -89,6 +89,36 @@ function createModel(model: ProviderModelInfo, overrides: { maxOutputTokens?: nu
   )
 }
 
+describe('ChatboxAI apiStyle fallback', () => {
+  it('infers google apiStyle for cached Gemini models without apiStyle metadata', () => {
+    const model = createModel({
+      modelId: 'gemini-3.5-flash',
+      type: 'chat',
+    })
+
+    expect(model.options.model.apiStyle).toBe('google')
+  })
+
+  it('infers anthropic apiStyle for cached Claude models without apiStyle metadata', () => {
+    const model = createModel({
+      modelId: 'claude-sonnet-5',
+      type: 'chat',
+    })
+
+    expect(model.options.model.apiStyle).toBe('anthropic')
+  })
+
+  it('preserves explicit apiStyle even when the model id has a known prefix', () => {
+    const model = createModel({
+      modelId: 'claude-compatible-via-openai',
+      type: 'chat',
+      apiStyle: 'openai',
+    })
+
+    expect(model.options.model.apiStyle).toBe('openai')
+  })
+})
+
 describe('ChatboxAI openai-responses models', () => {
   beforeEach(() => {
     vi.clearAllMocks()

@@ -57,6 +57,19 @@ interface Config {
 
 const DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS = 8192
 
+function inferChatboxAIModelApiStyle(modelId: string): ProviderModelInfo['apiStyle'] | undefined {
+  const normalized = modelId.toLowerCase()
+  if (normalized.startsWith('gemini-')) return 'google'
+  if (normalized.startsWith('claude-')) return 'anthropic'
+  return undefined
+}
+
+function withChatboxAIModelApiStyleFallback(model: ProviderModelInfo): ProviderModelInfo {
+  if (model.apiStyle) return model
+  const apiStyle = inferChatboxAIModelApiStyle(model.modelId)
+  return apiStyle ? { ...model, apiStyle } : model
+}
+
 /**
  * Default max_tokens for ChatboxAI Anthropic models when the user has not set one.
  * Capped by the model's real output limit: the gateway serves upstream Anthropic
@@ -106,6 +119,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
     dependencies: ModelDependencies
   ) {
     options.stream = true
+    options.model = withChatboxAIModelApiStyleFallback(options.model)
     super(options, dependencies)
   }
 
