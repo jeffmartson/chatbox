@@ -66,8 +66,18 @@ function getFailedImageGenerationError(
   }
 }
 
-function getCompletedImageUrls(result: ImageGenerationTaskResponse): string[] {
-  return result.items.flatMap((item) => (item.status === 'completed' && item.image_url ? [item.image_url] : []))
+function getCompletedImages(result: ImageGenerationTaskResponse): {
+  imageUrls: string[]
+  thumbnailUrls: string[]
+} {
+  const completedItems = result.items.filter(
+    (item): item is typeof item & { image_url: string } => item.status === 'completed' && !!item.image_url
+  )
+
+  return {
+    imageUrls: completedItems.map((item) => item.image_url),
+    thumbnailUrls: completedItems.map((item) => item.thumbnail_url || item.image_url),
+  }
 }
 
 export interface GenerateImageParams {
@@ -184,10 +194,13 @@ async function generateImages(recordId: string, params: GenerateImageParams): Pr
     const finalResult = await pollTaskUntilComplete(submission.task_id, licenseKey, {
       signal,
       onPoll: async (response) => {
-        const completedUrls = getCompletedImageUrls(response)
-        if (completedUrls.length > lastCompletedCount) {
-          lastCompletedCount = completedUrls.length
-          currentRecord = await updateRecord(recordId, { generatedImages: completedUrls })
+        const completedImages = getCompletedImages(response)
+        if (completedImages.imageUrls.length > lastCompletedCount) {
+          lastCompletedCount = completedImages.imageUrls.length
+          currentRecord = await updateRecord(recordId, {
+            generatedImages: completedImages.imageUrls,
+            generatedImageThumbnails: completedImages.thumbnailUrls,
+          })
           if (currentRecord) {
             queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, recordId], currentRecord)
           }
@@ -196,13 +209,15 @@ async function generateImages(recordId: string, params: GenerateImageParams): Pr
     })
 
     // Final update: set status based on results
-    const completedUrls = getCompletedImageUrls(finalResult)
+    const completedImages = getCompletedImages(finalResult)
+    const completedUrls = completedImages.imageUrls
     const hasError = finalResult.items.some((item) => item.status === 'failed')
 
     if (completedUrls.length > 0) {
       const failedError = getFailedImageGenerationError(finalResult, 'Some images failed to generate')
       currentRecord = await updateRecord(recordId, {
         generatedImages: completedUrls,
+        generatedImageThumbnails: completedImages.thumbnailUrls,
         status: hasError && completedUrls.length < num ? 'error' : 'done',
         error: hasError && completedUrls.length < num ? failedError.error : undefined,
         errorCode: hasError && completedUrls.length < num ? failedError.errorCode : undefined,
@@ -405,15 +420,13 @@ export async function resumeGeneration(recordId: string): Promise<void> {
       finalResult = await pollTaskUntilComplete(record.taskId, licenseKey, { signal })
     }
 
-    // Collect successful image URLs into generatedImages
-    const completedUrls: string[] = []
-    let hasError = false
+    // Collect successful original and thumbnail URLs into the local record.
+    const completedImages = getCompletedImages(finalResult)
+    const completedUrls = completedImages.imageUrls
+    const hasError = finalResult.items.some((item) => item.status === 'failed')
 
     for (const item of finalResult.items) {
-      if (item.status === 'completed' && item.image_url) {
-        completedUrls.push(item.image_url)
-      } else if (item.status === 'failed') {
-        hasError = true
+      if (item.status === 'failed') {
         log.error('Image generation item failed on resume:', item.uuid, item.error_message)
       }
     }
@@ -422,6 +435,7 @@ export async function resumeGeneration(recordId: string): Promise<void> {
 
     const updatedRecord = await updateRecord(recordId, {
       generatedImages: completedUrls,
+      generatedImageThumbnails: completedImages.thumbnailUrls,
       status: completedUrls.length >= expectedNum ? 'done' : hasError ? 'error' : 'done',
       ...(hasError && completedUrls.length < expectedNum
         ? getFailedImageGenerationError(finalResult, 'Some images failed to generate')
@@ -472,6 +486,7 @@ export async function retryGeneration(recordId: string): Promise<void> {
   await updateRecord(recordId, {
     taskId: undefined,
     generatedImages: [],
+    generatedImageThumbnails: [],
     status: 'pending',
     error: undefined,
     errorCode: undefined,

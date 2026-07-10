@@ -19,6 +19,7 @@ export function HistoryItem({ record, isActive, isMobile, modelDisplayName, onCl
   const { t } = useTranslation()
   const [deletePopoverOpened, setDeletePopoverOpened] = useState(false)
   const firstImage = record.generatedImages[0]
+  const firstThumbnail = record.generatedImageThumbnails?.[0] || firstImage
 
   const handleDeleteClick = useCallback(
     (e: React.MouseEvent) => {
@@ -61,7 +62,7 @@ export function HistoryItem({ record, isActive, isMobile, modelDisplayName, onCl
         }`}
       >
         {firstImage ? (
-          <HistoryThumbnail storageKey={firstImage} />
+          <HistoryThumbnail storageKey={firstThumbnail} />
         ) : (
           <Flex align="center" justify="center" h="100%" className="bg-[var(--chatbox-background-secondary)]">
             <IconPhoto size={24} className="opacity-20" />

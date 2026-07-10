@@ -1115,6 +1115,7 @@ const ImageGenerationItemSchema = z.object({
   status: z.enum(['pending', 'processing', 'completed', 'failed']),
   created_at: z.string(),
   image_url: z.string().optional(),
+  thumbnail_url: z.string().optional(),
   generated_at: z.string().optional(),
   error_code: z.string().optional(),
   error_message: z.string().optional(),

@@ -96,6 +96,7 @@ describe('imageGenerationActions reference image payload', () => {
         {
           status: 'completed',
           image_url: 'https://example.com/output.png',
+          thumbnail_url: 'https://example.com/output.png?thumbnail=512x512',
         },
       ],
     })
@@ -154,6 +155,31 @@ describe('imageGenerationActions reference image payload', () => {
           status: 'error',
           error: 'license not found',
           errorCode: 20004,
+        })
+      )
+    })
+  })
+
+  it('stores thumbnail URLs separately from original image URLs', async () => {
+    const { createAndGenerate } = await import('./imageGenerationActions')
+
+    await createAndGenerate({
+      prompt: 'make an image',
+      referenceImages: [],
+      model: {
+        provider: 'chatbox-ai',
+        modelId: 'gpt-image-1',
+      },
+      imageGenerateNum: 1,
+    })
+
+    await vi.waitFor(() => {
+      expect(updateRecordMock).toHaveBeenCalledWith(
+        'record-1',
+        expect.objectContaining({
+          generatedImages: ['https://example.com/output.png'],
+          generatedImageThumbnails: ['https://example.com/output.png?thumbnail=512x512'],
+          status: 'done',
         })
       )
     })
