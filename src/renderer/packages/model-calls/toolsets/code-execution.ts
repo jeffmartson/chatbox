@@ -5,7 +5,7 @@ import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
-import { remapPhantomHomePath } from './sandbox-paths'
+import { remapPhantomHomePath, remapPhantomHomePathForProvider } from './sandbox-paths'
 
 const log = getLogger('toolset:code-execution')
 
@@ -235,7 +235,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
     }),
     execute: async (input) => {
       const readInput = input as { file_path: string; offset?: number; limit?: number }
-      readInput.file_path = remapPhantomHomePath(readInput.file_path)
+      readInput.file_path = await remapPhantomHomePathForProvider(readInput.file_path, provider)
       if (isAbsolutePath(readInput.file_path)) {
         const status = await provider.getStatus().catch(() => null)
         const sandboxRoot = status?.workingDirectory
@@ -342,6 +342,8 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
     }),
     execute: async (input) => {
       const downloadInput = input as { file_path: string; display_name: string }
+      // Downloads must originate inside the sandbox, so phantom-home paths always map
+      // there even when the host's real home happens to be /home/user.
       downloadInput.file_path = remapPhantomHomePath(downloadInput.file_path)
       // Verify the file exists and resolve to absolute path (so download survives app restart)
       const escapedPath = escapeSingleQuotes(downloadInput.file_path)

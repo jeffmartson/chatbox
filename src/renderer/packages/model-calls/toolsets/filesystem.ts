@@ -6,7 +6,7 @@ import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
-import { remapPhantomHomePath } from './sandbox-paths'
+import { remapPhantomHomePathForProvider } from './sandbox-paths'
 
 interface FilesystemContext {
   sessionId?: string
@@ -280,7 +280,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input) => {
       const listInput = input as { path: string }
-      listInput.path = remapPhantomHomePath(listInput.path)
+      listInput.path = await remapPhantomHomePathForProvider(listInput.path, context.provider)
       if (await shouldUseSandbox(context, listInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
@@ -332,7 +332,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input) => {
       const searchInput = input as { path: string; query: string; regex?: boolean; include?: string }
-      searchInput.path = remapPhantomHomePath(searchInput.path)
+      searchInput.path = await remapPhantomHomePathForProvider(searchInput.path, context.provider)
       if (await shouldUseSandbox(context, searchInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
@@ -388,7 +388,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     }),
     execute: async (input, toolOptions) => {
       const writeInput = input as { file_path: string; content: string }
-      writeInput.file_path = remapPhantomHomePath(writeInput.file_path)
+      writeInput.file_path = await remapPhantomHomePathForProvider(writeInput.file_path, context.provider)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       if (await shouldUseSandbox(context, writeInput.file_path)) {
         const result = await writeSandboxFile(context, writeInput.file_path, writeInput.content)
@@ -424,7 +424,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     inputSchema: editFileInputSchema,
     execute: async (input, toolOptions) => {
       const editInput = input as EditFileInput
-      editInput.file_path = remapPhantomHomePath(editInput.file_path)
+      editInput.file_path = await remapPhantomHomePathForProvider(editInput.file_path, context.provider)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       const validatedInput = validateEditInput(editInput)
       if ('error' in validatedInput) return { error: validatedInput.error }

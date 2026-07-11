@@ -38,13 +38,19 @@ export class LocalSandboxProvider implements SandboxProvider {
     this.sessionId = null
   }
 
-  async getStatus(): Promise<{ initialized: boolean; sessionId?: string; workingDirectory?: string | null }> {
-    if (platform.sandboxStatus && this.sessionId) {
-      const status = await platform.sandboxStatus({ sessionId: this.sessionId })
+  async getStatus(): Promise<{
+    initialized: boolean
+    sessionId?: string
+    workingDirectory?: string | null
+    homeDirectory?: string
+  }> {
+    if (platform.sandboxStatus) {
+      const status = await platform.sandboxStatus({ sessionId: this.sessionId ?? undefined })
       return {
         initialized: this.initialized,
         sessionId: this.sessionId ?? undefined,
         workingDirectory: status.workingDirectory,
+        homeDirectory: status.homeDirectory,
       }
     }
     return { initialized: this.initialized, sessionId: this.sessionId ?? undefined }

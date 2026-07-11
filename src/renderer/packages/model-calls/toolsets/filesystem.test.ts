@@ -134,6 +134,20 @@ describe('filesystem write to sandbox-writable temp (/tmp)', () => {
     expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
     expect(fsWrite).toHaveBeenCalledTimes(1)
   })
+
+  test('preserves a real /home/user path and routes it through approval', async () => {
+    const realHomeProvider = {
+      ...provider,
+      getStatus: async () => ({ workingDirectory: '/sandbox/root', homeDirectory: '/home/user' }),
+    } as unknown as SandboxProvider
+    const tools = buildFilesystemTools({ sessionId: 'session-id', provider: realHomeProvider }).tools
+
+    await execute(tools.write_file, { file_path: '/home/user/report.txt', content: 'hello' })
+
+    expect(exec).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+    expect(fsWrite).toHaveBeenCalledWith({ filePath: '/home/user/report.txt', content: 'hello' })
+  })
 })
 
 describe('user-granted working directories (like /tmp)', () => {

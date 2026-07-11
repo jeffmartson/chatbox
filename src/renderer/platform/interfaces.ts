@@ -180,7 +180,7 @@ export interface Platform extends Storage {
   sandboxReset?(params?: { sessionId?: string }): Promise<{ success: boolean; error?: string }>
   sandboxStatus?(params?: {
     sessionId?: string
-  }): Promise<{ state: string; workingDirectory?: string | null; platform?: string }>
+  }): Promise<{ state: string; workingDirectory?: string | null; platform?: string; homeDirectory?: string }>
   /** Resolve a session's sandbox working directory without initializing the sandbox. */
   sandboxResolveWorkingDir?(params: { sessionId: string }): Promise<{ workingDirectory: string | null }>
   sandboxCheckAvailability?(): Promise<{ available: boolean; reason?: string }>

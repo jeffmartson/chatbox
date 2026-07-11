@@ -28,7 +28,12 @@ export interface SandboxProvider {
   reset(): Promise<void>
 
   /** Get current sandbox status */
-  getStatus(): Promise<{ initialized: boolean; sessionId?: string; workingDirectory?: string | null }>
+  getStatus(): Promise<{
+    initialized: boolean
+    sessionId?: string
+    workingDirectory?: string | null
+    homeDirectory?: string
+  }>
 
   /**
    * Resolve the working directory for a session without initializing the sandbox.

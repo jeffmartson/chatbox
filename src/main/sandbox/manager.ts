@@ -38,6 +38,7 @@ interface SandboxStatus {
   state: SandboxState
   workingDirectory: string | null
   platform: string
+  homeDirectory: string
 }
 
 // ─── Per-session sandbox instances ───────────────────────────────────
@@ -162,7 +163,21 @@ function isUnsafeResolvedPath(resolved: string): boolean {
   const home = homedir()
   // candidate is home itself or an ancestor of home (e.g. /Users, /home)
   if (home && (resolved === home || pathContains(resolved, home))) return true
-  const systemRoots = ['/etc', '/usr', '/bin', '/sbin', '/var', '/System', '/Library', '/private', '/boot', '/dev', '/proc', '/opt', '/root']
+  const systemRoots = [
+    '/etc',
+    '/usr',
+    '/bin',
+    '/sbin',
+    '/var',
+    '/System',
+    '/Library',
+    '/private',
+    '/boot',
+    '/dev',
+    '/proc',
+    '/opt',
+    '/root',
+  ]
   return systemRoots.some((sys) => resolved === sys || pathContains(sys, resolved))
 }
 
@@ -208,9 +223,7 @@ function buildConfig(
   })
   // Both the lexical and symlink-resolved forms of each granted dir.
   const userWriteVariants = safeUserPaths.flatMap((p) => [p, safeRealpathSync(p)])
-  const allowWrite = [
-    ...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths, ...userWriteVariants]),
-  ]
+  const allowWrite = [...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths, ...userWriteVariants])]
 
   // Protect sensitive files (.env, etc.) inside granted dirs with ABSOLUTE deny paths.
   // The bare relative patterns in TASK_SANDBOX_DENY_WRITE_PATHS are resolved by
@@ -743,6 +756,7 @@ export function getStatus(sessionId?: string): SandboxStatus {
     state: session?.state ?? 'idle',
     workingDirectory: session?.workingDirectory ?? null,
     platform: process.platform,
+    homeDirectory: homedir(),
   }
 }
 

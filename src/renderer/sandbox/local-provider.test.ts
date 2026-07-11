@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 // Mock the platform module so we can observe how exec() delegates to sandboxExecCode.
 const sandboxExecCode = vi.fn()
+const sandboxStatus = vi.fn()
 vi.mock('@/platform', () => ({
   default: {
     get sandboxExecCode() {
       return sandboxExecCodeRef.current
+    },
+    get sandboxStatus() {
+      return sandboxStatus
     },
   },
 }))
@@ -17,7 +21,28 @@ import { LocalSandboxProvider } from './local-provider'
 
 beforeEach(() => {
   sandboxExecCode.mockReset()
+  sandboxStatus.mockReset()
   sandboxExecCodeRef.current = sandboxExecCode
+})
+
+describe('LocalSandboxProvider.getStatus', () => {
+  test('returns the host home directory before the sandbox is initialized', async () => {
+    sandboxStatus.mockResolvedValue({
+      state: 'idle',
+      workingDirectory: null,
+      platform: 'linux',
+      homeDirectory: '/home/user',
+    })
+    const provider = new LocalSandboxProvider()
+
+    await expect(provider.getStatus()).resolves.toEqual({
+      initialized: false,
+      sessionId: undefined,
+      workingDirectory: null,
+      homeDirectory: '/home/user',
+    })
+    expect(sandboxStatus).toHaveBeenCalledWith({ sessionId: undefined })
+  })
 })
 
 describe('LocalSandboxProvider.exec', () => {
