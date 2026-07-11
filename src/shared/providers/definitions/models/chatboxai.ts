@@ -21,18 +21,13 @@ import type {
 import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
 import type { StreamTextResult, ToolUseScope } from '../../../types'
-import {
-  type ChatboxAILicenseDetail,
-  ModelProviderEnum,
-  type ProviderModelInfo,
-  type ProviderOptions,
-} from '../../../types'
+import { type ChatboxAILicenseDetail, ModelProviderEnum, type ProviderModelInfo } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 import {
   getLegacyOpenAICompatibleThinkingType,
-  isOpenAIReasoningEffortSupported,
   normalizeClaudeReasoningOptions,
   normalizeOpenAIReasoningOptions,
+  pickOpenAICompatibleReasoningOptions,
 } from '../../../utils/reasoning-control'
 import { buildGeminiImageConfig } from '../gemini-types'
 
@@ -85,27 +80,6 @@ function getDefaultAnthropicMaxOutputTokens(model: ProviderModelInfo): number {
     return Math.min(DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS, modelLimit)
   }
   return DEFAULT_CHATBOXAI_ANTHROPIC_MAX_OUTPUT_TOKENS
-}
-
-/**
- * The OpenAI-compatible gateway path forwards unknown provider-option keys verbatim
- * into the request body, and upstream vendors reject them (400 "Unknown parameter").
- * Both option namespaces can carry non-wire keys here: providerOptions.openai holds
- * @ai-sdk/openai-only flags (forceReasoning, reasoningSummary, include), and a session
- * can retain a stale openaiCompatible namespace written for a previously selected
- * model (e.g. Qwen enable_thinking/thinking_budget). Only reasoningEffort — which maps
- * to the reasoning_effort wire param — may pass through, and the current openai-style
- * value wins over a legacy openaiCompatible one. Efforts the target model rejects
- * (o-series with minimal/none, o1-preview/o1-mini with any) are dropped entirely.
- */
-function pickOpenAICompatibleReasoningOptions(
-  modelId: string,
-  providerOptions: ProviderOptions | undefined
-): ProviderOptions['openaiCompatible'] {
-  const reasoningEffort = providerOptions?.openai?.reasoningEffort ?? providerOptions?.openaiCompatible?.reasoningEffort
-  if (reasoningEffort === undefined) return undefined
-  if (!isOpenAIReasoningEffortSupported(modelId, reasoningEffort)) return undefined
-  return { reasoningEffort }
 }
 
 // 将chatboxAIFetch移到类内部作为私有方法

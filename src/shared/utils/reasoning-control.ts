@@ -202,6 +202,24 @@ export function normalizeOpenAIReasoningOptions(
   return openai
 }
 
+/**
+ * Select the OpenAI reasoning options that have a defined OpenAI-compatible wire mapping.
+ * `@ai-sdk/openai-compatible` forwards unknown keys verbatim, so OpenAI-only flags such as
+ * forceReasoning, reasoningSummary and include must never cross this boundary.
+ *
+ * Keep this whitelist in sync with the OpenAI option writers in getReasoningProviderOptions.
+ * Add a key here only after its compatible request-body mapping is verified.
+ */
+export function pickOpenAICompatibleReasoningOptions(
+  modelId: string,
+  providerOptions: ProviderOptions | undefined
+): ProviderOptions['openaiCompatible'] {
+  const reasoningEffort = providerOptions?.openai?.reasoningEffort ?? providerOptions?.openaiCompatible?.reasoningEffort
+  if (reasoningEffort === undefined) return undefined
+  if (!isOpenAIReasoningEffortSupported(modelId, reasoningEffort)) return undefined
+  return { reasoningEffort }
+}
+
 function isOpenAIStyleEffectiveProvider(provider: ModelProvider | undefined): boolean {
   return (
     provider === ModelProviderEnum.OpenAI ||
@@ -545,6 +563,8 @@ export function getReasoningProviderOptions(
   } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
     next.deepseek = { thinking: { type: 'enabled' } }
   } else if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
+    // Keep compatible wire mappings in pickOpenAICompatibleReasoningOptions in sync when
+    // adding an OpenAI option here. OpenAI-only SDK flags must not leak to compatible APIs.
     next.openai = {
       reasoningEffort: getOpenAIReasoningEffort(model?.modelId || '', level),
       ...(effectiveProvider === ModelProviderEnum.OpenAIResponses

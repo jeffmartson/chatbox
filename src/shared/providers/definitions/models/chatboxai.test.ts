@@ -245,7 +245,7 @@ describe('ChatboxAI openai-responses models', () => {
     })
   })
 
-  it('maps OpenAI-style reasoning options to OpenAI-compatible gateway extra body', () => {
+  it('maps only wire-compatible OpenAI reasoning options to the compatible gateway', () => {
     const model = createModel({
       modelId: 'gpt-5.5',
       type: 'chat',
@@ -257,46 +257,19 @@ describe('ChatboxAI openai-responses models', () => {
       providerOptions: {
         openai: {
           reasoningEffort: 'low',
-        },
-      },
-    })
-
-    expect(settings.providerOptions).toEqual({
-      openaiCompatible: {
-        reasoningEffort: 'low',
-      },
-      ChatboxAI: {
-        reasoningEffort: 'low',
-      },
-    })
-  })
-
-  it('drops @ai-sdk/openai-only flags from the OpenAI-compatible gateway mapping', () => {
-    const model = createModel({
-      modelId: 'gpt-5.5',
-      type: 'chat',
-      apiStyle: 'openai',
-      capabilities: ['reasoning', 'tool_use'],
-    })
-
-    // Reasoning "off" writes reasoningEffort + forceReasoning; forceReasoning is an
-    // @ai-sdk/openai flag with no chat-completions wire mapping, and the compatible
-    // provider would otherwise send it verbatim (upstream rejects unknown params).
-    const settings = model.exposeCallSettings({
-      providerOptions: {
-        openai: {
-          reasoningEffort: 'none',
           forceReasoning: true,
+          reasoningSummary: 'auto',
+          include: ['reasoning.encrypted_content'],
         },
       },
     })
 
     expect(settings.providerOptions).toEqual({
       openaiCompatible: {
-        reasoningEffort: 'none',
+        reasoningEffort: 'low',
       },
       ChatboxAI: {
-        reasoningEffort: 'none',
+        reasoningEffort: 'low',
       },
     })
   })

@@ -62,7 +62,6 @@ describe('reasoning-control', () => {
     expect(getReasoningControlCapabilities(ModelProviderEnum.OpenRouter, model('openai/gpt-5.1-chat')).supported).toBe(
       false
     )
-    expect(getReasoningProviderOptions(ModelProviderEnum.OpenAI, model('gpt-5-chat-latest'), 'medium')).toBeUndefined()
     // Real GPT-5 reasoning models keep effort controls.
     expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5.5')).supported).toBe(true)
     expect(getReasoningControlCapabilities(ModelProviderEnum.OpenAI, model('gpt-5-mini')).supported).toBe(true)

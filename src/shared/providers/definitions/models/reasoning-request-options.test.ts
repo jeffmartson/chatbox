@@ -4,6 +4,7 @@ import type { ModelDependencies } from '@shared/types/adapters'
 import type { SentryScope } from '@shared/utils/sentry_adapter'
 import { describe, expect, it, vi } from 'vitest'
 import Claude from './claude'
+import CustomOpenAI from './custom-openai'
 import DeepSeek from './deepseek'
 import OpenAI from './openai'
 import OpenRouter from './openrouter'
@@ -414,6 +415,43 @@ describe('reasoning request options', () => {
       openai: {
         reasoningEffort: 'medium',
       },
+    })
+  })
+
+  it('forwards only wire-compatible reasoning options for custom OpenAI providers', () => {
+    const customOpenAI = new CustomOpenAI(
+      {
+        apiKey: 'test-key',
+        apiHost: 'https://example.com/v1',
+        apiPath: '/chat/completions',
+        model: {
+          modelId: 'gpt-5.1',
+          type: 'chat',
+          apiStyle: 'openai',
+          providerId: 'custom-provider-test',
+        },
+      },
+      createDependencies()
+    )
+
+    const settings = (customOpenAI as unknown as ResolveCallSettingsHarness).resolveCallSettings({
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'high',
+          forceReasoning: true,
+          reasoningSummary: 'auto',
+          include: ['reasoning.encrypted_content'],
+        },
+        openaiCompatible: {
+          enable_thinking: true,
+          thinking_budget: 8192,
+        },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      openaiCompatible: { reasoningEffort: 'high' },
+      'Custom OpenAI': { reasoningEffort: 'high' },
     })
   })
 
