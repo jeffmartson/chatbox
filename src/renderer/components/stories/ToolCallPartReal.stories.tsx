@@ -1,13 +1,8 @@
 import { Box, Stack, Text } from '@mantine/core'
-import type { Message, MessageReasoningPart, MessageToolCallPart } from '@shared/types'
+import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
+import type { Message, MessageToolCallPart } from '@shared/types'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import React from 'react'
-import {
-  ReasoningContentUI,
-  type StepTimelinePart,
-  StepTimelineUI,
-  ToolCallPartUI,
-} from '../message-parts/ToolCallPartUI'
+import { type StepTimelinePart, StepTimelineUI, ToolCallPartUI } from '../message-parts/ToolCallPartUI'
 
 // ─── ToolCallPartUI Stories ─────────────────────────────────────────
 
@@ -137,6 +132,23 @@ export const TerminalSuccess: StoryObj<typeof ToolCallPartUI> = {
   },
 }
 
+export const BashNotAvailable: StoryObj<typeof ToolCallPartUI> = {
+  name: 'Code Execution — Bash Not Available',
+  args: {
+    part: makeToolCallPart({
+      toolName: 'code_execution',
+      state: 'result',
+      args: { language: 'bash', code: 'echo hello' },
+      result: {
+        stdout: '',
+        stderr: 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.',
+        exitCode: 127,
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      },
+    }),
+  },
+}
+
 export const ReadFileSuccess: StoryObj<typeof ToolCallPartUI> = {
   name: 'Read File — Success',
   args: {
@@ -145,6 +157,21 @@ export const ReadFileSuccess: StoryObj<typeof ToolCallPartUI> = {
       state: 'result',
       args: { path: 'src/index.ts' },
       result: { content: 'import { app } from "electron"\n...' },
+    }),
+  },
+}
+
+export const ReadFileBashNotAvailable: StoryObj<typeof ToolCallPartUI> = {
+  name: 'Read File — Bash Not Available',
+  args: {
+    part: makeToolCallPart({
+      toolName: 'read_file',
+      state: 'result',
+      args: { file_path: 'report.txt' },
+      result: {
+        error: 'bash is not available on this Windows host.',
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      },
     }),
   },
 }

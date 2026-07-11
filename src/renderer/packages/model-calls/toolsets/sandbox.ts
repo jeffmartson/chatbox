@@ -1,3 +1,4 @@
+import type { SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
 import { jsonSchema, type ToolSet } from 'ai'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
@@ -112,23 +113,31 @@ function formatSandboxBashOutput(output: unknown): string {
   const record = asRecord(output)
   const stdout = stringField(record, 'stdout') ?? ''
   const stderr = stringField(record, 'stderr') ?? ''
+  const errorCode = stringField(record, 'errorCode')
   const exitCode = numberField(record, 'exitCode')
   const sections = [`Exit code: ${exitCode ?? 'unknown'}`]
+  if (errorCode) sections.push(`Error code: ${errorCode}`)
   if (stdout) sections.push(`Stdout:\n${stdout}`)
   if (stderr) sections.push(`Stderr:\n${stderr}`)
   if (!stdout && !stderr) sections.push('(no output)')
   return sections.join('\n\n')
 }
 
-function abortableExec(
-  execPromise: Promise<{ stdout: string; stderr: string; exitCode: number }>,
-  abortSignal?: AbortSignal
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+function sandboxOperationToolError(prefix: string, result: SandboxOperationResult) {
+  const error = `${prefix}: ${result.error || 'Unknown error'}`
+  if (!result.errorCode) return error
+  return {
+    error,
+    errorCode: result.errorCode,
+  }
+}
+
+function abortableExec(execPromise: Promise<SandboxExecResult>, abortSignal?: AbortSignal): Promise<SandboxExecResult> {
   if (!abortSignal) return execPromise
 
   return Promise.race([
     execPromise,
-    new Promise<{ stdout: string; stderr: string; exitCode: number }>((_, reject) => {
+    new Promise<SandboxExecResult>((_, reject) => {
       if (abortSignal.aborted) {
         platform.sandboxKill?.()
         reject(new DOMException('Aborted', 'AbortError'))
@@ -174,7 +183,12 @@ const sandbox_bash: ToolSet[string] = {
         platform.sandboxExecCode({ code: bashInput.command, language: 'bash', timeout }),
         abortSignal
       )
-      return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode }
+      return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        errorCode: result.errorCode,
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         return { stdout: '', stderr: '[Command cancelled]', exitCode: 130 }
@@ -206,7 +220,7 @@ const sandbox_read: ToolSet[string] = {
     try {
       const result = await platform.sandboxRead({ filePath: readInput.file_path })
       if (!result.success) {
-        return `Error reading file: ${result.error}`
+        return sandboxOperationToolError('Error reading file', result)
       }
       return { content: result.content ?? '' }
     } catch (error) {
@@ -312,7 +326,7 @@ const sandbox_grep: ToolSet[string] = {
         include: grepInput.include,
       })
       if (!result.success) {
-        return `Error searching: ${result.error}`
+        return sandboxOperationToolError('Error searching', result)
       }
       return { content: result.content ?? '' }
     } catch (error) {
@@ -342,7 +356,7 @@ const sandbox_ls: ToolSet[string] = {
     try {
       const result = await platform.sandboxLs({ dirPath: lsInput.path || '.' })
       if (!result.success) {
-        return `Error listing directory: ${result.error}`
+        return sandboxOperationToolError('Error listing directory', result)
       }
       return { content: result.content ?? '' }
     } catch (error) {
@@ -376,7 +390,7 @@ const sandbox_find: ToolSet[string] = {
     try {
       const result = await platform.sandboxFind({ dirPath: findInput.path || '.', pattern: findInput.pattern })
       if (!result.success) {
-        return `Error finding files: ${result.error}`
+        return sandboxOperationToolError('Error finding files', result)
       }
       return { content: result.content ?? '' }
     } catch (error) {

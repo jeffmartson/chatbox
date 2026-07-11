@@ -6,6 +6,7 @@ import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
+import { sandboxExecToolError } from './sandbox-exec-errors'
 import { remapPhantomHomePathForProvider } from './sandbox-paths'
 
 interface FilesystemContext {
@@ -290,7 +291,9 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
           code: `ls -la ${shellQuote(listInput.path)}`,
           timeout: 10_000,
         })
-        return result.exitCode === 0 ? { content: result.stdout } : { error: result.stderr || result.stdout }
+        return result.exitCode === 0
+          ? { content: result.stdout }
+          : sandboxExecToolError(result, `Unable to list directory: ${listInput.path}`)
       }
       const pathError = requireAbsoluteRealPath(listInput.path)
       if (pathError) return pathError
@@ -346,13 +349,16 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
           code: `grep ${flags} -m ${SEARCH_MAX_MATCHES_PER_FILE}${include} ${excludes} -e ${shellQuote(searchInput.query)} -- ${shellQuote(searchInput.path)} | head -${SEARCH_MAX_TOTAL_LINES}`,
           timeout: 10_000,
         })
+        if (result.errorCode) {
+          return sandboxExecToolError(result, `Unable to search files under: ${searchInput.path}`)
+        }
         // exit 0 = matches, 1 = no matches. If `head` closes the pipe early (many matches),
         // grep can exit with SIGPIPE (141) under pipefail; treat any non-empty stdout as a
         // (possibly truncated) success rather than an error. Invalid regex exits 2 with empty
         // stdout, so it still falls through to the error branch.
         return result.exitCode === 0 || result.exitCode === 1 || result.stdout
           ? { content: result.stdout }
-          : { error: result.stderr || result.stdout }
+          : sandboxExecToolError(result, `Unable to search files under: ${searchInput.path}`)
       }
       const pathError = requireAbsoluteRealPath(searchInput.path)
       if (pathError) return pathError

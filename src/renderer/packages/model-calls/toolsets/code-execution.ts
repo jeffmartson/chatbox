@@ -5,6 +5,7 @@ import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
+import { sandboxExecToolError } from './sandbox-exec-errors'
 import { remapPhantomHomePath, remapPhantomHomePathForProvider } from './sandbox-paths'
 
 const log = getLogger('toolset:code-execution')
@@ -36,8 +37,10 @@ function formatCodeExecutionOutput(output: unknown): string {
   const record = asRecord(output)
   const stdout = stringField(record, 'stdout') ?? ''
   const stderr = stringField(record, 'stderr') ?? ''
+  const errorCode = stringField(record, 'errorCode')
   const exitCode = numberField(record, 'exitCode')
   const sections = [`Exit code: ${exitCode ?? 'unknown'}`]
+  if (errorCode) sections.push(`Error code: ${errorCode}`)
   if (stdout) sections.push(`Stdout:\n${stdout}`)
   if (stderr) sections.push(`Stderr:\n${stderr}`)
   if (!stdout && !stderr) sections.push('(no output)')
@@ -47,7 +50,7 @@ function formatCodeExecutionOutput(output: unknown): string {
 function formatReadFileOutput(output: unknown): string {
   const record = asRecord(output)
   const error = stringField(record, 'error')
-  if (error) return `Error: ${error}`
+  if (error) return contentOrErrorText(output)
   const content = stringField(record, 'content') ?? ''
   const hint = stringField(record, 'hint')
   return hint ? `${content}\n\n${hint}` : content
@@ -56,7 +59,7 @@ function formatReadFileOutput(output: unknown): string {
 function formatDownloadOutput(output: unknown): string {
   const record = asRecord(output)
   const error = stringField(record, 'error')
-  if (error) return `Error: ${error}`
+  if (error) return contentOrErrorText(output)
   const displayName = stringField(record, 'display_name')
   const filePath = stringField(record, 'file_path')
   if (displayName && filePath) return `Status: download ready\nName: ${displayName}\nPath: ${filePath}`
@@ -198,6 +201,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         stdout: truncateOutput(result.stdout),
         stderr: truncateOutput(result.stderr),
         exitCode: result.exitCode,
+        errorCode: result.errorCode,
       }
     },
     toModelOutput: toTextModelOutput(formatCodeExecutionOutput),
@@ -283,7 +287,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       })
 
       if (result.exitCode !== 0) {
-        return { error: `File not found: ${readInput.file_path}` }
+        return sandboxExecToolError(result, `File not found: ${readInput.file_path}`)
       }
 
       const stdout = result.stdout
@@ -352,6 +356,9 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         language: 'bash',
         timeout: 5000,
       })
+      if (checkResult.errorCode) {
+        return sandboxExecToolError(checkResult, `Unable to inspect file: ${downloadInput.file_path}`)
+      }
       const resolved = checkResult.stdout.trim()
       if (!resolved || resolved === 'not_found') {
         return { error: `File not found: ${downloadInput.file_path}` }

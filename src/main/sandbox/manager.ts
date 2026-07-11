@@ -15,6 +15,11 @@ import { pathToFileURL } from 'node:url'
 import type { SandboxRuntimeConfig } from '@anthropic-ai/sandbox-runtime'
 import { app } from 'electron'
 import {
+  SANDBOX_EXEC_ERROR_CODES,
+  type SandboxExecResult,
+  type SandboxOperationResult,
+} from '../../shared/sandbox-provider'
+import {
   TASK_SANDBOX_DENY_READ_PATHS,
   TASK_SANDBOX_DENY_WRITE_PATHS,
   TASK_SANDBOX_EXTRA_WRITE_PATHS,
@@ -28,11 +33,7 @@ const log = getLogger('sandbox:manager')
 
 type SandboxState = 'idle' | 'initialized'
 
-interface ExecResult {
-  stdout: string
-  stderr: string
-  exitCode: number
-}
+type ExecResult = SandboxExecResult
 
 interface SandboxStatus {
   state: SandboxState
@@ -89,10 +90,29 @@ function safeRealpathSync(p: string): string {
   }
 }
 
-/** True if `cmd` resolves on PATH (Windows `where`). Used only on win32. */
-function which(cmd: string): boolean {
+/** True if a command can start and complete successfully. Used only on win32. */
+function commandSucceeds(cmd: string, args: string[]): boolean {
   try {
-    return spawnSync('where', [cmd], { stdio: 'ignore' }).status === 0
+    return spawnSync(cmd, args, { stdio: 'ignore', windowsHide: true, timeout: 3_000 }).status === 0
+  } catch {
+    return false
+  }
+}
+
+/** WSL can be installed without a Linux distribution, in which case it cannot run bash. */
+function hasInstalledWslDistribution(): boolean {
+  try {
+    const result = spawnSync('wsl', ['--list', '--quiet'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      timeout: 3_000,
+    })
+    if (result.status !== 0 || !result.stdout?.length) return false
+    // wsl.exe may emit UTF-16LE (including a BOM) when stdout is piped.
+    const isUtf16Le =
+      (result.stdout[0] === 0xff && result.stdout[1] === 0xfe) || (result.stdout.length > 1 && result.stdout[1] === 0)
+    const output = result.stdout.toString(isUtf16Le ? 'utf16le' : 'utf8').replace(/^\uFEFF/, '')
+    return output.trim().length > 0
   } catch {
     return false
   }
@@ -100,13 +120,14 @@ function which(cmd: string): boolean {
 
 /**
  * Resolve a POSIX shell for the `bash` code-execution language on native Windows.
- * Native Windows has no bash, so we use any `bash` on PATH (Git Bash / MSYS) and
- * fall back to WSL's bash. The script is fed via stdin, so the shell's path format
- * (C:\ vs /mnt/c) never matters. Returns null when none is available.
+ * Native Windows has no bash, so we use a runnable `bash` on PATH (Git Bash / MSYS)
+ * and fall back to WSL only when it has an installed Linux distribution. The script
+ * is fed via stdin, so the shell's path format (C:\ vs /mnt/c) never matters.
+ * Returns null when neither option can actually run bash.
  */
 export function resolveWindowsBash(): { cmd: string; args: string[] } | null {
-  if (which('bash')) return { cmd: 'bash', args: [] }
-  if (which('wsl')) return { cmd: 'wsl', args: ['bash'] }
+  if (commandSucceeds('bash', ['--version'])) return { cmd: 'bash', args: [] }
+  if (hasInstalledWslDistribution()) return { cmd: 'wsl', args: ['bash'] }
   return null
 }
 
@@ -450,6 +471,7 @@ export async function execCode(params: {
         stdout: '',
         stderr: 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.',
         exitCode: 127,
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
       }
     }
     cmd = bash.cmd
@@ -571,14 +593,18 @@ async function execBashInSandbox(command: string, sessionId?: string): Promise<E
   return execCode({ code: command, language: 'bash', sessionId })
 }
 
-export async function readFile(
-  filePath: string,
-  sessionId?: string
-): Promise<{ success: boolean; content?: string; error?: string }> {
+function operationError(result: ExecResult, fallback: string): Pick<SandboxOperationResult, 'error' | 'errorCode'> {
+  return {
+    error: result.stderr || result.stdout || fallback,
+    ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+  }
+}
+
+export async function readFile(filePath: string, sessionId?: string): Promise<SandboxOperationResult> {
   try {
     const result = await execBashInSandbox(`cat ${shellEscape(filePath)}`, sessionId)
     if (result.exitCode !== 0) {
-      return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
+      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
     return { success: true, content: headTruncate(result.stdout) }
   } catch (error) {
@@ -660,14 +686,11 @@ export async function editFile(
   }
 }
 
-export async function listDir(
-  dirPath: string,
-  sessionId?: string
-): Promise<{ success: boolean; content?: string; error?: string }> {
+export async function listDir(dirPath: string, sessionId?: string): Promise<SandboxOperationResult> {
   try {
     const result = await execBashInSandbox(`ls -la ${shellEscape(dirPath)}`, sessionId)
     if (result.exitCode !== 0) {
-      return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
+      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
     return { success: true, content: headTruncate(result.stdout) }
   } catch (error) {
@@ -680,14 +703,14 @@ export async function grepFiles(
   dirPath?: string,
   options?: { include?: string },
   sessionId?: string
-): Promise<{ success: boolean; content?: string; error?: string }> {
+): Promise<SandboxOperationResult> {
   try {
     const target = dirPath ? shellEscape(dirPath) : '.'
     const includeFlag = options?.include ? `--include=${shellEscape(options.include)}` : ''
     const result = await execBashInSandbox(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, sessionId)
     // grep returns exit code 1 when no matches found — not an error
     if (result.exitCode > 1) {
-      return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
+      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
     return { success: true, content: headTruncate(result.stdout) }
   } catch (error) {
@@ -699,12 +722,12 @@ export async function findFiles(
   dirPath: string,
   pattern?: string,
   sessionId?: string
-): Promise<{ success: boolean; content?: string; error?: string }> {
+): Promise<SandboxOperationResult> {
   try {
     const nameFlag = pattern ? `-name ${shellEscape(pattern)}` : ''
     const result = await execBashInSandbox(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, sessionId)
     if (result.exitCode !== 0) {
-      return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
+      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
     return { success: true, content: headTruncate(result.stdout) }
   } catch (error) {

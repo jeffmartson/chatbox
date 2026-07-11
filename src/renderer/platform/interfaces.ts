@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
+import type { SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
 import type { Config, Language, Settings, ShortcutSetting } from '@shared/types'
 import type { ImageGenerationStorage } from '@/storage/ImageGenerationStorage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
@@ -144,11 +145,8 @@ export interface Platform extends Storage {
     language: 'bash' | 'node'
     timeout?: number
     sessionId?: string
-  }): Promise<{ stdout: string; stderr: string; exitCode: number }>
-  sandboxRead?(params: {
-    filePath: string
-    sessionId?: string
-  }): Promise<{ success: boolean; content?: string; error?: string }>
+  }): Promise<SandboxExecResult>
+  sandboxRead?(params: { filePath: string; sessionId?: string }): Promise<SandboxOperationResult>
   sandboxWrite?(params: {
     filePath: string
     content: string
@@ -161,21 +159,14 @@ export interface Platform extends Storage {
     edits?: Array<{ search: string; replace: string }>
     sessionId?: string
   }): Promise<{ success: boolean; error?: string }>
-  sandboxLs?(params: {
-    dirPath: string
-    sessionId?: string
-  }): Promise<{ success: boolean; content?: string; error?: string }>
+  sandboxLs?(params: { dirPath: string; sessionId?: string }): Promise<SandboxOperationResult>
   sandboxGrep?(params: {
     pattern: string
     dirPath?: string
     include?: string
     sessionId?: string
-  }): Promise<{ success: boolean; content?: string; error?: string }>
-  sandboxFind?(params: {
-    dirPath: string
-    pattern?: string
-    sessionId?: string
-  }): Promise<{ success: boolean; content?: string; error?: string }>
+  }): Promise<SandboxOperationResult>
+  sandboxFind?(params: { dirPath: string; pattern?: string; sessionId?: string }): Promise<SandboxOperationResult>
   sandboxKill?(params?: { sessionId?: string }): Promise<{ killed: boolean }>
   sandboxReset?(params?: { sessionId?: string }): Promise<{ success: boolean; error?: string }>
   sandboxStatus?(params?: {

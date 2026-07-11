@@ -1,4 +1,4 @@
-import type { SandboxProvider } from '@shared/sandbox-provider'
+import { SANDBOX_EXEC_ERROR_CODES, type SandboxExecResult, type SandboxProvider } from '@shared/sandbox-provider'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fsWrite = vi.fn(async (..._args: unknown[]) => ({ success: true }))
@@ -24,7 +24,7 @@ vi.mock('@/analytics/agent-mode', () => ({
 
 import { buildFilesystemTools } from './filesystem'
 
-const exec = vi.fn(async (..._args: unknown[]) => ({ stdout: '', stderr: '', exitCode: 0 }))
+const exec = vi.fn(async (..._args: unknown[]): Promise<SandboxExecResult> => ({ stdout: '', stderr: '', exitCode: 0 }))
 
 // Provider whose sandbox root never contains the tested absolute paths, so non-/tmp paths
 // take the real-filesystem branch where approval would normally be requested. /tmp paths
@@ -292,6 +292,27 @@ describe('search_files sandbox grep command', () => {
       value: 'No matches found.',
     })
   })
+
+  test('preserves Bash availability errors for the UI and model', async () => {
+    exec.mockResolvedValueOnce({
+      stdout: '',
+      stderr: 'bash is not available',
+      exitCode: 127,
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+
+    const tool = getTools().search_files
+    const result = await execute(tool, { path: '/tmp/project', query: 'needle' })
+
+    expect(result).toEqual({
+      error: 'bash is not available',
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+    await expect(toModelOutput(tool, result)).resolves.toEqual({
+      type: 'text',
+      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
+    })
+  })
 })
 
 describe('list_files model output', () => {
@@ -299,6 +320,27 @@ describe('list_files model output', () => {
     await expect(toModelOutput(getTools().list_files, { content: '' })).resolves.toEqual({
       type: 'text',
       value: 'Directory is empty.',
+    })
+  })
+
+  test('preserves Bash availability errors for the UI and model', async () => {
+    exec.mockResolvedValueOnce({
+      stdout: '',
+      stderr: 'bash is not available',
+      exitCode: 127,
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+
+    const tool = getTools().list_files
+    const result = await execute(tool, { path: '/tmp/project' })
+
+    expect(result).toEqual({
+      error: 'bash is not available',
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+    await expect(toModelOutput(tool, result)).resolves.toEqual({
+      type: 'text',
+      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
     })
   })
 })

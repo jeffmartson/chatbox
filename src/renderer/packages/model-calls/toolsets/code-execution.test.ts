@@ -1,4 +1,6 @@
 // @ts-nocheck — test file with heavily mocked types
+
+import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/lib/utils', () => ({
@@ -172,6 +174,30 @@ describe('buildCodeExecutionTools', () => {
     })
   })
 
+  test('read_file preserves Bash availability errors for the UI and model', async () => {
+    mockProvider.exec.mockResolvedValue({
+      stdout: '',
+      stderr: 'bash is not available',
+      exitCode: 127,
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    const result = await tool.execute({ file_path: 'report.txt' }, {})
+
+    expect(result).toEqual({
+      error: 'bash is not available',
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+    await expect(toModelOutput(tool, result)).resolves.toEqual({
+      type: 'text',
+      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
+    })
+  })
+
   test('code_execution tool handles non-zero exit code', async () => {
     mockProvider.exec.mockResolvedValue({ stdout: '', stderr: 'ReferenceError: x is not defined', exitCode: 1 })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
@@ -186,6 +212,27 @@ describe('buildCodeExecutionTools', () => {
 
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain('ReferenceError')
+  })
+
+  test('code_execution preserves a structured sandbox error code for the UI and model', async () => {
+    mockProvider.exec.mockResolvedValue({
+      stdout: '',
+      stderr: 'bash is not available',
+      exitCode: 127,
+      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+    })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.code_execution as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    const result = await tool.execute({ code: 'echo hello', language: 'bash' }, {})
+
+    expect(result.errorCode).toBe(SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE)
+    await expect(toModelOutput(tools.code_execution, result)).resolves.toEqual({
+      type: 'text',
+      value: 'Exit code: 127\n\nError code: BASH_NOT_AVAILABLE\n\nStderr:\nbash is not available',
+    })
   })
 
   test('provider.init is called only once across multiple executions', async () => {
@@ -276,6 +323,28 @@ describe('buildCodeExecutionTools', () => {
 
       expect(result.error).toMatch(/file not found/i)
       expect(mockProvider.persistArtifact).not.toHaveBeenCalled()
+    })
+
+    test('preserves Bash availability errors instead of reporting file-not-found', async () => {
+      mockProvider.exec.mockResolvedValue({
+        stdout: '',
+        stderr: 'bash is not available',
+        exitCode: 127,
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      })
+      const tool = getTool(mockProvider)
+
+      const result = await tool.execute({ file_path: '/tmp/report.pdf', display_name: 'Report' }, {})
+
+      expect(result).toEqual({
+        error: 'bash is not available',
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      })
+      expect(mockProvider.persistArtifact).not.toHaveBeenCalled()
+      await expect(toModelOutput(tool, result)).resolves.toEqual({
+        type: 'text',
+        value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
+      })
     })
   })
 })

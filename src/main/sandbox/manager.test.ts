@@ -1,4 +1,8 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { SANDBOX_EXEC_ERROR_CODES } from '../../shared/sandbox-provider'
 
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 vi.mock('../util', () => ({
@@ -7,7 +11,18 @@ vi.mock('../util', () => ({
 vi.mock('node:child_process', () => ({ spawn: vi.fn(), spawnSync: vi.fn() }))
 
 import { spawnSync } from 'node:child_process'
-import { normalizeWindowsShellPath, resolveWindowsBash, shellEscape } from './manager'
+import {
+  execCode,
+  findFiles,
+  grepFiles,
+  initSandbox,
+  listDir,
+  normalizeWindowsShellPath,
+  readFile,
+  resetSandbox,
+  resolveWindowsBash,
+  shellEscape,
+} from './manager'
 
 const originalPlatform = process.platform
 function setPlatform(p: NodeJS.Platform) {
@@ -62,25 +77,85 @@ describe('shellEscape', () => {
 })
 
 describe('resolveWindowsBash', () => {
-  const mockWhich = (present: string[]) => {
-    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((_cmd: string, args: string[]) => ({
-      status: present.includes(args[0]) ? 0 : 1,
-    }))
+  const mockShellAvailability = ({
+    bash = false,
+    wslStatus = 1,
+    wslDistros = '',
+  }: {
+    bash?: boolean
+    wslStatus?: number
+    wslDistros?: string
+  }) => {
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'bash' && args[0] === '--version') return { status: bash ? 0 : 1 }
+      if (cmd === 'wsl' && args[0] === '--list') {
+        return {
+          status: wslStatus,
+          stdout: Buffer.from(`\uFEFF${wslDistros}`, 'utf16le'),
+        }
+      }
+      return { status: 1 }
+    })
   }
 
   test('prefers bash on PATH', () => {
-    mockWhich(['bash', 'wsl'])
+    mockShellAvailability({ bash: true, wslStatus: 0, wslDistros: 'Ubuntu\n' })
     expect(resolveWindowsBash()).toEqual({ cmd: 'bash', args: [] })
   })
 
-  test('falls back to wsl bash when bash is absent', () => {
-    mockWhich(['wsl'])
+  test('falls back to wsl bash when bash is absent and a distribution is installed', () => {
+    mockShellAvailability({ wslStatus: 0, wslDistros: 'Ubuntu\n' })
     expect(resolveWindowsBash()).toEqual({ cmd: 'wsl', args: ['bash'] })
   })
 
-  test('returns null when neither bash nor wsl is available', () => {
-    mockWhich([])
+  test('returns null when wsl exists without an installed distribution', () => {
+    mockShellAvailability({ wslStatus: 0, wslDistros: '' })
     expect(resolveWindowsBash()).toBeNull()
+  })
+
+  test('returns null when neither bash nor wsl is available', () => {
+    mockShellAvailability({})
+    expect(resolveWindowsBash()).toBeNull()
+  })
+})
+
+describe('execCode on Windows without Bash', () => {
+  afterEach(() => setPlatform(originalPlatform))
+
+  test('returns a stable error code for localized UI handling', async () => {
+    setPlatform('win32')
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) =>
+      cmd === 'wsl' ? { status: 0, stdout: Buffer.alloc(0) } : { status: 1 }
+    )
+    const workDir = mkdtempSync(path.join(tmpdir(), 'chatbox-no-bash-'))
+    const sessionId = 'no-bash-session'
+    try {
+      await initSandbox(workDir, sessionId)
+      const result = await execCode({ code: 'echo hello', language: 'bash', sessionId })
+
+      expect(result).toEqual({
+        stdout: '',
+        stderr: 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.',
+        exitCode: 127,
+        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      })
+
+      const operationResults = await Promise.all([
+        readFile('report.txt', sessionId),
+        listDir('.', sessionId),
+        grepFiles('needle', '.', undefined, sessionId),
+        findFiles('.', '*.txt', sessionId),
+      ])
+      for (const operationResult of operationResults) {
+        expect(operationResult).toMatchObject({
+          success: false,
+          errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+        })
+      }
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(workDir, { recursive: true, force: true })
+    }
   })
 })
 

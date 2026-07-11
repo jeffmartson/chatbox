@@ -1,6 +1,7 @@
 import NiceModal from '@ebay/nice-modal-react'
 import {
   ActionIcon,
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -14,6 +15,7 @@ import {
   UnstyledButton,
 } from '@mantine/core'
 import { ChatboxAIAPIError } from '@shared/models/errors'
+import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
 import type { Message, MessageReasoningPart, MessageTextPart, MessageToolCallPart } from '@shared/types'
 import {
   IconBulb,
@@ -53,6 +55,7 @@ import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hoo
 import { getToolName } from '@/packages/tools'
 import { approveUserExec, denyUserExec, retryExplanation, usePendingApproval } from '@/packages/user-exec-approval'
 import type { SearchResultItem } from '@/packages/web-search'
+import platform from '@/platform'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
 import { settingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -63,6 +66,8 @@ import { inlineSandboxHtmlAssets } from './html-artifact-assets'
 const TOOL_ERROR_PREVIEW_LENGTH = 1_200
 const TOOL_PAYLOAD_PREVIEW_LENGTH = 8_000
 const APPROVAL_PAYLOAD_MAX_HEIGHT = 'min(240px, 35vh)'
+const GIT_BASH_DOWNLOAD_URL = 'https://git-scm.com/downloads/win'
+const WSL_INSTALL_URL = 'https://learn.microsoft.com/windows/wsl/install'
 
 function truncatePreview(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
@@ -77,6 +82,50 @@ function stringifyToolPayload(payload: unknown, maxLength = TOOL_PAYLOAD_PREVIEW
     text = String(payload)
   }
   return truncatePreview(text, maxLength)
+}
+
+function isBashNotAvailableResult(part: MessageToolCallPart): boolean {
+  if (part.state !== 'result') return false
+  const result = part.result as { errorCode?: unknown } | undefined
+  return result?.errorCode === SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE
+}
+
+const BashNotAvailableNotice: FC = () => {
+  const { t } = useTranslation()
+  return (
+    <Alert
+      color="yellow"
+      variant="light"
+      icon={<IconInfoCircle size={17} />}
+      title={t('Bash is not available on this Windows device.')}
+    >
+      <Stack gap="xs">
+        <Text size="sm">
+          {t(
+            'Install Git Bash or enable WSL to run Bash code. You can continue using Node.js code execution without either.'
+          )}
+        </Text>
+        <Group gap="xs">
+          <Button
+            size="compact-xs"
+            variant="light"
+            rightSection={<IconExternalLink size={12} />}
+            onClick={() => platform.openLink(GIT_BASH_DOWNLOAD_URL)}
+          >
+            {t('Download Git Bash')}
+          </Button>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            rightSection={<IconExternalLink size={12} />}
+            onClick={() => platform.openLink(WSL_INSTALL_URL)}
+          >
+            {t('How to install WSL2')}
+          </Button>
+        </Group>
+      </Stack>
+    </Alert>
+  )
 }
 
 function extractToolError(part: MessageToolCallPart): { errorCode?: number; errorText?: string } {
@@ -190,7 +239,7 @@ const ToolCallPill: FC<{
 }> = ({ part, summary, onClick, expanded }) => {
   const Icon = getToolIcon(part.toolName)
   const isLoading = part.state === 'call'
-  const isError = part.state === 'error'
+  const isError = part.state === 'error' || isBashNotAvailableResult(part)
 
   const bgColor = isError
     ? 'color-mix(in srgb, var(--chatbox-tint-error) 8%, transparent)'
@@ -548,8 +597,9 @@ const ParseLinkDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
 // ─── General Tool Call ──────────────────────────────────────────────
 
 const GeneralToolCallUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
-  const isError = part.state === 'error'
-  const [expanded, setExpanded] = useAutoExpandOnSignal(false)
+  const isBashNotAvailable = isBashNotAvailableResult(part)
+  const isError = part.state === 'error' || isBashNotAvailable
+  const [expanded, setExpanded] = useAutoExpandOnSignal(isBashNotAvailable)
 
   return (
     <Stack gap={6} mb="xs">
@@ -572,6 +622,7 @@ const GeneralToolCallUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
 const GeneralToolCallDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const { t } = useTranslation()
   const isError = part.state === 'error'
+  const isBashNotAvailable = isBashNotAvailableResult(part)
 
   return (
     <Stack gap="xs">
@@ -588,6 +639,8 @@ const GeneralToolCallDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => 
           </Text>
           <ToolCallErrorDetails part={part} />
         </Box>
+      ) : isBashNotAvailable ? (
+        <BashNotAvailableNotice />
       ) : (
         !!part.result && (
           <Box>
@@ -1411,9 +1464,10 @@ const TimelineToolCallStep: FC<
   const isWaitingApproval = !!pendingApproval
   const isPaused = part.state === 'paused'
   const isLoading = part.state === 'call' && !isWaitingApproval
-  const isError = part.state === 'error'
-  const isDone = part.state === 'result'
-  const [expanded, setExpanded] = useAutoExpandOnSignal(isWaitingApproval || isPaused)
+  const isBashNotAvailable = isBashNotAvailableResult(part)
+  const isError = part.state === 'error' || isBashNotAvailable
+  const isDone = part.state === 'result' && !isBashNotAvailable
+  const [expanded, setExpanded] = useAutoExpandOnSignal(isWaitingApproval || isPaused || isBashNotAvailable)
   const Icon = getToolIcon(part.toolName)
 
   // Per-step elapsed time: prefer the persisted duration, fall back to a live
@@ -1459,9 +1513,11 @@ const TimelineToolCallStep: FC<
       ? t('Waiting for approval')
       : isLoading
         ? t('Running')
-        : isError
-          ? t('Failed')
-          : truncateSummary(argSummary || resultSummary || t('Completed'))
+        : isBashNotAvailable
+          ? t('Bash is not available on this Windows device.')
+          : isError
+            ? t('Failed')
+            : truncateSummary(argSummary || resultSummary || t('Completed'))
 
   const hasDetail = isWaitingApproval || (isPaused ? showPausedActionDetails : part.state !== 'call')
 

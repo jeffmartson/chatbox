@@ -40,6 +40,9 @@ export function contentOrErrorText(output: unknown): string {
   if (typeof output === 'string') return output
   const record = asRecord(output)
   const error = stringField(record, 'error')
-  if (error) return `Error: ${error}`
+  if (error) {
+    const errorCode = stringField(record, 'errorCode')
+    return errorCode ? `Error code: ${errorCode}\n\nError: ${error}` : `Error: ${error}`
+  }
   return stringField(record, 'content') ?? JSON.stringify(output) ?? String(output)
 }

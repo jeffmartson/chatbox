@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
 
 import type { ElectronIPC } from '@shared/electron-types'
+import type { SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
 import type { Config, Settings, ShortcutSetting } from '@shared/types'
 import { cache } from '@shared/utils/cache'
 import localforage from 'localforage'
@@ -373,11 +374,11 @@ export default class DesktopPlatform implements Platform {
     language: 'bash' | 'node'
     timeout?: number
     sessionId?: string
-  }) {
+  }): Promise<SandboxExecResult> {
     return this.ipc.invoke('sandbox:exec-code', params)
   }
 
-  public async sandboxRead(params: { filePath: string; sessionId?: string }) {
+  public async sandboxRead(params: { filePath: string; sessionId?: string }): Promise<SandboxOperationResult> {
     return this.ipc.invoke('sandbox:read', params)
   }
 
@@ -395,15 +396,24 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:edit', params)
   }
 
-  public async sandboxLs(params: { dirPath: string; sessionId?: string }) {
+  public async sandboxLs(params: { dirPath: string; sessionId?: string }): Promise<SandboxOperationResult> {
     return this.ipc.invoke('sandbox:ls', params)
   }
 
-  public async sandboxGrep(params: { pattern: string; dirPath?: string; include?: string; sessionId?: string }) {
+  public async sandboxGrep(params: {
+    pattern: string
+    dirPath?: string
+    include?: string
+    sessionId?: string
+  }): Promise<SandboxOperationResult> {
     return this.ipc.invoke('sandbox:grep', params)
   }
 
-  public async sandboxFind(params: { dirPath: string; pattern?: string; sessionId?: string }) {
+  public async sandboxFind(params: {
+    dirPath: string
+    pattern?: string
+    sessionId?: string
+  }): Promise<SandboxOperationResult> {
     return this.ipc.invoke('sandbox:find', params)
   }
 

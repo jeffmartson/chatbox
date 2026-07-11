@@ -5,10 +5,24 @@
 
 export const DEFAULT_EXEC_TIMEOUT = 120_000
 
+export const SANDBOX_EXEC_ERROR_CODES = {
+  BASH_NOT_AVAILABLE: 'BASH_NOT_AVAILABLE',
+} as const
+
+export type SandboxExecErrorCode = (typeof SANDBOX_EXEC_ERROR_CODES)[keyof typeof SANDBOX_EXEC_ERROR_CODES]
+
 export interface SandboxExecResult {
   stdout: string
   stderr: string
   exitCode: number
+  errorCode?: SandboxExecErrorCode
+}
+
+export interface SandboxOperationResult {
+  success: boolean
+  content?: string
+  error?: string
+  errorCode?: SandboxExecErrorCode
 }
 
 export interface SandboxProvider {
