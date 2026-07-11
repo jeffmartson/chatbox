@@ -26,7 +26,7 @@ const MODE_COLORS: Record<AgentModeValue, string> = {
 }
 
 const OPEN_DELAY = 100
-const CLOSE_DELAY = 100
+const CLOSE_DELAY = 250
 
 const AgentModeButton: FC<AgentModeButtonProps> = ({
   sessionId,

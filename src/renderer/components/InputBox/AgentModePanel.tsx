@@ -105,6 +105,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const { t } = useTranslation()
   const [page, setPage] = useState<PanelPage>('main')
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const openTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const panelRef = useRef<HTMLDivElement>(null)
   const subPanelRef = useRef<HTMLDivElement>(null)
   const [subPanelAlign, setSubPanelAlign] = useState<'top' | 'bottom'>('bottom')
@@ -282,46 +283,78 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     closeTimerRef.current = undefined
   }, [])
 
+  const clearSubPanelOpenTimer = useCallback(() => {
+    clearTimeout(openTimerRef.current)
+    openTimerRef.current = undefined
+  }, [])
+
   const scheduleSubPanelClose = useCallback(
     (delay: number) => {
       clearSubPanelCloseTimer()
+      clearSubPanelOpenTimer()
       closeTimerRef.current = setTimeout(() => {
         setPage('main')
         closeTimerRef.current = undefined
       }, delay)
     },
-    [clearSubPanelCloseTimer]
+    [clearSubPanelCloseTimer, clearSubPanelOpenTimer]
   )
 
   const handleExtensionHover = useCallback(
     (target: PanelPage, e?: React.MouseEvent, align: 'top' | 'bottom' = 'bottom') => {
       clearSubPanelCloseTimer()
-      setPage(target)
-      setSubPanelAlign(align)
+      clearSubPanelOpenTimer()
+
+      let nextSubPanelTop = 0
       if (align === 'top' && e && panelRef.current) {
         const row = e.currentTarget as HTMLElement
         const panelRect = panelRef.current.getBoundingClientRect()
         const rowRect = row.getBoundingClientRect()
-        setSubPanelTop(rowRect.top - panelRect.top)
+        nextSubPanelTop = rowRect.top - panelRect.top
       }
+
+      const openTarget = () => {
+        setPage(target)
+        setSubPanelAlign(align)
+        if (align === 'top') {
+          setSubPanelTop(nextSubPanelTop)
+        }
+      }
+
+      if (page === 'main' || page === target) {
+        openTarget()
+        return
+      }
+
+      openTimerRef.current = setTimeout(openTarget, 180)
     },
-    [clearSubPanelCloseTimer]
+    [clearSubPanelCloseTimer, clearSubPanelOpenTimer, page]
   )
 
   const handleSubPanelEnter = useCallback(() => {
     clearSubPanelCloseTimer()
-  }, [clearSubPanelCloseTimer])
+    clearSubPanelOpenTimer()
+  }, [clearSubPanelCloseTimer, clearSubPanelOpenTimer])
 
   const handleSubPanelLeave = useCallback(() => {
-    scheduleSubPanelClose(150)
+    scheduleSubPanelClose(300)
   }, [scheduleSubPanelClose])
 
   const handleNonExtensionHover = useCallback(() => {
-    scheduleSubPanelClose(100)
+    scheduleSubPanelClose(200)
   }, [scheduleSubPanelClose])
 
+  const resetSubPanel = useCallback(() => {
+    clearSubPanelCloseTimer()
+    clearSubPanelOpenTimer()
+    setPage('main')
+  }, [clearSubPanelCloseTimer, clearSubPanelOpenTimer])
+
   useEffect(() => {
-    return () => clearTimeout(closeTimerRef.current)
+    return () => {
+      clearTimeout(closeTimerRef.current)
+      clearTimeout(openTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -402,7 +435,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
           : 'hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
       } ${disabled ? '' : 'cursor-pointer'}`}
       onMouseEnter={(e) => handleExtensionHover(targetPage, e, subPanelAlign)}
-      onMouseLeave={handleSubPanelLeave}
+      onMouseLeave={clearSubPanelOpenTimer}
       onFocus={(e) => handleExtensionHover(targetPage, e as unknown as React.MouseEvent, subPanelAlign)}
       onBlur={handleSubPanelLeave}
       onKeyDown={(e) => {
@@ -411,7 +444,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
           handleExtensionHover(targetPage, e as unknown as React.MouseEvent, subPanelAlign)
         } else if (e.key === 'Escape') {
           e.preventDefault()
-          setPage('main')
+          resetSubPanel()
         }
       }}
     >
@@ -817,6 +850,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     <div
       className="relative"
       ref={panelRef}
+      onMouseLeave={resetSubPanel}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && page === 'main') {
           e.preventDefault()
@@ -968,7 +1002,6 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
           className="absolute left-full w-[240px] max-h-[360px] overflow-y-auto bg-[var(--mantine-color-body)] rounded-r-lg shadow-lg border-l border-[var(--mantine-color-default-border)]"
           style={subPanelAlign === 'top' ? { top: subPanelTop } : { bottom: 0 }}
           onMouseEnter={handleSubPanelEnter}
-          onMouseLeave={handleSubPanelLeave}
         >
           {renderSubPanel()}
         </Stack>
