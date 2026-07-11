@@ -49,14 +49,6 @@ const RETRY_CONFIG = {
   BACKOFF_FACTOR: 2,
 } as const
 
-type ToolInputErrorChunk = {
-  type: 'tool-input-error'
-  toolCallId: string
-  toolName: string
-  input: unknown
-  errorText: string
-}
-
 /**
  * Retryable from a billing-safety perspective: upstream rejected or crashed
  * before running the model, so retrying will not cause duplicate charges.
@@ -476,6 +468,21 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     options: CallChatCompletionOptions
   ): void {
     for (const toolError of toolErrors) {
+      const existing = contentParts.find(
+        (part): part is MessageToolCallPart => part.type === 'tool-call' && part.toolCallId === toolError.toolCallId
+      )
+      if (!existing) {
+        contentParts.push({
+          type: 'tool-call',
+          state: 'call',
+          toolCallId: toolError.toolCallId,
+          toolName: toolError.toolName,
+          args: toolError.input,
+          providerMetadata: toolError.providerMetadata,
+          providerExecuted: toolError.providerExecuted,
+        })
+      }
+
       const serializedError =
         toolError.error instanceof Error
           ? {
@@ -492,39 +499,11 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
           toolName: toolError.toolName,
         },
         isError: true,
+        providerMetadata: existing ? toolError.providerMetadata : undefined,
       }
       this.updateToolResultPart(mappedResult, contentParts)
       options.onResultChange?.({ contentParts })
     }
-  }
-
-  private processToolInputError(
-    chunk: ToolInputErrorChunk,
-    contentParts: MessageContentParts,
-    options: CallChatCompletionOptions
-  ): void {
-    let toolCallPart = contentParts.find((p) => p.type === 'tool-call' && p.toolCallId === chunk.toolCallId) as
-      | MessageToolCallPart
-      | undefined
-
-    if (!toolCallPart) {
-      toolCallPart = {
-        type: 'tool-call',
-        state: 'call',
-        toolCallId: chunk.toolCallId,
-        toolName: chunk.toolName,
-        args: chunk.input,
-      }
-      contentParts.push(toolCallPart)
-    }
-
-    toolCallPart.state = 'error'
-    toolCallPart.result = {
-      error: chunk.errorText,
-      input: chunk.input,
-      toolName: chunk.toolName,
-    }
-    options.onResultChange?.({ contentParts })
   }
 
   private updateToolResultPart(toolResult: ToolExecutionResult, contentParts: MessageContentParts): void {
@@ -550,6 +529,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
           }
         }
         toolCallPart.state = 'error'
+        toolCallPart.resultProviderMetadata = toolResult.providerMetadata
       } else {
         toolCallPart.state = 'result'
         toolCallPart.result = toolResult.result
@@ -616,7 +596,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
   }
 
   private async processStreamChunk<T extends ToolSet>(
-    chunk: TextStreamPart<T> | ToolInputErrorChunk,
+    chunk: TextStreamPart<T>,
     contentParts: MessageContentParts,
     currentTextPart: MessageTextPart | undefined,
     currentReasoningPart: MessageReasoningPart | undefined,
@@ -666,14 +646,6 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
         finalizeReasoningDuration()
         this.processToolErrors([chunk], contentParts, _options)
         break
-      case 'tool-input-error':
-        finalizeReasoningDuration()
-        this.processToolInputError(chunk as ToolInputErrorChunk, contentParts, _options)
-        return {
-          currentTextPart: undefined,
-          currentReasoningPart: undefined,
-        }
-
       case 'file':
         if (chunk.file.mediaType?.startsWith('image/') && chunk.file.base64) {
           await this.processImageFile(chunk.file.mediaType, chunk.file.base64, contentParts)

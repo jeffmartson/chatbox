@@ -96,6 +96,9 @@ export const MessageRoleEnum = {
 
 export type MessageRole = (typeof MessageRoleEnum)[keyof typeof MessageRoleEnum]
 
+// Mirrors the AI SDK `ProviderMetadata` shape (provider → key → JSONValue). The inner
+// `.optional()` is required for assignability to `z.ZodType<ProviderMetadata>` because the
+// SDK's JSONObject values admit `undefined`.
 const MessageProviderMetadataSchema: z.ZodType<ProviderMetadata> = z.record(
   z.string(),
   z.record(z.string(), z.custom<JSONValue>().optional())
@@ -136,7 +139,7 @@ export const MessageToolCallPartSchema = z.object({
   state: z.enum(['call', 'result', 'error', 'paused']),
   toolCallId: z.string(),
   toolName: z.string(),
-  args: z.any(),
+  args: z.unknown().optional(),
   providerMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
   resultProviderMetadata: MessageProviderMetadataSchema.optional().catch(undefined),
   providerExecuted: z.boolean().optional(),
