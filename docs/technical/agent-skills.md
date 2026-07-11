@@ -2,7 +2,7 @@
 
 > Last updated: 2026-02
 
-本文档整理 `feat/skills` 分支合并后的技能系统技术方案，并归档 `.sisyphus/plans` 与 `.sisyphus/notepads` 的关键决策、实现约束和后续演进方向。
+本文档整理 `feat/skills` 分支合并后的技能系统技术方案，并归档历史设计中的关键决策、实现约束和后续演进方向。
 
 ---
 
@@ -59,7 +59,7 @@ Agent Skills 的核心目标是以低耦合方式扩展模型能力：
 3. 在支持 Tool Use 的模型上注册 `load_skill`（按名称加载技能正文）。
 4. 模型不支持 Tool Use 时，仅注入 XML 元数据，不注册技能工具。
 
-该设计来自 plans/notepads 中明确记录的“渐进披露（progressive disclosure）”原则。
+该设计遵循“渐进披露（progressive disclosure）”原则。
 
 ### 3) UI 管理路径
 
@@ -76,7 +76,7 @@ Agent Skills 的核心目标是以低耦合方式扩展模型能力：
 - `skills:open-directory`
 - `skills:execute-script`
 
-## 已归档决策（来自 .sisyphus/notepads）
+## 已归档决策
 
 - 技能规范遵循 agentskills.io（目录 + `SKILL.md`）
 - 技能激活采用 `load_skill` + `<available_skills>` 模式

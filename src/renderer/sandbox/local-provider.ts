@@ -1,6 +1,5 @@
 import type { SandboxExecResult, SandboxProvider } from '@shared/sandbox-provider'
 import { DEFAULT_EXEC_TIMEOUT } from '@shared/sandbox-provider'
-import { shellQuote } from '@shared/utils/shell'
 import platform from '@/platform'
 
 /**
@@ -102,38 +101,17 @@ export class LocalSandboxProvider implements SandboxProvider {
 
   async exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
     const timeout = params.timeout ?? DEFAULT_EXEC_TIMEOUT
-
-    // Native Windows has no POSIX shell and the SRT sandbox does not run there, so route the
-    // raw code to the native executor (no OS isolation — see docs/technical/windows-sandbox.md)
-    // instead of building a bash/base64 command for the SRT path.
-    if (isWindowsRenderer() && platform.sandboxExecCode) {
-      return platform.sandboxExecCode({
-        code: params.code,
-        language: params.language,
-        timeout,
-        sessionId: this.sessionId ?? undefined,
-      })
-    }
-
-    if (!platform.sandboxExec) {
+    if (!platform.sandboxExecCode) {
       return { stdout: '', stderr: 'Sandbox not available on this platform', exitCode: 1 }
     }
-
-    // For multi-line code or code with special characters, use base64 encoding
-    // to avoid all shell escaping issues
-    const encoded = btoa(unescape(encodeURIComponent(params.code)))
-
-    let command: string
-    switch (params.language) {
-      case 'bash':
-        command = buildBashExecutionCommand(encoded, await getNodeCommand())
-        break
-      case 'node':
-        command = buildNodeExecutionCommand(encoded, await getNodeCommand())
-        break
-    }
-
-    return platform.sandboxExec({ command, timeout, sessionId: this.sessionId ?? undefined })
+    // Code is sent raw; the main process feeds it to the sandboxed process via stdin — no base64
+    // encoding and no shell escaping (see src/main/sandbox/manager.ts execCode).
+    return platform.sandboxExecCode({
+      code: params.code,
+      language: params.language,
+      timeout,
+      sessionId: this.sessionId ?? undefined,
+    })
   }
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
@@ -142,31 +120,4 @@ export class LocalSandboxProvider implements SandboxProvider {
     }
     return platform.sandboxCheckAvailability()
   }
-}
-
-// Mirrors getOS() === 'Windows' without importing navigator.ts (keeps this hot path light).
-function isWindowsRenderer(): boolean {
-  return typeof navigator !== 'undefined' && (navigator.userAgent ?? '').includes('Windows')
-}
-
-async function getNodeCommand(): Promise<string> {
-  if (platform.sandboxNodeCommand) {
-    return platform.sandboxNodeCommand()
-  }
-  return shellQuote('node')
-}
-
-function buildNodeShellFunction(nodeCommand: string): string {
-  return `node() { ERR_FILE="./.chatbox-node-stderr.$$"; rm -f "$ERR_FILE"; ${nodeCommand} "$@" 2>"$ERR_FILE"; STATUS=$?; if [ -s "$ERR_FILE" ]; then grep -v 'ERROR:codesign_util\\.cc(109).*SecCodeCheckValidity' "$ERR_FILE" >&2 || true; fi; rm -f "$ERR_FILE"; return $STATUS; }`
-}
-
-export function buildBashExecutionCommand(encodedCode: string, nodeCommand: string): string {
-  const script = [buildNodeShellFunction(nodeCommand), `eval "$(echo '${encodedCode}' | base64 -d)"`].join('; ')
-  return `bash -c ${shellQuote(script)}`
-}
-
-export function buildNodeExecutionCommand(encodedCode: string, nodeCommand: string): string {
-  // Packaged Electron can emit a macOS code-signing self-check warning on stderr
-  // when launched as Node. Filter only that runtime noise and preserve user stderr.
-  return [buildNodeShellFunction(nodeCommand), `echo '${encodedCode}' | base64 -d | node`, 'exit $?'].join('; ')
 }

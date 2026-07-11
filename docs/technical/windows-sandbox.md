@@ -193,9 +193,11 @@ PR #813（已合并，commit `c955cbf94`）基于错误的 WSL 前提。本次�
 - `release/app/package.json`：SRT `^0.0.34` → `^0.0.54`。
 - `manager.ts`：win32 `initSandbox` 跳过 SRT；新增 `execCode`（node 经 execPath+ELECTRON_RUN_AS_NODE、
   bash 经 `resolveWindowsBash()`，均经 stdin 喂入）；`checkAvailability(win32)` 返回 available；清理 WSL 遗留。
-- `ipc-handlers.ts`：新增 `sandbox:exec-code`；还原 `sandbox:node-command`。
-- `interfaces.ts` / `desktop_platform.ts`：新增 `sandboxExecCode`。
-- `local-provider.ts`：`exec()` 在 Windows 路由到 `sandboxExecCode`（原始 code，不走 bash 包装）。
+- `ipc-handlers.ts`：`sandbox:exec-code` 成为全平台唯一代码执行入口，移除 `sandbox:exec` 与
+  `sandbox:node-command`。
+- `interfaces.ts` / `desktop_platform.ts`：桌面端统一使用 `sandboxExecCode`。
+- `local-provider.ts`：`exec()` 在所有桌面平台路由到 `sandboxExecCode`；Windows bash 保留其 PATH 中的
+  `node`，避免 WSL 执行宿主 Electron 路径。
 - 测试：`resolveWindowsBash` 决策单测；macOS SRT 路径与 stdin 执行机制已实测。
 
 ## 9. 验证状态与后续

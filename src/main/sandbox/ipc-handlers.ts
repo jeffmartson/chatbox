@@ -1,7 +1,6 @@
 import { lstat as fsLstat, readFile as fsReadFile, realpath as fsRealpath } from 'node:fs/promises'
 import path from 'node:path'
 import { ipcMain } from 'electron'
-import { shellQuote } from '../../shared/utils/shell'
 import { getLogger } from '../util'
 import {
   checkAvailability,
@@ -9,7 +8,6 @@ import {
   copyFileToSandbox,
   editFile,
   execCode,
-  execCommand,
   exportFileFromSandbox,
   findFiles,
   getSandboxAllowedRoots,
@@ -31,28 +29,9 @@ import { createSandboxHtmlPreviewUrl } from './preview-server'
 const log = getLogger('sandbox:ipc-handlers')
 
 export function registerSandboxIPCHandlers() {
-  ipcMain.handle(
-    'sandbox:exec',
-    async (_event, params: { command: string; timeout?: number; cwd?: string; sessionId?: string }) => {
-      try {
-        log.debug(
-          `sandbox:exec command=${params.command.length > 200 ? `${params.command.slice(0, 200)}...` : params.command}`
-        )
-        return await execCommand(params.command, {
-          timeout: params.timeout,
-          cwd: params.cwd,
-          sessionId: params.sessionId,
-        })
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error)
-        log.error('sandbox:exec failed', msg)
-        return { stdout: '', stderr: msg, exitCode: 1 }
-      }
-    }
-  )
-
-  // Native code execution path (Windows): runs code without an OS sandbox. The renderer
-  // routes here on Windows instead of building a POSIX bash command for sandbox:exec.
+  // Single code-execution entry point for all platforms. The renderer sends raw {code, language};
+  // execCode feeds it to the sandboxed process via stdin (macOS/Linux under SRT confinement,
+  // Windows natively with no OS sandbox). No base64 encoding or host-shell command building.
   ipcMain.handle(
     'sandbox:exec-code',
     async (_event, params: { code: string; language: 'bash' | 'node'; timeout?: number; sessionId?: string }) => {
@@ -237,13 +216,6 @@ export function registerSandboxIPCHandlers() {
       log.error('sandbox:export-file failed', msg)
       return { success: false, error: msg }
     }
-  })
-
-  // macOS/Linux only: the bash code-execution wrapper runs node via this command inside the
-  // SRT sandbox. Windows uses native execCode (sandbox:exec-code) and never calls this.
-  ipcMain.handle('sandbox:node-command', () => {
-    const executable = shellQuote(process.execPath)
-    return process.versions.electron ? `ELECTRON_RUN_AS_NODE=1 ${executable}` : executable
   })
 
   // Persist a generated file to durable storage (userData) so it stays downloadable

@@ -1,70 +1,49 @@
-import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { shellQuote } from '@shared/utils/shell'
-import { describe, expect, test } from 'vitest'
-import { buildBashExecutionCommand, buildNodeExecutionCommand } from './local-provider'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-function encodeCode(code: string): string {
-  return Buffer.from(code, 'utf8').toString('base64')
-}
+// Mock the platform module so we can observe how exec() delegates to sandboxExecCode.
+const sandboxExecCode = vi.fn()
+vi.mock('@/platform', () => ({
+  default: {
+    get sandboxExecCode() {
+      return sandboxExecCodeRef.current
+    },
+  },
+}))
 
-describe('buildNodeExecutionCommand', () => {
-  test('filters Electron codesign noise while preserving user stderr', () => {
-    const command = buildNodeExecutionCommand(
-      encodeCode(`
-console.error('[0525/114014.700946:ERROR:codesign_util.cc(109)] SecCodeCheckValidity: Error Domain=NSOSStatusErrorDomain Code=-2147409622 "(null)" (-2147409622)')
-console.error('real user stderr')
-console.log('ok')
-`),
-      shellQuote(process.execPath)
-    )
+// Indirection so individual tests can toggle sandboxExecCode presence.
+const sandboxExecCodeRef: { current: typeof sandboxExecCode | undefined } = { current: sandboxExecCode }
 
-    const result = spawnSync('sh', ['-c', command], { encoding: 'utf8' })
+import { LocalSandboxProvider } from './local-provider'
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toBe('ok\n')
-    expect(result.stderr).toBe('real user stderr\n')
+beforeEach(() => {
+  sandboxExecCode.mockReset()
+  sandboxExecCodeRef.current = sandboxExecCode
+})
+
+describe('LocalSandboxProvider.exec', () => {
+  test('forwards raw code/language to sandboxExecCode without any encoding', async () => {
+    sandboxExecCode.mockResolvedValue({ stdout: 'ok', stderr: '', exitCode: 0 })
+    const provider = new LocalSandboxProvider()
+
+    const code = "console.log('héllo');\nprocess.exit(0)"
+    const result = await provider.exec({ code, language: 'node', timeout: 5_000 })
+
+    expect(sandboxExecCode).toHaveBeenCalledTimes(1)
+    const arg = sandboxExecCode.mock.calls[0][0]
+    // Code is passed verbatim — no base64, no shell wrapping.
+    expect(arg.code).toBe(code)
+    expect(arg.language).toBe('node')
+    expect(arg.timeout).toBe(5_000)
+    expect(result).toEqual({ stdout: 'ok', stderr: '', exitCode: 0 })
   })
 
-  test('preserves node exit code', () => {
-    const command = buildNodeExecutionCommand(encodeCode('process.exit(7)'), shellQuote(process.execPath))
+  test('returns an error result when the platform has no sandbox executor', async () => {
+    sandboxExecCodeRef.current = undefined
+    const provider = new LocalSandboxProvider()
 
-    const result = spawnSync('sh', ['-c', command], { encoding: 'utf8' })
+    const result = await provider.exec({ code: 'echo hi', language: 'bash' })
 
-    expect(result.status).toBe(7)
-  })
-
-  test('does not require TMPDIR to exist', () => {
-    const cwd = mkdtempSync(join(tmpdir(), 'chatbox-node-wrapper-'))
-    try {
-      const command = buildNodeExecutionCommand(encodeCode("console.log('ok')"), shellQuote(process.execPath))
-
-      const result = spawnSync('sh', ['-c', command], {
-        cwd,
-        encoding: 'utf8',
-        env: { ...process.env, TMPDIR: join(cwd, 'missing') },
-      })
-
-      expect(result.status).toBe(0)
-      expect(result.stdout).toBe('ok\n')
-      expect(result.stderr).toBe('')
-    } finally {
-      rmSync(cwd, { recursive: true, force: true })
-    }
-  })
-
-  test('makes node available to bash scripts without PATH', () => {
-    const command = buildBashExecutionCommand(encodeCode('node -e "console.log(\'ok\')"'), shellQuote(process.execPath))
-
-    const result = spawnSync('sh', ['-c', command], {
-      encoding: 'utf8',
-      env: { PATH: '/usr/bin:/bin', HOME: tmpdir() },
-    })
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toBe('ok\n')
-    expect(result.stderr).toBe('')
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('Sandbox not available')
   })
 })

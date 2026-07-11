@@ -165,12 +165,15 @@ const sandbox_bash: ToolSet[string] = {
   }),
   execute: async (input, { abortSignal }) => {
     const bashInput = input as { command: string; timeout?: number }
-    if (!platform.sandboxExec) {
+    if (!platform.sandboxExecCode) {
       return 'Sandbox not available on this platform'
     }
     try {
       const timeout = bashInput.timeout ?? DEFAULT_BASH_TIMEOUT
-      const result = await abortableExec(platform.sandboxExec({ command: bashInput.command, timeout }), abortSignal)
+      const result = await abortableExec(
+        platform.sandboxExecCode({ code: bashInput.command, language: 'bash', timeout }),
+        abortSignal
+      )
       return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

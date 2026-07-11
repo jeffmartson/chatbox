@@ -214,10 +214,19 @@ async function writeSandboxFile(context: FilesystemContext, filePath: string, co
   const setup = await ensureSandbox(context)
   if (!setup.success) return setup
   if (!context.provider) return { success: false, error: 'Sandbox is not available' }
-  const encoded = btoa(unescape(encodeURIComponent(content)))
+  // Write via a node script with the content safely embedded through JSON.stringify (same pattern
+  // as editSandboxFile). The script is fed to node over stdin, so there is no shell escaping and no
+  // base64 round-trip, and the write still runs inside the sandbox (subject to allowWrite rules).
   const result = await context.provider.exec({
-    language: 'bash',
-    code: `mkdir -p "$(dirname ${shellQuote(filePath)})" && printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(filePath)}`,
+    language: 'node',
+    code: `
+const fs = require('fs')
+const path = require('path')
+const filePath = ${JSON.stringify(filePath)}
+const content = ${JSON.stringify(content)}
+fs.mkdirSync(path.dirname(filePath), { recursive: true })
+fs.writeFileSync(filePath, content)
+`,
     timeout: 10_000,
   })
   return result.exitCode === 0 ? { success: true } : { success: false, error: result.stderr || result.stdout }

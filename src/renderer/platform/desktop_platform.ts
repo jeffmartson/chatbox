@@ -368,10 +368,6 @@ export default class DesktopPlatform implements Platform {
     return this._sessionMetaStorage
   }
 
-  public async sandboxExec(params: { command: string; timeout?: number; sessionId?: string }) {
-    return this.ipc.invoke('sandbox:exec', params)
-  }
-
   public async sandboxExecCode(params: {
     code: string
     language: 'bash' | 'node'
@@ -457,10 +453,6 @@ export default class DesktopPlatform implements Platform {
 
   public async sandboxRemoveArtifacts(params: { sessionId: string }) {
     return this.ipc.invoke('sandbox:remove-artifacts', params)
-  }
-
-  public async sandboxNodeCommand() {
-    return this.ipc.invoke('sandbox:node-command')
   }
 
   public async sandboxReadFileBase64(params: {

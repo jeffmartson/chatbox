@@ -137,12 +137,8 @@ export interface Platform extends Storage {
   getSessionMetaStorage(): SessionMetaStorage
 
   // Sandbox operations (Desktop only)
-  sandboxExec?(params: {
-    command: string
-    timeout?: number
-    sessionId?: string
-  }): Promise<{ stdout: string; stderr: string; exitCode: number }>
-  // Native code execution (Windows): runs code without an OS sandbox.
+  // Single code-execution entry point for all platforms: code is fed to the sandboxed process
+  // via stdin (macOS/Linux under SRT confinement, Windows natively with no OS sandbox).
   sandboxExecCode?(params: {
     code: string
     language: 'bash' | 'node'
@@ -217,7 +213,6 @@ export interface Platform extends Storage {
   sandboxRemoveArtifacts?(params: { sessionId: string }): Promise<{ success: boolean; error?: string }>
   sandboxReadFileBase64?(params: { filePath: string }): Promise<{ success: boolean; base64?: string; error?: string }>
   sandboxCreateHtmlPreview?(params: { filePath: string }): Promise<{ success: boolean; url?: string; error?: string }>
-  sandboxNodeCommand?(): Promise<string>
 
   // Directory dialog (Desktop only)
   openDirectoryDialog?(): Promise<{ canceled: boolean; path?: string }>

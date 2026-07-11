@@ -21,6 +21,7 @@ import {
 } from '../../shared/task-sandbox'
 import { shellQuote } from '../../shared/utils/shell'
 import { getLogger } from '../util'
+import { buildSandboxStdinScript, stripCodesignNoise } from './exec-script'
 import { headTruncate, tailTruncate } from './truncate'
 
 const log = getLogger('sandbox:manager')
@@ -31,11 +32,6 @@ interface ExecResult {
   stdout: string
   stderr: string
   exitCode: number
-}
-
-interface ExecOptions {
-  timeout?: number
-  cwd?: string
 }
 
 interface SandboxStatus {
@@ -385,159 +381,56 @@ export async function initSandbox(
   }
 }
 
-export async function execCommand(
-  command: string,
-  options?: ExecOptions & { sessionId?: string }
-): Promise<ExecResult> {
-  const session = getSession(options?.sessionId)
-  if (!session || session.state !== 'initialized' || !globalSandboxManager) {
-    throw new Error('Sandbox not initialized. Call initSandbox first.')
-  }
-
-  // Pass per-session config as customConfig so each session's allowWrite is respected
-  const customConfig = session.sandboxConfig as Parameters<typeof globalSandboxManager.wrapWithSandbox>[2]
-  const wrappedCommand = await globalSandboxManager.wrapWithSandbox(command, undefined, customConfig)
-  const cwd = options?.cwd ?? session.workingDirectory ?? undefined
-  const timeout = options?.timeout ?? 30_000
-
-  const MAX_BUFFER_BYTES = 10 * 1024 * 1024 // 10MB cap to prevent OOM from runaway output
-
-  return new Promise((resolve, reject) => {
-    const stdoutChunks: Uint8Array[] = []
-    const stderrChunks: Uint8Array[] = []
-    let stdoutBytes = 0
-    let stderrBytes = 0
-    let stdoutCapped = false
-    let stderrCapped = false
-
-    const env = { ...process.env }
-    if (session.workingDirectory) {
-      const cacheDir = path.join(session.workingDirectory, '.cache')
-      mkdirSync(cacheDir, { recursive: true })
-      env.XDG_CACHE_HOME = cacheDir
-      env.TMPDIR = env.TMP = env.TEMP = session.workingDirectory
-      // Point HOME at the working directory so `~`, `$HOME`, and os.homedir() resolve there.
-      // Models trained on cloud sandboxes often write to a home dir; this makes those writes
-      // land in the sandbox working dir instead of a non-existent path. Confinement is
-      // unaffected: sandbox-runtime expands `~` in deny rules via the main process's
-      // os.homedir() when wrapWithSandbox bakes the seatbelt policy (before spawn), so the
-      // child's overridden HOME only affects that child shell's own `~` expansion, never the
-      // deny-read/write rules (e.g. ~/.ssh stays denied at the real home path).
-      env.HOME = session.workingDirectory
-    }
-
-    const child = spawn(wrappedCommand, {
-      shell: true,
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // POSIX needs its own process group so we can signal the whole tree via -pid.
-      // On Windows detached spawns a separate console window; the tree is killed via
-      // taskkill /T instead, so detaching is unnecessary and undesirable.
-      detached: process.platform !== 'win32',
-      env,
-    })
-    session.runningChild = child
-
-    let timedOut = false
-    const killTree = () => {
-      killProcessTree(child, 'SIGTERM')
-      setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
-    }
-    const timer = setTimeout(() => {
-      timedOut = true
-      killTree()
-    }, timeout)
-
-    child.stdout.on('data', (chunk: Uint8Array) => {
-      if (!stdoutCapped) {
-        stdoutBytes += chunk.byteLength
-        if (stdoutBytes > MAX_BUFFER_BYTES) {
-          stdoutCapped = true
-        } else {
-          stdoutChunks.push(chunk)
-        }
-      }
-    })
-    child.stderr.on('data', (chunk: Uint8Array) => {
-      if (!stderrCapped) {
-        stderrBytes += chunk.byteLength
-        if (stderrBytes > MAX_BUFFER_BYTES) {
-          stderrCapped = true
-        } else {
-          stderrChunks.push(chunk)
-        }
-      }
-    })
-
-    child.on('error', (err) => {
-      clearTimeout(timer)
-      session.runningChild = null
-      reject(err)
-    })
-
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      session.runningChild = null
-      let stdout = tailTruncate(Buffer.concat(stdoutChunks).toString('utf-8'))
-      let stderr = tailTruncate(Buffer.concat(stderrChunks).toString('utf-8'))
-      const exitCode = timedOut ? 124 : (code ?? 1)
-
-      if (stdoutCapped) {
-        stdout += `\n[Output truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
-      }
-      if (stderrCapped) {
-        stderr += `\n[Stderr truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
-      }
-      if (timedOut) {
-        stderr += `\n[Process timed out after ${timeout}ms]`
-      }
-      resolve({ stdout, stderr, exitCode })
-    })
-  })
-}
-
 /**
- * Execute code natively on Windows — NO OS sandbox (see docs/technical/windows-sandbox.md).
+ * Execute agent code inside the sandbox. The program is fed to the child via stdin (see
+ * {@link buildSandboxStdinScript}), so the user's bytes never touch a host shell command line —
+ * there is no shell escaping and no base64 round-trip.
  *
- * The sandbox-runtime only runs on macOS/Linux, so on Windows we run the user's code
- * directly with the session working directory as cwd. `node` uses the bundled Electron
- * binary via ELECTRON_RUN_AS_NODE; `bash` uses any bash on PATH (Git Bash) or WSL. The
- * program is fed via stdin, so there is no shell escaping or path translation. There is
- * no filesystem/network confinement on this path.
+ * macOS/Linux: the spawn argv comes from SandboxManager.wrapWithSandboxArgv() and runs with
+ * {shell:false}, applying SRT confinement. Windows: @anthropic-ai/sandbox-runtime does not run
+ * there, so the program executes natively with NO OS sandbox (see
+ * docs/technical/windows-sandbox.md) — the session working directory is the only scoping.
  */
 export async function execCode(params: {
   code: string
   language: 'bash' | 'node'
   timeout?: number
+  cwd?: string
   sessionId?: string
 }): Promise<ExecResult> {
-  // SECURITY: this path runs code with NO sandbox. It must never be reachable off Windows,
-  // where it would let a renderer bypass the SRT confinement that execCommand applies. The
-  // renderer-side OS check is convenience only; this is the authoritative boundary.
-  if (process.platform !== 'win32') {
-    throw new Error('execCode is only available on native Windows; other platforms use the sandboxed exec path.')
-  }
   const session = getSession(params.sessionId)
   if (!session || session.state !== 'initialized') {
     throw new Error('Sandbox not initialized. Call initSandbox first.')
   }
-  const cwd = session.workingDirectory ?? undefined
+  const isWindows = process.platform === 'win32'
+  const cwd = params.cwd ?? session.workingDirectory ?? undefined
   const timeout = params.timeout ?? 30_000
 
-  const env = { ...process.env }
+  // Session env overrides: point HOME/TMPDIR/cache at the working directory.
+  const envOverrides: NodeJS.ProcessEnv = {}
   if (session.workingDirectory) {
-    env.TMPDIR = env.TMP = env.TEMP = session.workingDirectory
+    const cacheDir = path.join(session.workingDirectory, '.cache')
+    mkdirSync(cacheDir, { recursive: true })
+    envOverrides.XDG_CACHE_HOME = cacheDir
+    envOverrides.TMPDIR = envOverrides.TMP = envOverrides.TEMP = session.workingDirectory
+    // Point HOME at the working directory so `~`, `$HOME`, and os.homedir() resolve there.
+    // Confinement is unaffected: SRT expands `~` in deny rules via the main process's
+    // os.homedir() when it bakes the seatbelt policy, so the child's overridden HOME only
+    // affects that child's own `~` expansion, never the deny rules (e.g. ~/.ssh stays denied).
+    envOverrides.HOME = session.workingDirectory
   }
 
+  // Resolve the program that reads the code from stdin.
   let cmd: string
   let args: string[]
   if (params.language === 'node') {
-    // The Electron binary acts as Node with ELECTRON_RUN_AS_NODE; with no script arg and
+    // The bundled Electron binary runs as Node via ELECTRON_RUN_AS_NODE; with no script arg and
     // piped (non-TTY) stdin it executes the piped program.
     cmd = process.execPath
     args = []
-    env.ELECTRON_RUN_AS_NODE = '1'
-  } else {
+    envOverrides.ELECTRON_RUN_AS_NODE = '1'
+  } else if (isWindows) {
+    // Native Windows has no bash; use Git Bash / WSL if present.
     const bash = resolveWindowsBash()
     if (!bash) {
       return {
@@ -548,9 +441,39 @@ export async function execCode(params: {
     }
     cmd = bash.cmd
     args = bash.args
+  } else {
+    cmd = 'bash'
+    args = []
   }
 
-  const MAX_BUFFER_BYTES = 10 * 1024 * 1024
+  // Build the spawn descriptor. macOS/Linux wrap the argv with the OS sandbox; Windows runs direct.
+  let spawnCmd: string
+  let spawnArgs: string[]
+  let spawnEnv: NodeJS.ProcessEnv
+  if (isWindows) {
+    spawnCmd = cmd
+    spawnArgs = args
+    spawnEnv = { ...process.env, ...envOverrides }
+  } else {
+    const mgr = globalSandboxManager
+    if (!mgr) {
+      throw new Error('Sandbox not initialized. Call initSandbox first.')
+    }
+    // Per-session config is passed as customConfig so each session's allowWrite is respected.
+    const customConfig = session.sandboxConfig as Parameters<typeof mgr.wrapWithSandboxArgv>[2]
+    const innerCommand = [cmd, ...args].map((token) => shellQuote(token)).join(' ')
+    const { argv, env: wrappedEnv } = await mgr.wrapWithSandboxArgv(innerCommand, undefined, customConfig)
+    spawnCmd = argv[0]
+    spawnArgs = argv.slice(1)
+    // On macOS/Linux wrappedEnv is process.env with proxy vars baked in; layer overrides on top.
+    spawnEnv = { ...wrappedEnv, ...envOverrides }
+  }
+
+  // Windows bash (especially WSL) must keep resolving `node` from its own PATH; a Windows
+  // process.execPath is not executable inside WSL. macOS/Linux need the bundled-node shim.
+  const script = buildSandboxStdinScript(params.code, params.language, process.execPath, !isWindows)
+  const MAX_BUFFER_BYTES = 10 * 1024 * 1024 // 10MB cap to prevent OOM from runaway output
+
   return new Promise((resolve, reject) => {
     const stdoutChunks: Uint8Array[] = []
     const stderrChunks: Uint8Array[] = []
@@ -559,7 +482,15 @@ export async function execCode(params: {
     let stdoutCapped = false
     let stderrCapped = false
 
-    const child = spawn(cmd, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false })
+    const child = spawn(spawnCmd, spawnArgs, {
+      cwd,
+      env: spawnEnv,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false,
+      // POSIX needs its own process group so we can signal the whole tree via -pid.
+      // On Windows the tree is killed via taskkill /T, so detaching is unnecessary.
+      detached: !isWindows,
+    })
     session.runningChild = child
 
     let timedOut = false
@@ -592,7 +523,7 @@ export async function execCode(params: {
       clearTimeout(timer)
       session.runningChild = null
       let stdout = tailTruncate(Buffer.concat(stdoutChunks).toString('utf-8'))
-      let stderr = tailTruncate(Buffer.concat(stderrChunks).toString('utf-8'))
+      let stderr = tailTruncate(stripCodesignNoise(Buffer.concat(stderrChunks).toString('utf-8')))
       const exitCode = timedOut ? 124 : (code ?? 1)
       if (stdoutCapped) stdout += `\n[Output truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
       if (stderrCapped) stderr += `\n[Stderr truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
@@ -602,7 +533,7 @@ export async function execCode(params: {
 
     // Feed the program via stdin: node executes the piped script; bash runs the piped commands.
     child.stdin.on('error', () => {})
-    child.stdin.write(params.code)
+    child.stdin.write(script)
     child.stdin.end()
   })
 }
@@ -622,12 +553,17 @@ export function killRunningCommand(sessionId?: string): { killed: boolean } {
 
 // ─── File operations ─────────────────────────────────────────────────
 
+/** Run a bash command string inside the sandbox — thin wrapper over execCode for internal file ops. */
+async function execBashInSandbox(command: string, sessionId?: string): Promise<ExecResult> {
+  return execCode({ code: command, language: 'bash', sessionId })
+}
+
 export async function readFile(
   filePath: string,
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`cat ${shellEscape(filePath)}`, { sessionId })
+    const result = await execBashInSandbox(`cat ${shellEscape(filePath)}`, sessionId)
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -716,7 +652,7 @@ export async function listDir(
   sessionId?: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    const result = await execCommand(`ls -la ${shellEscape(dirPath)}`, { sessionId })
+    const result = await execBashInSandbox(`ls -la ${shellEscape(dirPath)}`, sessionId)
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
@@ -735,7 +671,7 @@ export async function grepFiles(
   try {
     const target = dirPath ? shellEscape(dirPath) : '.'
     const includeFlag = options?.include ? `--include=${shellEscape(options.include)}` : ''
-    const result = await execCommand(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, { sessionId })
+    const result = await execBashInSandbox(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, sessionId)
     // grep returns exit code 1 when no matches found — not an error
     if (result.exitCode > 1) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
@@ -753,7 +689,7 @@ export async function findFiles(
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const nameFlag = pattern ? `-name ${shellEscape(pattern)}` : ''
-    const result = await execCommand(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, { sessionId })
+    const result = await execBashInSandbox(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, sessionId)
     if (result.exitCode !== 0) {
       return { success: false, error: result.stderr || `Exit code ${result.exitCode}` }
     }
