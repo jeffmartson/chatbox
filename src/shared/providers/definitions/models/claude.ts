@@ -1,4 +1,4 @@
-import { type AnthropicProviderOptions, createAnthropic } from '@ai-sdk/anthropic'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import type { ModelMessage, ToolSet } from 'ai'
 import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-ai-sdk'
 import { addAnthropicCacheControl } from '../../../models/anthropic-cache'
@@ -100,7 +100,7 @@ export default class Claude extends AbstractAISDKModel {
 
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
     const isModelSupportReasoning = this.isSupportReasoning()
-    let providerOptions = {} as { anthropic: AnthropicProviderOptions }
+    let providerOptions: CallSettings['providerOptions'] = {}
     if (isModelSupportReasoning) {
       providerOptions = {
         anthropic: {

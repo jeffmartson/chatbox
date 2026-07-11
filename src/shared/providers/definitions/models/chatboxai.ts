@@ -1,4 +1,4 @@
-import { type AnthropicProviderOptions, createAnthropic } from '@ai-sdk/anthropic'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import { createDeepSeek } from '@ai-sdk/deepseek'
 import {
   createGoogleGenerativeAI,
@@ -196,7 +196,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
 
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
     if (this.options.model.apiStyle === 'anthropic') {
-      let providerOptions = {} as { anthropic: AnthropicProviderOptions }
+      let providerOptions: CallSettings['providerOptions'] = {}
       const claudeOptions = normalizeClaudeReasoningOptions(this.options.model.modelId, options.providerOptions?.claude)
       if (claudeOptions) {
         providerOptions = {
