@@ -2,6 +2,29 @@ import { CapacitorHttp } from '@capacitor/core'
 import { createNativeReadableStream } from '@/native/stream-http'
 import { ApiError } from '../../shared/models/errors'
 
+function isLockedStreamCancelError(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    (error.message.includes('Cannot cancel a locked stream') ||
+      error.message.includes('ReadableStream is locked') ||
+      error.message.includes('stream is locked'))
+  )
+}
+
+export function cancelReadableStreamOnAbort(stream: ReadableStream<Uint8Array>) {
+  try {
+    void stream.cancel('aborted').catch((error: unknown) => {
+      if (!isLockedStreamCancelError(error)) {
+        console.warn('Failed to cancel native stream', error)
+      }
+    })
+  } catch (error) {
+    if (!isLockedStreamCancelError(error)) {
+      console.warn('Failed to cancel native stream', error)
+    }
+  }
+}
+
 export async function handleMobileRequest(
   url: string,
   method: string,
@@ -34,9 +57,7 @@ export async function handleMobileRequest(
       // Handle abort signal for stream cancellation
       if (signal) {
         const onAbort = () => {
-          try {
-            void stream.cancel('aborted')
-          } catch {}
+          cancelReadableStreamOnAbort(stream)
         }
         if (signal.aborted) onAbort()
         else signal.addEventListener('abort', onAbort, { once: true })
