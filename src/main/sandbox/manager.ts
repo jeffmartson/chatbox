@@ -25,6 +25,7 @@ import {
   TASK_SANDBOX_EXTRA_WRITE_PATHS,
 } from '../../shared/task-sandbox'
 import { shellQuote } from '../../shared/utils/shell'
+import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { getLogger } from '../util'
 import { buildSandboxStdinScript, stripCodesignNoise } from './exec-script'
 import { headTruncate, tailTruncate } from './truncate'
@@ -439,6 +440,20 @@ export async function execCode(params: {
   const isWindows = process.platform === 'win32'
   const cwd = params.cwd ?? session.workingDirectory ?? undefined
   const timeout = params.timeout ?? 30_000
+  const operationId = createOperationId()
+  const startedAt = Date.now()
+
+  log.info(
+    buildOperationStartLog({
+      operationId,
+      kind: 'sandbox_exec_code',
+      sessionId: params.sessionId,
+      cwd,
+      timeoutMs: timeout,
+      language: params.language,
+      code: params.code,
+    })
+  )
 
   // Session env overrides: point HOME/TMPDIR/cache at the working directory.
   const envOverrides: NodeJS.ProcessEnv = {}
@@ -467,9 +482,20 @@ export async function execCode(params: {
     // Native Windows has no bash; use Git Bash / WSL if present.
     const bash = resolveWindowsBash()
     if (!bash) {
+      const stderr = 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.'
+      log.warn(
+        buildOperationFinishLog({
+          operationId,
+          success: false,
+          exitCode: 127,
+          durationMs: Date.now() - startedAt,
+          stdout: '',
+          stderr,
+        })
+      )
       return {
         stdout: '',
-        stderr: 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.',
+        stderr,
         exitCode: 127,
         errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
       }
@@ -529,6 +555,7 @@ export async function execCode(params: {
     session.runningChild = child
 
     let timedOut = false
+    let settled = false
     const timer = setTimeout(() => {
       timedOut = true
       killProcessTree(child, 'SIGTERM')
@@ -536,15 +563,15 @@ export async function execCode(params: {
     }, timeout)
 
     child.stdout.on('data', (chunk: Uint8Array) => {
+      stdoutBytes += chunk.byteLength
       if (!stdoutCapped) {
-        stdoutBytes += chunk.byteLength
         if (stdoutBytes > MAX_BUFFER_BYTES) stdoutCapped = true
         else stdoutChunks.push(chunk)
       }
     })
     child.stderr.on('data', (chunk: Uint8Array) => {
+      stderrBytes += chunk.byteLength
       if (!stderrCapped) {
-        stderrBytes += chunk.byteLength
         if (stderrBytes > MAX_BUFFER_BYTES) stderrCapped = true
         else stderrChunks.push(chunk)
       }
@@ -552,17 +579,46 @@ export async function execCode(params: {
     child.on('error', (err) => {
       clearTimeout(timer)
       session.runningChild = null
+      if (settled) return
+      settled = true
+      log.warn(
+        buildOperationFinishLog({
+          operationId,
+          success: false,
+          exitCode: null,
+          durationMs: Date.now() - startedAt,
+          stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
+          stderr: err.message,
+          stdoutBytes,
+          stderrBytes,
+        })
+      )
       reject(err)
     })
     child.on('close', (code) => {
       clearTimeout(timer)
       session.runningChild = null
+      if (settled) return
+      settled = true
       let stdout = tailTruncate(Buffer.concat(stdoutChunks).toString('utf-8'))
       let stderr = tailTruncate(stripCodesignNoise(Buffer.concat(stderrChunks).toString('utf-8')))
       const exitCode = timedOut ? 124 : (code ?? 1)
       if (stdoutCapped) stdout += `\n[Output truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
       if (stderrCapped) stderr += `\n[Stderr truncated: exceeded ${MAX_BUFFER_BYTES / 1024 / 1024}MB buffer limit]`
       if (timedOut) stderr += `\n[Process timed out after ${timeout}ms]`
+      const finishLog = buildOperationFinishLog({
+        operationId,
+        success: exitCode === 0,
+        exitCode,
+        durationMs: Date.now() - startedAt,
+        timedOut,
+        stdout,
+        stderr,
+        stdoutBytes,
+        stderrBytes,
+      })
+      if (exitCode === 0) log.info(finishLog)
+      else log.warn(finishLog)
       resolve({ stdout, stderr, exitCode })
     })
 

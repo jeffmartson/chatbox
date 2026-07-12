@@ -1,16 +1,21 @@
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SANDBOX_EXEC_ERROR_CODES } from '../../shared/sandbox-provider'
 
+const { logger } = vi.hoisted(() => ({
+  logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 vi.mock('../util', () => ({
-  getLogger: () => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  getLogger: () => logger,
 }))
 vi.mock('node:child_process', () => ({ spawn: vi.fn(), spawnSync: vi.fn() }))
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   execCode,
   findFiles,
@@ -120,7 +125,10 @@ describe('resolveWindowsBash', () => {
 })
 
 describe('execCode on Windows without Bash', () => {
-  afterEach(() => setPlatform(originalPlatform))
+  afterEach(() => {
+    setPlatform(originalPlatform)
+    vi.clearAllMocks()
+  })
 
   test('returns a stable error code for localized UI handling', async () => {
     setPlatform('win32')
@@ -152,6 +160,36 @@ describe('execCode on Windows without Bash', () => {
           errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
         })
       }
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(workDir, { recursive: true, force: true })
+    }
+  })
+
+  test('logs only one finish record when spawn emits error and close', async () => {
+    setPlatform('win32')
+    const workDir = mkdtempSync(path.join(tmpdir(), 'chatbox-spawn-error-'))
+    const sessionId = 'spawn-error-session'
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      stdin: { on: vi.fn(), write: vi.fn(), end: vi.fn() },
+      killed: false,
+      pid: 123,
+    })
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockReturnValue(child)
+
+    try {
+      await initSandbox(workDir, sessionId)
+      const execution = execCode({ code: 'console.log("hello")', language: 'node', sessionId })
+      child.emit('error', new Error('spawn failed'))
+      child.emit('close', -2)
+
+      await expect(execution).rejects.toThrow('spawn failed')
+      const finishLogs = logger.warn.mock.calls.filter(
+        ([message]) => typeof message === 'string' && message.startsWith('agent_operation finish ')
+      )
+      expect(finishLogs).toHaveLength(1)
     } finally {
       await resetSandbox(sessionId)
       rmSync(workDir, { recursive: true, force: true })

@@ -447,7 +447,10 @@ describe('buildToolsForSession', () => {
     } as never)
 
     expect(requestUserExecApprovalMock).not.toHaveBeenCalled()
-    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/full-access')
+    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/full-access', {
+      sessionId: undefined,
+      toolCallId: 'tool-call-1',
+    })
     expect(executeResult).toMatchObject({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
     expect(trackAgentModeFullAccessBypassMock).toHaveBeenCalledWith({ tool: 'user_exec' })
   })
@@ -472,7 +475,10 @@ describe('buildToolsForSession', () => {
       'touch /tmp/needs-approval',
       expect.any(Object)
     )
-    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval')
+    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval', {
+      sessionId: undefined,
+      toolCallId: 'tool-call-2',
+    })
     expect(trackAgentModeFullAccessBypassMock).not.toHaveBeenCalled()
   })
 })

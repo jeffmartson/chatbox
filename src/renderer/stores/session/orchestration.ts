@@ -721,6 +721,7 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
       : undefined
 
   const { tools } = await buildToolsForSession(model, {
+    sessionId: session.id,
     webBrowsing,
     knowledgeBase,
     messages: promptMsgs,

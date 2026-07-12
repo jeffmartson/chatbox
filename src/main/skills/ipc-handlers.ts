@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { MarketplaceSkill } from '@shared/types/skills'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { getLogger } from '../util'
 import { discoverBuiltinSkills, ensureBuiltinSeeded, syncBuiltinSkills } from './builtin-sync'
 import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from './discovery'
@@ -336,9 +337,9 @@ export function registerSkillsHandlers() {
     'skills:user-exec',
     async (
       _event,
-      params: { command: string; timeout?: number }
+      params: { command: string; timeout?: number; sessionId?: string; toolCallId?: string }
     ): Promise<{ success: boolean; stdout: string; stderr: string; exitCode: number | null }> => {
-      const { command, timeout } = params
+      const { command, timeout, sessionId, toolCallId } = params
 
       try {
         if (!command || typeof command !== 'string') {
@@ -348,10 +349,26 @@ export function registerSkillsHandlers() {
         const homeDir = os.homedir()
         const TIMEOUT_MS = timeout || 120_000
         const MAX_OUTPUT_BYTES = 1024 * 1024 // 1MB
+        const operationId = createOperationId()
+        const startedAt = Date.now()
+
+        log.info(
+          buildOperationStartLog({
+            operationId,
+            kind: 'user_exec',
+            sessionId,
+            toolCallId,
+            cwd: homeDir,
+            timeoutMs: TIMEOUT_MS,
+            command,
+          })
+        )
 
         return await new Promise((resolve) => {
           let stdout = ''
           let stderr = ''
+          let stdoutBytes = 0
+          let stderrBytes = 0
           let settled = false
 
           const resolveOnce = (result: {
@@ -362,6 +379,19 @@ export function registerSkillsHandlers() {
           }) => {
             if (settled) return
             settled = true
+            const finishLog = buildOperationFinishLog({
+              operationId,
+              success: result.success,
+              exitCode: result.exitCode,
+              durationMs: Date.now() - startedAt,
+              timedOut: result.exitCode === null && result.stderr.includes('timed out'),
+              stdout: result.stdout,
+              stderr: result.stderr,
+              stdoutBytes,
+              stderrBytes,
+            })
+            if (result.success) log.info(finishLog)
+            else log.warn(finishLog)
             resolve(result)
           }
 
@@ -373,11 +403,13 @@ export function registerSkillsHandlers() {
           })
 
           child.stdout.on('data', (data: Buffer) => {
-            if (stdout.length < MAX_OUTPUT_BYTES) stdout += data.toString()
+            stdoutBytes += data.byteLength
+            if (stdoutBytes <= MAX_OUTPUT_BYTES) stdout += data.toString()
           })
 
           child.stderr.on('data', (data: Buffer) => {
-            if (stderr.length < MAX_OUTPUT_BYTES) stderr += data.toString()
+            stderrBytes += data.byteLength
+            if (stderrBytes <= MAX_OUTPUT_BYTES) stderr += data.toString()
           })
 
           child.on('error', (error) => {

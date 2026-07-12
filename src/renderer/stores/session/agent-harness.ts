@@ -288,6 +288,7 @@ export async function prepareAgentGenerationHarness(
     instructions: toolInstructions,
     initialActiveTools,
   } = await buildToolsForSession(model, {
+    sessionId: session.id,
     webBrowsing,
     knowledgeBase,
     messages: promptMsgs,

@@ -74,8 +74,11 @@ export const skillsController = {
     return result
   },
 
-  userExec(command: string, timeout?: number): Promise<SkillScriptResult> {
-    return window.electronAPI.invoke('skills:user-exec', { command, timeout })
+  userExec(
+    command: string,
+    options?: { timeout?: number; sessionId?: string; toolCallId?: string }
+  ): Promise<SkillScriptResult> {
+    return window.electronAPI.invoke('skills:user-exec', { command, ...options })
   },
 
   async installMarketplaceSkill(skill: MarketplaceSkill): Promise<SkillInstallResult> {

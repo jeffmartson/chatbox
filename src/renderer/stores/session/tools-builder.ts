@@ -46,6 +46,7 @@ export function resetSkillsCache(): void {
 subscribeSkillsChanged(resetSkillsCache)
 
 export interface BuildToolsOptions {
+  sessionId?: string
   webBrowsing: boolean
   knowledgeBase?: Pick<KnowledgeBase, 'id' | 'name'>
   messages: Message[]
@@ -539,7 +540,10 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
       if (!alreadyApproved && agentFullAccess) {
         trackAgentModeFullAccessBypass({ tool: 'user_exec' })
       }
-      const result = await skillsController.userExec(execInput.command)
+      const result = await skillsController.userExec(execInput.command, {
+        sessionId: options.sessionId ?? options.codeExecution?.sessionId,
+        toolCallId: toolOptions.toolCallId,
+      })
 
       try {
         options.onAgentModeActivated?.()
