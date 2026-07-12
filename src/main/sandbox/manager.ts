@@ -26,6 +26,7 @@ import {
 } from '../../shared/task-sandbox'
 import { shellQuote } from '../../shared/utils/shell'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
+import { runRipgrepSearch } from '../ripgrep-search'
 import { getLogger } from '../util'
 import { buildSandboxStdinScript, stripCodesignNoise } from './exec-script'
 import { headTruncate, tailTruncate } from './truncate'
@@ -754,24 +755,42 @@ export async function listDir(dirPath: string, sessionId?: string): Promise<Sand
   }
 }
 
-export async function grepFiles(
+export async function searchFiles(
   pattern: string,
   dirPath?: string,
-  options?: { include?: string },
+  options?: { regex?: boolean; include?: string },
   sessionId?: string
 ): Promise<SandboxOperationResult> {
-  try {
-    const target = dirPath ? shellEscape(dirPath) : '.'
-    const includeFlag = options?.include ? `--include=${shellEscape(options.include)}` : ''
-    const result = await execBashInSandbox(`grep -rn ${includeFlag} ${shellEscape(pattern)} ${target}`, sessionId)
-    // grep returns exit code 1 when no matches found — not an error
-    if (result.exitCode > 1) {
-      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
-    }
-    return { success: true, content: headTruncate(result.stdout) }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  const session = getSession(sessionId)
+  if (!session?.workingDirectory || session.state !== 'initialized') {
+    return { success: false, error: 'Sandbox not initialized' }
   }
+
+  const root = path.resolve(session.workingDirectory, dirPath ?? '.')
+  return runRipgrepSearch(
+    { root, pattern, regex: options?.regex, include: options?.include },
+    {
+      prepareCommand: async (command, args) => {
+        if (process.platform === 'win32') return { command, args }
+        if (!globalSandboxManager || !session.sandboxConfig) {
+          throw new Error('Sandbox not initialized')
+        }
+        const innerCommand = [command, ...args].map((token) => shellQuote(token)).join(' ')
+        const customConfig = session.sandboxConfig as Parameters<typeof globalSandboxManager.wrapWithSandboxArgv>[2]
+        const wrapped = await globalSandboxManager.wrapWithSandboxArgv(innerCommand, undefined, customConfig)
+        return {
+          command: wrapped.argv[0],
+          args: wrapped.argv.slice(1),
+          env: wrapped.env,
+          detached: true,
+        }
+      },
+      terminate: killProcessTree,
+      onChild: (child) => {
+        session.runningChild = child
+      },
+    }
+  )
 }
 
 export async function findFiles(

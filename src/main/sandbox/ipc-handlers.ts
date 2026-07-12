@@ -12,7 +12,6 @@ import {
   findFiles,
   getSandboxAllowedRoots,
   getStatus,
-  grepFiles,
   hasSessionArtifacts,
   initSandboxWithTempDir,
   killRunningCommand,
@@ -22,6 +21,7 @@ import {
   removeSessionArtifacts,
   resetSandbox,
   resolveSandboxWorkingDir,
+  searchFiles,
   writeFile,
 } from './manager'
 import { createSandboxHtmlPreviewUrl } from './preview-server'
@@ -103,14 +103,22 @@ export function registerSandboxIPCHandlers() {
   })
 
   ipcMain.handle(
-    'sandbox:grep',
-    async (_event, params: { pattern: string; dirPath?: string; include?: string; sessionId?: string }) => {
+    'sandbox:search',
+    async (
+      _event,
+      params: { pattern: string; dirPath?: string; regex?: boolean; include?: string; sessionId?: string }
+    ) => {
       try {
-        log.debug(`sandbox:grep pattern=${params.pattern}`)
-        return await grepFiles(params.pattern, params.dirPath, { include: params.include }, params.sessionId)
+        log.debug(`sandbox:search pattern=${params.pattern}`)
+        return await searchFiles(
+          params.pattern,
+          params.dirPath,
+          { regex: params.regex, include: params.include },
+          params.sessionId
+        )
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error)
-        log.error('sandbox:grep failed', msg)
+        log.error('sandbox:search failed', msg)
         return { success: false, error: msg }
       }
     }

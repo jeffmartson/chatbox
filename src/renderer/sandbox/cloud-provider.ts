@@ -1,4 +1,9 @@
-import type { SandboxExecResult, SandboxProvider } from '@shared/sandbox-provider'
+import type {
+  SandboxExecResult,
+  SandboxProvider,
+  SandboxSearchParams,
+  SandboxSearchResult,
+} from '@shared/sandbox-provider'
 
 /**
  * Cloud sandbox provider for Mobile/Web platforms.
@@ -57,6 +62,10 @@ export class CloudSandboxProvider implements SandboxProvider {
 
   async exec(_params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
     return { stdout: '', stderr: 'Cloud sandbox not yet implemented', exitCode: 1 }
+  }
+
+  async search(_params: SandboxSearchParams): Promise<SandboxSearchResult> {
+    return { success: false, error: 'Cloud sandbox not yet implemented' }
   }
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {

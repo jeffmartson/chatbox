@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 
 const sandboxOperations = vi.hoisted(() => ({
   read: vi.fn(),
-  grep: vi.fn(),
+  search: vi.fn(),
   ls: vi.fn(),
   find: vi.fn(),
 }))
@@ -13,7 +13,7 @@ vi.mock('@/platform', () => ({
   default: {
     type: 'web',
     sandboxRead: sandboxOperations.read,
-    sandboxGrep: sandboxOperations.grep,
+    sandboxSearch: sandboxOperations.search,
     sandboxLs: sandboxOperations.ls,
     sandboxFind: sandboxOperations.find,
   },
@@ -134,7 +134,7 @@ describe('edit file tool schemas', () => {
       errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
     }
     sandboxOperations.read.mockResolvedValueOnce(unavailable)
-    sandboxOperations.grep.mockResolvedValueOnce(unavailable)
+    sandboxOperations.search.mockResolvedValueOnce(unavailable)
     sandboxOperations.ls.mockResolvedValueOnce(unavailable)
     sandboxOperations.find.mockResolvedValueOnce(unavailable)
 

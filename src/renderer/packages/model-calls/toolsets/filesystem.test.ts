@@ -25,6 +25,7 @@ vi.mock('@/analytics/agent-mode', () => ({
 import { buildFilesystemTools } from './filesystem'
 
 const exec = vi.fn(async (..._args: unknown[]): Promise<SandboxExecResult> => ({ stdout: '', stderr: '', exitCode: 0 }))
+const search = vi.fn(async (..._args: unknown[]) => ({ success: true, content: '' }))
 
 // Provider whose sandbox root never contains the tested absolute paths, so non-/tmp paths
 // take the real-filesystem branch where approval would normally be requested. /tmp paths
@@ -33,6 +34,7 @@ const provider = {
   init: async () => ({ success: true }),
   getStatus: async () => ({ workingDirectory: '/sandbox/root' }),
   exec: (...args: unknown[]) => exec(...args),
+  search: (...args: unknown[]) => search(...args),
 } as unknown as SandboxProvider
 
 function getTools() {
@@ -244,39 +246,36 @@ describe('user-granted working directories (like /tmp)', () => {
   })
 })
 
-describe('search_files sandbox grep command', () => {
+describe('search_files sandbox routing', () => {
   beforeEach(() => {
     exec.mockClear()
+    search.mockClear()
   })
 
-  function lastGrepCode(): string {
-    const call = exec.mock.calls.at(-1)?.[0] as { code: string } | undefined
-    return call?.code ?? ''
-  }
-
-  test('literal search uses fixed-string (-F) flag and excludes heavy dirs', async () => {
+  test('literal search delegates structured parameters to the sandbox provider', async () => {
     await execute(getTools().search_files, { path: '/tmp/project', query: 'foo(bar)' })
-    const code = lastGrepCode()
-    expect(code).toContain('grep -RInF')
-    expect(code).not.toContain('-RInE')
-    expect(code).toContain("--exclude-dir='node_modules'")
-    expect(code).toContain("--exclude-dir='.git'")
-    expect(code).toContain('-m 50')
-    expect(code).toContain('head -100')
-    // pattern passed via -e and shell-quoted
-    expect(code).toContain("-e 'foo(bar)'")
+    expect(search).toHaveBeenCalledWith({
+      path: '/tmp/project',
+      pattern: 'foo(bar)',
+      regex: undefined,
+      include: undefined,
+    })
+    expect(exec).not.toHaveBeenCalled()
   })
 
-  test('regex search uses extended-regex (-E) flag', async () => {
-    await execute(getTools().search_files, { path: '/tmp/project', query: 'foo.*bar', regex: true })
-    const code = lastGrepCode()
-    expect(code).toContain('grep -RInE')
-    expect(code).not.toContain('-RInF')
-  })
-
-  test('include filter is forwarded as --include', async () => {
-    await execute(getTools().search_files, { path: '/tmp/project', query: 'x', include: '*.ts' })
-    expect(lastGrepCode()).toContain("--include='*.ts'")
+  test('regex and include settings use the same provider contract', async () => {
+    await execute(getTools().search_files, {
+      path: '/tmp/project',
+      query: String.raw`\d+?`,
+      regex: true,
+      include: '*.ts',
+    })
+    expect(search).toHaveBeenCalledWith({
+      path: '/tmp/project',
+      pattern: String.raw`\d+?`,
+      regex: true,
+      include: '*.ts',
+    })
   })
 
   test('search_files maps content objects to plain model text', async () => {
@@ -290,27 +289,6 @@ describe('search_files sandbox grep command', () => {
     await expect(toModelOutput(getTools().search_files, { content: '' })).resolves.toEqual({
       type: 'text',
       value: 'No matches found.',
-    })
-  })
-
-  test('preserves Bash availability errors for the UI and model', async () => {
-    exec.mockResolvedValueOnce({
-      stdout: '',
-      stderr: 'bash is not available',
-      exitCode: 127,
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-    })
-
-    const tool = getTools().search_files
-    const result = await execute(tool, { path: '/tmp/project', query: 'needle' })
-
-    expect(result).toEqual({
-      error: 'bash is not available',
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-    })
-    await expect(toModelOutput(tool, result)).resolves.toEqual({
-      type: 'text',
-      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
     })
   })
 })

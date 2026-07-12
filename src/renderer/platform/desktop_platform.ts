@@ -400,13 +400,17 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:ls', params)
   }
 
-  public async sandboxGrep(params: {
+  public async sandboxSearch(params: {
     pattern: string
-    dirPath?: string
+    path: string
+    regex?: boolean
     include?: string
     sessionId?: string
   }): Promise<SandboxOperationResult> {
-    return this.ipc.invoke('sandbox:grep', params)
+    return this.ipc.invoke('sandbox:search', {
+      ...params,
+      dirPath: params.path,
+    })
   }
 
   public async sandboxFind(params: {

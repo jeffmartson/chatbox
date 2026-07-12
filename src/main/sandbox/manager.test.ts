@@ -19,7 +19,6 @@ import { spawn, spawnSync } from 'node:child_process'
 import {
   execCode,
   findFiles,
-  grepFiles,
   initSandbox,
   listDir,
   normalizeWindowsShellPath,
@@ -151,7 +150,6 @@ describe('execCode on Windows without Bash', () => {
       const operationResults = await Promise.all([
         readFile('report.txt', sessionId),
         listDir('.', sessionId),
-        grepFiles('needle', '.', undefined, sessionId),
         findFiles('.', '*.txt', sessionId),
       ])
       for (const operationResult of operationResults) {

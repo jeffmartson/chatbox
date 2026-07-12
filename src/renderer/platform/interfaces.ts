@@ -160,9 +160,10 @@ export interface Platform extends Storage {
     sessionId?: string
   }): Promise<{ success: boolean; error?: string }>
   sandboxLs?(params: { dirPath: string; sessionId?: string }): Promise<SandboxOperationResult>
-  sandboxGrep?(params: {
+  sandboxSearch?(params: {
     pattern: string
-    dirPath?: string
+    path: string
+    regex?: boolean
     include?: string
     sessionId?: string
   }): Promise<SandboxOperationResult>

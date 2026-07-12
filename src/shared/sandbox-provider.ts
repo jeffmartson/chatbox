@@ -25,6 +25,15 @@ export interface SandboxOperationResult {
   errorCode?: SandboxExecErrorCode
 }
 
+export interface SandboxSearchParams {
+  pattern: string
+  path: string
+  regex?: boolean
+  include?: string
+}
+
+export type SandboxSearchResult = SandboxOperationResult
+
 export interface SandboxProvider {
   type: 'local' | 'cloud'
 
@@ -84,6 +93,9 @@ export interface SandboxProvider {
 
   /** Execute code in the sandbox */
   exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult>
+
+  /** Search file contents inside the sandbox with the shared bounded search engine. */
+  search(params: SandboxSearchParams): Promise<SandboxSearchResult>
 
   /** Check if the sandbox is available on this platform */
   checkAvailability(): Promise<{ available: boolean; reason?: string }>

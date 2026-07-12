@@ -294,13 +294,14 @@ const sandbox_edit: ToolSet[string] = {
 }
 
 const sandbox_grep: ToolSet[string] = {
-  description: 'Search file contents using a regex or literal pattern. Returns matching lines with file paths.',
+  description:
+    'Search file contents using ripgrep/Rust regex syntax (look-around and backreferences are unsupported). Returns matching lines with file paths.',
   inputSchema: jsonSchema({
     type: 'object',
     properties: {
       pattern: {
         type: 'string',
-        description: 'Search pattern (regex or literal)',
+        description: 'ripgrep/Rust regex pattern',
       },
       path: {
         type: 'string',
@@ -316,13 +317,14 @@ const sandbox_grep: ToolSet[string] = {
   }),
   execute: async (input) => {
     const grepInput = input as { pattern: string; path?: string; include?: string }
-    if (!platform.sandboxGrep) {
+    if (!platform.sandboxSearch) {
       return 'Sandbox not available on this platform'
     }
     try {
-      const result = await platform.sandboxGrep({
+      const result = await platform.sandboxSearch({
         pattern: grepInput.pattern,
-        dirPath: grepInput.path,
+        path: grepInput.path ?? '.',
+        regex: true,
         include: grepInput.include,
       })
       if (!result.success) {

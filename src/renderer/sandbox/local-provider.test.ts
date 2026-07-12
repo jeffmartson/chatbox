@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 // Mock the platform module so we can observe how exec() delegates to sandboxExecCode.
 const sandboxExecCode = vi.fn()
 const sandboxStatus = vi.fn()
+const sandboxSearch = vi.fn()
 vi.mock('@/platform', () => ({
   default: {
     get sandboxExecCode() {
@@ -11,18 +12,52 @@ vi.mock('@/platform', () => ({
     get sandboxStatus() {
       return sandboxStatus
     },
+    get sandboxSearch() {
+      return sandboxSearchRef.current
+    },
   },
 }))
 
 // Indirection so individual tests can toggle sandboxExecCode presence.
 const sandboxExecCodeRef: { current: typeof sandboxExecCode | undefined } = { current: sandboxExecCode }
+const sandboxSearchRef: { current: typeof sandboxSearch | undefined } = { current: sandboxSearch }
 
 import { LocalSandboxProvider } from './local-provider'
 
 beforeEach(() => {
   sandboxExecCode.mockReset()
   sandboxStatus.mockReset()
+  sandboxSearch.mockReset()
   sandboxExecCodeRef.current = sandboxExecCode
+  sandboxSearchRef.current = sandboxSearch
+})
+
+describe('LocalSandboxProvider.search', () => {
+  test('forwards structured search parameters to the shared main-process search', async () => {
+    sandboxSearch.mockResolvedValue({ success: true, content: 'src/a.ts:1:match' })
+    const provider = new LocalSandboxProvider()
+
+    const result = await provider.search({ path: '.', pattern: String.raw`\d+?`, regex: true, include: '*.ts' })
+
+    expect(sandboxSearch).toHaveBeenCalledWith({
+      path: '.',
+      pattern: String.raw`\d+?`,
+      regex: true,
+      include: '*.ts',
+      sessionId: undefined,
+    })
+    expect(result).toEqual({ success: true, content: 'src/a.ts:1:match' })
+  })
+
+  test('returns a clear error when sandbox search is unavailable', async () => {
+    sandboxSearchRef.current = undefined
+    const provider = new LocalSandboxProvider()
+
+    await expect(provider.search({ path: '.', pattern: 'x' })).resolves.toEqual({
+      success: false,
+      error: 'Sandbox search not available on this platform',
+    })
+  })
 })
 
 describe('LocalSandboxProvider.getStatus', () => {

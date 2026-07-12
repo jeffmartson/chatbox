@@ -1,5 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
-import { SEARCH_EXCLUDE_DIRS, TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
+import { TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
 import { shellQuote } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
@@ -71,11 +71,6 @@ const editFileInputSchema = jsonSchema({
   required: ['file_path'],
   additionalProperties: false,
 })
-
-// Cap matches per file so one large/minified file can't crowd out the rest.
-const SEARCH_MAX_MATCHES_PER_FILE = 50
-// Cap total result lines returned to the model.
-const SEARCH_MAX_TOTAL_LINES = 100
 
 function formatWriteFileOutput(output: unknown): string {
   const record = asRecord(output)
@@ -307,7 +302,8 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
   const search_files: ToolSet[string] = {
     description:
       'Search file contents. Relative paths search the session sandbox; absolute paths search the user filesystem. ' +
-      'By default the query is matched literally; set regex=true to match an extended regular expression (ERE). ' +
+      'By default the query is matched literally; set regex=true to use the bounded ripgrep/Rust regex syntax ' +
+      '(look-around and backreferences are not supported). ' +
       'Heavy directories (node_modules, .git, build output) are skipped and results are capped for speed.',
     inputSchema: jsonSchema({
       type: 'object',
@@ -323,7 +319,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         regex: {
           type: 'boolean',
           description:
-            'Treat query as an extended regular expression (ERE) instead of literal text. Defaults to false.',
+            'Treat query as a ripgrep/Rust regular expression instead of literal text. Defaults to false; look-around and backreferences are unsupported.',
         },
         include: {
           type: 'string',
@@ -340,25 +336,15 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
         if (!context.provider) return { error: 'Sandbox is not available' }
-        // -F = fixed string (literal), -E = extended regex (linear, avoids PCRE backtracking).
-        const flags = `-RIn${searchInput.regex ? 'E' : 'F'}`
-        const include = searchInput.include ? ` --include=${shellQuote(searchInput.include)}` : ''
-        const excludes = SEARCH_EXCLUDE_DIRS.map((dir) => `--exclude-dir=${shellQuote(dir)}`).join(' ')
-        const result = await context.provider.exec({
-          language: 'bash',
-          code: `grep ${flags} -m ${SEARCH_MAX_MATCHES_PER_FILE}${include} ${excludes} -e ${shellQuote(searchInput.query)} -- ${shellQuote(searchInput.path)} | head -${SEARCH_MAX_TOTAL_LINES}`,
-          timeout: 10_000,
+        const result = await context.provider.search({
+          path: searchInput.path,
+          pattern: searchInput.query,
+          regex: searchInput.regex,
+          include: searchInput.include,
         })
-        if (result.errorCode) {
-          return sandboxExecToolError(result, `Unable to search files under: ${searchInput.path}`)
-        }
-        // exit 0 = matches, 1 = no matches. If `head` closes the pipe early (many matches),
-        // grep can exit with SIGPIPE (141) under pipefail; treat any non-empty stdout as a
-        // (possibly truncated) success rather than an error. Invalid regex exits 2 with empty
-        // stdout, so it still falls through to the error branch.
-        return result.exitCode === 0 || result.exitCode === 1 || result.stdout
-          ? { content: result.stdout }
-          : sandboxExecToolError(result, `Unable to search files under: ${searchInput.path}`)
+        return result.success
+          ? { content: result.content ?? '' }
+          : { error: result.error, ...(result.errorCode ? { errorCode: result.errorCode } : {}) }
       }
       const pathError = requireAbsoluteRealPath(searchInput.path)
       if (pathError) return pathError

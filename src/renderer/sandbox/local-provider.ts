@@ -1,4 +1,9 @@
-import type { SandboxExecResult, SandboxProvider } from '@shared/sandbox-provider'
+import type {
+  SandboxExecResult,
+  SandboxProvider,
+  SandboxSearchParams,
+  SandboxSearchResult,
+} from '@shared/sandbox-provider'
 import { DEFAULT_EXEC_TIMEOUT } from '@shared/sandbox-provider'
 import platform from '@/platform'
 
@@ -118,6 +123,13 @@ export class LocalSandboxProvider implements SandboxProvider {
       timeout,
       sessionId: this.sessionId ?? undefined,
     })
+  }
+
+  async search(params: SandboxSearchParams): Promise<SandboxSearchResult> {
+    if (!platform.sandboxSearch) {
+      return { success: false, error: 'Sandbox search not available on this platform' }
+    }
+    return platform.sandboxSearch({ ...params, sessionId: this.sessionId ?? undefined })
   }
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
