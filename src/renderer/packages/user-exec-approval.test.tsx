@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe('persistent user approval pauses', () => {
   it('auto-approves read-only commands without pausing', async () => {
-    await expect(requestUserExecApproval('tool-a', 'pwd')).resolves.toBe(true)
+    await expect(requestUserExecApproval('tool-a', 'pwd')).resolves.toBe('whitelist')
   })
 
   it('throws a persistent pause error for privileged commands', async () => {
@@ -55,7 +55,7 @@ describe('persistent user approval pauses', () => {
             safe: true,
           }),
       })
-    ).resolves.toBe(true)
+    ).resolves.toBe('ai')
   })
 
   it('never auto-approves a locally ineligible command', async () => {

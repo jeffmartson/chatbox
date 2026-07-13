@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import os from 'node:os'
+import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { getLogger } from '../util'
 
@@ -10,6 +11,7 @@ export interface UserExecParams {
   timeout?: number
   sessionId?: string
   toolCallId?: string
+  approvalSource?: UserExecApprovalSource
 }
 
 export interface UserExecResult {
@@ -35,7 +37,7 @@ const DEFAULT_COMPLETED_TTL_MS = 10 * 60 * 1000
 const DEFAULT_MAX_COMPLETED_ENTRIES = 32
 
 async function executeUserExecCommand(params: UserExecParams): Promise<UserExecResult> {
-  const { command, timeout, sessionId, toolCallId } = params
+  const { command, timeout, sessionId, toolCallId, approvalSource } = params
 
   try {
     if (!command || typeof command !== 'string') throw new Error('Command is required')
@@ -52,6 +54,9 @@ async function executeUserExecCommand(params: UserExecParams): Promise<UserExecR
         kind: 'user_exec',
         sessionId,
         toolCallId,
+        // Renderer approval metadata is audit-only. Missing values remain visible
+        // instead of silently looking like a known authorization path.
+        approvalSource: approvalSource ?? 'unknown',
         cwd: homeDir,
         timeoutMs,
         command,

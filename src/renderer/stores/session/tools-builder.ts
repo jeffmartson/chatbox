@@ -1,6 +1,7 @@
 import type { ModelInterface } from '@shared/models/types'
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import type { AgentModeValue, KnowledgeBase, Message, SessionSettings } from '@shared/types'
+import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { getMessageText } from '@shared/utils/message'
 import { jsonSchema, type ToolSet } from 'ai'
 import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
@@ -534,23 +535,18 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
             }
           : undefined
 
-        const approved =
-          alreadyApproved ||
-          agentFullAccess ||
-          (await requestUserExecApproval(
+        let approvalSource: UserExecApprovalSource
+        if (alreadyApproved) {
+          approvalSource = 'user'
+        } else if (agentFullAccess) {
+          approvalSource = 'full_access'
+        } else {
+          approvalSource = await requestUserExecApproval(
             toolOptions.toolCallId,
             execInput.command,
             explanationCtx,
             toolOptions.abortSignal
-          ))
-
-        if (!approved) {
-          return {
-            success: false,
-            exitCode: null,
-            stdout: '',
-            stderr: 'Command denied by user.',
-          }
+          )
         }
 
         // Track when Full Access skipped an approval, regardless of whether the
@@ -563,6 +559,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
         const result = await skillsController.userExec(execInput.command, {
           sessionId: options.sessionId ?? options.codeExecution?.sessionId,
           toolCallId: toolOptions.toolCallId,
+          approvalSource,
         })
 
         try {

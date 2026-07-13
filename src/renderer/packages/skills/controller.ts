@@ -1,4 +1,5 @@
 import type { MarketplaceSkill, SkillInfo, SkillMetadata } from '@shared/types/skills'
+import type { UserExecApprovalSource } from '@shared/types/user-exec'
 
 interface SkillScriptResult {
   success: boolean
@@ -76,7 +77,7 @@ export const skillsController = {
 
   userExec(
     command: string,
-    options?: { timeout?: number; sessionId?: string; toolCallId?: string }
+    options?: { timeout?: number; sessionId?: string; toolCallId?: string; approvalSource?: UserExecApprovalSource }
   ): Promise<SkillScriptResult> {
     return window.electronAPI.invoke('skills:user-exec', { command, ...options })
   },

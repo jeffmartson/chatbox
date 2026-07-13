@@ -7,6 +7,7 @@
  * the tool-call part's render lifecycle (which can remount during streaming).
  */
 
+import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { createStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { CommandExplanationResult } from '@/packages/model-calls/command-explanation'
@@ -135,15 +136,15 @@ export async function requestUserExecApproval(
   command: string,
   explanationCtx?: ExplanationContext,
   signal?: AbortSignal
-): Promise<boolean> {
+): Promise<UserExecApprovalSource> {
   // Auto-approve safe read-only commands (no caching needed — idempotent)
   if (isCommandAutoApprovable(command)) {
-    return Promise.resolve(true)
+    return 'whitelist'
   }
 
   const aiEligibility = getAiAutoApprovalEligibility(command)
   const { explanation, explanationError, safe } = await generateApprovalAssessment(command, explanationCtx, signal)
-  if (aiEligibility.eligible && safe) return true
+  if (aiEligibility.eligible && safe) return 'ai'
 
   throw new UserExecApprovalPausedError(toolCallId, command, explanation, explanationError)
 }

@@ -241,7 +241,7 @@ beforeEach(() => {
     description: 'session attachment rag toolset',
     tools: { query_session_attachment: { execute: async () => ({}) } },
   })
-  requestUserExecApprovalMock.mockResolvedValue(true)
+  requestUserExecApprovalMock.mockResolvedValue('ai')
   userExecMock.mockResolvedValue({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
   installFromSandboxMock.mockResolvedValue({ success: true, skillName: 'new-skill' })
   discoverSkillsMock.mockResolvedValue([
@@ -450,6 +450,7 @@ describe('buildToolsForSession', () => {
     expect(userExecMock).toHaveBeenCalledWith('touch /tmp/full-access', {
       sessionId: undefined,
       toolCallId: 'tool-call-1',
+      approvalSource: 'full_access',
     })
     expect(executeResult).toMatchObject({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
     expect(trackAgentModeFullAccessBypassMock).toHaveBeenCalledWith({ tool: 'user_exec' })
@@ -479,8 +480,56 @@ describe('buildToolsForSession', () => {
     expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval', {
       sessionId: undefined,
       toolCallId: 'tool-call-2',
+      approvalSource: 'ai',
     })
     expect(trackAgentModeFullAccessBypassMock).not.toHaveBeenCalled()
+  })
+
+  test('records whitelist auto-approval as the execution source', async () => {
+    requestUserExecApprovalMock.mockResolvedValueOnce('whitelist')
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    await result.tools.user_exec.execute({ command: 'pwd' }, {
+      toolCallId: 'tool-call-whitelist',
+      messages: [],
+    } as never)
+
+    expect(userExecMock).toHaveBeenCalledWith('pwd', {
+      sessionId: undefined,
+      toolCallId: 'tool-call-whitelist',
+      approvalSource: 'whitelist',
+    })
+  })
+
+  test('records resumed user approval as the execution source', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    await result.tools.user_exec.execute({ command: 'touch /tmp/user-approved' }, {
+      toolCallId: 'tool-call-user-approved',
+      messages: [],
+      approved: true,
+    } as never)
+
+    expect(requestUserExecApprovalMock).not.toHaveBeenCalled()
+    expect(userExecMock).toHaveBeenCalledWith('touch /tmp/user-approved', {
+      sessionId: undefined,
+      toolCallId: 'tool-call-user-approved',
+      approvalSource: 'user',
+    })
   })
 
   test('deduplicates repeated user_exec calls with the same toolCallId', async () => {
@@ -526,10 +575,10 @@ describe('buildToolsForSession', () => {
   })
 
   test('does not execute user_exec when generation is aborted during approval', async () => {
-    let finishApproval: ((approved: boolean) => void) | undefined
+    let finishApproval: ((approvalSource: 'ai') => void) | undefined
     requestUserExecApprovalMock.mockImplementationOnce(
       () =>
-        new Promise<boolean>((resolve) => {
+        new Promise<'ai'>((resolve) => {
           finishApproval = resolve
         })
     )
@@ -551,7 +600,7 @@ describe('buildToolsForSession', () => {
     await vi.waitFor(() => expect(requestUserExecApprovalMock).toHaveBeenCalledTimes(1))
 
     controller.abort()
-    finishApproval?.(true)
+    finishApproval?.('ai')
 
     await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
     expect(userExecMock).not.toHaveBeenCalled()

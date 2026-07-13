@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import type { UserExecApprovalSource } from '@shared/types/user-exec'
 
 const COMMAND_PREVIEW_CHARS = 500
 const OUTPUT_PREVIEW_CHARS = 1500
@@ -8,6 +9,7 @@ export interface OperationStartRecord {
   kind: 'sandbox_exec' | 'sandbox_exec_code' | 'user_exec'
   sessionId?: string
   toolCallId?: string
+  approvalSource?: UserExecApprovalSource | 'unknown'
   cwd?: string
   timeoutMs?: number
   command?: string
@@ -59,6 +61,7 @@ export function buildOperationStartLog(record: OperationStartRecord): string {
     kind: record.kind,
     sessionId: record.sessionId,
     toolCallId: record.toolCallId,
+    approvalSource: record.approvalSource,
     cwd: record.cwd,
     timeoutMs: record.timeoutMs,
     language: record.language,

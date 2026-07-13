@@ -90,4 +90,15 @@ describe('operation log', () => {
     expect(log).toContain('"commandHash"')
     expect(log).toContain('"commandPreview":"echo hello"')
   })
+
+  it('records how a user command was approved', () => {
+    const log = buildOperationStartLog({
+      operationId: 'op-1',
+      kind: 'user_exec',
+      command: 'pwd',
+      approvalSource: 'ai',
+    })
+
+    expect(log).toContain('"approvalSource":"ai"')
+  })
 })
