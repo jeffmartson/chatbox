@@ -258,13 +258,7 @@ export function LicenseDetailCard({ licenseDetail, language, utmContent }: Licen
     : '-'
 
   const refreshText = licenseDetail.token_next_refresh_time
-    ? `${t('Quota Reset Time')} ${new Date(licenseDetail.token_next_refresh_time).toLocaleString(i18n.language, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
+    ? `${t('Quota Reset Time')} ${new Date(licenseDetail.token_next_refresh_time).toLocaleDateString(i18n.language)}`
     : undefined
 
   return (
