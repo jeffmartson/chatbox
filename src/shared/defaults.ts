@@ -100,7 +100,6 @@ export function settings(): Settings {
     pasteLongTextAsAFile: true,
 
     autoGenerateTitle: true,
-    showCommandExplanation: true,
 
     autoCompaction: true,
     compactionThreshold: 0.6,

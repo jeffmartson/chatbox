@@ -1,3 +1,5 @@
+import { extractCommandBaseName, tokenizeShellWords } from './user-exec-command-utils'
+
 /**
  * Whitelist rules for auto-approving safe user_exec commands.
  *
@@ -106,7 +108,6 @@ const SAFE_COMMANDS = new Set([
   'which',
   'where',
   'type',
-  'command',
   'whence',
   'man',
   'help',
@@ -122,7 +123,6 @@ const SAFE_COMMANDS = new Set([
   'expr',
   'seq',
   'yes',
-  'env',
   'printenv',
 ])
 
@@ -135,10 +135,6 @@ const SAFE_SUBCOMMANDS: Record<string, Set<string>> = {
     'log',
     'diff',
     'show',
-    'branch',
-    'tag',
-    'remote',
-    'stash', // stash list is common read op
     'shortlog',
     'describe',
     'rev-parse',
@@ -149,31 +145,24 @@ const SAFE_SUBCOMMANDS: Record<string, Set<string>> = {
     'name-rev',
     'blame',
     'reflog',
-    'config', // git config --get / --list
     'cat-file',
     'count-objects',
     'for-each-ref',
-    'worktree', // worktree list
   ]),
-  docker: new Set(['ps', 'images', 'image', 'inspect', 'logs', 'version', 'info', 'stats', 'top', 'port', 'diff']),
-  npm: new Set(['list', 'ls', 'view', 'info', 'show', 'outdated', 'audit', 'explain', 'why', 'config']),
-  pnpm: new Set(['list', 'ls', 'view', 'info', 'show', 'outdated', 'audit', 'explain', 'why', 'config']),
-  yarn: new Set(['list', 'info', 'why', 'outdated', 'config']),
-  bun: new Set(['pm', 'x']),
+  docker: new Set(['ps', 'images', 'inspect', 'logs', 'version', 'info', 'stats', 'top', 'port', 'diff']),
+  npm: new Set(['list', 'ls', 'view', 'info', 'show', 'outdated', 'audit', 'explain', 'why']),
+  pnpm: new Set(['list', 'ls', 'view', 'info', 'show', 'outdated', 'audit', 'explain', 'why']),
+  yarn: new Set(['list', 'info', 'why', 'outdated']),
   cargo: new Set(['tree', 'metadata', 'version', 'search', 'info']),
-  go: new Set(['version', 'env', 'list', 'doc']),
-  python: new Set(['--version', '-V', '-c']),
-  python3: new Set(['--version', '-V', '-c']),
-  node: new Set(['--version', '-v', '-e', '-p']),
-  ruby: new Set(['--version', '-v', '-e']),
+  go: new Set(['version', 'list', 'doc']),
   rustc: new Set(['--version', '-V', '--print']),
   java: new Set(['--version', '-version']),
-  swift: new Set(['--version', 'package']),
-  kubectl: new Set(['get', 'describe', 'logs', 'top', 'version', 'config', 'explain', 'api-resources', 'api-versions']),
+  swift: new Set(['--version']),
+  kubectl: new Set(['get', 'describe', 'logs', 'top', 'version', 'explain', 'api-resources', 'api-versions']),
   brew: new Set(['list', 'ls', 'info', 'search', 'outdated', 'config', 'doctor', 'deps']),
   apt: new Set(['list', 'show', 'search', 'depends', 'rdepends', 'policy']),
-  pip: new Set(['list', 'show', 'freeze', 'check', 'config']),
-  pip3: new Set(['list', 'show', 'freeze', 'check', 'config']),
+  pip: new Set(['list', 'show', 'freeze', 'check']),
+  pip3: new Set(['list', 'show', 'freeze', 'check']),
   systemctl: new Set(['status', 'list-units', 'list-unit-files', 'is-active', 'is-enabled', 'show']),
   launchctl: new Set(['list', 'print']),
 }
@@ -182,7 +171,8 @@ const SAFE_SUBCOMMANDS: Record<string, Set<string>> = {
 
 const DANGEROUS_FLAGS: Record<string, string[]> = {
   sed: ['-i', '--in-place'],
-  find: ['-delete', '-exec', '-execdir'],
+  find: ['-delete', '-exec', '-execdir', '-ok', '-okdir'],
+  git: ['--output'],
   xargs: [], // xargs itself can execute anything — always block
 }
 
@@ -192,6 +182,7 @@ const VERSION_HELP_FLAGS = new Set(['--version', '-v', '-V', '--help', '-h'])
 // ── Shell metacharacter detection ───────────────────────────────────
 
 const UNSAFE_PATTERNS = [
+  /[\r\n]/,
   /`/,
   /\$\(/,
   /<\(/,
@@ -300,11 +291,31 @@ function splitCompoundCommand(cmd: string): string[] {
  */
 function isSegmentSafe(segment: string): boolean {
   // Tokenize respecting quotes
-  const tokens = tokenize(segment)
-  if (tokens.length === 0) return false
+  const tokens = tokenizeShellWords(segment)
+  if (!tokens || tokens.length === 0) return false
 
-  const baseCmd = extractBaseCommand(tokens[0])
+  const baseCmd = extractCommandBaseName(tokens[0])
   const args = tokens.slice(1)
+
+  if (baseCmd === 'env') {
+    return args.length === 0 || (args.length === 1 && VERSION_HELP_FLAGS.has(args[0]))
+  }
+
+  if (baseCmd === 'command') {
+    return (
+      args.length >= 2 && (args[0] === '-v' || args[0] === '-V') && args.slice(1).every((arg) => !arg.startsWith('-'))
+    )
+  }
+
+  if (baseCmd === 'git') return isSafeGitCommand(args)
+  if (baseCmd === 'npm' || baseCmd === 'pnpm' || baseCmd === 'yarn') {
+    return isSafePackageManagerCommand(baseCmd, args)
+  }
+  if (baseCmd === 'pip' || baseCmd === 'pip3') return isSafePipCommand(args)
+  if (baseCmd === 'docker') return isSafeDockerCommand(args)
+  if (baseCmd === 'kubectl') return isSafeKubectlCommand(args)
+  if (baseCmd === 'go' && args[0] === 'env')
+    return !args.slice(1).some((arg) => arg.startsWith('-w') || arg.startsWith('-u'))
 
   // Simple safe command (no subcommand check)
   if (SAFE_COMMANDS.has(baseCmd)) {
@@ -327,46 +338,102 @@ function isSegmentSafe(segment: string): boolean {
   return false
 }
 
-function extractBaseCommand(token: string): string {
-  // /usr/bin/ls → ls
-  const parts = token.split('/')
-  return parts[parts.length - 1]
+function isSafeGitCommand(args: string[]): boolean {
+  const subCommand = args[0]
+  const subArgs = args.slice(1)
+  if (!subCommand) return false
+
+  const unconditionallyReadOnly = SAFE_SUBCOMMANDS.git
+  if (unconditionallyReadOnly.has(subCommand)) return !hasDangerousFlags('git', subArgs)
+
+  switch (subCommand) {
+    case 'branch': {
+      const mutatingFlags = new Set([
+        '-d',
+        '-D',
+        '-m',
+        '-M',
+        '-c',
+        '-C',
+        '--delete',
+        '--move',
+        '--copy',
+        '--edit-description',
+        '--unset-upstream',
+      ])
+      if (subArgs.some((arg) => mutatingFlags.has(arg) || arg.startsWith('--set-upstream-to'))) return false
+      return (
+        subArgs.length === 0 ||
+        subArgs.every((arg) => arg.startsWith('-')) ||
+        subArgs.includes('--list') ||
+        subArgs.includes('-l')
+      )
+    }
+    case 'tag':
+      return (
+        !subArgs.some((arg) => arg === '--delete' || arg === '-d' || arg === '--force' || arg === '-f') &&
+        (subArgs.length === 0 || subArgs[0] === '--list' || subArgs[0] === '-l')
+      )
+    case 'remote':
+      return (
+        subArgs.length === 0 ||
+        subArgs.every((arg) => arg === '-v' || arg === '--verbose') ||
+        subArgs[0] === 'show' ||
+        subArgs[0] === 'get-url'
+      )
+    case 'stash':
+      return subArgs[0] === 'list' || subArgs[0] === 'show'
+    case 'config': {
+      const readFlags = new Set(['--get', '--get-all', '--get-regexp', '--list', '-l', '--show-origin', '--show-scope'])
+      return (
+        subArgs.some((arg) => readFlags.has(arg)) && !subArgs.some((arg) => arg === '--unset' || arg === '--unset-all')
+      )
+    }
+    case 'worktree':
+      return subArgs[0] === 'list'
+    default:
+      return false
+  }
+}
+
+function isSafePackageManagerCommand(packageManager: 'npm' | 'pnpm' | 'yarn', args: string[]): boolean {
+  const [subCommand, configAction] = args
+  if (!subCommand) return false
+  if (subCommand === 'config') return configAction === 'get' || configAction === 'list' || configAction === 'ls'
+  if (subCommand === 'audit' && args.slice(1).some((arg) => arg === '--fix' || arg.startsWith('--fix='))) return false
+  return SAFE_SUBCOMMANDS[packageManager].has(subCommand)
+}
+
+function isSafePipCommand(args: string[]): boolean {
+  const [subCommand, configAction] = args
+  if (!subCommand) return false
+  if (subCommand === 'config') return configAction === 'get' || configAction === 'list' || configAction === 'debug'
+  return SAFE_SUBCOMMANDS.pip.has(subCommand)
+}
+
+function isSafeDockerCommand(args: string[]): boolean {
+  const [subCommand, imageAction] = args
+  if (!subCommand) return false
+  if (subCommand === 'image') {
+    return imageAction === 'ls' || imageAction === 'list' || imageAction === 'inspect' || imageAction === 'history'
+  }
+  return SAFE_SUBCOMMANDS.docker.has(subCommand)
+}
+
+function isSafeKubectlCommand(args: string[]): boolean {
+  const [subCommand, configAction] = args
+  if (!subCommand) return false
+  if (subCommand === 'config') {
+    return configAction === 'view' || configAction === 'get-contexts' || configAction === 'current-context'
+  }
+  return SAFE_SUBCOMMANDS.kubectl.has(subCommand)
 }
 
 function hasDangerousFlags(baseCmd: string, args: string[]): boolean {
   const dangerous = DANGEROUS_FLAGS[baseCmd]
   if (!dangerous) return false
   if (dangerous.length === 0) return true // command itself is dangerous (like xargs)
-  return args.some((arg) => dangerous.includes(arg))
-}
-
-function tokenize(segment: string): string[] {
-  const tokens: string[] = []
-  let current = ''
-  let inSingle = false
-  let inDouble = false
-
-  for (let i = 0; i < segment.length; i++) {
-    const ch = segment[i]
-
-    if (ch === "'" && !inDouble) {
-      inSingle = !inSingle
-      continue
-    }
-    if (ch === '"' && !inSingle) {
-      inDouble = !inDouble
-      continue
-    }
-    if (ch === ' ' && !inSingle && !inDouble) {
-      if (current) {
-        tokens.push(current)
-        current = ''
-      }
-      continue
-    }
-    current += ch
-  }
-
-  if (current) tokens.push(current)
-  return tokens
+  return args.some((arg) =>
+    dangerous.some((flag) => arg === flag || arg.startsWith(`${flag}=`) || (flag === '-i' && arg.startsWith('-i')))
+  )
 }

@@ -4,7 +4,6 @@ import os from 'node:os'
 import path from 'node:path'
 import type { MarketplaceSkill } from '@shared/types/skills'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { getLogger } from '../util'
 import { discoverBuiltinSkills, ensureBuiltinSeeded, syncBuiltinSkills } from './builtin-sync'
 import { discoverAgentSkills, discoverClaudeSkills, discoverSkills } from './discovery'
@@ -18,9 +17,13 @@ import {
 } from './installer'
 import { parseSkillFile } from './parser'
 import { collectSkillFiles, MAX_SKILL_FILES } from './skill-files'
+import { createDefaultUserExecRunner, type UserExecParams } from './user-exec-runner'
 import { isValidSkillName } from './validation'
 
 const log = getLogger('skills:ipc-handlers')
+
+const userExecRunner = createDefaultUserExecRunner()
+
 function getSkillsDir(): string {
   return path.join(app.getPath('userData'), 'skills')
 }
@@ -333,122 +336,7 @@ export function registerSkillsHandlers() {
     }
   })
 
-  ipcMain.handle(
-    'skills:user-exec',
-    async (
-      _event,
-      params: { command: string; timeout?: number; sessionId?: string; toolCallId?: string }
-    ): Promise<{ success: boolean; stdout: string; stderr: string; exitCode: number | null }> => {
-      const { command, timeout, sessionId, toolCallId } = params
-
-      try {
-        if (!command || typeof command !== 'string') {
-          throw new Error('Command is required')
-        }
-
-        const homeDir = os.homedir()
-        const TIMEOUT_MS = timeout || 120_000
-        const MAX_OUTPUT_BYTES = 1024 * 1024 // 1MB
-        const operationId = createOperationId()
-        const startedAt = Date.now()
-
-        log.info(
-          buildOperationStartLog({
-            operationId,
-            kind: 'user_exec',
-            sessionId,
-            toolCallId,
-            cwd: homeDir,
-            timeoutMs: TIMEOUT_MS,
-            command,
-          })
-        )
-
-        return await new Promise((resolve) => {
-          let stdout = ''
-          let stderr = ''
-          let stdoutBytes = 0
-          let stderrBytes = 0
-          let settled = false
-
-          const resolveOnce = (result: {
-            success: boolean
-            stdout: string
-            stderr: string
-            exitCode: number | null
-          }) => {
-            if (settled) return
-            settled = true
-            const finishLog = buildOperationFinishLog({
-              operationId,
-              success: result.success,
-              exitCode: result.exitCode,
-              durationMs: Date.now() - startedAt,
-              timedOut: result.exitCode === null && result.stderr.includes('timed out'),
-              stdout: result.stdout,
-              stderr: result.stderr,
-              stdoutBytes,
-              stderrBytes,
-            })
-            if (result.success) log.info(finishLog)
-            else log.warn(finishLog)
-            resolve(result)
-          }
-
-          const child = spawn('bash', ['-lc', command], {
-            cwd: homeDir,
-            timeout: TIMEOUT_MS,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: process.env,
-          })
-
-          child.stdout.on('data', (data: Buffer) => {
-            stdoutBytes += data.byteLength
-            if (stdoutBytes <= MAX_OUTPUT_BYTES) stdout += data.toString()
-          })
-
-          child.stderr.on('data', (data: Buffer) => {
-            stderrBytes += data.byteLength
-            if (stderrBytes <= MAX_OUTPUT_BYTES) stderr += data.toString()
-          })
-
-          child.on('error', (error) => {
-            log.error('skills:user-exec spawn error', error)
-            resolveOnce({ success: false, stdout, stderr: stderr || error.message, exitCode: null })
-          })
-
-          child.on('close', (code, signal) => {
-            if (signal === 'SIGTERM') {
-              resolveOnce({ success: false, stdout, stderr: stderr || 'Command timed out', exitCode: null })
-            } else {
-              resolveOnce({ success: code === 0, stdout, stderr, exitCode: code })
-            }
-          })
-
-          setTimeout(() => {
-            if (settled) return
-            if (!child.killed) {
-              child.kill('SIGTERM')
-              resolveOnce({
-                success: false,
-                stdout,
-                stderr: stderr || `Command timed out (${TIMEOUT_MS / 1000}s)`,
-                exitCode: null,
-              })
-            }
-          }, TIMEOUT_MS)
-        })
-      } catch (error) {
-        log.error('skills:user-exec failed', error)
-        return {
-          success: false,
-          stdout: '',
-          stderr: error instanceof Error ? error.message : 'Unknown error',
-          exitCode: null,
-        }
-      }
-    }
-  )
+  ipcMain.handle('skills:user-exec', (_event, params: UserExecParams) => userExecRunner.run(params))
 
   ipcMain.handle('skills:check-updates-batch', async () => {
     try {

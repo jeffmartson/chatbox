@@ -9,12 +9,18 @@
 
 import { createStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { settingsStore } from '@/stores/settingsStore'
+import type { CommandExplanationResult } from '@/packages/model-calls/command-explanation'
+import { getAiAutoApprovalEligibility } from './user-exec-ai-policy'
 import { isCommandAutoApprovable } from './user-exec-whitelist'
 
 export interface ExplanationContext {
   userContext: string
-  generateExplanation: (command: string, userContext: string, onStreamUpdate: (text: string) => void) => Promise<string>
+  generateExplanation: (
+    command: string,
+    userContext: string,
+    onStreamUpdate?: (text: string) => void,
+    signal?: AbortSignal
+  ) => Promise<CommandExplanationResult>
 }
 
 export interface PendingApproval {
@@ -84,8 +90,8 @@ function runExplanationGeneration(toolCallId: string, command: string, ctx: Expl
       // Stream update: set partial text, not yet done
       updateExplanation(toolCallId, text, false)
     })
-    .then((text) => {
-      updateExplanation(toolCallId, text, false)
+    .then((result) => {
+      updateExplanation(toolCallId, result.explanation, false)
     })
     .catch(() => {
       updateExplanation(toolCallId, null, true)
@@ -100,31 +106,26 @@ export function retryExplanation(toolCallId: string) {
   runExplanationGeneration(toolCallId, entry.command, ctx)
 }
 
-/**
- * Request user approval for a command. Idempotent per toolCallId:
- * if an entry already exists (e.g. execute() called twice for the
- * same tool call), the existing promise is returned.
- */
-const promiseCache = new Map<string, Promise<boolean>>()
+/** Evaluate whether a command can run automatically or must pause for user approval. */
 const MAX_PERSISTED_EXPLANATION_LENGTH = 4000
 
-async function generateApprovalExplanation(
+async function generateApprovalAssessment(
   command: string,
-  explanationCtx: ExplanationContext | undefined
-): Promise<{ explanation?: string; explanationError?: boolean }> {
-  const showExplanation = settingsStore.getState().getSettings().showCommandExplanation
-  if (!showExplanation || !explanationCtx) {
-    return {}
-  }
+  explanationCtx: ExplanationContext | undefined,
+  signal?: AbortSignal
+): Promise<{ explanation?: string; explanationError?: boolean; safe?: boolean }> {
+  if (!explanationCtx) return {}
 
   try {
-    let latestText = ''
-    const explanation = await explanationCtx.generateExplanation(command, explanationCtx.userContext, (text) => {
-      latestText = text
-    })
-    const text = explanation || latestText
-    return text ? { explanation: text.slice(0, MAX_PERSISTED_EXPLANATION_LENGTH) } : {}
-  } catch {
+    throwIfAborted(signal)
+    const result = await explanationCtx.generateExplanation(command, explanationCtx.userContext, undefined, signal)
+    throwIfAborted(signal)
+    return {
+      explanation: result.explanation ? result.explanation.slice(0, MAX_PERSISTED_EXPLANATION_LENGTH) : undefined,
+      safe: Boolean(result.explanation) && result.safe,
+    }
+  } catch (error) {
+    if (isAbortError(error)) throw error
     return { explanationError: true }
   }
 }
@@ -132,19 +133,27 @@ async function generateApprovalExplanation(
 export async function requestUserExecApproval(
   toolCallId: string,
   command: string,
-  explanationCtx?: ExplanationContext
+  explanationCtx?: ExplanationContext,
+  signal?: AbortSignal
 ): Promise<boolean> {
-  // Idempotent: return existing promise if already requested
-  const existing = promiseCache.get(toolCallId)
-  if (existing) return existing
-
   // Auto-approve safe read-only commands (no caching needed — idempotent)
   if (isCommandAutoApprovable(command)) {
     return Promise.resolve(true)
   }
 
-  const { explanation, explanationError } = await generateApprovalExplanation(command, explanationCtx)
+  const aiEligibility = getAiAutoApprovalEligibility(command)
+  const { explanation, explanationError, safe } = await generateApprovalAssessment(command, explanationCtx, signal)
+  if (aiEligibility.eligible && safe) return true
+
   throw new UserExecApprovalPausedError(toolCallId, command, explanation, explanationError)
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 export function requestFileMutationApproval(toolCallId: string, title: string, preview: string): Promise<boolean> {
@@ -223,6 +232,5 @@ export function denyAllPendingApprovals() {
 
 export function resetUserExecApprovalsForTests() {
   approvalStore.setState({ pending: new Map() })
-  promiseCache.clear()
   explanationCtxCache.clear()
 }

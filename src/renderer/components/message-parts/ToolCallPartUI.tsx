@@ -4,14 +4,12 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Code,
   Collapse,
   Group,
   Paper,
   Stack,
   Text,
-  Tooltip,
   UnstyledButton,
 } from '@mantine/core'
 import { ChatboxAIAPIError } from '@shared/models/errors'
@@ -57,7 +55,6 @@ import { approveUserExec, denyUserExec, retryExplanation, usePendingApproval } f
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
-import { settingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
 
@@ -1063,18 +1060,6 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
               >
                 {t('Deny')}
               </Button>
-              <Checkbox
-                size="xs"
-                label={t('AI Explain')}
-                checked={settingsStore.getState().getSettings().showCommandExplanation}
-                onChange={(e) =>
-                  settingsStore.getState().setSettings({ showCommandExplanation: e.currentTarget.checked })
-                }
-                styles={{ label: { fontSize: 11, paddingLeft: 4 } }}
-              />
-              <Tooltip label={t('AI explanation consumes additional tokens')} withArrow>
-                <IconInfoCircle size={13} color="var(--chatbox-tint-tertiary)" style={{ cursor: 'help' }} />
-              </Tooltip>
             </Group>
           </Stack>
         </Box>
@@ -1165,22 +1150,6 @@ const UserExecDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
           <Button size="compact-xs" variant="light" color="chatbox-error" onClick={() => denyUserExec(part.toolCallId)}>
             {t('Deny')}
           </Button>
-          {pendingApproval.kind !== 'file' && (
-            <>
-              <Checkbox
-                size="xs"
-                label={t('AI Explain')}
-                checked={settingsStore.getState().getSettings().showCommandExplanation}
-                onChange={(e) =>
-                  settingsStore.getState().setSettings({ showCommandExplanation: e.currentTarget.checked })
-                }
-                styles={{ label: { fontSize: 11, paddingLeft: 4 } }}
-              />
-              <Tooltip label={t('AI explanation consumes additional tokens')} withArrow>
-                <IconInfoCircle size={13} color="var(--chatbox-tint-tertiary)" style={{ cursor: 'help' }} />
-              </Tooltip>
-            </>
-          )}
         </Group>
       </Stack>
     )

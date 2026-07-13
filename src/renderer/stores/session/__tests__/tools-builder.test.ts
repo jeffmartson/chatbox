@@ -473,13 +473,88 @@ describe('buildToolsForSession', () => {
     expect(requestUserExecApprovalMock).toHaveBeenCalledWith(
       'tool-call-2',
       'touch /tmp/needs-approval',
-      expect.any(Object)
+      expect.any(Object),
+      undefined
     )
     expect(userExecMock).toHaveBeenCalledWith('touch /tmp/needs-approval', {
       sessionId: undefined,
       toolCallId: 'tool-call-2',
     })
     expect(trackAgentModeFullAccessBypassMock).not.toHaveBeenCalled()
+  })
+
+  test('deduplicates repeated user_exec calls with the same toolCallId', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    const context = { toolCallId: 'tool-call-repeated', messages: [] } as never
+    const first = result.tools.user_exec.execute({ command: 'touch /tmp/once' }, context)
+    const second = result.tools.user_exec.execute({ command: 'touch /tmp/once' }, context)
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { success: true, exitCode: 0, stdout: 'ok', stderr: '' },
+      { success: true, exitCode: 0, stdout: 'ok', stderr: '' },
+    ])
+    expect(requestUserExecApprovalMock).toHaveBeenCalledTimes(1)
+    expect(userExecMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('rejects a reused user_exec toolCallId with a different command', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    const context = { toolCallId: 'tool-call-reused', messages: [] } as never
+    await result.tools.user_exec.execute({ command: 'touch /tmp/first' }, context)
+
+    await expect(result.tools.user_exec.execute({ command: 'touch /tmp/second' }, context)).rejects.toThrow(
+      'was reused with a different command'
+    )
+    expect(requestUserExecApprovalMock).toHaveBeenCalledTimes(1)
+    expect(userExecMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not execute user_exec when generation is aborted during approval', async () => {
+    let finishApproval: ((approved: boolean) => void) | undefined
+    requestUserExecApprovalMock.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishApproval = resolve
+        })
+    )
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: false },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    const controller = new AbortController()
+    const execution = result.tools.user_exec.execute({ command: 'touch /tmp/aborted' }, {
+      toolCallId: 'tool-call-aborted',
+      messages: [],
+      abortSignal: controller.signal,
+    } as never)
+    await vi.waitFor(() => expect(requestUserExecApprovalMock).toHaveBeenCalledTimes(1))
+
+    controller.abort()
+    finishApproval?.(true)
+
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+    expect(userExecMock).not.toHaveBeenCalled()
   })
 })
 

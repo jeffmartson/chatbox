@@ -483,6 +483,9 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
 
 function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
   const agentFullAccess = options.sessionSettings?.agentFullAccess === true
+  type UserExecResult = { success: boolean; exitCode: number | null; stdout: string; stderr: string }
+  const executionCache = new Map<string, { command: string; promise: Promise<UserExecResult> }>()
+
   return {
     description:
       "Execute a command in the user's real environment (not sandbox). " +
@@ -491,7 +494,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
       "Runs in the user's login shell with full system access. " +
       (agentFullAccess
         ? 'Full Access is enabled, so commands run without per-command approval.'
-        : 'The user must approve the command before it runs.'),
+        : 'Clearly safe commands may be approved automatically; other commands require user approval.'),
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -503,61 +506,91 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
       required: ['command'],
       additionalProperties: false,
     }),
-    execute: async (input, toolOptions) => {
+    execute: (input, toolOptions) => {
       const execInput = input as { command: string }
-      const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
-      const recentUserMsgs = options.messages
-        .filter((m) => m.role === 'user')
-        .slice(-3)
-        .map((m) => getMessageText(m, true, false).slice(0, 500))
-      const userContext = recentUserMsgs.join('\n---\n')
-
-      const sessionSettings = options.sessionSettings
-      const explanationCtx: ExplanationContext | undefined = sessionSettings
-        ? {
-            userContext,
-            generateExplanation: (cmd, ctx, onStream) =>
-              generateCommandExplanation(sessionSettings, cmd, ctx, onStream),
-          }
-        : undefined
-
-      const approved =
-        alreadyApproved ||
-        agentFullAccess ||
-        (await requestUserExecApproval(toolOptions.toolCallId, execInput.command, explanationCtx))
-
-      if (!approved) {
-        return {
-          success: false,
-          exitCode: null,
-          stdout: '',
-          stderr: 'Command denied by user.',
+      const existingExecution = executionCache.get(toolOptions.toolCallId)
+      if (existingExecution) {
+        if (existingExecution.command !== execInput.command) {
+          return Promise.reject(new Error(`Tool call ${toolOptions.toolCallId} was reused with a different command`))
         }
+        return existingExecution.promise
       }
 
-      // Track when Full Access skipped an approval, regardless of whether the
-      // command later succeeds — failed bypassed attempts are the audit signal.
-      if (!alreadyApproved && agentFullAccess) {
-        trackAgentModeFullAccessBypass({ tool: 'user_exec' })
-      }
-      const result = await skillsController.userExec(execInput.command, {
-        sessionId: options.sessionId ?? options.codeExecution?.sessionId,
-        toolCallId: toolOptions.toolCallId,
+      const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
+      let hostExecutionStarted = false
+      const execution = Promise.resolve().then(async (): Promise<UserExecResult> => {
+        const recentUserMsgs = options.messages
+          .filter((m) => m.role === 'user')
+          .slice(-3)
+          .map((m) => getMessageText(m, true, false).slice(0, 500))
+        const userContext = recentUserMsgs.join('\n---\n')
+
+        const sessionSettings = options.sessionSettings
+        const explanationCtx: ExplanationContext | undefined = sessionSettings
+          ? {
+              userContext,
+              generateExplanation: (cmd, ctx, onStream, signal) =>
+                generateCommandExplanation(sessionSettings, cmd, ctx, onStream, signal),
+            }
+          : undefined
+
+        const approved =
+          alreadyApproved ||
+          agentFullAccess ||
+          (await requestUserExecApproval(
+            toolOptions.toolCallId,
+            execInput.command,
+            explanationCtx,
+            toolOptions.abortSignal
+          ))
+
+        if (!approved) {
+          return {
+            success: false,
+            exitCode: null,
+            stdout: '',
+            stderr: 'Command denied by user.',
+          }
+        }
+
+        // Track when Full Access skipped an approval, regardless of whether the
+        // command later succeeds — failed bypassed attempts are the audit signal.
+        if (!alreadyApproved && agentFullAccess) {
+          trackAgentModeFullAccessBypass({ tool: 'user_exec' })
+        }
+        throwIfAborted(toolOptions.abortSignal)
+        hostExecutionStarted = true
+        const result = await skillsController.userExec(execInput.command, {
+          sessionId: options.sessionId ?? options.codeExecution?.sessionId,
+          toolCallId: toolOptions.toolCallId,
+        })
+
+        try {
+          options.onAgentModeActivated?.()
+        } catch {
+          // ignore
+        }
+
+        return {
+          success: result.success,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        }
       })
 
-      try {
-        options.onAgentModeActivated?.()
-      } catch {
-        // ignore
-      }
-
-      return {
-        success: result.success,
-        exitCode: result.exitCode,
-        stdout: result.stdout,
-        stderr: result.stderr,
-      }
+      executionCache.set(toolOptions.toolCallId, { command: execInput.command, promise: execution })
+      void execution.catch(() => {
+        if (!hostExecutionStarted && executionCache.get(toolOptions.toolCallId)?.promise === execution) {
+          executionCache.delete(toolOptions.toolCallId)
+        }
+      })
+      return execution
     },
     toModelOutput: toTextModelOutput(formatUserExecOutput),
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 }

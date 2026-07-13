@@ -162,6 +162,7 @@ describe('isCommandAutoApprovable', () => {
   describe('dangerous flags on safe commands', () => {
     it.each([
       'sed -i "s/a/b/" file.txt',
+      'sed -i.bak "s/a/b/" file.txt',
       'sed --in-place "s/a/b/" file.txt',
       'find . -name "*.tmp" -delete',
       'find . -exec rm {} \\;',
@@ -180,8 +181,55 @@ describe('isCommandAutoApprovable', () => {
       'su -c "ls"',
       'eval "rm -rf /"',
       'source ~/.bashrc',
+      'env rm -rf /tmp/demo',
+      'command rm -rf /tmp/demo',
+      'python -c "import os; os.remove(\'file\')"',
+      'python3 -c "import os; os.remove(\'file\')"',
+      "node -e \"require('fs').unlinkSync('file')\"",
+      'ruby -e "File.delete(\'file\')"',
+      'git branch new-branch',
+      'git branch -d old-branch',
+      'git branch --set-upstream-to=origin/main',
+      'git tag v1.0.0',
+      'git tag --delete v1.0.0',
+      'git remote add origin https://example.com/repo.git',
+      'git config user.name Chatbox',
+      'git stash push',
+      'git worktree add ../other branch',
+      'npm config set registry https://example.com',
+      'npm audit --fix',
+      'pnpm config set registry https://example.com',
+      'docker image rm image-id',
+      'go env -w GOPROXY=https://example.com',
+      'go env -u GOPROXY',
+      'git diff --output=changes.diff',
     ])('rejects: %s', (cmd) => {
       expect(isCommandAutoApprovable(cmd)).toBe(false)
+    })
+  })
+
+  describe('argument-aware read-only commands', () => {
+    it.each([
+      'env',
+      'command -v node',
+      'python --version',
+      'node --version',
+      'ruby --version',
+      'git branch --list',
+      'git branch --show-current',
+      'git tag --list',
+      'git remote -v',
+      'git config --list',
+      'git stash list',
+      'git worktree list',
+      'npm config get registry',
+      'pnpm config list',
+      'pip config list',
+      'docker image ls',
+      'kubectl config current-context',
+      'go env GOPATH',
+    ])('approves: %s', (cmd) => {
+      expect(isCommandAutoApprovable(cmd)).toBe(true)
     })
   })
 
