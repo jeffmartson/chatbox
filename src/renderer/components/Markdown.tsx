@@ -1,6 +1,7 @@
 import { sanitizeUrl } from '@braintree/sanitize-url'
 import { useTheme } from '@mui/material'
 import {
+  type ComponentProps,
   type CSSProperties,
   createContext,
   type ElementType,
@@ -63,9 +64,11 @@ import { ScalableIcon } from './common/ScalableIcon'
 import IconDart from './icons/Dart'
 import IconJava from './icons/Java'
 import { MessageMermaid, SVGPreview } from './Mermaid'
+import { type StreamingTextSegment, useStreamingTextSegments, wrapStreamingSegmentsInHast } from './streaming-text-fade'
 import './shiki-code.css'
 
 const CODE_BLOCK_COLLAPSE_LINE_THRESHOLD = 7
+type RehypePlugins = NonNullable<ComponentProps<typeof ReactMarkdown>['rehypePlugins']>
 
 function remarkAddCodeIndex() {
   // biome-ignore lint/suspicious/noExplicitAny: remark AST nodes lack a friendly type here
@@ -76,6 +79,12 @@ function remarkAddCodeIndex() {
       node.data.hProperties = node.data.hProperties || {}
       node.data.hProperties['data-code-index'] = counter++
     })
+  }
+}
+
+function rehypeWrapStreamingSegments(options: StreamingTextSegment[]) {
+  return (tree: import('hast').Root) => {
+    wrapStreamingSegmentsInHast(tree, options)
   }
 }
 
@@ -106,16 +115,26 @@ function Markdown(props: {
 
   const codeFences = useMemo(() => (children.match(/```/g) || []).length, [children])
   const generatingCodeIndex = useMemo(() => (codeFences % 2 === 0 ? -1 : Math.floor(codeFences / 2)), [codeFences])
+  const processedChildren = useMemo(
+    () => (enableLaTeXRendering ? latex.processLaTeX(children) : children),
+    [children, enableLaTeXRendering]
+  )
+  const streamingSegments = useStreamingTextSegments(processedChildren, generating, uniqueId)
+  const rehypePlugins = useMemo<RehypePlugins>(
+    () =>
+      streamingSegments.length > 0 ? [rehypeKatex, [rehypeWrapStreamingSegments, streamingSegments]] : [rehypeKatex],
+    [streamingSegments]
+  )
 
   return (
     <ReactMarkdown
+      className={`break-words [overflow-wrap:anywhere] ${className || ''}`}
       remarkPlugins={
         enableLaTeXRendering
           ? [remarkGfm, remarkMath, remarkBreaks, remarkAddCodeIndex]
           : [remarkGfm, remarkBreaks, remarkAddCodeIndex]
       }
-      rehypePlugins={[rehypeKatex]}
-      className={`break-words [overflow-wrap:anywhere] ${className || ''}`}
+      rehypePlugins={rehypePlugins}
       // react-markdown's default defaultUrlTransform will incorrectly encode query parameters in URLs (e.g. & becomes &amp;)
       // Use sanitizeUrl here to avoid that and to prevent XSS attacks
       urlTransform={(url) => sanitizeUrl(url)}
@@ -160,7 +179,7 @@ function Markdown(props: {
         ]
       )}
     >
-      {enableLaTeXRendering ? latex.processLaTeX(children) : children}
+      {processedChildren}
     </ReactMarkdown>
   )
 }

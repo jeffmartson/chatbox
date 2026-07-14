@@ -163,7 +163,7 @@ export function GuideMessage({
                         {part.text}
                       </p>
                     ) : (
-                      <Markdown key={key} generating={isStreaming}>
+                      <Markdown key={key} uniqueId={key} generating={isStreaming}>
                         {part.text}
                       </Markdown>
                     )

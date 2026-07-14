@@ -56,6 +56,7 @@ import Message from './Message'
 import MessageMinimapRail, { type MessageMinimapAnchor } from './MessageMinimapRail'
 import MessageNavigation, { ScrollToBottomButton } from './MessageNavigation'
 import SummaryMessage from './SummaryMessage'
+import { createSmoothFollowOutputController } from './smooth-follow-output'
 
 // LRU-like cache with max size to prevent unbounded memory growth
 const MAX_SCROLL_CACHE_SIZE = 100
@@ -208,6 +209,11 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const showMinimap = !isSmallScreen && userMessageAnchors.length > 0
 
   const virtuoso = useRef<VirtuosoHandle>(null)
+  const [smoothFollowOutput] = useState(() =>
+    createSmoothFollowOutputController({
+      scrollToBottom: (behavior) => virtuoso.current?.scrollTo({ top: Infinity, behavior }),
+    })
+  )
   const messageListRef = useRef<HTMLDivElement>(null)
   const [messageViewportHeight, setMessageViewportHeight] = useState(0)
   const [isNewMessage, setIsNewMessage] = useState(false)
@@ -220,18 +226,25 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const handleMessageNavigationVisibleChanged = useCallback((v: boolean) => setMessageNavigationVisible(v), [])
 
   const handleScrollToTop = useCallback(() => {
+    smoothFollowOutput.pause()
     virtuoso.current?.scrollToIndex({ index: 0, align: 'start', behavior: 'smooth' })
-  }, [])
+  }, [smoothFollowOutput])
 
   const handleScrollToBottom = useCallback(() => {
+    smoothFollowOutput.resume()
     virtuoso.current?.scrollTo({ top: Infinity, behavior: 'smooth' })
-  }, [])
+  }, [smoothFollowOutput])
 
-  const handleMinimapJump = useCallback((anchor: MessageMinimapAnchor) => {
-    virtuoso.current?.scrollToIndex({ index: anchor.itemIndex, align: 'start', behavior: 'smooth' })
-  }, [])
+  const handleMinimapJump = useCallback(
+    (anchor: MessageMinimapAnchor) => {
+      smoothFollowOutput.pause()
+      virtuoso.current?.scrollToIndex({ index: anchor.itemIndex, align: 'start', behavior: 'smooth' })
+    },
+    [smoothFollowOutput]
+  )
 
   const handleScrollToPrev = useCallback(() => {
+    smoothFollowOutput.pause()
     if (messageListRef?.current && virtuoso?.current) {
       const containerRect = messageListRef.current.getBoundingClientRect()
       for (let i = 0; i < renderItems.length; i++) {
@@ -276,9 +289,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
         }
       }
     }
-  }, [renderItems, isSmallScreen])
+  }, [renderItems, isSmallScreen, smoothFollowOutput])
 
   const handleScrollToNext = useCallback(() => {
+    smoothFollowOutput.pause()
     if (messageListRef?.current && virtuoso?.current) {
       const containerRect = messageListRef.current.getBoundingClientRect()
       for (let i = 0; i < renderItems.length; i++) {
@@ -303,7 +317,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
         }
       }
     }
-  }, [renderItems])
+  }, [renderItems, smoothFollowOutput])
 
   const [atBottom, setAtBottom] = useState(false)
   const [atTop, setAtTop] = useState(false)
@@ -343,11 +357,15 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const handleScroll = useCallback<UIEventHandler>(
     (e) => {
       const scrollTop = e.currentTarget.scrollTop
+      const maxScrollTop = e.currentTarget.scrollHeight - e.currentTarget.clientHeight
+      if (smoothFollowOutput.handleScroll(scrollTop, maxScrollTop)) {
+        setAtBottom(false)
+      }
       if (e.currentTarget.scrollHeight - (scrollTop + e.currentTarget.clientHeight) >= 0) {
         handleScrollTopThrottled(scrollTop)
       }
     },
-    [handleScrollTopThrottled]
+    [handleScrollTopThrottled, smoothFollowOutput]
   )
   // message navigation handlers end
 
@@ -368,6 +386,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   useEffect(() => {
     setMessageListElement(messageListRef)
   }, [])
+
+  useEffect(() => {
+    return () => smoothFollowOutput.dispose()
+  }, [smoothFollowOutput])
 
   useEffect(() => {
     const element = messageListRef.current
@@ -448,8 +470,14 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   )
 
   useImperativeHandle(ref, () => ({
-    scrollToTop: (behavior = 'auto') => virtuoso.current?.scrollTo({ top: 0, behavior }),
-    scrollToBottom: (behavior = 'auto') => virtuoso.current?.scrollTo({ top: Infinity, behavior }),
+    scrollToTop: (behavior = 'auto') => {
+      smoothFollowOutput.pause()
+      virtuoso.current?.scrollTo({ top: 0, behavior })
+    },
+    scrollToBottom: (behavior = 'auto') => {
+      smoothFollowOutput.resume()
+      virtuoso.current?.scrollTo({ top: Infinity, behavior })
+    },
     setIsNewMessage: (value: boolean) => setIsNewMessage(value),
   }))
 
@@ -460,12 +488,13 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
           className={cn('overflow-hidden h-full pr-0 relative', showMinimap ? 'pl-[28px]' : 'pl-1 sm:pl-0')}
           ref={messageListRef}
         >
+          {/* Virtuoso smooths appended items but snaps same-item height growth; the controller below owns both cases. */}
           <Virtuoso
             style={{ scrollbarGutter: 'stable' }}
             className={platformType === 'win32' ? 'scrollbar-custom' : ''}
             data={renderItems}
             ref={virtuoso}
-            followOutput="smooth"
+            followOutput={false}
             {...(sessionScrollPositionCache.has(currentSession.id)
               ? {
                   restoreStateFrom: sessionScrollPositionCache.get(currentSession.id),
@@ -509,7 +538,13 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
               )
             }}
             atTopStateChange={setAtTop}
-            atBottomStateChange={setAtBottom}
+            atBottomStateChange={(nextAtBottom) => {
+              if (nextAtBottom) {
+                smoothFollowOutput.resume()
+              }
+              setAtBottom(nextAtBottom || smoothFollowOutput.isFollowing())
+            }}
+            totalListHeightChanged={smoothFollowOutput.handleHeightChange}
             onScroll={handleScroll}
           />
 

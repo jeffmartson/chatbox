@@ -127,6 +127,31 @@ html[data-theme="dark"] {
   animation: loadingrotation 0.4s linear infinite;
 }
 
+.chatbox-streaming-text-fade,
+[data-streaming-fade-key] {
+  display: inline;
+  position: relative;
+  animation: chatbox-streaming-text-fade 300ms ease-out both;
+}
+
+@keyframes chatbox-streaming-text-fade {
+  from {
+    opacity: 0;
+    top: 2px;
+  }
+  to {
+    opacity: 1;
+    top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatbox-streaming-text-fade,
+  [data-streaming-fade-key] {
+    animation: none;
+  }
+}
+
 @keyframes loadingrotation {
   0% {
     transform: rotate(0deg);

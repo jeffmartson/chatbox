@@ -63,6 +63,7 @@ import { trackAgentModeSuggestionAction } from '@/analytics/agent-mode'
 import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import Markdown from '@/components/Markdown'
+import StreamingTextFade from '@/components/StreamingTextFade'
 import { useFetchBlob } from '@/hooks/useBlob'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { formatElapsedTime } from '@/hooks/useThinkingTimer'
@@ -742,10 +743,14 @@ const _Message: FC<Props> = (props) => {
                         {item.text || ''}
                       </Markdown>
                     ) : (
-                      <div className="break-words [overflow-wrap:anywhere] whitespace-pre-line">
-                        {needCollapse && isCollapsed ? `${item.text.slice(0, collapseThreshold)}...` : item.text}
+                      <StreamingTextFade
+                        text={needCollapse && isCollapsed ? `${item.text.slice(0, collapseThreshold)}...` : item.text}
+                        streamKey={`${msg.id}-${index}`}
+                        generating={msg.role === 'assistant' && msg.generating === true}
+                        className="break-words [overflow-wrap:anywhere] whitespace-pre-line"
+                      >
                         {needCollapse && isCollapsed && CollapseButton}
-                      </div>
+                      </StreamingTextFade>
                     )}
                   </div>
                 ) : item.type === 'info' ? (
