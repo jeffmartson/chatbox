@@ -102,6 +102,9 @@ OpenAI Codex（**Apache-2.0**，`openai/codex` → `codex-rs/windows-sandbox-rs`
     工作目录外（包括用户授权的真实目录）使用绝对路径和结构化文件工具。Bash 提示会区分 Git Bash 的
     `C:/...` 与 WSL 的 `/mnt/c/...`，并禁止直接传入 `C:\\...`。若模型仍用原生路径执行 `cd`，shim 会通过
     `cygpath` / `wslpath` 做窄范围兜底。
+  - 核心文件工具不经过 Bash：分页读取和单目录列表使用 Node helper，递归发现和内容搜索使用内置
+    ripgrep，本地产物下载直接调用持久化接口。未安装 Git Bash/WSL 不影响 `read_file`、`list_files`、
+    `search_files` 或 `create_download`。
 - **`checkAvailability(win32)` → available**（原生、无隔离），移除旧的 `wsl --status` 探测。
 - **不做** env 级网络关闭（容易绕过，价值低）。
 - **支持绑定真实工作目录**：Agent Mode 的工作目录入口在 Windows 上可用。文件工具会把原生
@@ -223,8 +226,11 @@ PR #813（已合并，commit `c955cbf94`）基于错误的 WSL 前提。本次�
 - `windows-path.ts` / `filesystem.ts`：统一 Windows 原生与 shell 路径、大小写无关边界判断，并把授权目录
   的文件工具写入路由到主进程。
 - `manager.ts`：会话记录经过筛选的授权目录；写入/编辑执行词法边界与 canonical symlink/junction 校验。
-- 测试：`resolveWindowsPowerShell` / `resolveWindowsBash` 决策、Windows 路径别名/大小写/越界，以及授权目录 symlink 逃逸单测；
-  macOS SRT 路径与 stdin 执行机制已实测。
+- `manager.ts` / `ripgrep-search.ts`：文件分页读取和单目录列表使用 Node helper；文件发现与内容搜索统一走
+  内置 ripgrep；相对下载路径基于会话工作目录解析并校验允许根目录，不再依赖 Bash `realpath`。
+- `code-execution.ts`：本地 `create_download` 直接调用 `persistArtifact`，Windows 输出固定保存在工作目录。
+- 测试：`resolveWindowsPowerShell` / `resolveWindowsBash` 决策、Windows 路径别名/大小写/越界、授权目录
+  symlink 逃逸、无 Bash 文件工具与大输出分页单测；macOS SRT 路径与 stdin 执行机制已实测。
 
 ## 9. 验证状态与后续
 
@@ -232,6 +238,6 @@ PR #813（已合并，commit `c955cbf94`）基于错误的 WSL 前提。本次�
 - ✅ 机制：node（无参 + stdin）、PowerShell（stdin）与 bash（stdin）执行均有聚焦测试覆盖。
 - ✅ Windows：GitHub Actions `windows-2022` 已覆盖原生 Node/PowerShell/Bash stdin 执行、PowerShell 7
   / Windows PowerShell 解析、Git Bash 解析、原生 `C:\\...` 路径、空格/中文目录、文件读写/搜索以及
-  shell 路径回转；WSL 仍只做决策单测，
+  shell 路径回转，并在 PR #901 验证无 Bash 文件读取/列表、内置 ripgrep 查找与相对路径产物持久化；WSL 仍只做决策单测，
   未在 hosted runner 上安装发行版做端到端验证。
 - 后续（如需补回隔离）：按 §3.3 / §4 的 Codex unelevated 方向实现受限令牌 + ACL。

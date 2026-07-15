@@ -27,6 +27,12 @@ export interface SandboxOperationResult {
   errorCode?: SandboxExecErrorCode
 }
 
+export interface SandboxReadResult extends SandboxOperationResult {
+  startLine?: number
+  endLine?: number
+  totalLines?: number
+}
+
 export interface SandboxSearchParams {
   pattern: string
   path: string
@@ -76,8 +82,11 @@ export interface SandboxProvider {
   /** Copy a file from the blob store into the sandbox (avoids sending content through IPC) */
   copyBlobIn(blobKey: string, targetFilename: string): Promise<{ success: boolean; error?: string }>
 
-  /** Read a file from the sandbox */
-  readFileOut(sandboxPath: string): Promise<{ success: boolean; content?: string; error?: string }>
+  /** Read a bounded line range from a file in the sandbox. */
+  readFileOut(sandboxPath: string, options?: { offset?: number; limit?: number }): Promise<SandboxReadResult>
+
+  /** List one directory in the sandbox. Recursive file discovery uses bundled ripgrep separately. */
+  listFiles(sandboxPath: string): Promise<SandboxOperationResult>
 
   /** Export a file from sandbox to user's filesystem (triggers save dialog on desktop) */
   exportFile(

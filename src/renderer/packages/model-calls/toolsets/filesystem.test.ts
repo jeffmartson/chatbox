@@ -1,4 +1,4 @@
-import { SANDBOX_EXEC_ERROR_CODES, type SandboxExecResult, type SandboxProvider } from '@shared/sandbox-provider'
+import type { SandboxExecResult, SandboxOperationResult, SandboxProvider } from '@shared/sandbox-provider'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fsWrite = vi.fn(async (..._args: unknown[]) => ({ success: true }))
@@ -32,6 +32,9 @@ import { buildFilesystemTools } from './filesystem'
 
 const exec = vi.fn(async (..._args: unknown[]): Promise<SandboxExecResult> => ({ stdout: '', stderr: '', exitCode: 0 }))
 const search = vi.fn(async (..._args: unknown[]) => ({ success: true, content: '' }))
+const listFiles = vi.fn(
+  async (..._args: unknown[]): Promise<SandboxOperationResult> => ({ success: true, content: '' })
+)
 
 // Provider whose sandbox root never contains the tested absolute paths, so non-/tmp paths
 // take the real-filesystem branch where approval would normally be requested. /tmp paths
@@ -41,6 +44,7 @@ const provider = {
   getStatus: async () => ({ workingDirectory: '/sandbox/root' }),
   exec: (...args: unknown[]) => exec(...args),
   search: (...args: unknown[]) => search(...args),
+  listFiles: (...args: unknown[]) => listFiles(...args),
 } as unknown as SandboxProvider
 
 function getTools() {
@@ -444,6 +448,21 @@ describe('search_files sandbox routing', () => {
 })
 
 describe('list_files model output', () => {
+  beforeEach(() => {
+    exec.mockClear()
+    listFiles.mockClear()
+  })
+
+  test('lists sandbox files through the provider without invoking a shell', async () => {
+    listFiles.mockResolvedValueOnce({ success: true, content: 'file\t5\treport.txt' })
+
+    const result = await execute(getTools().list_files, { path: '.' })
+
+    expect(listFiles).toHaveBeenCalledWith('.')
+    expect(exec).not.toHaveBeenCalled()
+    expect(result).toEqual({ content: 'file\t5\treport.txt' })
+  })
+
   test('list_files maps empty content to an empty-directory result', async () => {
     await expect(toModelOutput(getTools().list_files, { content: '' })).resolves.toEqual({
       type: 'text',
@@ -451,24 +470,18 @@ describe('list_files model output', () => {
     })
   })
 
-  test('preserves Bash availability errors for the UI and model', async () => {
-    exec.mockResolvedValueOnce({
-      stdout: '',
-      stderr: 'bash is not available',
-      exitCode: 127,
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-    })
+  test('preserves provider errors for the UI and model', async () => {
+    listFiles.mockResolvedValueOnce({ success: false, error: 'directory unavailable' })
 
     const tool = getTools().list_files
     const result = await execute(tool, { path: '/tmp/project' })
 
     expect(result).toEqual({
-      error: 'bash is not available',
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
+      error: 'directory unavailable',
     })
     await expect(toModelOutput(tool, result)).resolves.toEqual({
       type: 'text',
-      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
+      value: 'Error: directory unavailable',
     })
   })
 })

@@ -1,7 +1,9 @@
 import type {
   SandboxExecLanguage,
   SandboxExecResult,
+  SandboxOperationResult,
   SandboxProvider,
+  SandboxReadResult,
   SandboxSearchParams,
   SandboxSearchResult,
 } from '@shared/sandbox-provider'
@@ -126,11 +128,18 @@ export class LocalSandboxProvider implements SandboxProvider {
     return platform.sandboxCopyBlob({ blobKey, targetFilename, sessionId: this.sessionId ?? undefined })
   }
 
-  async readFileOut(sandboxPath: string): Promise<{ success: boolean; content?: string; error?: string }> {
+  async readFileOut(sandboxPath: string, options?: { offset?: number; limit?: number }): Promise<SandboxReadResult> {
     if (!platform.sandboxRead) {
       return { success: false, error: 'Sandbox read not available' }
     }
-    return platform.sandboxRead({ filePath: sandboxPath, sessionId: this.sessionId ?? undefined })
+    return await platform.sandboxRead({ filePath: sandboxPath, ...options, sessionId: this.sessionId ?? undefined })
+  }
+
+  async listFiles(sandboxPath: string): Promise<SandboxOperationResult> {
+    if (!platform.sandboxLs) {
+      return { success: false, error: 'Sandbox list not available' }
+    }
+    return await platform.sandboxLs({ dirPath: sandboxPath, sessionId: this.sessionId ?? undefined })
   }
 
   async exportFile(

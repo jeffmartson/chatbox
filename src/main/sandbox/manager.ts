@@ -19,6 +19,7 @@ import {
   type SandboxExecLanguage,
   type SandboxExecResult,
   type SandboxOperationResult,
+  type SandboxReadResult,
 } from '../../shared/sandbox-provider'
 import {
   TASK_SANDBOX_DENY_READ_PATHS,
@@ -28,10 +29,11 @@ import {
 import { shellQuote } from '../../shared/utils/shell'
 import { normalizeWindowsAbsolutePath } from '../../shared/utils/windows-path'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
-import { runRipgrepSearch } from '../ripgrep-search'
+import { runRipgrepFileList, runRipgrepSearch } from '../ripgrep-search'
 import { getLogger } from '../util'
 import { resolveWindowsPowerShell } from '../windows-powershell'
 import { buildSandboxStdinScript, stripCodesignNoise } from './exec-script'
+import { buildSandboxReadScript } from './file-read'
 import { headTruncate, tailTruncate } from './truncate'
 
 export { resetWindowsPowerShellResolutionCache, resolveWindowsPowerShell } from '../windows-powershell'
@@ -881,11 +883,6 @@ export function killRunningCommand(sessionId?: string): { killed: boolean } {
 
 // ─── File operations ─────────────────────────────────────────────────
 
-/** Run a bash command string inside the sandbox — thin wrapper over execCode for internal file ops. */
-async function execBashInSandbox(command: string, sessionId?: string): Promise<ExecResult> {
-  return execCode({ code: command, language: 'bash', sessionId })
-}
-
 function operationError(result: ExecResult, fallback: string): Pick<SandboxOperationResult, 'error' | 'errorCode'> {
   return {
     error: result.stderr || result.stdout || fallback,
@@ -893,13 +890,43 @@ function operationError(result: ExecResult, fallback: string): Pick<SandboxOpera
   }
 }
 
-export async function readFile(filePath: string, sessionId?: string): Promise<SandboxOperationResult> {
+const SANDBOX_READ_DEFAULT_LINES = 500
+const SANDBOX_READ_MAX_LINES = 2000
+const SANDBOX_MAX_LINE_LENGTH = 2000
+const SANDBOX_LIST_MAX_ENTRIES = 200
+
+export async function readFile(
+  filePath: string,
+  sessionId?: string,
+  options?: { offset?: number; limit?: number }
+): Promise<SandboxReadResult> {
   try {
-    const result = await execBashInSandbox(`cat ${shellEscape(filePath)}`, sessionId)
+    const startLine = Math.max(1, Math.floor(options?.offset ?? 1))
+    const limit = Math.min(
+      SANDBOX_READ_MAX_LINES,
+      Math.max(1, Math.floor(options?.limit ?? SANDBOX_READ_DEFAULT_LINES))
+    )
+    const result = await execCode({
+      language: 'node',
+      sessionId,
+      timeout: 10_000,
+      code: buildSandboxReadScript({
+        filePath,
+        startLine,
+        limit,
+        maxLineLength: SANDBOX_MAX_LINE_LENGTH,
+      }),
+    })
     if (result.exitCode !== 0) {
       return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
-    return { success: true, content: headTruncate(result.stdout) }
+    const output = JSON.parse(result.stdout) as {
+      content: string
+      startLine: number
+      endLine: number
+      totalLines: number
+    }
+    return { success: true, ...output }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -988,7 +1015,27 @@ export async function editFile(
 
 export async function listDir(dirPath: string, sessionId?: string): Promise<SandboxOperationResult> {
   try {
-    const result = await execBashInSandbox(`ls -la ${shellEscape(dirPath)}`, sessionId)
+    const result = await execCode({
+      language: 'node',
+      sessionId,
+      timeout: 10_000,
+      code: `
+const fs = require('fs')
+const path = require('path')
+const dirPath = ${JSON.stringify(dirPath)}
+const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+const rows = entries.slice(0, ${SANDBOX_LIST_MAX_ENTRIES}).map((entry) => {
+  let size = 0
+  try { size = fs.statSync(path.join(dirPath, entry.name)).size } catch {}
+  const type = entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
+  return type + '\\t' + size + '\\t' + entry.name
+})
+if (entries.length > ${SANDBOX_LIST_MAX_ENTRIES}) {
+  rows.push('... ' + (entries.length - ${SANDBOX_LIST_MAX_ENTRIES}) + ' more entries')
+}
+process.stdout.write(rows.join('\\n'))
+`,
+    })
     if (result.exitCode !== 0) {
       return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
     }
@@ -1010,7 +1057,7 @@ export async function searchFiles(
   }
 
   const root = path.resolve(session.workingDirectory, dirPath ?? '.')
-  return runRipgrepSearch(
+  return await runRipgrepSearch(
     { root, pattern, regex: options?.regex, include: options?.include },
     {
       prepareCommand: async (command, args) => {
@@ -1041,16 +1088,35 @@ export async function findFiles(
   pattern?: string,
   sessionId?: string
 ): Promise<SandboxOperationResult> {
-  try {
-    const nameFlag = pattern ? `-name ${shellEscape(pattern)}` : ''
-    const result = await execBashInSandbox(`find ${shellEscape(dirPath)} ${nameFlag} -type f`, sessionId)
-    if (result.exitCode !== 0) {
-      return { success: false, ...operationError(result, `Exit code ${result.exitCode}`) }
-    }
-    return { success: true, content: headTruncate(result.stdout) }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  const session = getSession(sessionId)
+  if (!session?.workingDirectory || session.state !== 'initialized') {
+    return { success: false, error: 'Sandbox not initialized' }
   }
+
+  return await runRipgrepFileList(
+    { root: session.workingDirectory, path: dirPath, pattern },
+    {
+      prepareCommand: async (command, args) => {
+        if (process.platform === 'win32') return { command, args }
+        if (!globalSandboxManager || !session.sandboxConfig) {
+          throw new Error('Sandbox not initialized')
+        }
+        const innerCommand = [command, ...args].map((token) => shellQuote(token)).join(' ')
+        const customConfig = session.sandboxConfig as Parameters<typeof globalSandboxManager.wrapWithSandboxArgv>[2]
+        const wrapped = await globalSandboxManager.wrapWithSandboxArgv(innerCommand, undefined, customConfig)
+        return {
+          command: wrapped.argv[0],
+          args: wrapped.argv.slice(1),
+          env: wrapped.env,
+          detached: true,
+        }
+      },
+      terminate: killProcessTree,
+      onChild: (child) => {
+        session.runningChild = child
+      },
+    }
+  )
 }
 
 // ─── Sandbox lifecycle (continued) ───────────────────────────────────
@@ -1378,27 +1444,42 @@ export async function persistSandboxArtifact(
   // normalize to native Windows form before absolute/root validation.
   sandboxPath = normalizeWindowsShellPath(sandboxPath)
   if (!path.isAbsolute(sandboxPath)) {
-    return { success: false, error: 'Artifact path must be absolute' }
+    const workingDirectory = getSession(sessionId)?.workingDirectory ?? path.join(getSandboxTmpRoot(), sessionId)
+    const resolvedRelativePath = path.resolve(workingDirectory, sandboxPath)
+    if (resolvedRelativePath !== workingDirectory && !resolvedRelativePath.startsWith(workingDirectory + path.sep)) {
+      return { success: false, error: 'Access denied: relative artifact path escapes the sandbox' }
+    }
+    sandboxPath = resolvedRelativePath
   }
   try {
-    // Security: the source must live inside a sandbox root (per-session working dir or
-    // persisted artifacts) or a sandbox-writable temp location (/tmp, OS temp dir) — i.e.
-    // somewhere the sandbox can legitimately produce files.
+    // Security: scope session-managed paths to this session. getSandboxAllowedRoots() is
+    // intentionally broader for preview/recovery, so using it here would allow one live
+    // session to persist another session's working file or durable artifact.
     const resolvedSource = safeRealpathSync(sandboxPath)
-    const allowedRoots = [...getSandboxAllowedRoots(), ...getSandboxExtraWriteRoots()]
-    const insideSandbox = allowedRoots.some(
+    const sessionWorkingRoot = safeRealpathSync(
+      getSession(sessionId)?.workingDirectory ?? path.join(getSandboxTmpRoot(), sessionId)
+    )
+    const sessionArtifactsRoot = safeRealpathSync(path.join(getSandboxArtifactsRoot(), sessionId))
+    const sharedSandboxTmpRoot = safeRealpathSync(getSandboxTmpRoot())
+    const sharedArtifactsRoot = safeRealpathSync(getSandboxArtifactsRoot())
+    const isInsideRoot = (root: string) => resolvedSource === root || resolvedSource.startsWith(root + path.sep)
+    const insideSessionManagedRoot = [sessionWorkingRoot, sessionArtifactsRoot].some(isInsideRoot)
+    const insideSharedManagedRoot = [sharedSandboxTmpRoot, sharedArtifactsRoot].some(isInsideRoot)
+    const insideExtraWriteRoot = getSandboxExtraWriteRoots().some(
       (root) => resolvedSource === root || resolvedSource.startsWith(root + path.sep)
     )
-    if (!insideSandbox) {
+    if (!insideSessionManagedRoot && (insideSharedManagedRoot || !insideExtraWriteRoot)) {
       return { success: false, error: 'Access denied: path is outside the sandbox' }
     }
     if (!existsSync(resolvedSource)) {
       return { success: false, error: `File not found: ${sandboxPath}` }
     }
+    if (!statSync(resolvedSource).isFile()) {
+      return { success: false, error: `Not a file: ${sandboxPath}` }
+    }
 
     // Already persisted — nothing to copy.
-    const artifactsRoot = safeRealpathSync(getSandboxArtifactsRoot())
-    if (resolvedSource === artifactsRoot || resolvedSource.startsWith(artifactsRoot + path.sep)) {
+    if (isInsideRoot(sessionArtifactsRoot)) {
       return { success: true, artifactPath: resolvedSource }
     }
 

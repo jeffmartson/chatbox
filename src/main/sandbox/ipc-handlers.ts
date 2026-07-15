@@ -47,16 +47,19 @@ export function registerSandboxIPCHandlers() {
     }
   )
 
-  ipcMain.handle('sandbox:read', async (_event, params: { filePath: string; sessionId?: string }) => {
-    try {
-      log.debug(`sandbox:read path=${params.filePath}`)
-      return await readFile(params.filePath, params.sessionId)
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error)
-      log.error('sandbox:read failed', msg)
-      return { success: false, error: msg }
+  ipcMain.handle(
+    'sandbox:read',
+    async (_event, params: { filePath: string; offset?: number; limit?: number; sessionId?: string }) => {
+      try {
+        log.debug(`sandbox:read path=${params.filePath}`)
+        return await readFile(params.filePath, params.sessionId, { offset: params.offset, limit: params.limit })
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        log.error('sandbox:read failed', msg)
+        return { success: false, error: msg }
+      }
     }
-  })
+  )
 
   ipcMain.handle('sandbox:write', async (_event, params: { filePath: string; content: string; sessionId?: string }) => {
     try {

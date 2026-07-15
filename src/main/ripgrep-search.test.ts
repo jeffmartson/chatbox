@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { runRipgrepSearch } from './ripgrep-search'
+import { runRipgrepFileList, runRipgrepSearch } from './ripgrep-search'
 
 const temporaryDirectories: string[] = []
 const bundledRipgrepPath = path.join(
@@ -28,6 +28,7 @@ function createFixture(): string {
   mkdirSync(path.join(root, 'node_modules'), { recursive: true })
   writeFileSync(path.join(root, 'nested', 'example.ts'), 'alpha 123\nfoo(bar)\n')
   writeFileSync(path.join(root, 'notes.md'), 'alpha 456\n')
+  writeFileSync(path.join(root, 'nested', 'empty.txt'), '')
   writeFileSync(path.join(root, 'node_modules', 'ignored.ts'), 'alpha 789\n')
   return root
 }
@@ -108,5 +109,21 @@ describe('runRipgrepSearch', () => {
     expect(result.success).toBe(true)
     expect(lines).toHaveLength(100)
     expect(Math.max(...counts.values())).toBe(50)
+  })
+})
+
+describe('runRipgrepFileList', () => {
+  test('uses ripgrep file enumeration, includes empty files, and applies glob/exclude rules', async () => {
+    const root = createFixture()
+    const result = await runRipgrepFileList({ root, pattern: '*.txt' }, { ripgrepPath })
+
+    expect(result).toEqual({ success: true, content: 'nested/empty.txt' })
+  })
+
+  test('preserves the searched directory prefix in returned paths', async () => {
+    const root = createFixture()
+    const result = await runRipgrepFileList({ root, path: 'nested', pattern: '*.txt' }, { ripgrepPath })
+
+    expect(result).toEqual({ success: true, content: 'nested/empty.txt' })
   })
 })

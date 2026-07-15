@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -171,10 +170,57 @@ describe('persistSandboxArtifact', () => {
     expect(result.error).toMatch(/outside the sandbox/i)
   })
 
-  test('rejects a relative path', async () => {
-    const result = await persistSandboxArtifact('relative/path.txt', SESSION_ID)
+  test('resolves a relative path from the session sandbox directory', async () => {
+    makeSandboxFile('relative.txt', 'relative artifact')
+
+    const result = await persistSandboxArtifact('relative.txt', SESSION_ID)
+
+    expect(result.success).toBe(true)
+    expect(result.artifactPath).toBeTruthy()
+    if (result.artifactPath) {
+      expect(readFileSync(result.artifactPath, 'utf8')).toBe('relative artifact')
+    }
+  })
+
+  test('rejects a file from another session sandbox directory', async () => {
+    const otherSessionDir = path.join(getSandboxTmpRoot(), 'other-session')
+    mkdirSync(otherSessionDir, { recursive: true })
+    const source = path.join(otherSessionDir, 'private.txt')
+    writeFileSync(source, 'other session', 'utf8')
+
+    const result = await persistSandboxArtifact(realpathSync(source), SESSION_ID)
+
     expect(result.success).toBe(false)
-    expect(result.error).toMatch(/absolute/i)
+    expect(result.error).toMatch(/outside the sandbox/i)
+    rmSync(otherSessionDir, { recursive: true, force: true })
+  })
+
+  test('rejects a durable artifact owned by another session', async () => {
+    const otherSessionArtifact = path.join(getSandboxArtifactsRoot(), 'other-session', 'source', 'private.txt')
+    mkdirSync(path.dirname(otherSessionArtifact), { recursive: true })
+    writeFileSync(otherSessionArtifact, 'other artifact', 'utf8')
+
+    const result = await persistSandboxArtifact(realpathSync(otherSessionArtifact), SESSION_ID)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/outside the sandbox/i)
+  })
+
+  test('rejects a directory instead of exposing it as a downloadable artifact', async () => {
+    const directory = path.join(getSandboxArtifactsRoot(), SESSION_ID, 'directory')
+    mkdirSync(directory, { recursive: true })
+
+    const result = await persistSandboxArtifact(realpathSync(directory), SESSION_ID)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/not a file/i)
+  })
+
+  test('rejects a relative path that escapes the session sandbox directory', async () => {
+    const result = await persistSandboxArtifact('../escape.txt', SESSION_ID)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/escapes the sandbox/i)
   })
 
   test('rejects a session id with path traversal', async () => {

@@ -26,6 +26,14 @@ export interface RipgrepSearchResult {
   error?: string
 }
 
+export interface RipgrepFileListParams {
+  root: string
+  path?: string
+  pattern?: string
+}
+
+export type RipgrepFileListResult = RipgrepSearchResult
+
 interface PreparedCommand {
   command: string
   args: string[]
@@ -104,6 +112,16 @@ function buildRipgrepArgs(params: RipgrepSearchParams): string[] {
   return args
 }
 
+function buildRipgrepFileListArgs(params: RipgrepFileListParams): string[] {
+  const args = ['--no-config', '--hidden', '--no-ignore', '--path-separator', '/', '--files']
+  if (params.pattern) args.push('--glob', params.pattern)
+  for (const directory of SEARCH_EXCLUDE_DIRS) {
+    args.push('--glob', `!**/${directory}/**`)
+  }
+  args.push('--', params.path ?? '.')
+  return args
+}
+
 function normalizeResultLine(line: string): string {
   return line.replace(/^\.\//, '')
 }
@@ -112,13 +130,28 @@ function normalizeResultLine(line: string): string {
  * Search with ripgrep's default Rust regex engine. The engine is linear-time and deliberately
  * does not enable PCRE2, so model-supplied patterns cannot trigger catastrophic backtracking.
  */
-export async function runRipgrepSearch(
+export function runRipgrepSearch(
   params: RipgrepSearchParams,
   options: RipgrepRunnerOptions = {}
 ): Promise<RipgrepSearchResult> {
   const root = path.resolve(params.root)
+  return runRipgrepLines(root, buildRipgrepArgs(params), options)
+}
+
+/** Recursively list files with bundled ripgrep instead of walking large trees in Node. */
+export function runRipgrepFileList(
+  params: RipgrepFileListParams,
+  options: RipgrepRunnerOptions = {}
+): Promise<RipgrepFileListResult> {
+  return runRipgrepLines(path.resolve(params.root), buildRipgrepFileListArgs(params), options)
+}
+
+async function runRipgrepLines(
+  root: string,
+  baseArgs: string[],
+  options: RipgrepRunnerOptions
+): Promise<RipgrepSearchResult> {
   const ripgrepPath = options.ripgrepPath ?? getRipgrepBinaryPath()
-  const baseArgs = buildRipgrepArgs(params)
   const prepared = options.prepareCommand
     ? await options.prepareCommand(ripgrepPath, baseArgs)
     : { command: ripgrepPath, args: baseArgs }

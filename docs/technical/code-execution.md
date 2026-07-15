@@ -1,6 +1,6 @@
 # Chat 模式代码执行技术设计
 
-> Last updated: 2026-06
+> Last updated: 2026-07
 
 本文档描述 Chat 模式下代码执行、Agent Mode、工具暂停审批和 HTML 产物预览的技术设计。产品说明见 [`docs/product/code-execution.md`](../product/code-execution.md)。
 
@@ -48,7 +48,7 @@ Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sand
 | 工具 | 输入 | 输出 | 说明 |
 |------|------|------|------|
 | `code_execution` | `code`, `language`, `timeout?` | `{ stdout, stderr, exitCode }` | 执行短 Node.js、PowerShell（Windows）或 Bash 脚本。`language` 为 `node | powershell | bash` |
-| `read_file` | `file_path`, `offset?`, `limit?` | `{ content, startLine, endLine, totalLines, hasMore }` | 读取沙箱文件或经授权读取用户真实文件，支持分页 |
+| `read_file` | `file_path`, `offset?`, `limit?` | `{ content, startLine, endLine, totalLines, hint? }` | 读取沙箱文件或经授权读取用户真实文件，按行数和输出字节数双重限制分页 |
 | `create_download` | `file_path`, `display_name?` | `{ downloadable, file_path, display_name }` | 将沙箱文件标记为消息产物 |
 
 ### 运行环境
@@ -57,7 +57,8 @@ Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sand
 
 - 不创建 venv，不预装 pandas/numpy/matplotlib，也不支持 pip 安装作为默认路径。
 - Node.js 优先使用应用解析出的本地运行时，避免依赖用户 shell 的 `PATH` 或 nvm 初始化状态。
-- Bash 只用于轻量命令和文件处理；需要复杂依赖时应让模型解释限制，而不是安装大型软件包。
+- Windows 优先使用 PowerShell 7，并回退到 Windows PowerShell；Bash 仅作为 Git Bash/WSL 可用时的可选运行时。
+- macOS/Linux 可使用 Bash 执行轻量命令；核心文件工具不依赖 Bash 或 WSL。
 - 图表优先生成 HTML/SVG/浏览器 JS，通过本地预览展示。
 
 这个选择降低了安装包体积和签名风险，也让 Chat 代码执行聚焦于简单文件处理。
@@ -71,6 +72,13 @@ Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sand
 - 复制采用并发批次控制，避免大量文件 IPC 传输阻塞 UI。
 
 工具结果必须保持小体积。大输出写入沙箱文件，再通过 `read_file` 分页、`create_download` 下载或 HTML 预览展示。
+
+### 结构化文件操作
+
+- `read_file` 和单目录 `list_files` 通过 `SandboxProvider` 调用受限 Node helper，不拼接 Bash 命令。Node helper 在 macOS/Linux 继续继承 SRT 隔离，在 Windows 使用原生工作目录。
+- `read_file` 的 helper 输出单个 JSON 对象，并按 JSON 编码后的字节数限制内容，保证不会被通用 `execCode` 的 50KB stdout 截断逻辑破坏；内容达到上限时通过 `endLine` 继续分页。
+- 递归文件发现和内容搜索使用应用内置 ripgrep，统一结果数量、超时、重目录排除和 Rust regex 语义；不使用 Node 递归遍历。
+- 本地 `create_download` 直接调用 `persistArtifact`。相对路径基于会话工作目录解析，持久化前进行真实路径和允许根目录校验，不再通过 Shell 执行 `test` / `realpath`。
 
 ## Agent Mode
 
@@ -220,6 +228,8 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 - `tools-builder.test.ts`：不同 agent mode、code execution provider、web search、sandbox_* 不可见。
 - `agent-mode-orchestration.test.ts`：prepareStep、暂停/继续和 append 行为。
 - `code-execution.test.ts`：懒初始化、文件注入、执行和错误处理。
+- `file-read.test.ts`：分页读取、JSON 字节预算和大输出结构完整性。
+- `manager.windows.test.ts`：Windows 原生 Node/PowerShell、无 Bash 文件读写/目录列表、ripgrep 搜索与相对路径下载持久化。
 - `user-exec-whitelist.test.ts`：自动审批白名单。
 - 文件工具与 UI 组件测试：暂停审批、timeline、产物展示、HTML 预览。
 
@@ -228,7 +238,7 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 | 决策 | 选择 | 理由 |
 |------|------|------|
 | Chat 工具形态 | 高层 `code_execution` 替代 `sandbox_*` | 降低模型误用底层 shell/file 工具的概率 |
-| 运行时 | Node.js/Bash，不内置 Python 科学栈 | 控制安装包体积和签名风险，聚焦简单文件处理 |
+| 运行时 | Node.js、PowerShell（Windows）、可选 Bash，不内置 Python 科学栈 | 控制安装包体积和签名风险，核心文件工具不依赖 Shell |
 | Auto 进入条件 | 首轮快速分类模型建议 + 用户手动确认，移除文件类型自动升级 | 避免误判，把控制权交回用户，减少纯文本对话的上下文污染 |
 | 暂停机制 | 持久化 `paused` tool call | 重启可恢复，继续后能 append 到原消息 |
 | HTML 预览 | 本地 preview server + 沙箱相对路径 | 支持相对资源文件，不依赖远端 artifact 域名 |

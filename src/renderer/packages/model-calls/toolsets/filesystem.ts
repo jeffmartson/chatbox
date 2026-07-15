@@ -1,6 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import { TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
-import { shellQuote } from '@shared/utils/shell'
 import {
   isWindowsAbsolutePath,
   isWindowsFilesystemRoot,
@@ -12,7 +11,6 @@ import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
-import { sandboxExecToolError } from './sandbox-exec-errors'
 import { remapPhantomHomePathForProvider } from './sandbox-paths'
 
 interface FilesystemContext {
@@ -326,14 +324,10 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
         if (!context.provider) return { error: 'Sandbox is not available' }
-        const result = await context.provider.exec({
-          language: 'bash',
-          code: `ls -la ${shellQuote(listInput.path)}`,
-          timeout: 10_000,
-        })
-        return result.exitCode === 0
-          ? { content: result.stdout }
-          : sandboxExecToolError(result, `Unable to list directory: ${listInput.path}`)
+        const result = await context.provider.listFiles(listInput.path)
+        return result.success
+          ? { content: result.content ?? '' }
+          : { error: result.error, ...(result.errorCode ? { errorCode: result.errorCode } : {}) }
       }
       const pathError = requireAbsoluteRealPath(listInput.path)
       if (pathError) return pathError

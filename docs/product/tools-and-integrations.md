@@ -92,7 +92,7 @@ Chatbox 支持多种技能来源：
 
 ## 代码执行
 
-在 Chat 模式下，通过 Agent Mode 启用代码执行后，AI 可以在桌面端本地沙箱中运行 Node.js/Bash 代码、处理上传文件、生成可下载文件和 HTML 预览。该能力聚焦简单文件处理和数据计算，不预装 Python 科学计算栈，也不鼓励安装大型依赖包。详见 [Chat 代码执行](./code-execution.md)。
+在 Chat 模式下，通过 Agent Mode 启用代码执行后，AI 可以在桌面端运行 Node.js 或平台可用的 Shell（Windows 优先 PowerShell，Bash 可选）、处理上传文件、生成可下载文件和 HTML 预览。核心文件工具不依赖 Bash 或 WSL。该能力聚焦简单文件处理和数据计算，不预装 Python 科学计算栈，也不鼓励安装大型依赖包。详见 [Chat 代码执行](./code-execution.md)。
 
 ## 文件读取
 

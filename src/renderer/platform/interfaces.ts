@@ -1,5 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
-import type { SandboxExecLanguage, SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
+import type {
+  SandboxExecLanguage,
+  SandboxExecResult,
+  SandboxOperationResult,
+  SandboxReadResult,
+} from '@shared/sandbox-provider'
 import type { Config, Language, Settings, ShortcutSetting } from '@shared/types'
 import type { ImageGenerationStorage } from '@/storage/ImageGenerationStorage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
@@ -146,7 +151,12 @@ export interface Platform extends Storage {
     timeout?: number
     sessionId?: string
   }): Promise<SandboxExecResult>
-  sandboxRead?(params: { filePath: string; sessionId?: string }): Promise<SandboxOperationResult>
+  sandboxRead?(params: {
+    filePath: string
+    offset?: number
+    limit?: number
+    sessionId?: string
+  }): Promise<SandboxReadResult>
   sandboxWrite?(params: {
     filePath: string
     content: string

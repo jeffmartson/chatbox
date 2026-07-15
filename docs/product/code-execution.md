@@ -1,6 +1,6 @@
 # Chat 模式代码执行
 
-> Last updated: 2026-06
+> Last updated: 2026-07
 
 ## 概述
 
@@ -10,7 +10,7 @@ Chat 模式代码执行让 AI 在普通对话中处理文件、运行轻量代�
 
 ## 工作方式
 
-Chat 模式代码执行在聊天对话中通过 Agent Mode 控制，自动为每个会话分配临时沙箱目录，文件来源为用户上传的文件或 AI 在沙箱内生成的文件，适用于文件分析、简单脚本、数据计算和产物生成。
+Chat 模式代码执行在聊天对话中通过 Agent Mode 控制，自动为每个会话分配临时工作目录，文件来源为用户上传的文件或 AI 在工作目录内生成的文件，适用于文件分析、简单脚本、数据计算和产物生成。macOS/Linux 会对代码执行施加操作系统级隔离；Windows 当前为原生执行，仅提供独立工作目录，不提供操作系统级文件或网络隔离。
 
 Chat 模式向模型提供 `code_execution` / `read_file` / `create_download` 等高级工具，不会向模型展示底层 `sandbox_*` 工具。历史消息仍可能渲染这些底层工具调用，但当前的 Chat Agent 工具集使用更高层的 code execution 工具。
 
@@ -18,7 +18,7 @@ Chat 模式向模型提供 `code_execution` / `read_file` / `create_download` �
 
 | 能力 | 说明 |
 |------|------|
-| 代码执行 | 在本地沙箱中运行 Node.js 或 Bash。优先用于短脚本、轻量数据处理和文件生成 |
+| 代码执行 | 运行 Node.js 或平台可用的 Shell；Windows 优先使用 PowerShell，Bash 为可选能力 |
 | 文件读取 | 读取沙箱文件或经授权读取用户真实文件，支持分页读取大文件 |
 | 文件解析 | 上传时预解析 PDF、Office 等文档；非文本文件会提供 `{文件名}_parsed.txt` 供 AI 读取 |
 | 文件生成 | AI 可生成文件并通过 `create_download` 在消息末尾展示为下载产物 |
@@ -29,9 +29,11 @@ Chat 模式向模型提供 `code_execution` / `read_file` / `create_download` �
 
 ## 运行环境
 
-当前 Chat 代码执行只提供 Node.js 和 Bash：
+当前 Chat 代码执行提供 Node.js 和平台可用的 Shell：
 
 - 使用应用内置或解析出的 Node.js，避免依赖用户终端环境。
+- Windows 优先使用 PowerShell 7，并可回退到 Windows PowerShell；Bash 仅在安装 Git Bash 或可用 WSL 时提供。
+- 文件读取、目录列表、文件搜索和下载产物等核心文件工具不依赖 Bash 或 WSL。
 - 不预装 Python、pandas、numpy、matplotlib，也不鼓励 AI 安装大型依赖包。
 - 生成图表时优先输出 HTML、SVG 或使用浏览器可直接运行的 JavaScript。
 - 工具结果会被截断，较大的输出应写入沙箱文件，再作为下载或预览产物展示。
@@ -68,7 +70,7 @@ Auto 模式下，在用户接受建议前不会注入 Agent 工具。切换到 O
 
 1. 将 Agent Mode 手动切换为 On（或接受 Auto 模式的建议），上传 CSV/XLSX 等文件。
 2. 询问“计算每月收入总和”或“找出峰值月份”。
-3. AI 使用 Node.js/Bash 读取文件、计算结果。
+3. AI 使用 Node.js 或平台可用的 Shell 读取文件、计算结果。
 4. 大结果写入文件，小结果直接在消息中总结。
 
 ### 生成 HTML 图表
@@ -101,7 +103,7 @@ Auto 模式下，在用户接受建议前不会注入 Agent 工具。切换到 O
 
 ## 安全与限制
 
-- 每个会话使用独立沙箱目录。
+- 每个会话使用独立工作目录；macOS/Linux 提供操作系统级隔离，Windows 当前原生执行且拥有当前用户权限。
 - 沙箱内文件可被 HTML 预览访问；预览使用本地服务解析相对资源。
 - 工具结果必须保持小体积，避免把大文件内容、base64 或长日志写入会话数据。
 - 写入真实文件系统前需要用户确认。

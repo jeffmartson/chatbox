@@ -231,7 +231,7 @@ Model Chat Refactor 中的核心部分已落地：
 
 ## Sandbox 工具集（历史保留）
 
-底层 Sandbox 工具集（`toolsets/sandbox.ts`）通过 Electron IPC 调用 Main 进程中的沙箱管理器执行，所有操作在 OS 级沙箱中隔离运行。包含 7 个工具：`sandbox_bash`（Shell 执行）、`sandbox_read`（文件读取）、`sandbox_write`（文件写入）、`sandbox_edit`（精确替换）、`sandbox_grep`（内容搜索）、`sandbox_ls`（目录列表）、`sandbox_find`（文件查找）。
+底层 Sandbox 工具集（`toolsets/sandbox.ts`）通过 Electron IPC 调用 Main 进程中的沙箱管理器执行。macOS/Linux 使用 OS 级沙箱隔离；Windows 当前原生执行，不提供 OS 级隔离。该工具集包含 7 个工具：`sandbox_bash`（Shell 执行）、`sandbox_read`（文件读取）、`sandbox_write`（文件写入）、`sandbox_edit`（精确替换）、`sandbox_grep`（内容搜索）、`sandbox_ls`（目录列表）、`sandbox_find`（文件查找）。
 
 这些 `sandbox_*` 底层工具当前不再注入到任何生成路径中，Chat Agent 使用下文的 Code Execution 高层工具集；`toolsets/sandbox.ts` 仅保留用于渲染历史消息中的 `sandbox_*` 工具调用。
 
@@ -240,6 +240,8 @@ Model Chat Refactor 中的核心部分已落地：
 Chat 模式引入了第五类工具集——Code Execution 工具集（`toolsets/code-execution.ts`），为 Chat 对话中的 AI 提供代码执行、文件读取和文件生成能力。包含 3 个核心工具：`code_execution`（代码执行）、`read_file`（文件读取，支持行级分页）、`create_download`（文件下载）。另有 3 个 Skills 相关辅助工具：`load_skill`、`user_exec`（用户环境命令执行，含审批机制）、`install_skill`（沙箱安装技能）。
 
 与 Sandbox 工具集的区别：Code Execution 面向 Chat 用户（隐藏底层沙箱细节、自动临时目录、文件上传注入、产物展示），通过 Agent Mode 控制注入。Chat Agent 不再把 `sandbox_*` 作为 code execution 不可用时的可见 fallback。
+
+文件读取和单目录列表通过结构化 Node helper 完成；递归发现和内容搜索使用应用内置 ripgrep；本地产物下载直接走持久化接口。因此核心文件工具在 Windows 上不依赖 Bash 或 WSL。
 
 详细技术设计参见 [`./code-execution.md`](./code-execution.md)。
 

@@ -1,7 +1,9 @@
 import type {
   SandboxExecLanguage,
   SandboxExecResult,
+  SandboxOperationResult,
   SandboxProvider,
+  SandboxReadResult,
   SandboxSearchParams,
   SandboxSearchResult,
 } from '@shared/sandbox-provider'
@@ -43,8 +45,12 @@ export class CloudSandboxProvider implements SandboxProvider {
     return { success: false, error: 'Cloud sandbox not yet implemented' }
   }
 
-  async readFileOut(_sandboxPath: string): Promise<{ success: boolean; content?: string; error?: string }> {
-    return { success: false, error: 'Cloud sandbox not yet implemented' }
+  readFileOut(_sandboxPath: string, _options?: { offset?: number; limit?: number }): Promise<SandboxReadResult> {
+    return Promise.resolve({ success: false, error: 'Cloud sandbox not yet implemented' })
+  }
+
+  listFiles(_sandboxPath: string): Promise<SandboxOperationResult> {
+    return Promise.resolve({ success: false, error: 'Cloud sandbox not yet implemented' })
   }
 
   async exportFile(

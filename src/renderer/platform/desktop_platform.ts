@@ -1,7 +1,12 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
 
 import type { ElectronIPC } from '@shared/electron-types'
-import type { SandboxExecLanguage, SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
+import type {
+  SandboxExecLanguage,
+  SandboxExecResult,
+  SandboxOperationResult,
+  SandboxReadResult,
+} from '@shared/sandbox-provider'
 import type { Config, Settings, ShortcutSetting } from '@shared/types'
 import { cache } from '@shared/utils/cache'
 import localforage from 'localforage'
@@ -378,7 +383,12 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:exec-code', params)
   }
 
-  public async sandboxRead(params: { filePath: string; sessionId?: string }): Promise<SandboxOperationResult> {
+  public async sandboxRead(params: {
+    filePath: string
+    offset?: number
+    limit?: number
+    sessionId?: string
+  }): Promise<SandboxReadResult> {
     return this.ipc.invoke('sandbox:read', params)
   }
 

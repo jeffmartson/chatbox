@@ -190,31 +190,56 @@ describe('buildCodeExecutionTools', () => {
     })
   })
 
-  test('read_file counts a final line without a trailing newline', async () => {
-    mockProvider.exec.mockResolvedValue({ stdout: '1\nsingle line without newline', stderr: '', exitCode: 0 })
+  test('read_file delegates bounded reads without invoking Bash', async () => {
+    mockProvider.readFileOut.mockResolvedValue({
+      success: true,
+      content: 'line two',
+      startLine: 2,
+      endLine: 2,
+      totalLines: 3,
+    })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
     const tool = tools.read_file as {
       execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
     }
 
-    const result = await tool.execute({ file_path: 'note.txt' }, {})
+    const result = await tool.execute({ file_path: 'report.txt', offset: 2, limit: 1 }, {})
 
-    expect(result).toEqual({
+    expect(mockProvider.readFileOut).toHaveBeenCalledWith('report.txt', { offset: 2, limit: 1 })
+    expect(mockProvider.exec).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ content: 'line two', startLine: 2, endLine: 2, totalLines: 3 })
+  })
+
+  test('read_file preserves a final line without a trailing newline', async () => {
+    mockProvider.readFileOut.mockResolvedValue({
+      success: true,
+      content: 'single line without newline',
+      startLine: 1,
+      endLine: 1,
+      totalLines: 1,
+    })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    await expect(tool.execute({ file_path: 'note.txt' }, {})).resolves.toEqual({
       file_path: 'note.txt',
       content: 'single line without newline',
       startLine: 1,
       endLine: 1,
       totalLines: 1,
     })
-    expect(mockProvider.exec).toHaveBeenCalledWith({
-      code: expect.stringContaining('tail -c 1'),
-      language: 'bash',
-      timeout: 10_000,
-    })
   })
 
   test('read_file returns an empty-file result instead of an offset error', async () => {
-    mockProvider.exec.mockResolvedValue({ stdout: '0\n', stderr: '', exitCode: 0 })
+    mockProvider.readFileOut.mockResolvedValue({
+      success: true,
+      content: '',
+      startLine: 1,
+      endLine: 0,
+      totalLines: 0,
+    })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
     const tool = tools.read_file as {
       execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -227,7 +252,13 @@ describe('buildCodeExecutionTools', () => {
   })
 
   test('read_file preserves a selected blank line', async () => {
-    mockProvider.exec.mockResolvedValue({ stdout: '1\n\n', stderr: '', exitCode: 0 })
+    mockProvider.readFileOut.mockResolvedValue({
+      success: true,
+      content: '',
+      startLine: 1,
+      endLine: 1,
+      totalLines: 1,
+    })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
     const tool = tools.read_file as {
       execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -242,40 +273,15 @@ describe('buildCodeExecutionTools', () => {
     })
   })
 
-  test('read_file rejects an invalid line-count response', async () => {
-    mockProvider.exec.mockResolvedValue({ stdout: 'not-a-number\ncontent', stderr: '', exitCode: 0 })
+  test('read_file returns provider errors without invoking Bash', async () => {
+    mockProvider.readFileOut.mockResolvedValue({ success: false, error: 'read failed' })
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
     const tool = tools.read_file as {
       execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
     }
 
-    await expect(tool.execute({ file_path: 'broken.txt' }, {})).resolves.toEqual({
-      error: 'Failed to determine line count: broken.txt',
-    })
-  })
-
-  test('read_file preserves Bash availability errors for the UI and model', async () => {
-    mockProvider.exec.mockResolvedValue({
-      stdout: '',
-      stderr: 'bash is not available',
-      exitCode: 127,
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-    })
-    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
-    const tool = tools.read_file as {
-      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
-    }
-
-    const result = await tool.execute({ file_path: 'report.txt' }, {})
-
-    expect(result).toEqual({
-      error: 'bash is not available',
-      errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-    })
-    await expect(toModelOutput(tool, result)).resolves.toEqual({
-      type: 'text',
-      value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
-    })
+    await expect(tool.execute({ file_path: 'missing.txt' }, {})).resolves.toEqual({ error: 'read failed' })
+    expect(mockProvider.exec).not.toHaveBeenCalled()
   })
 
   test('code_execution tool handles non-zero exit code', async () => {
@@ -352,12 +358,13 @@ describe('buildCodeExecutionTools', () => {
     }
 
     test('persists the file and returns a download (local provider)', async () => {
-      mockProvider.exec.mockResolvedValue({ stdout: '/tmp/report.pdf\n', stderr: '', exitCode: 0 })
       mockProvider.persistArtifact.mockResolvedValue({ success: true, artifactPath: '/durable/report.pdf' })
 
-      const result = await getTool(mockProvider).execute({ file_path: '/tmp/report.pdf', display_name: 'Report' }, {})
+      const result = await getTool(mockProvider).execute({ file_path: 'report.pdf', display_name: 'Report' }, {})
 
-      expect(mockProvider.persistArtifact).toHaveBeenCalledWith('/tmp/report.pdf', 'Report')
+      expect(mockProvider.init).toHaveBeenCalledWith('test-session')
+      expect(mockProvider.persistArtifact).toHaveBeenCalledWith('report.pdf', 'Report')
+      expect(mockProvider.exec).not.toHaveBeenCalled()
       expect(result).toMatchObject({ downloadable: true, file_path: '/durable/report.pdf', display_name: 'Report' })
     })
 
@@ -373,7 +380,6 @@ describe('buildCodeExecutionTools', () => {
     })
 
     test('reports an error to the model when persisting fails (local provider)', async () => {
-      mockProvider.exec.mockResolvedValue({ stdout: '/tmp/report.pdf\n', stderr: '', exitCode: 0 })
       mockProvider.persistArtifact.mockResolvedValue({
         success: false,
         error: 'Access denied: path is outside the sandbox',
@@ -383,6 +389,7 @@ describe('buildCodeExecutionTools', () => {
 
       expect(result.downloadable).toBeUndefined()
       expect(result.error).toMatch(/outside the sandbox/i)
+      expect(mockProvider.exec).not.toHaveBeenCalled()
     })
 
     test('falls back to the sandbox path when persistence is unsupported (cloud provider)', async () => {
@@ -394,37 +401,17 @@ describe('buildCodeExecutionTools', () => {
       const result = await getTool(cloud).execute({ file_path: 'report.pdf', display_name: 'Report' }, {})
 
       expect(result).toMatchObject({ downloadable: true, file_path: '/work/report.pdf', provider_type: 'cloud' })
+      expect(cloud.exec).toHaveBeenCalledWith(expect.objectContaining({ language: 'node' }))
     })
 
-    test('returns file-not-found without persisting when the file is missing', async () => {
-      mockProvider.exec.mockResolvedValue({ stdout: 'not_found\n', stderr: '', exitCode: 0 })
+    test('returns file-not-found from local persistence without invoking a shell', async () => {
+      mockProvider.persistArtifact.mockResolvedValue({ success: false, error: 'File not found: missing.pdf' })
 
-      const result = await getTool(mockProvider).execute({ file_path: '/tmp/missing.pdf', display_name: 'X' }, {})
+      const result = await getTool(mockProvider).execute({ file_path: 'missing.pdf', display_name: 'X' }, {})
 
       expect(result.error).toMatch(/file not found/i)
-      expect(mockProvider.persistArtifact).not.toHaveBeenCalled()
-    })
-
-    test('preserves Bash availability errors instead of reporting file-not-found', async () => {
-      mockProvider.exec.mockResolvedValue({
-        stdout: '',
-        stderr: 'bash is not available',
-        exitCode: 127,
-        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-      })
-      const tool = getTool(mockProvider)
-
-      const result = await tool.execute({ file_path: '/tmp/report.pdf', display_name: 'Report' }, {})
-
-      expect(result).toEqual({
-        error: 'bash is not available',
-        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-      })
-      expect(mockProvider.persistArtifact).not.toHaveBeenCalled()
-      await expect(toModelOutput(tool, result)).resolves.toEqual({
-        type: 'text',
-        value: 'Error code: BASH_NOT_AVAILABLE\n\nError: bash is not available',
-      })
+      expect(mockProvider.persistArtifact).toHaveBeenCalled()
+      expect(mockProvider.exec).not.toHaveBeenCalled()
     })
   })
 })

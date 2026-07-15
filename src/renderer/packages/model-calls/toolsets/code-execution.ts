@@ -1,12 +1,9 @@
 import { isTextFilePath } from '@shared/file-extensions'
 import { DEFAULT_EXEC_TIMEOUT, type SandboxExecLanguage, type SandboxProvider } from '@shared/sandbox-provider'
-import { buildReadFileScript } from '@shared/utils/read-file-script'
-import { escapeSingleQuotes } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
 import platform from '@/platform'
 import { asRecord, contentOrErrorText, numberField, stringField, toTextModelOutput } from './model-output'
-import { sandboxExecToolError } from './sandbox-exec-errors'
 import { remapPhantomHomePath, remapPhantomHomePathForProvider } from './sandbox-paths'
 
 const log = getLogger('toolset:code-execution')
@@ -285,49 +282,26 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       const safeStart = Math.max(1, Math.floor(Number(startLine)))
       const safeLimit = Math.max(1, Math.floor(Number(limit)))
 
-      // wc -l counts newline characters, so include a final unterminated line when the file is non-empty.
-      const safeEnd = safeStart + safeLimit - 1
-      const readScript = buildReadFileScript(readInput.file_path, safeStart, safeEnd)
-      const result = await provider.exec({
-        code: readScript,
-        language: 'bash',
-        timeout: 10_000,
-      })
-
-      if (result.exitCode !== 0) {
-        return sandboxExecToolError(result, `File not found: ${readInput.file_path}`)
-      }
-
-      const stdout = result.stdout
-      const newlineIdx = stdout.indexOf('\n')
-      const totalLines = Number.parseInt(stdout.slice(0, newlineIdx).trim(), 10)
-      if (newlineIdx < 0 || !Number.isSafeInteger(totalLines) || totalLines < 0) {
-        return { error: `Failed to determine line count: ${readInput.file_path}` }
-      }
-
-      if (totalLines === 0) {
+      const result = await provider.readFileOut(readInput.file_path, { offset: safeStart, limit: safeLimit })
+      if (!result.success) {
         return {
-          file_path: readInput.file_path,
-          content: '',
-          totalLines: 0,
+          error: result.error || `File not found: ${readInput.file_path}`,
+          ...(result.errorCode ? { errorCode: result.errorCode } : {}),
         }
       }
 
-      // Remove trailing newline added by sed to avoid phantom empty line in split
-      const rawContent = stdout.slice(newlineIdx + 1)
-      const content = rawContent.endsWith('\n') ? rawContent.slice(0, -1) : rawContent
-
-      if (safeStart > totalLines) {
-        return { error: `Offset ${safeStart} is beyond end of file (${totalLines} lines total)` }
+      const content = result.content ?? ''
+      const totalLines = result.totalLines ?? 0
+      const endLine = result.endLine ?? 0
+      if (totalLines === 0) {
+        return { file_path: readInput.file_path, content: '', totalLines: 0 }
       }
-
-      const endLine = Math.min(safeEnd, totalLines)
       const hasMore = endLine < totalLines
 
       return {
         file_path: readInput.file_path,
         content: truncateOutput(content, MAX_STDOUT_LENGTH),
-        startLine: safeStart,
+        startLine: result.startLine ?? safeStart,
         endLine,
         totalLines,
         ...(hasMore
@@ -343,7 +317,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       'Persist a sandbox-generated file to durable storage and mark it downloadable. Returns metadata for ' +
       'rendering a download button. Use after generating files (PDFs, charts, spreadsheets, etc.) with ' +
       'code_execution. The file must be one the sandbox produced — write it to the working directory (relative ' +
-      'paths) or a sandbox-writable temp dir (e.g. /tmp). If the file cannot be persisted, this returns an ' +
+      'paths), or on macOS/Linux to a sandbox-writable temp dir such as /tmp. If the file cannot be persisted, this returns an ' +
       'error instead of a download; write the file inside the sandbox and try again.',
     inputSchema: jsonSchema({
       type: 'object',
@@ -352,7 +326,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
           type: 'string',
           description:
             'Path to the file the sandbox generated, in the working directory (relative paths preferred) or a ' +
-            'sandbox-writable temp dir such as /tmp',
+            'sandbox-writable temp dir such as /tmp on macOS/Linux',
         },
         display_name: {
           type: 'string',
@@ -367,18 +341,47 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       // Downloads must originate inside the sandbox, so phantom-home paths always map
       // there even when the host's real home happens to be /home/user.
       downloadInput.file_path = remapPhantomHomePath(downloadInput.file_path)
+
+      const setupResult = await ensureSandbox()
+      if (!setupResult.success) {
+        return { error: setupResult.error || 'Sandbox setup failed' }
+      }
+
+      if (provider.type === 'local') {
+        const persisted = await provider
+          .persistArtifact(downloadInput.file_path, downloadInput.display_name)
+          .catch((error) => ({
+            success: false as const,
+            error: error instanceof Error ? error.message : String(error),
+          }))
+        if (!persisted.success || !persisted.artifactPath) {
+          return {
+            error:
+              persisted.error ||
+              'Failed to prepare file for download. Make sure the file was written inside the sandbox working directory.',
+          }
+        }
+        return {
+          downloadable: true,
+          file_path: persisted.artifactPath,
+          display_name: downloadInput.display_name,
+          provider_type: provider.type,
+        }
+      }
+
       // Verify the file exists and resolve to absolute path (so download survives app restart)
-      const escapedPath = escapeSingleQuotes(downloadInput.file_path)
       const checkResult = await provider.exec({
-        code: `test -f '${escapedPath}' && realpath '${escapedPath}' || echo "not_found"`,
-        language: 'bash',
+        code: `
+const fs = require('fs')
+const filePath = ${JSON.stringify(downloadInput.file_path)}
+if (!fs.statSync(filePath).isFile()) throw new Error('not_found')
+process.stdout.write(fs.realpathSync(filePath))
+`,
+        language: 'node',
         timeout: 5000,
       })
-      if (checkResult.errorCode) {
-        return sandboxExecToolError(checkResult, `Unable to inspect file: ${downloadInput.file_path}`)
-      }
       const resolved = checkResult.stdout.trim()
-      if (!resolved || resolved === 'not_found') {
+      if (checkResult.exitCode !== 0 || !resolved) {
         return { error: `File not found: ${downloadInput.file_path}` }
       }
 
@@ -390,15 +393,6 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         .catch((error) => ({ success: false as const, error: error instanceof Error ? error.message : String(error) }))
       if (persisted.success && persisted.artifactPath) {
         downloadPath = persisted.artifactPath
-      } else if (provider.type === 'local') {
-        // On desktop, persisting is required: a failure means the path is not a valid
-        // sandbox output (e.g. outside the sandbox-writable area). Report it so the model
-        // can retry with a file in the working directory instead of silently "succeeding".
-        return {
-          error:
-            persisted.error ||
-            'Failed to prepare file for download. Make sure the file was written inside the sandbox working directory.',
-        }
       }
       // Cloud/unsupported providers: fall back to the resolved sandbox path.
 
@@ -455,7 +449,7 @@ Execute focused Node.js, PowerShell, or Bash snippets. Keep scripts small and ta
 
 ### create_download
 After generating a file with code_execution, use this to make it downloadable. The user will see a download button in the chat.
-- Write downloadable outputs into the working directory (use relative paths, which resolve to the sandbox working directory). A sandbox-writable temp dir such as \`/tmp\` also works.
+- Write downloadable outputs into the working directory (use relative paths, which resolve to the sandbox working directory). On macOS/Linux, a sandbox-writable temp dir such as \`/tmp\` also works; on Windows, keep outputs in the working directory.
 - create_download copies the file into durable storage, so it stays downloadable after the session's temporary files are cleaned up.
 - If it returns an error (e.g. the file is not inside the sandbox-writable area), re-create the file in the working directory and call create_download again — do not assume the download succeeded.
 `

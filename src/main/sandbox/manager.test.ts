@@ -28,11 +28,8 @@ import { spawn, spawnSync } from 'node:child_process'
 import {
   editFile,
   execCode,
-  findFiles,
   initSandbox,
-  listDir,
   normalizeWindowsShellPath,
-  readFile,
   resetSandbox,
   resetWindowsPowerShellResolutionCache,
   resolveWindowsBash,
@@ -275,7 +272,7 @@ describe('execCode on Windows without shell runtimes', () => {
     vi.clearAllMocks()
   })
 
-  test('returns a stable error code for localized UI handling', async () => {
+  test('returns a stable error code for Bash while native file tools remain independent', async () => {
     setPlatform('win32')
     ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) =>
       cmd === 'wsl' ? { status: 0, stdout: Buffer.alloc(0) } : { status: 1 }
@@ -292,18 +289,6 @@ describe('execCode on Windows without shell runtimes', () => {
         exitCode: 127,
         errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
       })
-
-      const operationResults = await Promise.all([
-        readFile('report.txt', sessionId),
-        listDir('.', sessionId),
-        findFiles('.', '*.txt', sessionId),
-      ])
-      for (const operationResult of operationResults) {
-        expect(operationResult).toMatchObject({
-          success: false,
-          errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-        })
-      }
     } finally {
       await resetSandbox(sessionId)
       rmSync(workDir, { recursive: true, force: true })

@@ -13,6 +13,11 @@ vi.mock('electron', () => ({
   app: {
     isPackaged: false,
     getAppPath: () => process.cwd(),
+    getPath: () => {
+      const os = require('node:os') as typeof import('node:os')
+      const path = require('node:path') as typeof import('node:path')
+      return path.join(os.tmpdir(), `chatbox-windows-tools-user-data-${process.pid}`)
+    },
   },
 }))
 vi.mock('../util', () => ({
@@ -28,7 +33,9 @@ import {
   initSandbox,
   listDir,
   normalizeWindowsShellPath,
+  persistSandboxArtifact,
   readFile,
+  removeSessionArtifacts,
   resetSandbox,
   resolveWindowsBash,
   resolveWindowsPowerShell,
@@ -50,6 +57,7 @@ describe.skipIf(process.platform !== 'win32')('native Windows sandbox tools', ()
   })
 
   afterEach(async () => {
+    removeSessionArtifacts(sessionId)
     await resetSandbox(sessionId)
     rmSync(workDir, { recursive: true, force: true })
     vi.clearAllMocks()
@@ -259,13 +267,16 @@ console.log(JSON.stringify(payload))
     expect(result).toEqual({ stdout: marker, stderr: '', exitCode: 0 })
   })
 
-  test('reads, lists, and finds files through Bash on Windows', async () => {
+  test('reads and lists files without Bash, and finds files with bundled ripgrep', async () => {
     const relativePath = path.join('folder with spaces', '报告.txt')
     await expect(writeFile(relativePath, 'hello from Windows\n', sessionId)).resolves.toEqual({ success: true })
 
-    await expect(readFile(relativePath, sessionId)).resolves.toMatchObject({
+    await expect(readFile(relativePath, sessionId, { offset: 1, limit: 1 })).resolves.toMatchObject({
       success: true,
-      content: 'hello from Windows\n',
+      content: 'hello from Windows',
+      startLine: 1,
+      endLine: 1,
+      totalLines: 1,
     })
 
     const listResult = await listDir(path.dirname(relativePath), sessionId)
@@ -275,6 +286,35 @@ console.log(JSON.stringify(payload))
     const findResult = await findFiles('.', '*.txt', sessionId)
     expect(findResult).toMatchObject({ success: true })
     expect(findResult.content).toContain('报告.txt')
+  })
+
+  test('reads large files without corrupting the structured result', async () => {
+    const relativePath = 'large-output.txt'
+    const line = `${'x'.repeat(900)}\t${'\\"'.repeat(40)}`
+    await expect(
+      writeFile(relativePath, Array.from({ length: 100 }, () => line).join('\n'), sessionId)
+    ).resolves.toEqual({
+      success: true,
+    })
+
+    const result = await readFile(relativePath, sessionId, { offset: 1, limit: 100 })
+
+    expect(result).toMatchObject({ success: true, startLine: 1, totalLines: 100 })
+    expect(result.endLine).toBeGreaterThan(0)
+    expect(result.endLine).toBeLessThan(100)
+    expect(Buffer.byteLength(result.content ?? '', 'utf8')).toBeLessThan(50 * 1024)
+  })
+
+  test('persists a relative download artifact without Bash path resolution', async () => {
+    await expect(writeFile('dashboard.html', '<html>Windows</html>', sessionId)).resolves.toEqual({ success: true })
+
+    const result = await persistSandboxArtifact('dashboard.html', sessionId)
+
+    expect(result.success).toBe(true)
+    expect(result.artifactPath).toBeTruthy()
+    if (result.artifactPath) {
+      expect(readFileSync(result.artifactPath, 'utf8')).toBe('<html>Windows</html>')
+    }
   })
 
   test('searches files with the bundled native Windows ripgrep binary', async () => {
