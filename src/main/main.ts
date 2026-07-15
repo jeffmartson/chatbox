@@ -33,6 +33,7 @@ import { AppUpdater } from './app-updater'
 import * as autoLauncher from './autoLauncher'
 import { handleDeepLink } from './deeplinks'
 import { parseFile } from './file-parser'
+import { isQuitForInstallRequested } from './installer-command'
 import Locale from './locales'
 import * as mcpIpc from './mcp/ipc-stdio-transport'
 import MenuBuilder from './menu'
@@ -463,12 +464,22 @@ async function showOrHideWindow() {
 
 // --------- 应用管理 ---------
 
+const quitForInstallRequested = process.platform === 'win32' && isQuitForInstallRequested(process.argv)
 const gotTheLock = app.isPackaged ? app.requestSingleInstanceLock() : true
 
-if (!gotTheLock) {
+if (quitForInstallRequested) {
+  log.info('installer: quit helper instance exiting')
+  app.quit()
+} else if (!gotTheLock) {
   app.quit()
 } else {
-  app.on('second-instance', async (event, commandLine, workingDirectory) => {
+  app.on('second-instance', async (_event, commandLine, _workingDirectory) => {
+    if (process.platform === 'win32' && isQuitForInstallRequested(commandLine)) {
+      log.info('installer: running instance received quit request')
+      app.quit()
+      return
+    }
+
     // on windows and linux, the deep link is passed in the command line
     const url = commandLine.find((arg) => arg.startsWith('chatbox://') || arg.startsWith('chatbox-dev://'))
 
