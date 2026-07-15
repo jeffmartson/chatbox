@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const sandboxExecCode = vi.fn()
 const sandboxStatus = vi.fn()
 const sandboxSearch = vi.fn()
+const sandboxInitTemp = vi.fn()
+const sandboxReset = vi.fn()
 vi.mock('@/platform', () => ({
   default: {
     get sandboxExecCode() {
@@ -15,6 +17,8 @@ vi.mock('@/platform', () => ({
     get sandboxSearch() {
       return sandboxSearchRef.current
     },
+    sandboxInitTemp: (...args: unknown[]) => sandboxInitTemp(...args),
+    sandboxReset: (...args: unknown[]) => sandboxReset(...args),
   },
 }))
 
@@ -28,8 +32,42 @@ beforeEach(() => {
   sandboxExecCode.mockReset()
   sandboxStatus.mockReset()
   sandboxSearch.mockReset()
+  sandboxInitTemp.mockReset()
+  sandboxReset.mockReset()
   sandboxExecCodeRef.current = sandboxExecCode
   sandboxSearchRef.current = sandboxSearch
+})
+
+describe('LocalSandboxProvider.init', () => {
+  test('reuses an unchanged successful initialization and its accepted grants', async () => {
+    sandboxInitTemp.mockResolvedValue({
+      success: true,
+      acceptedWorkingDirectories: [String.raw`C:\Users\me\project`],
+    })
+    const provider = new LocalSandboxProvider()
+    provider.setExtraWritableDirs([String.raw`C:\Users\me\project`])
+
+    await expect(Promise.all([provider.init('session-1'), provider.init('session-1')])).resolves.toEqual([
+      { success: true, acceptedWorkingDirectories: [String.raw`C:\Users\me\project`] },
+      { success: true },
+    ])
+    await expect(provider.init('session-1')).resolves.toEqual({ success: true })
+
+    expect(sandboxInitTemp).toHaveBeenCalledTimes(1)
+    expect(provider.getAcceptedExtraWritableDirs()).toEqual([String.raw`C:\Users\me\project`])
+  })
+
+  test('reinitializes when the session or requested grants change', async () => {
+    sandboxInitTemp.mockResolvedValue({ success: true, acceptedWorkingDirectories: [] })
+    const provider = new LocalSandboxProvider()
+
+    await provider.init('session-1')
+    provider.setExtraWritableDirs([String.raw`D:\workspace`])
+    await provider.init('session-1')
+    await provider.init('session-2')
+
+    expect(sandboxInitTemp).toHaveBeenCalledTimes(3)
+  })
 })
 
 describe('LocalSandboxProvider.search', () => {

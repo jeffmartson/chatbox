@@ -178,10 +178,12 @@ export interface Platform extends Storage {
   sandboxCheckAvailability?(): Promise<{ available: boolean; reason?: string }>
 
   // Sandbox temp dir operations (Desktop only, for code execution)
-  sandboxInitTemp?(params: {
-    sessionId: string
-    workingDirectories?: string[]
-  }): Promise<{ success: boolean; workingDirectory?: string; error?: string }>
+  sandboxInitTemp?(params: { sessionId: string; workingDirectories?: string[] }): Promise<{
+    success: boolean
+    workingDirectory?: string
+    acceptedWorkingDirectories?: string[]
+    error?: string
+  }>
   sandboxCopyFile?(params: {
     content: string
     targetFilename: string

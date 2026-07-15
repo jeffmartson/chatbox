@@ -81,10 +81,10 @@ function buildWorkingDirectoryInstruction(workingDir: string | null, userWorking
   const dirLine = workingDir
     ? `Your sandbox working directory is: ${formatPathForModel(workingDir)}`
     : 'You have a sandbox working directory.'
-  // Directories the user explicitly granted access to (the working-directory feature).
-  // These are real paths on the user's machine, readable and writable without approval.
+  // Directories the user requested through the working-directory feature. The host validates
+  // them lazily during sandbox initialization, so avoid promising approval-free access here.
   const grantedDirsBlock = userWorkingDirectories?.length
-    ? `\nThe user has granted you read/write access to these real directories (use their absolute paths; no approval needed):\n${userWorkingDirectories.map((dir) => `- ${formatPathForModel(dir)}`).join('\n')}\n`
+    ? `\nThe user selected these real directories for working-directory access (use their absolute paths):\n${userWorkingDirectories.map((dir) => `- ${formatPathForModel(dir)}`).join('\n')}\nThe host validates each binding before use. Accepted bindings allow structured file-tool writes without additional approval; rejected bindings follow the normal approval flow.\n`
     : ''
   return `
 ## Working Directory & File Paths

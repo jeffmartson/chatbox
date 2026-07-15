@@ -1,5 +1,14 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -17,6 +26,7 @@ vi.mock('node:child_process', () => ({ spawn: vi.fn(), spawnSync: vi.fn() }))
 
 import { spawn, spawnSync } from 'node:child_process'
 import {
+  editFile,
   execCode,
   findFiles,
   initSandbox,
@@ -28,6 +38,8 @@ import {
   resolveWindowsBash,
   resolveWindowsPowerShell,
   shellEscape,
+  validateWritePath,
+  writeFile,
 } from './manager'
 
 const originalPlatform = process.platform
@@ -371,5 +383,213 @@ describe('normalizeWindowsShellPath', () => {
   test('is a no-op on POSIX platforms', () => {
     setPlatform('linux')
     expect(normalizeWindowsShellPath('/c/x')).toBe('/c/x')
+  })
+})
+
+describe('validateWritePath with user-granted directories', () => {
+  test('accepts a granted directory while rejecting sibling and symlink escapes', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'chatbox-granted-path-'))
+    const workDir = path.join(root, 'sandbox')
+    const grantedDir = path.join(root, 'granted')
+    const outsideDir = path.join(root, 'outside')
+    mkdirSync(workDir)
+    mkdirSync(grantedDir)
+    mkdirSync(outsideDir)
+    symlinkSync(outsideDir, path.join(grantedDir, 'escape'), 'dir')
+
+    try {
+      await expect(
+        validateWritePath(path.join(grantedDir, 'nested', 'out.txt'), workDir, [grantedDir])
+      ).resolves.toEqual({ valid: true })
+      await expect(validateWritePath(path.join(outsideDir, 'out.txt'), workDir, [grantedDir])).resolves.toEqual({
+        valid: false,
+        error: 'Invalid path: outside sandbox or granted working directories',
+      })
+      await expect(
+        validateWritePath(path.join(grantedDir, 'escape', 'out.txt'), workDir, [grantedDir])
+      ).resolves.toEqual({
+        valid: false,
+        error: 'Invalid path: outside sandbox or granted working directories',
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('native Windows writes to user-granted directories', () => {
+  afterEach(() => setPlatform(originalPlatform))
+
+  test('preserves the sandbox-only error when no user directory grant exists', async () => {
+    setPlatform('win32')
+    const root = mkdtempSync(path.join(process.cwd(), '.tmp-windows-sandbox-only-'))
+    const workDir = path.join(root, 'sandbox')
+    const outsideFile = path.join(root, 'outside.txt')
+    const sessionId = 'windows-sandbox-only-session'
+    mkdirSync(workDir)
+
+    try {
+      await expect(initSandbox(workDir, sessionId)).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [],
+      })
+      await expect(writeFile(outsideFile, 'blocked', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Invalid path: outside sandbox',
+      })
+      expect(existsSync(outsideFile)).toBe(false)
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test('persists the grant on the session and applies it to write/edit operations', async () => {
+    setPlatform('win32')
+    // The production guard intentionally rejects /var and /private; use the checkout as a
+    // representative user project location rather than the OS temp root for this grant test.
+    const root = mkdtempSync(path.join(process.cwd(), '.tmp-windows-granted-'))
+    const workDir = path.join(root, 'sandbox')
+    const grantedDir = path.join(root, 'granted')
+    const outsideDir = path.join(root, 'outside')
+    const sessionId = 'windows-granted-session'
+    mkdirSync(workDir)
+    mkdirSync(grantedDir)
+    mkdirSync(outsideDir)
+
+    try {
+      await expect(initSandbox(workDir, sessionId, [grantedDir])).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [path.resolve(grantedDir)],
+      })
+      const grantedFile = path.join(grantedDir, 'nested', 'out.txt')
+      await expect(writeFile(grantedFile, 'before', sessionId)).resolves.toEqual({ success: true })
+      await expect(
+        editFile(grantedFile, { edits: [{ search: 'before', replace: 'after' }] }, sessionId)
+      ).resolves.toEqual({ success: true })
+      expect(readFileSync(grantedFile, 'utf8')).toBe('after')
+
+      await expect(writeFile(path.join(outsideDir, 'out.txt'), 'blocked', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Invalid path: outside sandbox or granted working directories',
+      })
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test('does not report missing paths or regular files as accepted directories', async () => {
+    setPlatform('win32')
+    const root = mkdtempSync(path.join(process.cwd(), '.tmp-windows-unavailable-'))
+    const workDir = path.join(root, 'sandbox')
+    const missingDir = path.join(root, 'missing')
+    const regularFile = path.join(root, 'file.txt')
+    const sessionId = 'windows-unavailable-session'
+    mkdirSync(workDir)
+    writeFileSync(regularFile, 'not a directory')
+
+    try {
+      await expect(initSandbox(workDir, sessionId, [missingDir, regularFile])).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [],
+      })
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test('rejects protected files inside a granted directory', async () => {
+    setPlatform('win32')
+    const root = mkdtempSync(path.join(process.cwd(), '.tmp-windows-protected-'))
+    const workDir = path.join(root, 'sandbox')
+    const grantedDir = path.join(root, 'granted')
+    const nestedDir = path.join(grantedDir, 'nested')
+    const protectedDir = path.join(grantedDir, '.env')
+    const protectedAlias = path.join(grantedDir, 'config')
+    const sessionId = 'windows-protected-session'
+    mkdirSync(workDir)
+    mkdirSync(nestedDir, { recursive: true })
+    mkdirSync(protectedDir)
+    symlinkSync(protectedDir, protectedAlias, process.platform === 'win32' ? 'junction' : 'dir')
+    writeFileSync(path.join(nestedDir, '.ENV.LOCAL'), 'before')
+
+    try {
+      await expect(initSandbox(workDir, sessionId, [grantedDir])).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [path.resolve(grantedDir)],
+      })
+      await expect(writeFile(path.join(grantedDir, '.env'), 'secret', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      await expect(writeFile(path.join(grantedDir, '.ENV. '), 'secret', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      await expect(writeFile(path.join(nestedDir, '.ENV.LOCAL::$DATA'), 'secret', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      await expect(writeFile(path.join(grantedDir, '.env.production:payload'), 'secret', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      await expect(writeFile(path.join(protectedAlias, 'secret.txt'), 'secret', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      await expect(
+        editFile(path.join(nestedDir, '.ENV.LOCAL'), { search: 'before', replace: 'after' }, sessionId)
+      ).resolves.toEqual({
+        success: false,
+        error: 'Write access denied for protected file',
+      })
+      expect(readFileSync(path.join(nestedDir, '.ENV.LOCAL'), 'utf8')).toBe('before')
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test('rejects writes after the granted root is replaced with a symlink or junction', async () => {
+    setPlatform('win32')
+    const root = mkdtempSync(path.join(process.cwd(), '.tmp-windows-retargeted-'))
+    const workDir = path.join(root, 'sandbox')
+    const grantedDir = path.join(root, 'granted')
+    const originalGrantedDir = path.join(root, 'granted-original')
+    const outsideDir = path.join(root, 'outside')
+    const outsideFile = path.join(outsideDir, 'out.txt')
+    const sessionId = 'windows-retargeted-session'
+    mkdirSync(workDir)
+    mkdirSync(grantedDir)
+    mkdirSync(outsideDir)
+
+    try {
+      await expect(initSandbox(workDir, sessionId, [grantedDir])).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [path.resolve(grantedDir)],
+      })
+      renameSync(grantedDir, originalGrantedDir)
+      symlinkSync(outsideDir, grantedDir, process.platform === 'win32' ? 'junction' : 'dir')
+
+      // Renderer providers can be recreated between messages. Repeating initialization with
+      // the same requested paths must retain the original canonical target instead of granting
+      // the replacement junction.
+      await expect(initSandbox(workDir, sessionId, [grantedDir])).resolves.toEqual({
+        success: true,
+        acceptedWorkingDirectories: [path.resolve(grantedDir)],
+      })
+
+      await expect(writeFile(path.join(grantedDir, 'out.txt'), 'escaped', sessionId)).resolves.toEqual({
+        success: false,
+        error: 'Invalid path: outside sandbox or granted working directories',
+      })
+      expect(existsSync(outsideFile)).toBe(false)
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

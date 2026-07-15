@@ -42,7 +42,10 @@ describe.skipIf(process.platform !== 'win32')('native Windows sandbox tools', ()
   beforeEach(async () => {
     sessionId = `windows-tools-${randomUUID()}`
     workDir = mkdtempSync(path.join(tmpdir(), 'chatbox Windows 中文-'))
-    await expect(initSandbox(workDir, sessionId)).resolves.toEqual({ success: true })
+    await expect(initSandbox(workDir, sessionId)).resolves.toEqual({
+      success: true,
+      acceptedWorkingDirectories: [],
+    })
   })
 
   afterEach(async () => {
@@ -177,6 +180,23 @@ console.log(JSON.stringify(payload))
       error: 'Invalid path: outside sandbox',
     })
     expect(existsSync(outsidePath)).toBe(false)
+  })
+
+  test('rejects NTFS stream aliases for protected files in a granted directory', async () => {
+    const grantedDir = path.join(workDir, 'granted')
+    const protectedFile = path.join(grantedDir, '.env')
+    mkdirSync(grantedDir)
+    writeFileSync(protectedFile, 'before')
+
+    await expect(initSandbox(workDir, sessionId, [grantedDir])).resolves.toEqual({
+      success: true,
+      acceptedWorkingDirectories: [path.resolve(grantedDir)],
+    })
+    await expect(writeFile(`${protectedFile}::$DATA`, 'after', sessionId)).resolves.toEqual({
+      success: false,
+      error: 'Write access denied for protected file',
+    })
+    expect(readFileSync(protectedFile, 'utf8')).toBe('before')
   })
 
   test('executes Bash through the shell available on the Windows runner', async () => {

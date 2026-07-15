@@ -1,14 +1,20 @@
 import { SANDBOX_EXEC_ERROR_CODES, type SandboxExecResult, type SandboxProvider } from '@shared/sandbox-provider'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fsWrite = vi.fn(async (..._args: unknown[]) => ({ success: true }))
 const fsEdit = vi.fn(async (..._args: unknown[]) => ({ success: true }))
+const fsList = vi.fn(async (..._args: unknown[]) => ({ success: true, content: 'file\t1\tout.txt' }))
+const sandboxWrite = vi.fn(async (..._args: unknown[]) => ({ success: true }))
+const sandboxEdit = vi.fn(async (..._args: unknown[]) => ({ success: true }))
 
 vi.mock('@/platform', () => ({
   default: {
     type: 'web',
     fsWrite: (...args: unknown[]) => fsWrite(...args),
     fsEdit: (...args: unknown[]) => fsEdit(...args),
+    fsList: (...args: unknown[]) => fsList(...args),
+    sandboxWrite: (...args: unknown[]) => sandboxWrite(...args),
+    sandboxEdit: (...args: unknown[]) => sandboxEdit(...args),
   },
 }))
 
@@ -243,6 +249,150 @@ describe('user-granted working directories (like /tmp)', () => {
     }).tools
     await execute(wdTools.write_file, { file_path: '/Users/me/granted/out.txt', content: 'x' })
     expect(trackAgentModeFullAccessBypass).not.toHaveBeenCalled()
+  })
+})
+
+describe('Windows user-granted working directories', () => {
+  const originalNavigator = globalThis.navigator
+
+  beforeEach(() => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      configurable: true,
+    })
+    fsWrite.mockClear()
+    fsEdit.mockClear()
+    fsList.mockClear()
+    sandboxWrite.mockClear()
+    sandboxEdit.mockClear()
+    exec.mockClear()
+    search.mockClear()
+    requestFileMutationApproval.mockClear()
+  })
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'navigator', { value: originalNavigator, configurable: true })
+  })
+
+  function windowsTools(workingDirectories = [String.raw`C:\Users\Me\Project`]) {
+    return buildFilesystemTools({ sessionId: 'session-id', provider, userWorkingDirectories: workingDirectories }).tools
+  }
+
+  test('matches native paths case-insensitively and writes through the main-process boundary', async () => {
+    const result = await execute(windowsTools().write_file, {
+      file_path: String.raw`c:\USERS\me\project\out.txt`,
+      content: 'hello',
+    })
+
+    expect(requestFileMutationApproval).not.toHaveBeenCalled()
+    expect(exec).not.toHaveBeenCalled()
+    expect(fsWrite).not.toHaveBeenCalled()
+    expect(sandboxWrite).toHaveBeenCalledWith({
+      filePath: String.raw`C:\USERS\me\project\out.txt`,
+      content: 'hello',
+      sessionId: 'session-id',
+    })
+    expect(result).toEqual({ success: true, file_path: String.raw`C:\USERS\me\project\out.txt` })
+  })
+
+  test('maps WSL and Git Bash aliases to the granted native path', async () => {
+    await execute(windowsTools().write_file, {
+      file_path: '/mnt/c/Users/Me/Project/nested/../out.txt',
+      content: 'hello',
+    })
+    expect(sandboxWrite).toHaveBeenCalledWith({
+      filePath: String.raw`C:\Users\Me\Project\out.txt`,
+      content: 'hello',
+      sessionId: 'session-id',
+    })
+
+    await execute(windowsTools().edit_file, {
+      file_path: '/c/Users/Me/Project/out.txt',
+      old_text: 'before',
+      new_text: 'after',
+    })
+    expect(sandboxEdit).toHaveBeenCalledWith({
+      filePath: String.raw`C:\Users\Me\Project\out.txt`,
+      edits: [{ search: 'before', replace: 'after' }],
+      sessionId: 'session-id',
+    })
+  })
+
+  test('does not bypass approval for sibling or traversal paths', async () => {
+    await execute(windowsTools().write_file, {
+      file_path: '/mnt/c/Users/Me/Project/../secret.txt',
+      content: 'x',
+    })
+    expect(sandboxWrite).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+    expect(fsWrite).toHaveBeenCalledWith({
+      filePath: String.raw`C:\Users\Me\secret.txt`,
+      content: 'x',
+    })
+
+    requestFileMutationApproval.mockClear()
+    fsWrite.mockClear()
+    await execute(windowsTools().write_file, {
+      file_path: String.raw`C:\Users\Me\Project-evil\out.txt`,
+      content: 'x',
+    })
+    expect(sandboxWrite).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not allow a drive or UNC share root to grant the whole filesystem', async () => {
+    await execute(windowsTools(['C:\\']).write_file, {
+      file_path: String.raw`C:\Windows\System32\drivers\etc\hosts`,
+      content: 'x',
+    })
+    expect(sandboxWrite).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+
+    requestFileMutationApproval.mockClear()
+    await execute(windowsTools(['\\\\server\\share\\']).write_file, {
+      file_path: String.raw`\\server\share\folder\out.txt`,
+      content: 'x',
+    })
+    expect(sandboxWrite).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+  })
+
+  test('falls back to approval when the main process rejected a requested working directory', async () => {
+    const rejectedGrantProvider = {
+      ...provider,
+      getAcceptedExtraWritableDirs: () => [],
+    } as unknown as SandboxProvider
+    const tools = buildFilesystemTools({
+      sessionId: 'session-id',
+      provider: rejectedGrantProvider,
+      userWorkingDirectories: [String.raw`C:\Users\Me`],
+    }).tools
+
+    await execute(tools.write_file, {
+      file_path: String.raw`C:\Users\Me\project\out.txt`,
+      content: 'hello',
+    })
+
+    expect(sandboxWrite).not.toHaveBeenCalled()
+    expect(requestFileMutationApproval).toHaveBeenCalledTimes(1)
+    expect(fsWrite).toHaveBeenCalledWith({
+      filePath: String.raw`C:\Users\Me\project\out.txt`,
+      content: 'hello',
+    })
+  })
+
+  test('uses normalized native paths for list and search operations', async () => {
+    await execute(windowsTools().list_files, { path: '/cygdrive/c/Users/Me/Project' })
+    expect(fsList).toHaveBeenCalledWith({ dirPath: String.raw`C:\Users\Me\Project` })
+    expect(exec).not.toHaveBeenCalled()
+
+    await execute(windowsTools().search_files, { path: '/mnt/c/Users/Me/Project', query: 'needle' })
+    expect(search).toHaveBeenCalledWith({
+      path: String.raw`C:\Users\Me\Project`,
+      pattern: 'needle',
+      regex: undefined,
+      include: undefined,
+    })
   })
 })
 

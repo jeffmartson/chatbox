@@ -49,6 +49,9 @@ export interface SandboxProvider {
    */
   setExtraWritableDirs(dirs: string[]): void
 
+  /** Directories accepted by the local sandbox after unsafe roots were filtered. */
+  getAcceptedExtraWritableDirs?(): readonly string[]
+
   /** Reset/destroy the sandbox */
   reset(): Promise<void>
 

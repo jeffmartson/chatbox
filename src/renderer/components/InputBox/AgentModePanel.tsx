@@ -21,7 +21,6 @@ import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
 import { BUILTIN_MCP_SERVERS } from '@/packages/mcp/builtin'
-import { getOS } from '@/packages/navigator'
 import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
 import { WEB_SEARCH_PROVIDERS, type WebSearchProviderValue } from '@/packages/web-search/constants'
 import platform from '@/platform'
@@ -37,13 +36,9 @@ import { getAgentModeUIState } from './agentModeState'
 
 type PanelPage = 'main' | 'web-search' | 'code-execution' | 'skills' | 'mcp' | 'knowledge-base' | 'working-directory'
 
-// The working-directory feature binds real local directories to the sandbox; only the
-// desktop build has a local sandbox and a real filesystem to grant access to. Windows is
-// excluded for now: the sandbox runs under WSL and the renderer-side path routing does not
-// yet map Windows paths (C:\...) to their WSL form, so writes would silently still require
-// approval. Tracked as a follow-up.
-const supportsWorkingDirectories =
-  platform.type === 'desktop' && !!platform.openDirectoryDialog && getOS() !== 'Windows'
+// The working-directory feature needs the desktop filesystem and directory picker. Windows
+// uses the native execution backend; bound directory writes are validated in the main process.
+const supportsWorkingDirectories = platform.type === 'desktop' && !!platform.openDirectoryDialog
 
 export interface AgentModePanelProps {
   sessionId: string

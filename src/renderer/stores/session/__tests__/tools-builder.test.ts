@@ -363,6 +363,9 @@ describe('buildToolsForSession', () => {
     expect(result.instructions).toContain('C:/Users/themez/workspace/chatbox-pro')
     expect(result.instructions).toContain('D:/Projects/shared folder')
     expect(result.instructions).not.toContain('C:\\Users\\themez')
+    expect(result.instructions).not.toContain('no approval needed')
+    expect(result.instructions).toContain('The host validates each binding before use')
+    expect(result.instructions).toContain('rejected bindings follow the normal approval flow')
     expect(result.instructions).toContain('Do not prepend `cd <working-directory>`')
     expect(result.instructions).toContain(
       'On Windows, prefer PowerShell for terminal commands and native filesystem paths'

@@ -18,9 +18,16 @@ export class LocalSandboxProvider implements SandboxProvider {
   private sessionId: string | null = null
   private initialized = false
   private extraWritableDirs: string[] = []
+  private acceptedExtraWritableDirs: string[] = []
+  private initializedConfigKey: string | null = null
+  private initializationPromise: Promise<{ success: boolean; error?: string }> | null = null
 
   setExtraWritableDirs(dirs: string[]): void {
-    this.extraWritableDirs = dirs
+    this.extraWritableDirs = [...dirs]
+  }
+
+  getAcceptedExtraWritableDirs(): readonly string[] {
+    return this.acceptedExtraWritableDirs
   }
 
   async init(sessionId: string): Promise<{ success: boolean; error?: string }> {
@@ -28,10 +35,43 @@ export class LocalSandboxProvider implements SandboxProvider {
       return { success: false, error: 'Sandbox not available on this platform' }
     }
 
-    const result = await platform.sandboxInitTemp({ sessionId, workingDirectories: this.extraWritableDirs })
+    const configKey = JSON.stringify({ sessionId, extraWritableDirs: this.extraWritableDirs })
+    if (this.initialized && this.initializedConfigKey === configKey) {
+      return { success: true }
+    }
+    if (this.initializationPromise) {
+      await this.initializationPromise
+      return this.init(sessionId)
+    }
+
+    const requestedWorkingDirectories = [...this.extraWritableDirs]
+    this.initializationPromise = this.initialize(sessionId, requestedWorkingDirectories, configKey)
+    try {
+      return await this.initializationPromise
+    } finally {
+      this.initializationPromise = null
+    }
+  }
+
+  private async initialize(
+    sessionId: string,
+    requestedWorkingDirectories: string[],
+    configKey: string
+  ): Promise<{ success: boolean; error?: string }> {
+    this.initialized = false
+    this.sessionId = null
+    this.acceptedExtraWritableDirs = []
+    this.initializedConfigKey = null
+    const result = await platform.sandboxInitTemp?.({
+      sessionId,
+      workingDirectories: requestedWorkingDirectories,
+    })
+    if (!result) return { success: false, error: 'Sandbox not available on this platform' }
     if (result.success) {
       this.sessionId = sessionId
       this.initialized = true
+      this.initializedConfigKey = configKey
+      this.acceptedExtraWritableDirs = result.acceptedWorkingDirectories ?? []
     }
     return result
   }
@@ -42,6 +82,8 @@ export class LocalSandboxProvider implements SandboxProvider {
     }
     this.initialized = false
     this.sessionId = null
+    this.acceptedExtraWritableDirs = []
+    this.initializedConfigKey = null
   }
 
   async getStatus(): Promise<{

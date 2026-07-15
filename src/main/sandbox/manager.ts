@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import {
   copyFile as fsCopyFile,
-  lstat as fsLstat,
   readFile as fsReadFile,
   realpath as fsRealpath,
   writeFile as fsWriteFile,
@@ -27,6 +26,7 @@ import {
   TASK_SANDBOX_EXTRA_WRITE_PATHS,
 } from '../../shared/task-sandbox'
 import { shellQuote } from '../../shared/utils/shell'
+import { normalizeWindowsAbsolutePath } from '../../shared/utils/windows-path'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { runRipgrepSearch } from '../ripgrep-search'
 import { getLogger } from '../util'
@@ -51,9 +51,27 @@ interface SandboxStatus {
 
 // ─── Per-session sandbox instances ───────────────────────────────────
 
+interface WritePathGrant {
+  /** Lexical path selected by the user or created for the session sandbox. */
+  root: string
+  /** Canonical target captured when the grant was created. */
+  canonicalRoot: string
+}
+
+interface WritePathValidationResult {
+  valid: boolean
+  error?: string
+  canonicalTarget?: string
+}
+
 interface SandboxSession {
   state: SandboxState
   workingDirectory: string | null
+  workingDirectoryGrant: WritePathGrant | null
+  /** Real directories explicitly granted by the user for approval-free file-tool writes. */
+  userWriteGrants: WritePathGrant[]
+  /** Requested configuration used to keep canonical grants stable across repeated initialization. */
+  initConfigKey: string | null
   runningChild: ChildProcess | null
   /** Per-session sandbox config for wrapWithSandbox customConfig override */
   sandboxConfig: ReturnType<typeof buildConfig> | null
@@ -78,6 +96,9 @@ function getOrCreateSession(sessionId?: string): SandboxSession {
     session = {
       state: 'idle',
       workingDirectory: null,
+      workingDirectoryGrant: null,
+      userWriteGrants: [],
+      initConfigKey: null,
       runningChild: null,
       sandboxConfig: null,
     }
@@ -88,10 +109,10 @@ function getOrCreateSession(sessionId?: string): SandboxSession {
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-/** Resolve symlinks, falling back to path.normalize if the path doesn't exist. */
+/** Resolve symlinks with the same native semantics as fs.promises.realpath(). */
 function safeRealpathSync(p: string): string {
   try {
-    return realpathSync(p)
+    return realpathSync.native(p)
   } catch {
     return path.normalize(p)
   }
@@ -220,10 +241,7 @@ export function resolveWindowsBash(): WindowsBashResolution | null {
  */
 export function normalizeWindowsShellPath(p: string): string {
   if (process.platform !== 'win32') return p
-  const m = p.match(/^\/(?:mnt\/|cygdrive\/)?([a-zA-Z])(\/.*)?$/)
-  if (!m) return p
-  const rest = (m[2] ?? '').replace(/\//g, '\\')
-  return `${m[1].toUpperCase()}:${rest || '\\'}`
+  return normalizeWindowsAbsolutePath(p) ?? p
 }
 
 /**
@@ -265,6 +283,19 @@ function isUnsafeResolvedPath(resolved: string): boolean {
   const home = homedir()
   // candidate is home itself or an ancestor of home (e.g. /Users, /home)
   if (home && (resolved === home || pathContains(resolved, home))) return true
+  if (process.platform === 'win32') {
+    const windowsSystemRoots = [
+      process.env.SystemRoot,
+      process.env.ProgramFiles,
+      process.env['ProgramFiles(x86)'],
+      process.env.ProgramData,
+    ]
+    for (const systemRoot of windowsSystemRoots) {
+      if (!systemRoot) continue
+      const normalizedRoot = path.resolve(systemRoot)
+      if (resolved === normalizedRoot || pathContains(normalizedRoot, resolved)) return true
+    }
+  }
   const systemRoots = [
     '/etc',
     '/usr',
@@ -283,20 +314,56 @@ function isUnsafeResolvedPath(resolved: string): boolean {
   return systemRoots.some((sys) => resolved === sys || pathContains(sys, resolved))
 }
 
-// Reject overly-broad or sensitive roots from being granted no-approval sandbox write.
-// Checks BOTH the lexical path and its symlink-resolved real target, so a safe-looking
-// symlink (e.g. /tmp/project -> $HOME) cannot smuggle a sensitive root into allowWrite
-// (buildConfig adds the realpath variant to allowWrite).
-function isUnsafeUserWriteDir(dir: string): boolean {
-  let resolved: string
+function createWritePathGrant(root: string): WritePathGrant {
+  const resolvedRoot = path.resolve(root)
+  return { root: resolvedRoot, canonicalRoot: safeRealpathSync(resolvedRoot) }
+}
+
+function createExistingDirectoryGrant(root: string): WritePathGrant | null {
   try {
-    resolved = path.resolve(dir)
+    const resolvedRoot = path.resolve(root)
+    if (!statSync(resolvedRoot).isDirectory()) return null
+    return { root: resolvedRoot, canonicalRoot: realpathSync.native(resolvedRoot) }
   } catch {
-    return true
+    return null
   }
-  if (isUnsafeResolvedPath(resolved)) return true
-  const real = safeRealpathSync(resolved)
-  return real !== resolved && isUnsafeResolvedPath(real)
+}
+
+function getSafeUserWriteGrants(userWritePaths: string[]): WritePathGrant[] {
+  const safeGrants: WritePathGrant[] = []
+  for (const userPath of userWritePaths) {
+    const normalized = normalizeWindowsShellPath(userPath)
+    if (!path.isAbsolute(normalized)) {
+      log.warn(`Refusing to grant sandbox write access to unsafe directory: ${userPath}`)
+      continue
+    }
+    const grant = createExistingDirectoryGrant(normalized)
+    if (!grant) {
+      log.warn(`Refusing to grant sandbox write access to unavailable directory: ${userPath}`)
+      continue
+    }
+    // Check both the selected path and its canonical target so a symlink cannot smuggle
+    // a broad or sensitive root into allowWrite.
+    if (isUnsafeResolvedPath(grant.root) || isUnsafeResolvedPath(grant.canonicalRoot)) {
+      log.warn(`Refusing to grant sandbox write access to unsafe directory: ${userPath}`)
+      continue
+    }
+    safeGrants.push(grant)
+  }
+  return safeGrants.filter(
+    (grant, index) => safeGrants.findIndex((candidate) => path.relative(candidate.root, grant.root) === '') === index
+  )
+}
+
+function getSandboxInitConfigKey(workDir: string, userWritePaths: string[]): string {
+  const normalizeRequestedPath = (requestedPath: string) => {
+    const normalized = normalizeWindowsShellPath(requestedPath)
+    return path.isAbsolute(normalized) ? path.resolve(normalized) : normalized
+  }
+  return JSON.stringify({
+    workDir: path.resolve(workDir),
+    userWritePaths: userWritePaths.map(normalizeRequestedPath),
+  })
 }
 
 // True when `child` is `parent` or lives under it (lexical, after resolution).
@@ -309,22 +376,15 @@ function buildConfig(
   workDir: string,
   // Extra real directories the user granted write access to (sandbox working-directory
   // feature). buildConfig is macOS/Linux-only (Windows skips SRT), so these are POSIX paths.
-  userWritePaths: string[] = []
+  userWriteGrants: WritePathGrant[] = []
 ): Omit<SandboxRuntimeConfig, 'network'> & {
   network: Omit<SandboxRuntimeConfig['network'], 'allowedDomains'>
 } {
   // buildConfig is only used by the macOS/Linux SRT path; Windows skips SRT (see initSandbox).
   const isMacOS = process.platform === 'darwin'
   const tempWritePaths = [tmpdir(), '/tmp'].flatMap((p) => [p, safeRealpathSync(p)])
-  const safeUserPaths = userWritePaths.filter((p) => {
-    if (isUnsafeUserWriteDir(p)) {
-      log.warn(`Refusing to grant sandbox write access to unsafe directory: ${p}`)
-      return false
-    }
-    return true
-  })
   // Both the lexical and symlink-resolved forms of each granted dir.
-  const userWriteVariants = safeUserPaths.flatMap((p) => [p, safeRealpathSync(p)])
+  const userWriteVariants = userWriteGrants.flatMap((grant) => [grant.root, grant.canonicalRoot])
   const allowWrite = [...new Set([workDir, ...TASK_SANDBOX_EXTRA_WRITE_PATHS, ...tempWritePaths, ...userWriteVariants])]
 
   // Protect sensitive files (.env, etc.) inside granted dirs with ABSOLUTE deny paths.
@@ -393,28 +453,96 @@ export const shellEscape = shellQuote
  * Validate that a resolved target path is inside the sandbox working directory.
  * Defense-in-depth: also checks for symlinks that could redirect writes outside the sandbox.
  */
-export async function validateWritePath(
+async function validateWritePathAgainstGrants(
   resolved: string,
-  workDir: string
-): Promise<{ valid: boolean; error?: string }> {
-  if (!resolved.startsWith(workDir + path.sep) && resolved !== workDir) {
-    return { valid: false, error: 'Invalid path: outside sandbox' }
-  }
-  // Check if any component is a symlink pointing outside the sandbox
-  if (existsSync(resolved)) {
+  allowedRoots: WritePathGrant[]
+): Promise<WritePathValidationResult> {
+  const targetPath = path.resolve(resolved)
+
+  for (const grant of allowedRoots) {
+    if (!pathContains(grant.root, targetPath)) continue
+
+    // Resolve the nearest existing ancestor so junctions/symlinks in any parent component
+    // cannot redirect a new file outside the user-granted root.
+    let existingAncestor = targetPath
+    const missingSegments: string[] = []
+    while (!existsSync(existingAncestor)) {
+      const parent = path.dirname(existingAncestor)
+      if (parent === existingAncestor) break
+      missingSegments.unshift(path.basename(existingAncestor))
+      existingAncestor = parent
+    }
+
     try {
-      const stat = await fsLstat(resolved)
-      if (stat.isSymbolicLink()) {
-        const realTarget = await fsRealpath(resolved)
-        if (!realTarget.startsWith(workDir + path.sep) && realTarget !== workDir) {
-          return { valid: false, error: 'Invalid path: symlink target is outside sandbox' }
-        }
-      }
+      const realRoot = await fsRealpath(grant.root)
+      // The selected root itself may be replaced with a symlink/junction after initialization.
+      // Keep the grant pinned to the canonical target that the user originally selected.
+      if (path.relative(grant.canonicalRoot, realRoot) !== '') continue
+      const realAncestor = await fsRealpath(existingAncestor)
+      const realTarget = path.resolve(realAncestor, ...missingSegments)
+      if (pathContains(grant.canonicalRoot, realTarget)) return { valid: true, canonicalTarget: realTarget }
     } catch {
-      // If lstat fails, the file doesn't exist yet — that's OK for new files
+      // A selected directory can disappear or change while the app is running. Fail closed
+      // instead of recreating or following a path whose canonical boundary is now unknown.
     }
   }
-  return { valid: true }
+  return { valid: false, error: 'Invalid path: outside sandbox or granted working directories' }
+}
+
+export async function validateWritePath(
+  resolved: string,
+  workDir: string,
+  userWritePaths: string[] = []
+): Promise<{ valid: boolean; error?: string }> {
+  const grants = [createWritePathGrant(workDir), ...userWritePaths.map(createWritePathGrant)]
+  const validation = await validateWritePathAgainstGrants(resolved, grants)
+  return validation.valid ? { valid: true } : { valid: false, error: validation.error }
+}
+
+function isProtectedUserWritePath(
+  resolved: string,
+  canonicalTarget: string | undefined,
+  grants: WritePathGrant[]
+): boolean {
+  const normalizeName = (name: string) => {
+    if (process.platform !== 'win32') return name
+    // NTFS exposes streams as `filename:stream:type`; `filename::$DATA` is the
+    // default stream and is equivalent to writing the file itself. Compare the
+    // base filename so stream syntax cannot bypass protected-name checks.
+    const streamSeparator = name.indexOf(':')
+    const baseName = streamSeparator >= 0 ? name.slice(0, streamSeparator) : name
+    return baseName.replace(/[. ]+$/u, '').toLowerCase()
+  }
+  const deniedNames = new Set(TASK_SANDBOX_DENY_WRITE_PATHS.map(normalizeName))
+  const containsProtectedSegment = (root: string, target: string) => {
+    if (!pathContains(root, target)) return false
+    const relativeSegments = path.relative(root, target).split(path.sep)
+    return relativeSegments.some((segment) => deniedNames.has(normalizeName(segment)))
+  }
+
+  const targetPath = path.resolve(resolved)
+  return grants.some(
+    (grant) =>
+      containsProtectedSegment(grant.root, targetPath) ||
+      (canonicalTarget !== undefined && containsProtectedSegment(grant.canonicalRoot, canonicalTarget))
+  )
+}
+
+async function validateSessionWritePath(
+  session: SandboxSession,
+  resolved: string
+): Promise<{ valid: boolean; error?: string }> {
+  const allowedRoots = [session.workingDirectoryGrant, ...session.userWriteGrants].filter(
+    (grant): grant is WritePathGrant => grant !== null
+  )
+  const validation = await validateWritePathAgainstGrants(resolved, allowedRoots)
+  if (!validation.valid) {
+    return session.userWriteGrants.length > 0 ? validation : { valid: false, error: 'Invalid path: outside sandbox' }
+  }
+  if (isProtectedUserWritePath(resolved, validation.canonicalTarget, session.userWriteGrants)) {
+    return { valid: false, error: 'Write access denied for protected file' }
+  }
+  return validation
 }
 
 /**
@@ -446,24 +574,34 @@ export async function initSandbox(
   workDir: string,
   sessionId?: string,
   userWritePaths: string[] = []
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; acceptedWorkingDirectories?: string[]; error?: string }> {
   let session = getOrCreateSession(sessionId)
+  const initConfigKey = getSandboxInitConfigKey(workDir, userWritePaths)
 
   if (session.state === 'initialized') {
+    if (session.initConfigKey === initConfigKey) {
+      return { success: true, acceptedWorkingDirectories: session.userWriteGrants.map((grant) => grant.root) }
+    }
     log.info(`Sandbox session ${sessionId || DEFAULT_SESSION} already initialized, resetting first`)
     await resetSandbox(sessionId)
     // resetSandbox deletes the session from the Map, so re-create it
     session = getOrCreateSession(sessionId)
   }
 
+  const safeUserWriteGrants = getSafeUserWriteGrants(userWritePaths)
+  const workingDirectoryGrant = createWritePathGrant(workDir)
+
   // Native Windows path: @anthropic-ai/sandbox-runtime only runs on macOS/Linux. On Windows
   // we execute code natively with NO OS sandbox (see docs/technical/windows-sandbox.md), so
   // skip SRT entirely and just record the working directory.
   if (process.platform === 'win32') {
     session.workingDirectory = workDir
+    session.workingDirectoryGrant = workingDirectoryGrant
+    session.userWriteGrants = safeUserWriteGrants
+    session.initConfigKey = initConfigKey
     session.state = 'initialized'
     log.info(`Sandbox session ${sessionId || DEFAULT_SESSION} initialized (native Windows, no OS isolation)`)
-    return { success: true }
+    return { success: true, acceptedWorkingDirectories: safeUserWriteGrants.map((grant) => grant.root) }
   }
 
   try {
@@ -474,7 +612,7 @@ export async function initSandbox(
       globalSandboxManager = SandboxManager
     }
 
-    const config = buildConfig(workDir, userWritePaths)
+    const config = buildConfig(workDir, safeUserWriteGrants)
     log.info(
       `Initializing sandbox session=${sessionId || DEFAULT_SESSION} workDir=${workDir} platform=${process.platform} extraWritePaths=${userWritePaths.length}`
     )
@@ -486,9 +624,12 @@ export async function initSandbox(
 
     session.sandboxConfig = config
     session.workingDirectory = workDir
+    session.workingDirectoryGrant = workingDirectoryGrant
+    session.userWriteGrants = safeUserWriteGrants
+    session.initConfigKey = initConfigKey
     session.state = 'initialized'
     log.info(`Sandbox session ${sessionId || DEFAULT_SESSION} initialized successfully`)
-    return { success: true }
+    return { success: true, acceptedWorkingDirectories: safeUserWriteGrants.map((grant) => grant.root) }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     log.error('Sandbox initialization failed:', msg)
@@ -775,9 +916,13 @@ export async function writeFile(
   }
   try {
     // Write directly via fs to avoid ARG_MAX limits with shell commands.
-    // Resolve path relative to sandbox working directory.
-    const resolved = path.resolve(session.workingDirectory, filePath)
-    const validation = await validateWritePath(resolved, session.workingDirectory)
+    // Relative paths resolve inside the session temp directory. Absolute paths are accepted
+    // only when they are inside a user-granted working directory.
+    const normalizedPath = normalizeWindowsShellPath(filePath)
+    const resolved = path.isAbsolute(normalizedPath)
+      ? path.resolve(normalizedPath)
+      : path.resolve(session.workingDirectory, normalizedPath)
+    const validation = await validateSessionWritePath(session, resolved)
     if (!validation.valid) {
       return { success: false, error: validation.error }
     }
@@ -814,8 +959,11 @@ export async function editFile(
     if (!session?.workingDirectory) {
       return { success: false, error: 'Sandbox not initialized' }
     }
-    const resolved = path.resolve(session.workingDirectory, filePath)
-    const validation = await validateWritePath(resolved, session.workingDirectory)
+    const normalizedPath = normalizeWindowsShellPath(filePath)
+    const resolved = path.isAbsolute(normalizedPath)
+      ? path.resolve(normalizedPath)
+      : path.resolve(session.workingDirectory, normalizedPath)
+    const validation = await validateSessionWritePath(session, resolved)
     if (!validation.valid) {
       return { success: false, error: validation.error }
     }
@@ -995,7 +1143,12 @@ export async function checkAvailability(): Promise<{ available: boolean; reason?
 export async function initSandboxWithTempDir(
   sessionId: string,
   userWritePaths: string[] = []
-): Promise<{ success: boolean; workingDirectory?: string; error?: string }> {
+): Promise<{
+  success: boolean
+  workingDirectory?: string
+  acceptedWorkingDirectories?: string[]
+  error?: string
+}> {
   // Validate sessionId to prevent path traversal
   if (!sessionId || /[/\\]/.test(sessionId) || sessionId === '.' || sessionId === '..') {
     return { success: false, error: 'Invalid session ID' }
@@ -1006,7 +1159,11 @@ export async function initSandboxWithTempDir(
     mkdirSync(tempBase, { recursive: true })
     const result = await initSandbox(tempBase, sessionId, userWritePaths)
     if (result.success) {
-      return { success: true, workingDirectory: tempBase }
+      return {
+        success: true,
+        workingDirectory: tempBase,
+        acceptedWorkingDirectories: result.acceptedWorkingDirectories,
+      }
     }
     return result
   } catch (error) {

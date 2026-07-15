@@ -104,11 +104,19 @@ OpenAI Codex（**Apache-2.0**，`openai/codex` → `codex-rs/windows-sandbox-rs`
     `cygpath` / `wslpath` 做窄范围兜底。
 - **`checkAvailability(win32)` → available**（原生、无隔离），移除旧的 `wsl --status` 探测。
 - **不做** env 级网络关闭（容易绕过，价值低）。
+- **支持绑定真实工作目录**：Agent Mode 的工作目录入口在 Windows 上可用。文件工具会把原生
+  `C:\...`、WSL `/mnt/c/...`、Git Bash `/c/...` 和 Cygwin `/cygdrive/c/...` 路径统一成原生路径，
+  并用不区分大小写、按路径段匹配的方式判断是否位于用户授权目录中。
+- **绑定目录的写入边界**：`write_file` / `edit_file` 对授权目录内的路径免二次审批，但实际写入仍经
+  主进程按会话保存的授权根目录校验；授权时会固定目录的 canonical target，根目录、相邻前缀、`..`
+  越界、授权后被替换的根目录以及指向目录外的 symlink/junction 不会获得免审批写入。绑定目录内任意
+  层级的 `.env`、`.env.local`、`.env.production` 仍保持拒写。
 
 **安全取舍（须知）**：Windows 上 `code_execution` 运行模型生成的任意代码，以**当前用户完整权限**执行——
 可读 `~/.ssh`、删改用户文件、自由联网。相对 macOS（Seatbelt）/ Linux（bubblewrap）的
-denyRead/allowWrite 是**实质降级**。UI/文档须如实标注，并保持在显式开启入口之后；`write_file`/`edit_file`
-对工作目录外绝对路径的用户批准提示仍然有效（工具层，与 OS 沙箱无关）。
+denyRead/allowWrite 是**实质降级**。UI/文档须如实标注，并保持在显式开启入口之后。绑定工作目录只表示
+用户授予文件工具在该目录内免二次审批，**不是 Windows OS 沙箱**；`write_file` / `edit_file` 对临时目录、
+绑定目录以外绝对路径的用户批准提示仍然有效（工具层，与 OS 沙箱无关）。
 
 ### 3.2 未来强隔离选项 A：SRT-Windows 后端
 
@@ -211,7 +219,12 @@ PR #813（已合并，commit `c955cbf94`）基于错误的 WSL 前提。本次�
 - `interfaces.ts` / `desktop_platform.ts`：桌面端统一使用 `sandboxExecCode`。
 - `local-provider.ts`：`exec()` 在所有桌面平台路由到 `sandboxExecCode`；Windows bash 保留其 PATH 中的
   `node`，避免 WSL 执行宿主 Electron 路径。
-- 测试：`resolveWindowsPowerShell` / `resolveWindowsBash` 决策单测；macOS SRT 路径与 stdin 执行机制已实测。
+- `AgentModePanel.tsx`：Windows 开放绑定工作目录入口。
+- `windows-path.ts` / `filesystem.ts`：统一 Windows 原生与 shell 路径、大小写无关边界判断，并把授权目录
+  的文件工具写入路由到主进程。
+- `manager.ts`：会话记录经过筛选的授权目录；写入/编辑执行词法边界与 canonical symlink/junction 校验。
+- 测试：`resolveWindowsPowerShell` / `resolveWindowsBash` 决策、Windows 路径别名/大小写/越界，以及授权目录 symlink 逃逸单测；
+  macOS SRT 路径与 stdin 执行机制已实测。
 
 ## 9. 验证状态与后续
 

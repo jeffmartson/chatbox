@@ -1,6 +1,12 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import { TASK_SANDBOX_EXTRA_WRITE_PATHS } from '@shared/task-sandbox'
 import { shellQuote } from '@shared/utils/shell'
+import {
+  isWindowsAbsolutePath,
+  isWindowsFilesystemRoot,
+  isWindowsPathInside,
+  normalizeWindowsAbsolutePath,
+} from '@shared/utils/windows-path'
 import { jsonSchema, type ToolSet } from 'ai'
 import { trackAgentModeFullAccessBypass } from '@/analytics/agent-mode'
 import { requestFileMutationApproval } from '@/packages/user-exec-approval'
@@ -93,7 +99,7 @@ function formatEditFileOutput(output: unknown): string {
 }
 
 function isAbsolutePath(filePath: string): boolean {
-  return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
+  return filePath.startsWith('/') || isWindowsAbsolutePath(filePath)
 }
 
 function previewContent(content: string, maxLength = 2000): string {
@@ -134,6 +140,9 @@ async function getSandboxRoot(context: FilesystemContext): Promise<string | null
 }
 
 function isInsideRoot(root: string, filePath: string): boolean {
+  if (isWindowsRenderer() && isWindowsAbsolutePath(root) && isWindowsAbsolutePath(filePath)) {
+    return isWindowsPathInside(root, filePath)
+  }
   const normalizedRoot = root.endsWith('/') ? root : `${root}/`
   return filePath === root || filePath.startsWith(normalizedRoot)
 }
@@ -165,6 +174,11 @@ function isWindowsRenderer(): boolean {
   return typeof navigator !== 'undefined' && (navigator.userAgent ?? '').includes('Windows')
 }
 
+function normalizeToolPathForPlatform(filePath: string): string {
+  if (!isWindowsRenderer()) return filePath
+  return normalizeWindowsAbsolutePath(filePath) ?? filePath
+}
+
 // Absolute paths under these roots (e.g. /tmp) are writable by the sandbox runtime, so
 // writes/edits are routed through the sandbox (see shouldUseSandbox) rather than the real
 // filesystem — that way the sandbox's own confinement/symlink checks apply and no user
@@ -183,16 +197,38 @@ function isSandboxWritableTempPath(filePath: string): boolean {
 // Absolute paths under a user-granted working directory are routed through the sandbox
 // (no approval), like /tmp. The directory is in the sandbox's allowWrite set, so writes
 // succeed under confinement. Normalized first so '..' traversal can't spoof a match.
-function isInsideUserWorkingDir(context: FilesystemContext, filePath: string): boolean {
-  if (!context.userWorkingDirectories?.length || !filePath.startsWith('/')) return false
+function isInsideWorkingDirectories(directories: readonly string[] | undefined, filePath: string): boolean {
+  if (!directories?.length) return false
+  if (isWindowsRenderer()) {
+    const normalized = normalizeWindowsAbsolutePath(filePath)
+    if (!normalized) return false
+    return directories.some((dir) => {
+      const normalizedDir = normalizeWindowsAbsolutePath(dir)
+      if (!normalizedDir || isWindowsFilesystemRoot(normalizedDir)) return false
+      return isWindowsPathInside(normalizedDir, normalized)
+    })
+  }
+  if (!filePath.startsWith('/')) return false
   const normalized = normalizeAbsolutePosixPath(filePath)
-  return context.userWorkingDirectories.some((dir) => {
+  return directories.some((dir) => {
     const normDir = normalizeAbsolutePosixPath(dir)
     // Never treat the whole filesystem as a granted dir — isInsideRoot('/', x) is always
     // true, which would route every absolute path through the sandbox and skip approval.
     if (normDir === '/' || normDir === '') return false
     return isInsideRoot(normDir, normalized)
   })
+}
+
+function isInsideUserWorkingDir(context: FilesystemContext, filePath: string): boolean {
+  return isInsideWorkingDirectories(context.userWorkingDirectories, filePath)
+}
+
+async function isAcceptedUserWorkingDir(context: FilesystemContext, filePath: string): Promise<boolean> {
+  if (!isInsideUserWorkingDir(context, filePath)) return false
+  const setup = await ensureSandbox(context)
+  if (!setup.success) return false
+  const acceptedDirectories = context.provider?.getAcceptedExtraWritableDirs?.()
+  return acceptedDirectories === undefined || isInsideWorkingDirectories(acceptedDirectories, filePath)
 }
 
 async function shouldUseSandbox(context: FilesystemContext, filePath: string): Promise<boolean> {
@@ -277,7 +313,16 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     execute: async (input) => {
       const listInput = input as { path: string }
       listInput.path = await remapPhantomHomePathForProvider(listInput.path, context.provider)
-      if (await shouldUseSandbox(context, listInput.path)) {
+      listInput.path = normalizeToolPathForPlatform(listInput.path)
+      const useSandbox = await shouldUseSandbox(context, listInput.path)
+      // Windows bound/temporary absolute paths are real host paths. Use the native file
+      // operation instead of sending a Windows path through Git Bash or WSL path parsing.
+      if (useSandbox && isWindowsRenderer() && isWindowsAbsolutePath(listInput.path)) {
+        if (!platform.fsList) return { error: 'Filesystem access is not available on this platform' }
+        const result = await platform.fsList({ dirPath: listInput.path })
+        return result.success ? { content: result.content ?? '' } : { error: result.error }
+      }
+      if (useSandbox) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
         if (!context.provider) return { error: 'Sandbox is not available' }
@@ -332,6 +377,7 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     execute: async (input) => {
       const searchInput = input as { path: string; query: string; regex?: boolean; include?: string }
       searchInput.path = await remapPhantomHomePathForProvider(searchInput.path, context.provider)
+      searchInput.path = normalizeToolPathForPlatform(searchInput.path)
       if (await shouldUseSandbox(context, searchInput.path)) {
         const setup = await ensureSandbox(context)
         if (!setup.success) return { error: setup.error }
@@ -381,8 +427,25 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     execute: async (input, toolOptions) => {
       const writeInput = input as { file_path: string; content: string }
       writeInput.file_path = await remapPhantomHomePathForProvider(writeInput.file_path, context.provider)
+      writeInput.file_path = normalizeToolPathForPlatform(writeInput.file_path)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
-      if (await shouldUseSandbox(context, writeInput.file_path)) {
+      const useSandbox = await shouldUseSandbox(context, writeInput.file_path)
+      const rejectedUserGrant =
+        useSandbox &&
+        isInsideUserWorkingDir(context, writeInput.file_path) &&
+        !(await isAcceptedUserWorkingDir(context, writeInput.file_path))
+      if (useSandbox && !rejectedUserGrant) {
+        if (isWindowsRenderer()) {
+          const setup = await ensureSandbox(context)
+          if (!setup.success) return { error: setup.error }
+          if (!platform.sandboxWrite) return { error: 'Sandbox write is not available on this platform' }
+          const result = await platform.sandboxWrite({
+            filePath: writeInput.file_path,
+            content: writeInput.content,
+            sessionId: context.sessionId,
+          })
+          return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
+        }
         const result = await writeSandboxFile(context, writeInput.file_path, writeInput.content)
         return result.success ? { success: true, file_path: writeInput.file_path } : { error: result.error }
       }
@@ -417,11 +480,30 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
     execute: async (input, toolOptions) => {
       const editInput = input as EditFileInput
       editInput.file_path = await remapPhantomHomePathForProvider(editInput.file_path, context.provider)
+      editInput.file_path = normalizeToolPathForPlatform(editInput.file_path)
       const alreadyApproved = (toolOptions as typeof toolOptions & { approved?: boolean }).approved
       const validatedInput = validateEditInput(editInput)
       if ('error' in validatedInput) return { error: validatedInput.error }
       const { edits } = validatedInput
-      if (await shouldUseSandbox(context, editInput.file_path)) {
+      const useSandbox = await shouldUseSandbox(context, editInput.file_path)
+      const rejectedUserGrant =
+        useSandbox &&
+        isInsideUserWorkingDir(context, editInput.file_path) &&
+        !(await isAcceptedUserWorkingDir(context, editInput.file_path))
+      if (useSandbox && !rejectedUserGrant) {
+        if (isWindowsRenderer()) {
+          const setup = await ensureSandbox(context)
+          if (!setup.success) return { error: setup.error }
+          if (!platform.sandboxEdit) return { error: 'Sandbox edit is not available on this platform' }
+          const result = await platform.sandboxEdit({
+            filePath: editInput.file_path,
+            edits: edits.map((edit) => ({ search: edit.old_text, replace: edit.new_text })),
+            sessionId: context.sessionId,
+          })
+          return result.success
+            ? { success: true, file_path: editInput.file_path, edits: edits.length }
+            : { error: result.error }
+        }
         const result = await editSandboxFile(context, editInput.file_path, edits)
         return result.success
           ? { success: true, file_path: editInput.file_path, edits: edits.length }
@@ -469,7 +551,7 @@ Use these tools (write_file / edit_file / list_files / search_files) as the prim
 - Relative paths are resolved in the session sandbox working directory and can be written or edited without confirmation. Prefer relative paths.
 - Do NOT use phantom home paths like /home/user or /root — they do not exist. Use relative paths instead.
 - Absolute paths access the user's real filesystem. Read/list/search only when the user provided or clearly requested the path.
-- Writing or editing an absolute user filesystem path requires user approval unless Full Access is enabled. Do not attempt destructive operations; file deletion is not available.
+- Writing or editing an absolute user filesystem path requires user approval unless it is inside a bound working directory or Full Access is enabled. Do not attempt destructive operations; file deletion is not available.
 - Keep tool results small. For large generated outputs, write a file and return a path plus a short summary.
 `,
   }
