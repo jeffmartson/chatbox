@@ -36,19 +36,34 @@ Var /GLOBAL pid
 
       ; Older Chatbox versions do not understand --quit-for-install. Fall back
       ; to electron-builder's process termination after the graceful timeout.
+      DetailPrint "Graceful exit timed out; force-closing Chatbox"
       StrCpy $pid 0
       !insertmacro KILL_PROCESS "${APP_EXECUTABLE_FILENAME}" 1
-      Sleep 500
-      !insertmacro FIND_PROCESS "${APP_EXECUTABLE_FILENAME}" $R0
 
-      ${If} $R0 == 0
-        ${If} ${Silent}
-          SetErrorLevel 2
-          Quit
-        ${EndIf}
-        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY installerRequestAppExit
+      ; Process termination can finish after the kill command returns. Poll for
+      ; up to 3 seconds before asking the user to close the app manually.
+      StrCpy $R1 0
+
+    installerWaitForForceClose:
+      Sleep 250
+      !insertmacro FIND_PROCESS "${APP_EXECUTABLE_FILENAME}" $R0
+      ${If} $R0 != 0
+        DetailPrint "Force-close completed"
+        Goto installerAppClosed
+      ${EndIf}
+
+      IntOp $R1 $R1 + 1
+      ${If} $R1 < 12
+        Goto installerWaitForForceClose
+      ${EndIf}
+
+      DetailPrint "Force-close timed out after 3 seconds"
+      ${If} ${Silent}
+        SetErrorLevel 2
         Quit
       ${EndIf}
+      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY installerRequestAppExit
+      Quit
 
     installerAppClosed:
   ${EndIf}
