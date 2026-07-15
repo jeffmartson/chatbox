@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { buildReadFileScript } from '../../shared/utils/read-file-script'
 
 const { logger } = vi.hoisted(() => ({
   logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -209,6 +210,38 @@ console.log(JSON.stringify(payload))
     })
 
     expect(result).toEqual({ stdout: 'bash-ok\nnode-from-bash\n', stderr: '', exitCode: 0 })
+  })
+
+  test.each([
+    {
+      name: 'a final line without a trailing newline',
+      filename: 'read unterminated 中文.txt',
+      content: 'single line without newline',
+      expectedStdout: '1\nsingle line without newline',
+    },
+    {
+      name: 'an empty file',
+      filename: 'read empty 中文.txt',
+      content: '',
+      expectedStdout: '0\n',
+    },
+    {
+      name: 'a blank line',
+      filename: 'read blank 中文.txt',
+      content: '\n',
+      expectedStdout: '1\n\n',
+    },
+  ])('executes the read_file Bash script for $name', async ({ filename, content, expectedStdout }) => {
+    expect(resolveWindowsBash()).not.toBeNull()
+    writeFileSync(path.join(workDir, filename), content, 'utf8')
+
+    const result = await execCode({
+      code: buildReadFileScript(filename, 1, 2000),
+      language: 'bash',
+      sessionId,
+    })
+
+    expect(result).toEqual({ stdout: expectedStdout, stderr: '', exitCode: 0 })
   })
 
   test('changes directory from a native Windows path in Bash', async () => {

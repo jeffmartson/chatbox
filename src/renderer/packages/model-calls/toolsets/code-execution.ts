@@ -1,5 +1,6 @@
 import { isTextFilePath } from '@shared/file-extensions'
 import { DEFAULT_EXEC_TIMEOUT, type SandboxExecLanguage, type SandboxProvider } from '@shared/sandbox-provider'
+import { buildReadFileScript } from '@shared/utils/read-file-script'
 import { escapeSingleQuotes } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
@@ -52,8 +53,14 @@ function formatReadFileOutput(output: unknown): string {
   const error = stringField(record, 'error')
   if (error) return contentOrErrorText(output)
   const content = stringField(record, 'content') ?? ''
+  const startLine = numberField(record, 'startLine')
+  const endLine = numberField(record, 'endLine')
   const hint = stringField(record, 'hint')
-  return hint ? `${content}\n\n${hint}` : content
+  const displayContent =
+    content.trim() === '' && startLine !== undefined && endLine !== undefined && endLine >= startLine
+      ? '[Selected lines are blank.]'
+      : content
+  return hint ? `${displayContent}\n\n${hint}` : displayContent
 }
 
 function formatDownloadOutput(output: unknown): string {
@@ -274,15 +281,15 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
 
       const startLine = readInput.offset ?? 1
       const limit = readInput.limit ?? READ_FILE_DEFAULT_LINES
-      const escapedPath = escapeSingleQuotes(readInput.file_path)
       // Coerce to safe integers
       const safeStart = Math.max(1, Math.floor(Number(startLine)))
       const safeLimit = Math.max(1, Math.floor(Number(limit)))
 
-      // Use sed for line-based extraction + wc -l for total line count
+      // wc -l counts newline characters, so include a final unterminated line when the file is non-empty.
       const safeEnd = safeStart + safeLimit - 1
+      const readScript = buildReadFileScript(readInput.file_path, safeStart, safeEnd)
       const result = await provider.exec({
-        code: `FILE='${escapedPath}'; if [ ! -f "$FILE" ]; then exit 1; else TOTAL=$(wc -l < "$FILE" | tr -d ' '); echo "$TOTAL"; sed -n '${safeStart},${safeEnd}p' "$FILE"; fi`,
+        code: readScript,
         language: 'bash',
         timeout: 10_000,
       })
@@ -294,17 +301,27 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       const stdout = result.stdout
       const newlineIdx = stdout.indexOf('\n')
       const totalLines = Number.parseInt(stdout.slice(0, newlineIdx).trim(), 10)
+      if (newlineIdx < 0 || !Number.isSafeInteger(totalLines) || totalLines < 0) {
+        return { error: `Failed to determine line count: ${readInput.file_path}` }
+      }
+
+      if (totalLines === 0) {
+        return {
+          file_path: readInput.file_path,
+          content: '',
+          totalLines: 0,
+        }
+      }
+
       // Remove trailing newline added by sed to avoid phantom empty line in split
       const rawContent = stdout.slice(newlineIdx + 1)
       const content = rawContent.endsWith('\n') ? rawContent.slice(0, -1) : rawContent
-      const outputLines = content === '' ? 0 : content.split('\n').length
 
       if (safeStart > totalLines) {
         return { error: `Offset ${safeStart} is beyond end of file (${totalLines} lines total)` }
       }
 
-      // Cap endLine to totalLines (sed may match beyond wc -l count for files without trailing newline)
-      const endLine = Math.min(safeStart + outputLines - 1, totalLines)
+      const endLine = Math.min(safeEnd, totalLines)
       const hasMore = endLine < totalLines
 
       return {

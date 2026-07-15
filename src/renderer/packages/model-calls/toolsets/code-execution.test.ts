@@ -190,6 +190,70 @@ describe('buildCodeExecutionTools', () => {
     })
   })
 
+  test('read_file counts a final line without a trailing newline', async () => {
+    mockProvider.exec.mockResolvedValue({ stdout: '1\nsingle line without newline', stderr: '', exitCode: 0 })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    const result = await tool.execute({ file_path: 'note.txt' }, {})
+
+    expect(result).toEqual({
+      file_path: 'note.txt',
+      content: 'single line without newline',
+      startLine: 1,
+      endLine: 1,
+      totalLines: 1,
+    })
+    expect(mockProvider.exec).toHaveBeenCalledWith({
+      code: expect.stringContaining('tail -c 1'),
+      language: 'bash',
+      timeout: 10_000,
+    })
+  })
+
+  test('read_file returns an empty-file result instead of an offset error', async () => {
+    mockProvider.exec.mockResolvedValue({ stdout: '0\n', stderr: '', exitCode: 0 })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    const result = await tool.execute({ file_path: 'empty.txt' }, {})
+
+    expect(result).toEqual({ file_path: 'empty.txt', content: '', totalLines: 0 })
+    await expect(toModelOutput(tool, result)).resolves.toEqual({ type: 'text', value: 'File is empty.' })
+  })
+
+  test('read_file preserves a selected blank line', async () => {
+    mockProvider.exec.mockResolvedValue({ stdout: '1\n\n', stderr: '', exitCode: 0 })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    const result = await tool.execute({ file_path: 'blank.txt' }, {})
+
+    expect(result).toMatchObject({ content: '', startLine: 1, endLine: 1, totalLines: 1 })
+    await expect(toModelOutput(tool, result)).resolves.toEqual({
+      type: 'text',
+      value: '[Selected lines are blank.]',
+    })
+  })
+
+  test('read_file rejects an invalid line-count response', async () => {
+    mockProvider.exec.mockResolvedValue({ stdout: 'not-a-number\ncontent', stderr: '', exitCode: 0 })
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.read_file as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<Record<string, unknown>>
+    }
+
+    await expect(tool.execute({ file_path: 'broken.txt' }, {})).resolves.toEqual({
+      error: 'Failed to determine line count: broken.txt',
+    })
+  })
+
   test('read_file preserves Bash availability errors for the UI and model', async () => {
     mockProvider.exec.mockResolvedValue({
       stdout: '',
