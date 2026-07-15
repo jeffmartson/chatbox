@@ -1,6 +1,6 @@
 import type { ModelInterface } from '@shared/models/types'
 import type { SandboxProvider } from '@shared/sandbox-provider'
-import type { AgentModeValue, KnowledgeBase, Message, SessionSettings } from '@shared/types'
+import type { KnowledgeBase, Message, SessionSettings } from '@shared/types'
 import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { getMessageText } from '@shared/utils/message'
 import { jsonSchema, type ToolSet } from 'ai'
@@ -51,7 +51,7 @@ export interface BuildToolsOptions {
   webBrowsing: boolean
   knowledgeBase?: Pick<KnowledgeBase, 'id' | 'name'>
   messages: Message[]
-  agentMode: AgentModeValue
+  agentMode: 'on' | 'off'
   sessionSettings?: SessionSettings
   codeExecution?: {
     sessionId: string
@@ -64,8 +64,6 @@ export interface BuildToolsOptions {
 export interface BuildToolsResult {
   tools: ToolSet
   instructions: string
-  /** When agentMode is 'auto', only these tools are active until load_skill escalates to full mode. */
-  initialActiveTools?: string[]
 }
 
 /**
@@ -138,8 +136,9 @@ No skills are currently enabled.
   instruction += `
 ### Running Commands in User Environment
 **user_exec** runs commands in the user's real environment with full system access. This is a privileged tool.
-Only use user_exec when a loaded skill explicitly instructs you to run a command in the user's environment.
-Do NOT use user_exec on your own initiative — use code_execution (sandbox) for file processing, data analysis, downloading files, and all other tasks.
+In Work Mode, use user_exec when the user's task requires their real environment, including when a loaded skill instructs you to run a host command. It is not limited to skill-driven tasks.
+Prefer code_execution (sandbox) for file processing, data analysis, downloading files, and other work that does not require the user's host environment.
+Unless Full Access is enabled, every command is still subject to the host approval policy and may pause for user confirmation.
 On Windows, user_exec runs PowerShell commands; on macOS/Linux, it runs Bash commands. Write PowerShell syntax directly on Windows, and use newlines or semicolons instead of Bash-only operators such as && so the command also works with Windows PowerShell 5.1. Do not invoke PowerShell from Bash or paste a Windows path into Bash.
 ${userExecWorkingDirectory ? `user_exec already starts in the first user-granted working directory: ${userExecWorkingDirectory.replace(/\\/g, '/')}. Use relative paths there and do not prepend cd or Set-Location.\n` : 'Without a user-granted working directory, user_exec starts in the user home directory.\n'}
 ${agentFullAccess ? 'Full Access is enabled, so user_exec commands run without per-command approval.\n' : ''}
@@ -215,9 +214,8 @@ function getSessionAttachmentRagIds(messages: Message[]): number[] {
 /**
  * Builds the tool set and instructions for a chat session based on model capabilities and session options.
  *
- * agentMode controls skill and code execution tool availability:
+ * agentMode is the effective mode resolved by orchestration and controls skill and code execution tool availability:
  * - 'off': No skill or code execution tools
- * - 'auto': load_skill only (code execution tools gated behind load_skill activation)
  * - 'on': Full suite — skills + code execution
  */
 export async function buildToolsForSession(
@@ -231,7 +229,7 @@ export async function buildToolsForSession(
   // so they won't get any agent-specific tools (MCP, sandbox, skills, KB, code execution).
   // Web search is independent — it works outside agent mode.
   const modelSupportsAgentTools = model.isSupportToolUse('agent')
-  const includeAgentTools = (agentMode === 'on' || agentMode === 'auto') && modelSupportsAgentTools
+  const includeAgentTools = agentMode === 'on' && modelSupportsAgentTools
 
   const hasInlineFileOrLink = messages.some(
     (m) => m.links?.length || m.files?.some((file) => file.ragMode !== 'session-retrieval')
@@ -359,25 +357,11 @@ In long conversations, earlier tool call results may be automatically compressed
     }
   }
 
-  // In 'auto' mode, only expose skill discovery tools initially.
-  // Full tools become available after load_skill fires (via prepareStep).
-  let initialActiveTools: string[] | undefined
-  if (agentMode === 'auto' && includeAgentTools) {
-    const allToolNames = Object.keys(tools)
-    // Code execution and file mutation tools are gated behind load_skill activation.
-    const codeExecToolNames = codeExecToolSet ? new Set(Object.keys(codeExecToolSet.tools)) : new Set<string>()
-    const filesystemToolNames = new Set(['list_files', 'search_files', 'write_file', 'edit_file'])
-    const gatedTools = new Set([...codeExecToolNames, ...filesystemToolNames, 'user_exec'])
-    // install_skill should be available immediately so downloaded skills can be installed before loading one.
-    gatedTools.delete('install_skill')
-    initialActiveTools = allToolNames.filter((name) => !gatedTools.has(name))
-  }
-
   if (Object.keys(tools).length > 0) {
     instructions = buildToolUseCommunicationInstruction() + instructions
   }
 
-  return { tools, instructions, initialActiveTools }
+  return { tools, instructions }
 }
 
 function buildLoadSkillTool(options: BuildToolsOptions): ToolSet[string] {

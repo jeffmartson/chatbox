@@ -37,9 +37,9 @@ Main
 
 ## Sandbox 工具说明
 
-Chat 模式向模型注入的是 `code_execution` / `read_file` / `create_download` 等高层工具，工作目录为自动创建的临时沙箱目录，上传文件在首次工具调用时复制进沙箱，工具可见性由 Agent Mode 的 auto/on/off 控制。
+Chat 模式向模型注入的是 `code_execution` / `read_file` / `create_download` 等高层工具，工作目录为自动创建的临时沙箱目录，上传文件在首次工具调用时复制进沙箱。编排层先把 Auto 解析为有效的 On/Off，builder 只根据有效模式构建工具。
 
-Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sandbox.ts` 仍保留给历史消息渲染使用。
+Chat 模式不再向模型注入底层 `sandbox_*` 工具，旧的 `toolsets/sandbox.ts` 已移除；历史消息仍由通用 tool-call UI 按工具名渲染。
 
 ## Code Execution 工具集
 
@@ -109,7 +109,7 @@ export function computeEffectiveAgentMode(agentModeValue, agentModeSupported) {
 
 规则：
 
-- 模型不支持 agent scope（非桌面端），或用户选择 `off`：`effectiveAgentMode = 'off'`。
+- 非桌面端、模型不支持 agent scope，或用户选择 `off`：`effectiveAgentMode = 'off'`。
 - 用户选择 `on`：`effectiveAgentMode = 'on'`，注入完整 agent 工具集。
 - `auto`：`effectiveAgentMode = 'off'`。Auto **不再**根据文件类型或数量自动升级；是否进入 Agent Mode 由首轮的建议分类器决定（见下）。
 
@@ -120,8 +120,7 @@ export function computeEffectiveAgentMode(agentModeValue, agentModeSupported) {
 触发条件（全部满足才运行分类器）：
 
 - `operationType === 'send_message'` 且非 `appendToMessage`、非 `skipAgentModeSuggestion`。
-- 桌面端（`agentModeSupported`）且 `agentModeValue === 'auto'`。
-- 模型支持 `agent` scope。
+- 桌面端、模型支持 `agent` scope（`agentModeSupported`），且 `agentModeValue === 'auto'`。
 - 当前是该 thread 的首条用户消息（`isFirstUserTurn()`）。
 
 流程：
@@ -141,11 +140,9 @@ export function computeEffectiveAgentMode(agentModeValue, agentModeSupported) {
 
 `AgentModeLockReason` 类型仍保留 `'file_upload'` 取值以兼容历史会话数据，但当前代码不再因文件上传触发该锁定。
 
-### Auto 工具门控
+### Auto 与工具构建边界
 
-由于 `auto` 的 `effectiveAgentMode` 为 `'off'`，普通 Auto 对话不注入任何 Agent 工具；用户接受建议后会话变为 `on`，此时注入完整工具集。
-
-`buildToolsForSession()` 仍保留按 `agentMode === 'auto'` 计算 `initialActiveTools` 的渐进门控逻辑（隐藏 `code_execution`、文件系统读写、`user_exec`，待 `load_skill` 触发后由 `prepareStep` 解锁完整工具集），但在当前 Chat 编排里 builder 收到的是 `effectiveAgentMode`（只会是 `on`/`off`），因此该渐进门控目前只在单元测试中覆盖，不在实时流程触发。
+由于 `auto` 的 `effectiveAgentMode` 为 `'off'`，普通 Auto 对话不注入任何 Agent 工具；用户接受建议后会话变为 `on`，此时注入完整工具集。`buildToolsForSession()` 的输入只允许有效的 `on` / `off`，不包含 Auto，也没有 `initialActiveTools` / `prepareStep` 渐进门控。
 
 ## Tool 构建
 
@@ -156,13 +153,13 @@ export function computeEffectiveAgentMode(agentModeValue, agentModeSupported) {
 1. Web Search：独立于 Agent Mode，只受用户开关和 `web-browsing` scope 控制。
 2. 普通文件工具：当没有 code execution provider 且模型支持 `read-file` 时，用于读取内联附件/链接。
 3. Session attachment RAG：对已有 session attachment 提供检索式读取。
-4. Agent 工具：`agentMode !== 'off'` 且模型支持 `agent` scope 时注入。
+4. Agent 工具：有效模式为 `on` 且模型支持 `agent` scope 时注入。
 5. Code execution：存在 `codeExecution` provider 时注入 `code_execution/read_file/create_download`。
-6. Filesystem tools：注入真实文件系统读写编辑工具，写入/编辑需要审批。
-7. Skills：注入启用 Skill 元数据、`load_skill`、`chatbox_cli`、`user_exec`，以及 code execution 可用时的 `install_skill`。
+6. Filesystem tools：注入真实文件系统读写编辑工具；沙箱和绑定目录直接写入，其他路径按审批和 Full Access 设置处理。
+7. Skills 与命令：注入启用 Skill 元数据、`load_skill`、`chatbox_cli`、On 模式可直接使用的 `user_exec`，以及 code execution 可用时的 `install_skill`。
 8. MCP 和知识库：按会话配置和模型 scope 注入。
 
-Chat Agent 不再 fallback 注入 `sandboxToolSet`。
+Chat Agent 不再 fallback 注入底层 `sandbox_*` 工具。
 
 ## 暂停、审批和继续
 
@@ -171,8 +168,8 @@ Chat Agent 不再 fallback 注入 `sandboxToolSet`。
 | pauseReason | 触发 | 继续行为 |
 |-------------|------|----------|
 | `tool_call_limit` | 多轮工具调用达到上限 | 用户确认后执行原本暂停的工具调用 |
-| `user_exec_approval` | `user_exec` 命令不在自动审批白名单 | 批准后执行命令，拒绝后写入拒绝结果 |
-| `file_mutation_approval` | 写入或编辑用户真实文件系统 | 批准后执行文件变更，拒绝后写入拒绝结果 |
+| `user_exec_approval` | `user_exec` 命令未命中白名单、未通过 AI 安全评估且未开启 Full Access | 批准后执行命令，拒绝后写入拒绝结果 |
+| `file_mutation_approval` | 写入或编辑绑定目录之外的用户真实文件系统，且未开启 Full Access | 批准后执行文件变更，拒绝后写入拒绝结果 |
 
 设计要点：
 
@@ -180,7 +177,7 @@ Chat Agent 不再 fallback 注入 `sandboxToolSet`。
 - 重启后 UI 可从消息状态恢复“继续/停止”操作，不依赖内存 Promise。
 - 点击继续后走 `continuePausedToolCall()`，执行原工具并调用 `orchestrateGeneration(..., appendToMessage: true)`，结果追加到同一条 assistant 消息。
 - 暂停的 tool call 不会作为已完成工具结果注入模型上下文，避免模型误判工具已经执行。
-- `user_exec` 白名单只自动批准安全只读命令；写入、删除、安装、提权和复杂 shell 组合会暂停。
+- `user_exec` 先检查安全只读白名单，再对本地策略允许评估的命令执行 AI 结构化安全判断；未通过或评估失败时进入持久化暂停。Full Access 跳过逐次审批，但仍记录审批来源。
 
 ## 多轮工具调用上限
 
@@ -212,6 +209,10 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 
 原则：会话消息中只保存摘要、路径和短预览；大内容写入文件，按需读取。
 
+## 操作日志关联
+
+`user_exec` 和 `code_execution` 都会把 `sessionId`、`toolCallId` 传到 Main 进程。Main 进程为每次执行生成 `operationId`，记录命令或代码哈希、有限预览、运行目录、超时、耗时、退出码和 stdout/stderr 字节数。成功执行不记录输出正文；失败和超时只保留脱敏后的有限预览。这样可以从消息中的 tool call 精确关联到本地执行日志，同时控制日志体积。
+
 ## 平台和模型门控
 
 - 桌面端：可创建 `LocalSandboxProvider`，支持 Agent Mode。
@@ -226,7 +227,7 @@ HTML 下载产物在桌面端可复用本地预览组件展示：
 - `agent-harness.test.ts`：有效模式计算、harness 准备。
 - `agent-mode-suggestion.test.ts`：首轮建议分类器的 prompt 构造与决策解析。
 - `tools-builder.test.ts`：不同 agent mode、code execution provider、web search、sandbox_* 不可见。
-- `agent-mode-orchestration.test.ts`：prepareStep、暂停/继续和 append 行为。
+- `agent-mode-orchestration.test.ts`：暂停/继续、流持久化和 append 行为。
 - `code-execution.test.ts`：懒初始化、文件注入、执行和错误处理。
 - `file-read.test.ts`：分页读取、JSON 字节预算和大输出结构完整性。
 - `manager.windows.test.ts`：Windows 原生 Node/PowerShell、无 Bash 文件读写/目录列表、ripgrep 搜索与相对路径下载持久化。

@@ -124,7 +124,7 @@ describe('LocalSandboxProvider.exec', () => {
     const provider = new LocalSandboxProvider()
 
     const code = "console.log('héllo');\nprocess.exit(0)"
-    const result = await provider.exec({ code, language: 'node', timeout: 5_000 })
+    const result = await provider.exec({ code, language: 'node', timeout: 5_000, toolCallId: 'tool-call-1' })
 
     expect(sandboxExecCode).toHaveBeenCalledTimes(1)
     const arg = sandboxExecCode.mock.calls[0][0]
@@ -132,6 +132,7 @@ describe('LocalSandboxProvider.exec', () => {
     expect(arg.code).toBe(code)
     expect(arg.language).toBe('node')
     expect(arg.timeout).toBe(5_000)
+    expect(arg.toolCallId).toBe('tool-call-1')
     expect(result).toEqual({ stdout: 'ok', stderr: '', exitCode: 0 })
   })
 

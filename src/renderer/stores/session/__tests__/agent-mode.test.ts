@@ -196,11 +196,12 @@ describe('getSessionAgentModeEntry', () => {
   })
 
   test('prefers session settings over legacy uiStore map', () => {
-    uiStore.getState().lockSessionAgentMode('known-session', 'file_upload')
+    uiStore.setState({
+      sessionAgentModeMap: {
+        'known-session': { value: 'on', locked: true, lockReason: 'file_upload' },
+      },
+    })
     const entry = getSessionAgentModeEntry('known-session', {
-      id: 'known-session',
-      name: 'Test',
-      messages: [],
       settings: { agentMode: { value: 'off', locked: false, lockReason: null } },
     })
 

@@ -150,6 +150,7 @@ export interface Platform extends Storage {
     language: SandboxExecLanguage
     timeout?: number
     sessionId?: string
+    toolCallId?: string
   }): Promise<SandboxExecResult>
   sandboxRead?(params: {
     filePath: string

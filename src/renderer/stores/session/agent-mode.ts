@@ -63,11 +63,22 @@ function lockNewSessionAgentMode(reason: Exclude<AgentModeLockReason, null>): Ag
   return next
 }
 
-function applyAgentMode<T extends Pick<Session, 'settings'>>(session: T, agentMode: AgentModeEntry): T {
+function requireSession<T extends Pick<Session, 'settings'>>(session: T | null | undefined): T {
+  if (!session) {
+    throw new Error('Session not found')
+  }
+  return session
+}
+
+function applyAgentMode<T extends Pick<Session, 'settings'>>(
+  session: T | null | undefined,
+  agentMode: AgentModeEntry
+): T {
+  const current = requireSession(session)
   return {
-    ...session,
+    ...current,
     settings: {
-      ...(session.settings || {}),
+      ...(current.settings || {}),
       agentMode,
     },
   } as T
@@ -75,15 +86,16 @@ function applyAgentMode<T extends Pick<Session, 'settings'>>(session: T, agentMo
 
 function resolveSetAgentMode<T extends Pick<Session, 'settings'>>(
   sessionId: string,
-  session: T,
+  session: T | null | undefined,
   value: AgentModeValue
 ): { session: T; entry: AgentModeEntry } {
-  const current = getSessionAgentModeEntry(sessionId, session)
+  const currentSession = requireSession(session)
+  const current = getSessionAgentModeEntry(sessionId, currentSession)
   if (current.locked && value !== 'on') {
-    return { session, entry: current }
+    return { session: currentSession, entry: current }
   }
   const entry: AgentModeEntry = { value, locked: current.locked, lockReason: current.lockReason }
-  return { session: applyAgentMode(session, entry), entry }
+  return { session: applyAgentMode(currentSession, entry), entry }
 }
 
 export async function setSessionAgentMode(sessionId: string, value: AgentModeValue): Promise<AgentModeEntry> {

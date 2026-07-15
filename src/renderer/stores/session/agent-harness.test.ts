@@ -104,6 +104,7 @@ import {
   type SessionSettings,
   type Settings,
 } from '@shared/types'
+import type { ModelDependencies } from '@shared/types/adapters'
 import { getMessageText } from '@shared/utils/message'
 import { computeEffectiveAgentMode, prepareAgentGenerationHarness } from './agent-harness'
 
@@ -119,6 +120,24 @@ function createMockModel(overrides?: Partial<ModelInterface>): ModelInterface {
     paint: vi.fn(),
     ...overrides,
   } as unknown as ModelInterface
+}
+
+function createModelDependencies(): ModelDependencies {
+  return {
+    request: {
+      apiRequest: vi.fn(),
+      fetchWithOptions: vi.fn(),
+    },
+    storage: {
+      saveImage: vi.fn(),
+      getImage: vi.fn(),
+    },
+    sentry: {
+      captureException: vi.fn(),
+      withScope: vi.fn(),
+    },
+    getRemoteConfig: vi.fn(),
+  }
 }
 
 function createSession(): Session {
@@ -197,7 +216,7 @@ describe('prepareAgentGenerationHarness', () => {
       messages: [userMessage],
       targetMsgIx: 1,
       model: createMockModel(),
-      dependencies: {},
+      dependencies: createModelDependencies(),
       webBrowsing: false,
       agentModeValue: 'on',
       agentModeLocked: false,
@@ -261,7 +280,7 @@ describe('prepareAgentGenerationHarness', () => {
       messages: [userMessage],
       targetMsgIx: 1,
       model: createMockModel(),
-      dependencies: {},
+      dependencies: createModelDependencies(),
       webBrowsing: false,
       agentModeValue: 'auto',
       agentModeLocked: false,
@@ -309,7 +328,7 @@ describe('prepareAgentGenerationHarness', () => {
       messages: [userMessage],
       targetMsgIx: 1,
       model: createMockModel(),
-      dependencies: {},
+      dependencies: createModelDependencies(),
       webBrowsing: false,
       agentModeValue: 'auto',
       agentModeLocked: false,
@@ -347,7 +366,7 @@ describe('prepareAgentGenerationHarness', () => {
       messages: [userMessage],
       targetMsgIx: 1,
       model: createMockModel(),
-      dependencies: {},
+      dependencies: createModelDependencies(),
       webBrowsing: false,
       agentModeValue: 'off',
       agentModeLocked: false,

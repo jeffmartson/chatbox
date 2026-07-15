@@ -1,15 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   FileMutationApprovalPausedError,
   requestFileMutationApproval,
   requestUserExecApproval,
-  resetUserExecApprovalsForTests,
   UserExecApprovalPausedError,
 } from './user-exec-approval'
-
-afterEach(() => {
-  resetUserExecApprovalsForTests()
-})
 
 describe('persistent user approval pauses', () => {
   it('auto-approves read-only commands without pausing', async () => {

@@ -655,6 +655,7 @@ export async function execCode(params: {
   timeout?: number
   cwd?: string
   sessionId?: string
+  toolCallId?: string
 }): Promise<ExecResult> {
   const session = getSession(params.sessionId)
   if (!session || session.state !== 'initialized') {
@@ -671,6 +672,7 @@ export async function execCode(params: {
       operationId,
       kind: 'sandbox_exec_code',
       sessionId: params.sessionId,
+      toolCallId: params.toolCallId,
       cwd,
       timeoutMs: timeout,
       language: params.language,

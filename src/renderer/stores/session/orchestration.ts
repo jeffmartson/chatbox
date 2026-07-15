@@ -20,11 +20,7 @@ import {
 } from '@/analytics/agent-mode'
 import * as appleAppStore from '@/packages/apple_app_store'
 import { estimateTokensFromMessages } from '@/packages/token'
-import {
-  denyAllPendingApprovals,
-  FileMutationApprovalPausedError,
-  UserExecApprovalPausedError,
-} from '@/packages/user-exec-approval'
+import { FileMutationApprovalPausedError, UserExecApprovalPausedError } from '@/packages/user-exec-approval'
 import platform from '@/platform'
 import { createSandboxProvider } from '@/sandbox'
 import storage from '@/storage'
@@ -424,7 +420,7 @@ export async function orchestrateGeneration(
     const sessionKnowledgeBaseMap = uiStore.getState().sessionKnowledgeBaseMap
     const knowledgeBase = sessionKnowledgeBaseMap[sessionId]
     const webBrowsing = getSessionWebBrowsing(sessionId, settings.provider)
-    const agentModeSupported = platform.type === 'desktop'
+    const agentModeSupported = platform.type === 'desktop' && model.isSupportToolUse('agent')
     const agentModeEntry = getSessionAgentModeEntry(sessionId, session)
     const { value: storedAgentModeValue } = agentModeEntry
     const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
@@ -438,7 +434,6 @@ export async function orchestrateGeneration(
       // Only 'auto' runs the suggestion classifier; 'on' is already enabled and
       // 'off' opts out of suggestions entirely.
       agentModeValue === 'auto' &&
-      model.isSupportToolUse('agent') &&
       lastUserMessage &&
       isFirstUserTurn(messages, promptTargetMsgIx)
     ) {
@@ -619,12 +614,9 @@ export async function orchestrateGeneration(
       markFirstSuccessfulChatCompleted()
     }
     appleAppStore.tickAfterMessageGenerated()
-    // Defensive: deny any approvals that are still pending after normal completion
-    denyAllPendingApprovals()
   } catch (err: unknown) {
     const pause = getToolCallPause(err)
     if (pause) {
-      denyAllPendingApprovals()
       targetMsg = {
         ...targetMsg,
         generating: false,
@@ -643,7 +635,6 @@ export async function orchestrateGeneration(
     }
 
     if (controller.signal.aborted) {
-      denyAllPendingApprovals()
       targetMsg = {
         ...targetMsg,
         generating: false,
@@ -654,7 +645,6 @@ export async function orchestrateGeneration(
       return
     }
 
-    denyAllPendingApprovals()
     targetMsg = handleGenerationError(err, targetMsg, settings, {
       agentMode: getSessionAgentModeEntry(sessionId, session).value,
       operationType: options?.operationType,
@@ -668,7 +658,7 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   const model = await createModel(settings, dependencies)
   const location = findTargetMessageIndex(session, targetMsg.id)
   const messagesBeforeTarget = location ? location.messages.slice(0, location.index) : session.messages
-  const agentModeSupported = platform.type === 'desktop'
+  const agentModeSupported = platform.type === 'desktop' && model.isSupportToolUse('agent')
   const { value: storedAgentModeValue } = getSessionAgentModeEntry(session.id, session)
   const agentModeValue = agentModeSupported ? storedAgentModeValue : 'off'
   const effectiveAgentMode = agentModeSupported && agentModeValue === 'on' ? 'on' : 'off'

@@ -101,15 +101,17 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
       position="top-start"
       withArrow
       shadow="md"
-      opened={opened && !settingsOpened}
+      opened={opened && !settingsOpened && !disabled}
       onChange={setOpened}
       keepMounted
       transitionProps={{ transition: 'pop', duration: 200 }}
     >
       <Popover.Target>
         <UnstyledButton
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          disabled={disabled}
+          title={disabled ? t('This model does not support Agent Mode') : undefined}
+          onMouseEnter={disabled ? undefined : handleMouseEnter}
+          onMouseLeave={disabled ? undefined : handleMouseLeave}
           className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${disabled ? '' : 'hover:bg-[var(--chatbox-background-tertiary)]'}`}
           style={{ color, opacity: disabled ? 0.5 : undefined }}
         >

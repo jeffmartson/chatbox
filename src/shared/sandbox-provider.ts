@@ -106,7 +106,12 @@ export interface SandboxProvider {
   ): Promise<{ success: boolean; artifactPath?: string; error?: string }>
 
   /** Execute code in the sandbox */
-  exec(params: { code: string; language: SandboxExecLanguage; timeout?: number }): Promise<SandboxExecResult>
+  exec(params: {
+    code: string
+    language: SandboxExecLanguage
+    timeout?: number
+    toolCallId?: string
+  }): Promise<SandboxExecResult>
 
   /** Search file contents inside the sandbox with the shared bounded search engine. */
   search(params: SandboxSearchParams): Promise<SandboxSearchResult>

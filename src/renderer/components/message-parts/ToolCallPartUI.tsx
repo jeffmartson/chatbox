@@ -37,7 +37,6 @@ import {
   IconLoader,
   IconMessage,
   IconPlayerPlay,
-  IconRefresh,
   IconSparkles,
   IconTerminal,
   IconWorld,
@@ -51,7 +50,6 @@ import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hooks/useThinkingTimer'
 import { getToolName } from '@/packages/tools'
-import { approveUserExec, denyUserExec, retryExplanation, usePendingApproval } from '@/packages/user-exec-approval'
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
@@ -881,87 +879,26 @@ export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] }> = ({ part
   )
 }
 
-// ─── User Exec (with approval) ──────────────────────────────────────
-
-// Command to be executed, collapsed by default so a long command doesn't
-// dominate the approval prompt. Shows the first line as a preview when collapsed.
-const CollapsibleCommand: FC<{ command: string }> = ({ command }) => {
-  const { t } = useTranslation()
-  const lines = command.split('\n')
-  const hiddenLineCount = Math.max(0, lines.length - 1)
-  // Collapse multi-line commands by default for readability, but surface the
-  // hidden-line count so a later (possibly destructive) line is never silently
-  // approved — the user always sees there is more to expand.
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Box>
-      <UnstyledButton onClick={() => setOpen((prev) => !prev)} style={{ width: '100%' }}>
-        <Group gap={4} wrap="nowrap" style={{ minWidth: 0 }}>
-          {open ? (
-            <IconChevronDown size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
-          ) : (
-            <IconChevronRight size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
-          )}
-          <IconTerminal size={12} color="var(--chatbox-tint-tertiary)" style={{ flexShrink: 0 }} />
-          <Text
-            size="xs"
-            c="chatbox-secondary"
-            style={{
-              fontFamily: 'monospace',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            {open ? t('Command') : lines[0]}
-          </Text>
-          {!open && hiddenLineCount > 0 && (
-            <Text size="xs" c="chatbox-warning" fw={500} style={{ flexShrink: 0 }}>
-              {t('+{{count}} more lines', { count: hiddenLineCount })}
-            </Text>
-          )}
-        </Group>
-      </UnstyledButton>
-      <Collapse in={open}>
-        <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
-          <Code block style={{ fontSize: 12, marginTop: 4 }}>
-            {command}
-          </Code>
-        </Box>
-      </Collapse>
-    </Box>
-  )
-}
+// ─── User Exec ──────────────────────────────────────────────────────
 
 const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const { t } = useTranslation()
   const command = (part.args as Record<string, unknown>)?.command as string | undefined
-  const pendingApproval = usePendingApproval(part.toolCallId)
   const [expanded, setExpanded] = useState(false)
 
-  // pendingApproval is the source of truth for showing buttons.
-  // Do NOT gate on part.state — the component can remount during streaming
-  // with a stale part while the approval promise is still alive in the store.
-  const isWaitingApproval = !!pendingApproval
-  const isExecuting = part.state === 'call' && !pendingApproval
+  const isExecuting = part.state === 'call'
   const isError = part.state === 'error'
   const isDenied =
     part.state === 'result' && (part.result as Record<string, unknown>)?.stderr === 'Command denied by user.'
 
-  const bgColor = isWaitingApproval
-    ? 'color-mix(in srgb, var(--chatbox-tint-warning) 8%, transparent)'
-    : isError || isDenied
+  const bgColor =
+    isError || isDenied
       ? 'color-mix(in srgb, var(--chatbox-tint-error) 8%, transparent)'
       : 'var(--chatbox-background-gray-secondary)'
 
-  const borderColor = isWaitingApproval ? 'var(--chatbox-tint-warning)' : 'transparent'
-
   return (
     <Stack gap={6} mb="xs">
-      <UnstyledButton onClick={() => !isWaitingApproval && setExpanded((prev) => !prev)}>
+      <UnstyledButton onClick={() => setExpanded((prev) => !prev)}>
         <Group
           gap={6}
           px={10}
@@ -969,31 +906,24 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
           style={{
             borderRadius: 'var(--mantine-radius-md)',
             backgroundColor: bgColor,
-            border: `1px solid ${borderColor}`,
+            border: '1px solid transparent',
             display: 'inline-flex',
           }}
         >
           <IconTerminal
             size={13}
             color={
-              isWaitingApproval
-                ? 'var(--chatbox-tint-warning)'
-                : isExecuting
-                  ? 'var(--chatbox-tint-brand)'
-                  : isError || isDenied
-                    ? 'var(--chatbox-tint-error)'
-                    : 'var(--chatbox-tint-success)'
+              isExecuting
+                ? 'var(--chatbox-tint-brand)'
+                : isError || isDenied
+                  ? 'var(--chatbox-tint-error)'
+                  : 'var(--chatbox-tint-success)'
             }
             style={{ flexShrink: 0 }}
           />
           <Text size="xs" fw={500} lh={1}>
             {getToolName(part.toolName)}
           </Text>
-          {isWaitingApproval && (
-            <Text size="xs" c="chatbox-warning" fw={500} lh={1}>
-              {t('Waiting for approval')}
-            </Text>
-          )}
           {isExecuting && (
             <IconLoader
               size={11}
@@ -1014,165 +944,34 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
         </Group>
       </UnstyledButton>
 
-      {isWaitingApproval && (
-        <Box ml={4} pl="sm" style={{ borderLeft: '2px solid var(--chatbox-tint-warning)' }}>
+      <Collapse in={expanded}>
+        <Box
+          ml={4}
+          pl="sm"
+          style={{
+            borderLeft: `2px solid ${isError || isDenied ? 'var(--chatbox-tint-error)' : 'var(--chatbox-tint-success)'}`,
+          }}
+        >
           <Stack gap="xs">
-            <CollapsibleCommand command={pendingApproval.command} />
-            {!pendingApproval.explanation &&
-              pendingApproval.explanation !== undefined &&
-              !pendingApproval.explanationError && (
-                <Group gap={4}>
-                  <IconLoader size={11} className="animate-spin" color="var(--chatbox-tint-brand)" />
-                  <Text size="xs" c="chatbox-tertiary">
-                    {t('Analyzing command...')}
-                  </Text>
-                </Group>
-              )}
-            {pendingApproval.explanation && (
-              <Text size="xs" c="chatbox-secondary" style={{ whiteSpace: 'pre-wrap' }}>
-                {pendingApproval.explanation}
-              </Text>
-            )}
-            {pendingApproval.explanationError && (
-              <Group gap={4}>
-                <Text size="xs" c="chatbox-tertiary">
-                  {t('Explanation failed')}
+            {command && (
+              <Box>
+                <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
+                  {t('Command')}
                 </Text>
-                <UnstyledButton onClick={() => retryExplanation(part.toolCallId)}>
-                  <Group gap={2}>
-                    <IconRefresh size={11} color="var(--chatbox-tint-brand)" />
-                    <Text size="xs" c="chatbox-brand">
-                      {t('Retry')}
-                    </Text>
-                  </Group>
-                </UnstyledButton>
-              </Group>
+                <Code block>{command}</Code>
+              </Box>
             )}
-            <Group gap="xs">
-              <Button size="compact-xs" color="chatbox-brand" onClick={() => approveUserExec(part.toolCallId)}>
-                {t('Approve')}
-              </Button>
-              <Button
-                size="compact-xs"
-                variant="light"
-                color="chatbox-error"
-                onClick={() => denyUserExec(part.toolCallId)}
-              >
-                {t('Deny')}
-              </Button>
-            </Group>
+            {!!part.result && (
+              <Box>
+                <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
+                  {t('Result')}
+                </Text>
+                <Code block>{stringifyToolPayload(part.result)}</Code>
+              </Box>
+            )}
           </Stack>
         </Box>
-      )}
-
-      {!isWaitingApproval && (
-        <Collapse in={expanded}>
-          <Box
-            ml={4}
-            pl="sm"
-            style={{
-              borderLeft: `2px solid ${isError || isDenied ? 'var(--chatbox-tint-error)' : 'var(--chatbox-tint-success)'}`,
-            }}
-          >
-            <Stack gap="xs">
-              {command && (
-                <Box>
-                  <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-                    {t('Command')}
-                  </Text>
-                  <Code block>{command}</Code>
-                </Box>
-              )}
-              {!!part.result && (
-                <Box>
-                  <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-                    {t('Result')}
-                  </Text>
-                  <Code block>{stringifyToolPayload(part.result)}</Code>
-                </Box>
-              )}
-            </Stack>
-          </Box>
-        </Collapse>
-      )}
-    </Stack>
-  )
-}
-
-const UserExecDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
-  const { t } = useTranslation()
-  const command = (part.args as Record<string, unknown>)?.command as string | undefined
-  const pendingApproval = usePendingApproval(part.toolCallId)
-
-  if (pendingApproval) {
-    return (
-      <Stack gap="xs">
-        {pendingApproval.title && (
-          <Text size="xs" c="chatbox-secondary" fw={500}>
-            {pendingApproval.title}
-          </Text>
-        )}
-        <CollapsibleCommand command={pendingApproval.command} />
-        {!pendingApproval.explanation &&
-          pendingApproval.explanation !== undefined &&
-          !pendingApproval.explanationError && (
-            <Group gap={4}>
-              <IconLoader size={11} className="animate-spin" color="var(--chatbox-tint-brand)" />
-              <Text size="xs" c="chatbox-tertiary">
-                {t('Analyzing command...')}
-              </Text>
-            </Group>
-          )}
-        {pendingApproval.explanation && (
-          <Text size="xs" c="chatbox-secondary" style={{ whiteSpace: 'pre-wrap' }}>
-            {pendingApproval.explanation}
-          </Text>
-        )}
-        {pendingApproval.explanationError && (
-          <Group gap={4}>
-            <Text size="xs" c="chatbox-tertiary">
-              {t('Explanation failed')}
-            </Text>
-            <UnstyledButton onClick={() => retryExplanation(part.toolCallId)}>
-              <Group gap={2}>
-                <IconRefresh size={11} color="var(--chatbox-tint-brand)" />
-                <Text size="xs" c="chatbox-brand">
-                  {t('Retry')}
-                </Text>
-              </Group>
-            </UnstyledButton>
-          </Group>
-        )}
-        <Group gap="xs">
-          <Button size="compact-xs" color="chatbox-brand" onClick={() => approveUserExec(part.toolCallId)}>
-            {t('Approve')}
-          </Button>
-          <Button size="compact-xs" variant="light" color="chatbox-error" onClick={() => denyUserExec(part.toolCallId)}>
-            {t('Deny')}
-          </Button>
-        </Group>
-      </Stack>
-    )
-  }
-
-  return (
-    <Stack gap="xs">
-      {command && (
-        <Box>
-          <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-            {t('Command')}
-          </Text>
-          <Code block>{command}</Code>
-        </Box>
-      )}
-      {!!part.result && (
-        <Box>
-          <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-            {t('Result')}
-          </Text>
-          <Code block>{stringifyToolPayload(part.result)}</Code>
-        </Box>
-      )}
+      </Collapse>
     </Stack>
   )
 }
@@ -1347,12 +1146,8 @@ const TimelineToolCallDetail: FC<{ part: MessageToolCallPart } & ToolCallActionC
   sessionId,
   messageId,
 }) => {
-  const pendingApproval = usePendingApproval(part.toolCallId)
   if (part.state === 'paused') {
     return <PausedToolCallDetails part={part} sessionId={sessionId} messageId={messageId} />
-  }
-  if (pendingApproval) {
-    return <UserExecDetails part={part} />
   }
   if (part.toolName === 'web_search') {
     return <WebSearchDetails part={part} />
@@ -1429,14 +1224,12 @@ const TimelineToolCallStep: FC<
   } & ToolCallActionContext
 > = ({ part, isFirst, isLast, sessionId, messageId, showPausedActionDetails = true }) => {
   const { t } = useTranslation()
-  const pendingApproval = usePendingApproval(part.toolCallId)
-  const isWaitingApproval = !!pendingApproval
   const isPaused = part.state === 'paused'
-  const isLoading = part.state === 'call' && !isWaitingApproval
+  const isLoading = part.state === 'call'
   const isBashNotAvailable = isBashNotAvailableResult(part)
   const isError = part.state === 'error' || isBashNotAvailable
   const isDone = part.state === 'result' && !isBashNotAvailable
-  const [expanded, setExpanded] = useAutoExpandOnSignal(isWaitingApproval || isPaused || isBashNotAvailable)
+  const [expanded, setExpanded] = useAutoExpandOnSignal(isPaused || isBashNotAvailable)
   const Icon = getToolIcon(part.toolName)
 
   // Per-step elapsed time: prefer the persisted duration, fall back to a live
@@ -1445,22 +1238,20 @@ const TimelineToolCallStep: FC<
   const stepDuration = part.duration && part.duration > 0 ? part.duration : isLoading ? liveElapsed : 0
   const showTime = stepDuration >= MIN_STEP_DURATION_MS
 
-  const stateColor =
-    isWaitingApproval || isPaused
-      ? 'var(--chatbox-tint-warning)'
-      : isLoading
-        ? 'var(--chatbox-tint-brand)'
-        : isError
-          ? 'var(--chatbox-tint-error)'
-          : 'var(--chatbox-tint-success)'
-  const dotBg =
-    isWaitingApproval || isPaused
-      ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
-      : isLoading
-        ? 'var(--chatbox-background-brand-secondary)'
-        : isError
-          ? 'color-mix(in srgb, var(--chatbox-tint-error) 10%, transparent)'
-          : 'color-mix(in srgb, var(--chatbox-tint-success) 10%, transparent)'
+  const stateColor = isPaused
+    ? 'var(--chatbox-tint-warning)'
+    : isLoading
+      ? 'var(--chatbox-tint-brand)'
+      : isError
+        ? 'var(--chatbox-tint-error)'
+        : 'var(--chatbox-tint-success)'
+  const dotBg = isPaused
+    ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
+    : isLoading
+      ? 'var(--chatbox-background-brand-secondary)'
+      : isError
+        ? 'color-mix(in srgb, var(--chatbox-tint-error) 10%, transparent)'
+        : 'color-mix(in srgb, var(--chatbox-tint-success) 10%, transparent)'
 
   const argSummary =
     part.toolName === 'user_exec'
@@ -1478,17 +1269,15 @@ const TimelineToolCallStep: FC<
 
   const summary = isPaused
     ? t('Paused')
-    : isWaitingApproval
-      ? t('Waiting for approval')
-      : isLoading
-        ? t('Running')
-        : isBashNotAvailable
-          ? t('Bash is not available on this Windows device.')
-          : isError
-            ? t('Failed')
-            : truncateSummary(argSummary || resultSummary || t('Completed'))
+    : isLoading
+      ? t('Running')
+      : isBashNotAvailable
+        ? t('Bash is not available on this Windows device.')
+        : isError
+          ? t('Failed')
+          : truncateSummary(argSummary || resultSummary || t('Completed'))
 
-  const hasDetail = isWaitingApproval || (isPaused ? showPausedActionDetails : part.state !== 'call')
+  const hasDetail = isPaused ? showPausedActionDetails : part.state !== 'call'
 
   return (
     <Box pos="relative" pl={32} style={{ minHeight: 28, overflow: 'visible' }}>

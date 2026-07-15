@@ -379,6 +379,7 @@ export default class DesktopPlatform implements Platform {
     language: SandboxExecLanguage
     timeout?: number
     sessionId?: string
+    toolCallId?: string
   }): Promise<SandboxExecResult> {
     return this.ipc.invoke('sandbox:exec-code', params)
   }

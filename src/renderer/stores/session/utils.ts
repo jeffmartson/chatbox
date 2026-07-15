@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/react'
 import { AIProviderNoImplementedPaintError, ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
 import type {
-  AgentModeEntry,
   AgentModeValue,
   Message,
   ModelProvider,
@@ -22,7 +21,7 @@ import { getModelDisplayName } from '@/packages/model-setting-utils'
 import platform from '@/platform'
 import { trackEvent } from '@/utils/track'
 import { uiStore } from '../uiStore'
-import { createDefaultAgentModeEntry } from './agent-mode'
+import { getSessionAgentModeEntry } from './agent-mode'
 
 /**
  * Get session-level web browsing setting
@@ -35,15 +34,6 @@ export function getSessionWebBrowsing(sessionId: string, provider: string | unde
   }
   // Default: true for ChatboxAI, false for others
   return provider === ModelProviderEnum.ChatboxAI
-}
-
-/**
- * Get session-level agent mode setting
- * Compatibility helper for non-React callers that do not have the session
- * object. Prefer getSessionAgentModeEntry(sessionId, session) when possible.
- */
-export function getSessionAgentMode(sessionId: string): AgentModeEntry {
-  return uiStore.getState().sessionAgentModeMap[sessionId] ?? createDefaultAgentModeEntry()
 }
 
 /**
@@ -74,7 +64,7 @@ export function trackGenerateEvent(
     }
 
     const webBrowsing = getSessionWebBrowsing(sessionId, settings.provider)
-    const agentModeEntry = getSessionAgentMode(sessionId)
+    const agentModeEntry = getSessionAgentModeEntry(sessionId, { settings })
     const agentModeActive = platform.type === 'desktop' && agentModeEntry.value === 'on'
     const agentModeEntrySource: AgentModeEntrySource =
       options?.agentModeEntrySource ??

@@ -117,6 +117,21 @@ describe('buildCodeExecutionTools', () => {
     })
   })
 
+  test('code_execution forwards toolCallId for operation-log correlation', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.code_execution as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<unknown>
+    }
+
+    await tool.execute({ code: 'console.log("hello world")', language: 'node' }, { toolCallId: 'tool-call-1' })
+
+    expect(mockProvider.exec).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: 'tool-call-1',
+      })
+    )
+  })
+
   test('code_execution forwards PowerShell as a first-class execution language', async () => {
     const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
     const tool = tools.code_execution as {

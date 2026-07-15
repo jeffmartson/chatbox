@@ -1,11 +1,4 @@
-import type {
-  AgentModeEntry,
-  AgentModeLockReason,
-  AgentModeValue,
-  KnowledgeBase,
-  MessagePicture,
-  Toast,
-} from '@shared/types'
+import type { AgentModeEntry, KnowledgeBase, MessagePicture, Toast } from '@shared/types'
 import type { RefObject } from 'react'
 import type { VirtuosoHandle } from 'react-virtuoso'
 import { v4 as uuidv4 } from 'uuid'
@@ -65,7 +58,6 @@ export const uiStore = createStore(
         sidebarWidth: null as number | null, // Custom sidebar width, null means use default
         agentModeSmartSwitchingDefault: true,
         sessionAgentModeMap: {} as Record<string, AgentModeEntry>,
-        sessionCodeExecutionMap: {} as Record<string, boolean | undefined>,
       },
       (set, get) => ({
         addToast: (content: string, duration?: number, action?: Toast['action']) => {
@@ -224,47 +216,6 @@ export const uiStore = createStore(
           set({ agentModeSmartSwitchingDefault: enabled })
         },
 
-        setSessionAgentMode: (sessionId: string, value: AgentModeValue) => {
-          const current = get().sessionAgentModeMap[sessionId]
-          if (current?.locked && value !== 'on') return // Cannot change away from 'on' if locked
-          set((state) => ({
-            sessionAgentModeMap: {
-              ...state.sessionAgentModeMap,
-              [sessionId]: { value, locked: current?.locked ?? false, lockReason: current?.lockReason ?? null },
-            },
-          }))
-        },
-
-        lockSessionAgentMode: (sessionId: string, reason: AgentModeLockReason) => {
-          set((state) => ({
-            sessionAgentModeMap: {
-              ...state.sessionAgentModeMap,
-              [sessionId]: { value: 'on', locked: true, lockReason: reason },
-            },
-          }))
-        },
-
-        setSessionCodeExecution: (sessionId: string, enabled: boolean) => {
-          set((state) => ({
-            sessionCodeExecutionMap: {
-              ...state.sessionCodeExecutionMap,
-              [sessionId]: enabled,
-            },
-          }))
-        },
-
-        getSessionCodeExecution: (sessionId: string) => {
-          return get().sessionCodeExecutionMap[sessionId] ?? true
-        },
-
-        clearSessionCodeExecution: (sessionId: string) => {
-          set((state) => {
-            const newMap = { ...state.sessionCodeExecutionMap }
-            delete newMap[sessionId]
-            return { sessionCodeExecutionMap: newMap }
-          })
-        },
-
         clearSessionAgentMode: (sessionId?: string) => {
           if (sessionId) {
             set((state) => {
@@ -287,7 +238,6 @@ export const uiStore = createStore(
         sidebarWidth: state.sidebarWidth,
         agentModeSmartSwitchingDefault: state.agentModeSmartSwitchingDefault,
         sessionWebBrowsingMap: state.sessionWebBrowsingMap,
-        sessionCodeExecutionMap: state.sessionCodeExecutionMap,
       }),
       storage: safeStorage,
     }

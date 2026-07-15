@@ -281,7 +281,12 @@ describe('execCode on Windows without shell runtimes', () => {
     const sessionId = 'no-bash-session'
     try {
       await initSandbox(workDir, sessionId)
-      const result = await execCode({ code: 'echo hello', language: 'bash', sessionId })
+      const result = await execCode({
+        code: 'echo hello',
+        language: 'bash',
+        sessionId,
+        toolCallId: 'tool-call-1',
+      })
 
       expect(result).toEqual({
         stdout: '',
@@ -289,6 +294,7 @@ describe('execCode on Windows without shell runtimes', () => {
         exitCode: 127,
         errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
       })
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('"toolCallId":"tool-call-1"'))
     } finally {
       await resetSandbox(sessionId)
       rmSync(workDir, { recursive: true, force: true })

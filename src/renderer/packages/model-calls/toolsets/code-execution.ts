@@ -185,7 +185,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       required: ['code'],
       additionalProperties: false,
     }),
-    execute: async (input, { abortSignal }) => {
+    execute: async (input, { abortSignal, toolCallId }) => {
       const codeInput = input as { code: string; language?: SandboxExecLanguage; timeout?: number }
       const setupResult = await ensureSandbox()
       if (!setupResult.success) {
@@ -200,6 +200,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         code: codeInput.code,
         language: codeInput.language ?? 'node',
         timeout: codeInput.timeout ?? DEFAULT_EXEC_TIMEOUT,
+        ...(toolCallId ? { toolCallId } : {}),
       })
 
       return {

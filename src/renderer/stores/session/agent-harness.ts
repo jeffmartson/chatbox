@@ -71,14 +71,14 @@ export interface PreparedAgentGenerationHarness {
   fallbackToolCallPart: MessageContentParts[number] | undefined
   sandboxProvider: SandboxProvider | null
   debug: {
-    effectiveAgentMode: AgentModeValue
+    effectiveAgentMode: 'on' | 'off'
     canExecuteCode: boolean
     toolNames: string[]
     instructions: string
   }
 }
 
-export function computeEffectiveAgentMode(agentModeValue: AgentModeValue, agentModeSupported: boolean): AgentModeValue {
+export function computeEffectiveAgentMode(agentModeValue: AgentModeValue, agentModeSupported: boolean): 'on' | 'off' {
   if (!agentModeSupported || agentModeValue === 'off') return 'off'
   return agentModeValue === 'on' ? 'on' : 'off'
 }
@@ -283,11 +283,7 @@ export async function prepareAgentGenerationHarness(
         }
       : undefined
 
-  const {
-    tools,
-    instructions: toolInstructions,
-    initialActiveTools,
-  } = await buildToolsForSession(model, {
+  const { tools, instructions: toolInstructions } = await buildToolsForSession(model, {
     sessionId: session.id,
     webBrowsing,
     knowledgeBase,
@@ -335,22 +331,6 @@ export async function prepareAgentGenerationHarness(
 
   if (Object.keys(tools).length > 0) {
     chatOptions.tools = tools as ToolSet
-  }
-
-  if (initialActiveTools) {
-    const allToolNames = Object.keys(tools)
-    let activated = false
-    chatOptions.prepareStep = ({ steps }) => {
-      if (!activated) {
-        const hasLoadedSkill = steps.some((step) =>
-          step.toolCalls.some((toolCall) => 'toolName' in toolCall && toolCall.toolName === 'load_skill')
-        )
-        if (hasLoadedSkill) {
-          activated = true
-        }
-      }
-      return { activeTools: activated ? allToolNames : initialActiveTools }
-    }
   }
 
   return {

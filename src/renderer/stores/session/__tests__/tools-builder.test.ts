@@ -155,21 +155,6 @@ vi.mock('@/packages/model-calls/toolsets/session-attachment-rag', () => ({
   getToolSet: getSessionAttachmentRagToolSetMock,
 }))
 
-vi.mock('@/packages/model-calls/toolsets/sandbox', () => ({
-  default: {
-    description: 'sandbox toolset',
-    tools: {
-      sandbox_bash: { execute: async () => ({}) },
-      sandbox_read: { execute: async () => ({}) },
-      sandbox_write: { execute: async () => ({}) },
-      sandbox_edit: { execute: async () => ({}) },
-      sandbox_grep: { execute: async () => ({}) },
-      sandbox_ls: { execute: async () => ({}) },
-      sandbox_find: { execute: async () => ({}) },
-    },
-  },
-}))
-
 import type { ModelInterface } from '@shared/models/types'
 import type { SandboxProvider } from '@shared/sandbox-provider'
 import type { Message } from '@shared/types'
@@ -279,46 +264,9 @@ describe('buildToolsForSession', () => {
     for (const name of sandboxToolNames) {
       expect(result.tools[name]).toBeUndefined()
     }
-    expect(result.initialActiveTools).toBeUndefined()
   })
 
-  test('agentMode="auto" — has load_skill, has code-exec tools, returns initialActiveTools excluding code execution', async () => {
-    const model = createMockModel()
-    const provider = createMockSandboxProvider()
-    const options: BuildToolsOptions = {
-      webBrowsing: false,
-      messages: [],
-      agentMode: 'auto',
-      codeExecution: {
-        sessionId: 'session-1',
-        provider,
-        files: [],
-      },
-    }
-
-    const result = await buildToolsForSession(model, options)
-
-    // Skills tools present
-    expect(result.tools.load_skill).toBeDefined()
-
-    // Low-level sandbox_* tools are never exposed to the model.
-    for (const name of sandboxToolNames) {
-      expect(result.tools[name]).toBeUndefined()
-    }
-
-    // Code execution tools present
-    expect(result.tools.code_execution).toBeDefined()
-    expect(result.tools.parse_file).toBeDefined()
-
-    // initialActiveTools should exclude code-exec tools and privileged real-environment tools.
-    expect(result.initialActiveTools).toBeDefined()
-    expect(result.initialActiveTools).toContain('load_skill')
-    expect(result.initialActiveTools).not.toContain('code_execution')
-    expect(result.initialActiveTools).not.toContain('parse_file')
-    expect(result.initialActiveTools).not.toContain('user_exec')
-  })
-
-  test('agentMode="on" — has all tools, no initialActiveTools', async () => {
+  test('agentMode="on" — has all tools', async () => {
     const model = createMockModel()
     const provider = createMockSandboxProvider()
     const options: BuildToolsOptions = {
@@ -340,7 +288,6 @@ describe('buildToolsForSession', () => {
       expect(result.tools[name]).toBeUndefined()
     }
     expect(result.tools.code_execution).toBeDefined()
-    expect(result.initialActiveTools).toBeUndefined()
   })
 
   test('normalizes Windows paths and prefers PowerShell without redundant directory changes', async () => {
@@ -413,12 +360,12 @@ describe('buildToolsForSession', () => {
     expect(result.instructions).not.toContain('## parse_link')
   })
 
-  test('agentMode="auto" without codeExecution — load_skill only, no code-exec tools', async () => {
+  test('agentMode="on" without codeExecution — load_skill only, no code-exec tools', async () => {
     const model = createMockModel()
     const options: BuildToolsOptions = {
       webBrowsing: false,
       messages: [],
-      agentMode: 'auto',
+      agentMode: 'on',
       // no codeExecution
     }
 
@@ -762,7 +709,7 @@ describe('chatbox_cli tool', () => {
     const result = await buildToolsForSession(model, {
       webBrowsing: false,
       messages: [],
-      agentMode: 'auto',
+      agentMode: 'on',
       onAgentModeActivated,
     })
     if (!result.tools.chatbox_cli.execute) throw new Error('chatbox_cli execute missing')
@@ -847,24 +794,6 @@ describe('install_skill tool', () => {
     expect(result.tools.install_skill).toBeDefined()
   })
 
-  test('install_skill is in tools when agentMode="auto" AND codeExecution is provided', async () => {
-    const model = createMockModel()
-    const provider = createMockSandboxProvider()
-    const options: BuildToolsOptions = {
-      webBrowsing: false,
-      messages: [],
-      agentMode: 'auto',
-      codeExecution: {
-        sessionId: 'session-1',
-        provider,
-        files: [],
-      },
-    }
-
-    const result = await buildToolsForSession(model, options)
-    expect(result.tools.install_skill).toBeDefined()
-  })
-
   test('install_skill is NOT in tools when agentMode="off"', async () => {
     const model = createMockModel()
     const options: BuildToolsOptions = {
@@ -888,25 +817,6 @@ describe('install_skill tool', () => {
 
     const result = await buildToolsForSession(model, options)
     expect(result.tools.install_skill).toBeUndefined()
-  })
-
-  test('install_skill is in initialActiveTools in auto mode (not gated)', async () => {
-    const model = createMockModel()
-    const provider = createMockSandboxProvider()
-    const options: BuildToolsOptions = {
-      webBrowsing: false,
-      messages: [],
-      agentMode: 'auto',
-      codeExecution: {
-        sessionId: 'session-1',
-        provider,
-        files: [],
-      },
-    }
-
-    const result = await buildToolsForSession(model, options)
-    expect(result.initialActiveTools).toBeDefined()
-    expect(result.initialActiveTools).toContain('install_skill')
   })
 
   test('maps installed skill result to readable model text', async () => {
@@ -979,22 +889,17 @@ describe('user_exec tool', () => {
     expect(result.tools.user_exec).toBeUndefined()
   })
 
-  test('user_exec is gated behind load_skill in auto mode', async () => {
-    const model = createMockModel()
-    const provider = createMockSandboxProvider()
-    const options: BuildToolsOptions = {
+  test('user_exec is available in on mode without requiring a loaded skill', async () => {
+    getSettingsMock.mockReturnValue({ skills: { enabledSkillNames: [] } })
+    const result = await buildToolsForSession(createMockModel(), {
       webBrowsing: false,
       messages: [],
-      agentMode: 'auto',
-      codeExecution: {
-        sessionId: 'session-1',
-        provider,
-        files: [],
-      },
-    }
-    const result = await buildToolsForSession(model, options)
+      agentMode: 'on',
+    })
+
     expect(result.tools.user_exec).toBeDefined()
-    expect(result.initialActiveTools).not.toContain('user_exec')
+    expect(result.instructions).toContain('It is not limited to skill-driven tasks')
+    expect(result.instructions).toContain('subject to the host approval policy')
   })
 
   test('uses the first granted directory as cwd and describes the platform shell', async () => {
