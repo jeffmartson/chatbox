@@ -24,7 +24,9 @@ import {
   normalizeWindowsShellPath,
   readFile,
   resetSandbox,
+  resetWindowsPowerShellResolutionCache,
   resolveWindowsBash,
+  resolveWindowsPowerShell,
   shellEscape,
 } from './manager'
 
@@ -92,6 +94,7 @@ describe('resolveWindowsBash', () => {
   }) => {
     ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
       if (cmd === 'bash' && args[0] === '--version') return { status: bash ? 0 : 1 }
+      if (cmd === 'where.exe') return { status: 1, stdout: '' }
       if (cmd === 'wsl' && args[0] === '--list') {
         return {
           status: wslStatus,
@@ -102,14 +105,66 @@ describe('resolveWindowsBash', () => {
     })
   }
 
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.clearAllMocks()
+  })
+
+  test('uses an explicit Git Bash override before auto-discovery', () => {
+    const customPath = 'D:\\PortableGit\\bin\\bash.exe'
+    vi.stubEnv('CHATBOX_GIT_BASH_PATH', customPath)
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => ({
+      status: cmd === customPath && args[0] === '--version' ? 0 : 1,
+      stdout: '',
+    }))
+
+    expect(resolveWindowsBash()).toEqual({ kind: 'git-bash', cmd: customPath, args: [] })
+  })
+
+  test('prefers a known Git Bash installation over bash on PATH and WSL', () => {
+    vi.stubEnv('ProgramFiles', 'C:\\Program Files')
+    const gitBashPath = 'C:\\Program Files\\Git\\bin\\bash.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === gitBashPath && args[0] === '--version') return { status: 0 }
+      if (cmd === 'bash' && args[0] === '--version') return { status: 0 }
+      return { status: 1, stdout: '' }
+    })
+
+    expect(resolveWindowsBash()).toEqual({ kind: 'git-bash', cmd: gitBashPath, args: [] })
+  })
+
+  test('derives Git Bash from a git.exe discovered by where.exe', () => {
+    const gitPath = 'D:\\PortableGit\\cmd\\git.exe'
+    const bashPath = 'D:\\PortableGit\\bin\\bash.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'where.exe' && args[0] === 'git.exe') return { status: 0, stdout: `${gitPath}\r\n` }
+      if (cmd === bashPath && args[0] === '--version') return { status: 0 }
+      return { status: 1, stdout: '' }
+    })
+
+    expect(resolveWindowsBash()).toEqual({ kind: 'git-bash', cmd: bashPath, args: [] })
+  })
+
+  test('classifies a non-Git bash.exe discovered on PATH separately', () => {
+    const bashPath = 'C:\\msys64\\usr\\bin\\bash.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'where.exe' && args[0] === 'git.exe') return { status: 1, stdout: '' }
+      if (cmd === 'where.exe' && args[0] === 'bash.exe') return { status: 0, stdout: `${bashPath}\r\n` }
+      if (cmd === bashPath && args[0] === '--version') return { status: 0 }
+      return { status: 1, stdout: '' }
+    })
+
+    expect(resolveWindowsBash()).toEqual({ kind: 'path-bash', cmd: bashPath, args: [] })
+  })
+
   test('prefers bash on PATH', () => {
     mockShellAvailability({ bash: true, wslStatus: 0, wslDistros: 'Ubuntu\n' })
-    expect(resolveWindowsBash()).toEqual({ cmd: 'bash', args: [] })
+    expect(resolveWindowsBash()).toEqual({ kind: 'path-bash', cmd: 'bash', args: [] })
   })
 
   test('falls back to wsl bash when bash is absent and a distribution is installed', () => {
     mockShellAvailability({ wslStatus: 0, wslDistros: 'Ubuntu\n' })
-    expect(resolveWindowsBash()).toEqual({ cmd: 'wsl', args: ['bash'] })
+    expect(resolveWindowsBash()).toEqual({ kind: 'wsl', cmd: 'wsl', args: ['bash'] })
   })
 
   test('returns null when wsl exists without an installed distribution', () => {
@@ -123,7 +178,86 @@ describe('resolveWindowsBash', () => {
   })
 })
 
-describe('execCode on Windows without Bash', () => {
+describe('resolveWindowsPowerShell', () => {
+  const stdinArgs = ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '-']
+
+  afterEach(() => {
+    resetWindowsPowerShellResolutionCache()
+    vi.unstubAllEnvs()
+    vi.clearAllMocks()
+  })
+
+  test('uses an explicit PowerShell override before auto-discovery', () => {
+    const customPath = 'D:\\Tools\\pwsh.exe'
+    vi.stubEnv('CHATBOX_POWERSHELL_PATH', customPath)
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => ({
+      status: cmd === customPath ? 0 : 1,
+    }))
+
+    expect(resolveWindowsPowerShell()).toEqual({ kind: 'pwsh', cmd: customPath, args: stdinArgs })
+  })
+
+  test('allows a slow cold start and caches the successful resolution', () => {
+    const customPath = 'D:\\Tools\\pwsh.exe'
+    vi.stubEnv('CHATBOX_POWERSHELL_PATH', customPath)
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (_cmd: string, _args: string[], options: { timeout?: number }) => ({
+        status: (options.timeout ?? 0) >= 10_000 ? 0 : null,
+      })
+    )
+
+    const expected = { kind: 'pwsh', cmd: customPath, args: stdinArgs }
+    expect(resolveWindowsPowerShell()).toEqual(expected)
+    expect(resolveWindowsPowerShell()).toEqual(expected)
+    expect(spawnSync).toHaveBeenCalledTimes(1)
+  })
+
+  test('prefers a known PowerShell 7 installation over Windows PowerShell', () => {
+    vi.stubEnv('ProgramW6432', 'C:\\Program Files')
+    vi.stubEnv('SystemRoot', 'C:\\Windows')
+    const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+    const windowsPowerShellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => ({
+      status: cmd === pwshPath || cmd === windowsPowerShellPath ? 0 : 1,
+      stdout: '',
+    }))
+
+    expect(resolveWindowsPowerShell()).toEqual({ kind: 'pwsh', cmd: pwshPath, args: stdinArgs })
+  })
+
+  test('discovers PowerShell 7 through where.exe', () => {
+    const pwshPath = 'D:\\PowerShell\\pwsh.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === 'where.exe' && args[0] === 'pwsh.exe') return { status: 0, stdout: `${pwshPath}\r\n` }
+      if (cmd === pwshPath) return { status: 0, stdout: '' }
+      return { status: 1, stdout: '' }
+    })
+
+    expect(resolveWindowsPowerShell()).toEqual({ kind: 'pwsh', cmd: pwshPath, args: stdinArgs })
+  })
+
+  test('falls back to the Windows PowerShell bundled with Windows', () => {
+    vi.stubEnv('SystemRoot', 'C:\\Windows')
+    const windowsPowerShellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => ({
+      status: cmd === windowsPowerShellPath ? 0 : 1,
+      stdout: '',
+    }))
+
+    expect(resolveWindowsPowerShell()).toEqual({
+      kind: 'windows-powershell',
+      cmd: windowsPowerShellPath,
+      args: stdinArgs,
+    })
+  })
+
+  test('returns null when neither PowerShell implementation is available', () => {
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ status: 1, stdout: '' })
+    expect(resolveWindowsPowerShell()).toBeNull()
+  })
+})
+
+describe('execCode on Windows without shell runtimes', () => {
   afterEach(() => {
     setPlatform(originalPlatform)
     vi.clearAllMocks()
@@ -158,6 +292,28 @@ describe('execCode on Windows without Bash', () => {
           errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
         })
       }
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(workDir, { recursive: true, force: true })
+    }
+  })
+
+  test('returns a stable error when PowerShell cannot be resolved', async () => {
+    setPlatform('win32')
+    ;(spawnSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ status: 1, stdout: '' })
+    const workDir = mkdtempSync(path.join(tmpdir(), 'chatbox-no-powershell-'))
+    const sessionId = 'no-powershell-session'
+    try {
+      await initSandbox(workDir, sessionId)
+      const result = await execCode({ code: "Write-Output 'hello'", language: 'powershell', sessionId })
+
+      expect(result).toEqual({
+        stdout: '',
+        stderr:
+          'PowerShell is not available on this Windows host. Install PowerShell 7 or enable Windows PowerShell, or use Node.js.',
+        exitCode: 127,
+        errorCode: SANDBOX_EXEC_ERROR_CODES.POWERSHELL_NOT_AVAILABLE,
+      })
     } finally {
       await resetSandbox(sessionId)
       rmSync(workDir, { recursive: true, force: true })

@@ -40,6 +40,7 @@
     "start:renderer": "electron-vite",
     "serve:web": "npx serve ./release/app/dist/renderer",
     "test": "vitest run",
+    "test:windows": "vitest run src/main/sandbox/manager.windows.test.ts src/main/skills/user-exec-runner.windows.test.ts",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

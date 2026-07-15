@@ -47,7 +47,7 @@ Chat 模式当前不再向模型注入底层 `sandbox_*` 工具。`toolsets/sand
 
 | 工具 | 输入 | 输出 | 说明 |
 |------|------|------|------|
-| `code_execution` | `code`, `language`, `timeout?` | `{ stdout, stderr, exitCode }` | 执行短 Node.js 或 Bash 脚本。`language` 为 `node | bash` |
+| `code_execution` | `code`, `language`, `timeout?` | `{ stdout, stderr, exitCode }` | 执行短 Node.js、PowerShell（Windows）或 Bash 脚本。`language` 为 `node | powershell | bash` |
 | `read_file` | `file_path`, `offset?`, `limit?` | `{ content, startLine, endLine, totalLines, hasMore }` | 读取沙箱文件或经授权读取用户真实文件，支持分页 |
 | `create_download` | `file_path`, `display_name?` | `{ downloadable, file_path, display_name }` | 将沙箱文件标记为消息产物 |
 

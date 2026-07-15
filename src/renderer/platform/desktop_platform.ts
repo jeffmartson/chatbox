@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
 
 import type { ElectronIPC } from '@shared/electron-types'
-import type { SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
+import type { SandboxExecLanguage, SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
 import type { Config, Settings, ShortcutSetting } from '@shared/types'
 import { cache } from '@shared/utils/cache'
 import localforage from 'localforage'
@@ -371,7 +371,7 @@ export default class DesktopPlatform implements Platform {
 
   public async sandboxExecCode(params: {
     code: string
-    language: 'bash' | 'node'
+    language: SandboxExecLanguage
     timeout?: number
     sessionId?: string
   }): Promise<SandboxExecResult> {

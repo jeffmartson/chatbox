@@ -16,6 +16,8 @@ import type { SandboxRuntimeConfig } from '@anthropic-ai/sandbox-runtime'
 import { app } from 'electron'
 import {
   SANDBOX_EXEC_ERROR_CODES,
+  type SandboxExecErrorCode,
+  type SandboxExecLanguage,
   type SandboxExecResult,
   type SandboxOperationResult,
 } from '../../shared/sandbox-provider'
@@ -28,8 +30,11 @@ import { shellQuote } from '../../shared/utils/shell'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
 import { runRipgrepSearch } from '../ripgrep-search'
 import { getLogger } from '../util'
+import { resolveWindowsPowerShell } from '../windows-powershell'
 import { buildSandboxStdinScript, stripCodesignNoise } from './exec-script'
 import { headTruncate, tailTruncate } from './truncate'
+
+export { resetWindowsPowerShellResolutionCache, resolveWindowsPowerShell } from '../windows-powershell'
 
 const log = getLogger('sandbox:manager')
 
@@ -93,12 +98,76 @@ function safeRealpathSync(p: string): string {
 }
 
 /** True if a command can start and complete successfully. Used only on win32. */
-function commandSucceeds(cmd: string, args: string[]): boolean {
+function commandSucceeds(cmd: string, args: string[], timeout = 3_000): boolean {
   try {
-    return spawnSync(cmd, args, { stdio: 'ignore', windowsHide: true, timeout: 3_000 }).status === 0
+    return spawnSync(cmd, args, { stdio: 'ignore', windowsHide: true, timeout }).status === 0
   } catch {
     return false
   }
+}
+
+export interface WindowsBashResolution {
+  kind: 'git-bash' | 'path-bash' | 'wsl'
+  cmd: string
+  args: string[]
+}
+
+function findWindowsExecutables(name: 'git.exe' | 'bash.exe'): string[] {
+  try {
+    const result = spawnSync('where.exe', [name], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      timeout: 3_000,
+    })
+    if (result.status !== 0 || !result.stdout) return []
+
+    const cwd = path.win32.resolve(process.cwd()).toLowerCase()
+    return result.stdout
+      .split(/\r?\n/)
+      .map((candidate) => candidate.trim())
+      .filter(Boolean)
+      .filter((candidate) => {
+        const resolved = path.win32.resolve(candidate).toLowerCase()
+        const dir = path.win32.dirname(resolved)
+        return dir !== cwd && !dir.startsWith(`${cwd}\\`)
+      })
+  } catch {
+    return []
+  }
+}
+
+function getKnownGitBashCandidates(): string[] {
+  const roots = [
+    path.win32.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git'),
+    path.win32.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Git'),
+    ...(process.env.LOCALAPPDATA ? [path.win32.join(process.env.LOCALAPPDATA, 'Programs', 'Git')] : []),
+    ...(process.env.USERPROFILE ? [path.win32.join(process.env.USERPROFILE, 'scoop', 'apps', 'git', 'current')] : []),
+  ]
+  return roots.map((root) => path.win32.join(root, 'bin', 'bash.exe'))
+}
+
+function findGitBash(): string | null {
+  const override = process.env.CHATBOX_GIT_BASH_PATH
+  if (override && commandSucceeds(override, ['--version'])) return override
+
+  for (const candidate of getKnownGitBashCandidates()) {
+    if (commandSucceeds(candidate, ['--version'])) return candidate
+  }
+
+  for (const gitExe of findWindowsExecutables('git.exe')) {
+    const gitDir = path.win32.dirname(gitExe)
+    const candidates = [
+      path.win32.join(gitDir, 'bash.exe'),
+      path.win32.join(gitDir, '..', 'bin', 'bash.exe'),
+      path.win32.join(gitDir, '..', 'usr', 'bin', 'bash.exe'),
+    ]
+    for (const candidate of candidates) {
+      if (commandSucceeds(candidate, ['--version'])) return candidate
+    }
+  }
+
+  return null
 }
 
 /** WSL can be installed without a Linux distribution, in which case it cannot run bash. */
@@ -122,14 +191,24 @@ function hasInstalledWslDistribution(): boolean {
 
 /**
  * Resolve a POSIX shell for the `bash` code-execution language on native Windows.
- * Native Windows has no bash, so we use a runnable `bash` on PATH (Git Bash / MSYS)
- * and fall back to WSL only when it has an installed Linux distribution. The script
- * is fed via stdin, so the shell's path format (C:\ vs /mnt/c) never matters.
- * Returns null when neither option can actually run bash.
+ * Prefer an explicit Git Bash path so its `/c/...` path model is predictable. Preserve
+ * compatibility with other PATH-provided POSIX shells, then fall back to WSL as a distinct
+ * shell kind. Scripts are fed via stdin and the working directory is supplied through spawn.
  */
-export function resolveWindowsBash(): { cmd: string; args: string[] } | null {
-  if (commandSucceeds('bash', ['--version'])) return { cmd: 'bash', args: [] }
-  if (hasInstalledWslDistribution()) return { cmd: 'wsl', args: ['bash'] }
+export function resolveWindowsBash(): WindowsBashResolution | null {
+  const gitBash = findGitBash()
+  if (gitBash) return { kind: 'git-bash', cmd: gitBash, args: [] }
+
+  const bashOnPath = findWindowsExecutables('bash.exe')[0]
+  if (bashOnPath && commandSucceeds(bashOnPath, ['--version'])) {
+    const normalized = path.win32.normalize(bashOnPath).toLowerCase()
+    const kind = /\\windows\\(?:system32|sysnative)\\bash\.exe$/.test(normalized) ? 'wsl' : 'path-bash'
+    return { kind, cmd: bashOnPath, args: [] }
+  }
+
+  // Keep the old command-name fallback for POSIX shells exposed through a custom process PATH.
+  if (commandSucceeds('bash', ['--version'])) return { kind: 'path-bash', cmd: 'bash', args: [] }
+  if (hasInstalledWslDistribution()) return { kind: 'wsl', cmd: 'wsl', args: ['bash'] }
   return null
 }
 
@@ -429,7 +508,7 @@ export async function initSandbox(
  */
 export async function execCode(params: {
   code: string
-  language: 'bash' | 'node'
+  language: SandboxExecLanguage
   timeout?: number
   cwd?: string
   sessionId?: string
@@ -456,6 +535,20 @@ export async function execCode(params: {
     })
   )
 
+  const unavailableResult = (stderr: string, errorCode: SandboxExecErrorCode): ExecResult => {
+    log.warn(
+      buildOperationFinishLog({
+        operationId,
+        success: false,
+        exitCode: 127,
+        durationMs: Date.now() - startedAt,
+        stdout: '',
+        stderr,
+      })
+    )
+    return { stdout: '', stderr, exitCode: 127, errorCode }
+  }
+
   // Session env overrides: point HOME/TMPDIR/cache at the working directory.
   const envOverrides: NodeJS.ProcessEnv = {}
   if (session.workingDirectory) {
@@ -479,27 +572,28 @@ export async function execCode(params: {
     cmd = process.execPath
     args = []
     envOverrides.ELECTRON_RUN_AS_NODE = '1'
+  } else if (params.language === 'powershell') {
+    if (!isWindows) {
+      return unavailableResult(
+        'PowerShell code execution is only available on Windows. Use Node.js or Bash on this platform.',
+        SANDBOX_EXEC_ERROR_CODES.POWERSHELL_NOT_AVAILABLE
+      )
+    }
+    const powershell = resolveWindowsPowerShell()
+    if (!powershell) {
+      return unavailableResult(
+        'PowerShell is not available on this Windows host. Install PowerShell 7 or enable Windows PowerShell, or use Node.js.',
+        SANDBOX_EXEC_ERROR_CODES.POWERSHELL_NOT_AVAILABLE
+      )
+    }
+    cmd = powershell.cmd
+    args = powershell.args
   } else if (isWindows) {
     // Native Windows has no bash; use Git Bash / WSL if present.
     const bash = resolveWindowsBash()
     if (!bash) {
       const stderr = 'bash is not available on this Windows host. Install Git Bash or enable WSL, or use node.'
-      log.warn(
-        buildOperationFinishLog({
-          operationId,
-          success: false,
-          exitCode: 127,
-          durationMs: Date.now() - startedAt,
-          stdout: '',
-          stderr,
-        })
-      )
-      return {
-        stdout: '',
-        stderr,
-        exitCode: 127,
-        errorCode: SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE,
-      }
+      return unavailableResult(stderr, SANDBOX_EXEC_ERROR_CODES.BASH_NOT_AVAILABLE)
     }
     cmd = bash.cmd
     args = bash.args
@@ -531,9 +625,10 @@ export async function execCode(params: {
     spawnEnv = { ...wrappedEnv, ...envOverrides }
   }
 
-  // Windows bash (especially WSL) must keep resolving `node` from its own PATH; a Windows
-  // process.execPath is not executable inside WSL. macOS/Linux need the bundled-node shim.
-  const script = buildSandboxStdinScript(params.code, params.language, process.execPath, !isWindows)
+  // Windows Bash (especially WSL) must keep resolving `node` from its own PATH; a Windows
+  // process.execPath is not executable inside WSL. PowerShell reads its script directly.
+  // macOS/Linux Bash needs the bundled-node shim.
+  const script = buildSandboxStdinScript(params.code, params.language, process.execPath, !isWindows, isWindows)
   const MAX_BUFFER_BYTES = 10 * 1024 * 1024 // 10MB cap to prevent OOM from runaway output
 
   return new Promise((resolve, reject) => {

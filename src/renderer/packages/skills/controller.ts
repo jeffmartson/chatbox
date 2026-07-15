@@ -77,7 +77,13 @@ export const skillsController = {
 
   userExec(
     command: string,
-    options?: { timeout?: number; sessionId?: string; toolCallId?: string; approvalSource?: UserExecApprovalSource }
+    options?: {
+      cwd?: string
+      timeout?: number
+      sessionId?: string
+      toolCallId?: string
+      approvalSource?: UserExecApprovalSource
+    }
   ): Promise<SkillScriptResult> {
     return window.electronAPI.invoke('skills:user-exec', { command, ...options })
   },

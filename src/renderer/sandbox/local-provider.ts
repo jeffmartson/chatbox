@@ -1,4 +1,5 @@
 import type {
+  SandboxExecLanguage,
   SandboxExecResult,
   SandboxProvider,
   SandboxSearchParams,
@@ -110,7 +111,7 @@ export class LocalSandboxProvider implements SandboxProvider {
     return platform.sandboxPersistArtifact({ sandboxPath, sessionId: this.sessionId, displayName })
   }
 
-  async exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
+  async exec(params: { code: string; language: SandboxExecLanguage; timeout?: number }): Promise<SandboxExecResult> {
     const timeout = params.timeout ?? DEFAULT_EXEC_TIMEOUT
     if (!platform.sandboxExecCode) {
       return { stdout: '', stderr: 'Sandbox not available on this platform', exitCode: 1 }

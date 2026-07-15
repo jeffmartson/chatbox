@@ -2,12 +2,15 @@ import { spawn } from 'node:child_process'
 import os from 'node:os'
 import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
+import { buildPowerShellStdinScript } from '../sandbox/exec-script'
 import { getLogger } from '../util'
+import { resolveWindowsPowerShell } from '../windows-powershell'
 
 const log = getLogger('skills:user-exec')
 
 export interface UserExecParams {
   command: string
+  cwd?: string
   timeout?: number
   sessionId?: string
   toolCallId?: string
@@ -23,6 +26,7 @@ export interface UserExecResult {
 
 interface UserExecEntry {
   command: string
+  cwd?: string
   promise: Promise<UserExecResult>
   completedAt?: number
 }
@@ -36,13 +40,14 @@ interface UserExecRunnerOptions {
 const DEFAULT_COMPLETED_TTL_MS = 10 * 60 * 1000
 const DEFAULT_MAX_COMPLETED_ENTRIES = 32
 
-async function executeUserExecCommand(params: UserExecParams): Promise<UserExecResult> {
-  const { command, timeout, sessionId, toolCallId, approvalSource } = params
+export async function executeUserExecCommand(params: UserExecParams): Promise<UserExecResult> {
+  const { command, cwd: requestedCwd, timeout, sessionId, toolCallId, approvalSource } = params
 
   try {
     if (!command || typeof command !== 'string') throw new Error('Command is required')
 
     const homeDir = os.homedir()
+    const cwd = requestedCwd?.trim() || homeDir
     const timeoutMs = timeout || 120_000
     const maxOutputBytes = 1024 * 1024 // 1MB
     const operationId = createOperationId()
@@ -57,11 +62,35 @@ async function executeUserExecCommand(params: UserExecParams): Promise<UserExecR
         // Renderer approval metadata is audit-only. Missing values remain visible
         // instead of silently looking like a known authorization path.
         approvalSource: approvalSource ?? 'unknown',
-        cwd: homeDir,
+        cwd,
         timeoutMs,
         command,
       })
     )
+
+    const isWindows = process.platform === 'win32'
+    const powershell = isWindows ? resolveWindowsPowerShell() : null
+    if (isWindows && !powershell) {
+      const result = {
+        success: false,
+        stdout: '',
+        stderr: 'PowerShell is not available on this Windows host.',
+        exitCode: null,
+      }
+      log.warn(
+        buildOperationFinishLog({
+          operationId,
+          success: false,
+          exitCode: null,
+          durationMs: Date.now() - startedAt,
+          stdout: '',
+          stderr: result.stderr,
+        })
+      )
+      return result
+    }
+    const shellCommand = powershell?.cmd ?? 'bash'
+    const shellArgs = powershell?.args ?? ['-lc', command]
 
     return await new Promise((resolve) => {
       let stdout = ''
@@ -73,6 +102,7 @@ async function executeUserExecCommand(params: UserExecParams): Promise<UserExecR
       const resolveOnce = (result: UserExecResult) => {
         if (settled) return
         settled = true
+        clearTimeout(timeoutHandle)
         const finishLog = buildOperationFinishLog({
           operationId,
           success: result.success,
@@ -89,12 +119,37 @@ async function executeUserExecCommand(params: UserExecParams): Promise<UserExecR
         resolve(result)
       }
 
-      const child = spawn('bash', ['-lc', command], {
-        cwd: homeDir,
+      const child = spawn(shellCommand, shellArgs, {
+        cwd,
         timeout: timeoutMs,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [isWindows ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         env: process.env,
+        shell: false,
       })
+
+      const timeoutHandle = setTimeout(() => {
+        if (settled || child.killed) return
+        child.kill('SIGTERM')
+        resolveOnce({
+          success: false,
+          stdout,
+          stderr: stderr || `Command timed out (${timeoutMs / 1000}s)`,
+          exitCode: null,
+        })
+      }, timeoutMs)
+
+      if (!child.stdout || !child.stderr) {
+        child.kill('SIGTERM')
+        resolveOnce({ success: false, stdout: '', stderr: 'Command output streams are unavailable', exitCode: null })
+        return
+      }
+
+      if (isWindows && child.stdin) {
+        child.stdin.on('error', () => {
+          // The process error/close handlers below own the final result.
+        })
+        child.stdin.end(buildPowerShellStdinScript(command), 'utf8')
+      }
 
       child.stdout.on('data', (data: Buffer) => {
         stdoutBytes += data.byteLength
@@ -115,17 +170,6 @@ async function executeUserExecCommand(params: UserExecParams): Promise<UserExecR
             : { success: code === 0, stdout, stderr, exitCode: code }
         )
       })
-
-      setTimeout(() => {
-        if (settled || child.killed) return
-        child.kill('SIGTERM')
-        resolveOnce({
-          success: false,
-          stdout,
-          stderr: stderr || `Command timed out (${timeoutMs / 1000}s)`,
-          exitCode: null,
-        })
-      }, timeoutMs)
     })
   } catch (error) {
     log.error('skills:user-exec failed', error)
@@ -171,11 +215,11 @@ export function createUserExecRunner(
       const key = `${params.sessionId ?? ''}:${params.toolCallId}`
       const existing = entries.get(key)
       if (existing) {
-        if (existing.command !== params.command) {
+        if (existing.command !== params.command || existing.cwd !== params.cwd) {
           return Promise.resolve({
             success: false,
             stdout: '',
-            stderr: `Tool call ${params.toolCallId} was reused with a different command`,
+            stderr: `Tool call ${params.toolCallId} was reused with a different command or working directory`,
             exitCode: null,
           })
         }
@@ -184,6 +228,7 @@ export function createUserExecRunner(
 
       const entry: UserExecEntry = {
         command: params.command,
+        cwd: params.cwd,
         promise: Promise.resolve().then(() => execute(params)),
       }
       entries.set(key, entry)

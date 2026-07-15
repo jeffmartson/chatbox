@@ -1,5 +1,5 @@
 import { isTextFilePath } from '@shared/file-extensions'
-import { DEFAULT_EXEC_TIMEOUT, type SandboxProvider } from '@shared/sandbox-provider'
+import { DEFAULT_EXEC_TIMEOUT, type SandboxExecLanguage, type SandboxProvider } from '@shared/sandbox-provider'
 import { escapeSingleQuotes } from '@shared/utils/shell'
 import { jsonSchema, type ToolSet } from 'ai'
 import { getLogger } from '@/lib/utils'
@@ -153,7 +153,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
 
   const code_execution: ToolSet[string] = {
     description:
-      'Run short Node.js or Bash code in a sandbox for lightweight file processing, data analysis, ' +
+      'Run short Node.js, PowerShell (Windows), or Bash code in a sandbox for lightweight file processing, data analysis, ' +
       'calculations, simple HTML/SVG/Canvas chart generation, and file conversion. Prefer Node.js built-ins ' +
       'and shell tools. Avoid installing packages or creating projects unless the user explicitly asks for ' +
       'that and the task cannot be completed with the available runtime. To create or modify files, prefer ' +
@@ -168,9 +168,10 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
         },
         language: {
           type: 'string',
-          enum: ['node', 'bash'],
+          enum: ['node', 'powershell', 'bash'],
           default: 'node',
-          description: 'Programming language',
+          description:
+            'Execution language. Prefer Node.js for cross-platform processing, PowerShell for native Windows commands, and Bash for POSIX-specific scripts.',
         },
         timeout: {
           type: 'number',
@@ -181,7 +182,7 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       additionalProperties: false,
     }),
     execute: async (input, { abortSignal }) => {
-      const codeInput = input as { code: string; language?: 'node' | 'bash'; timeout?: number }
+      const codeInput = input as { code: string; language?: SandboxExecLanguage; timeout?: number }
       const setupResult = await ensureSandbox()
       if (!setupResult.success) {
         return { stdout: '', stderr: setupResult.error || 'Sandbox setup failed', exitCode: 1 }
@@ -402,13 +403,14 @@ Uploaded files are described in <ATTACHMENT_FILE> tags. In sandbox mode, those t
 ### Available Runtime
 - Bash
 - Node.js
+- PowerShell (Windows only; PowerShell 7 preferred, Windows PowerShell fallback)
 
 Use the preinstalled runtime first:
 - CSV/TSV/JSON/table calculations: use Node.js built-ins such as fs, path, stream, readline, URL, TextDecoder, Intl, crypto, zlib, and child_process when needed.
 - XLSX, DOCX, PPTX, PDF, and image files: prefer <PARSED_SANDBOX_PATH> for extracted text. If direct binary manipulation requires unavailable libraries, explain the limitation or produce a text/CSV/HTML alternative.
 - Charts and visual outputs: generate standalone HTML with inline SVG or Canvas. Keep JavaScript, CSS, and small data inline in the HTML instead of referencing sibling .js/.css/data files. Save the HTML file, then call create_download when the user needs the result. Do not rely on Python plotting libraries.
-- File outputs: prefer CSV, JSON, Markdown, HTML, or other text-based formats that can be generated with Node.js or Bash.
-- Python is not available in this code_execution tool; choose Node.js or Bash.
+- File outputs: prefer CSV, JSON, Markdown, HTML, or other text-based formats that can be generated with Node.js, PowerShell, or Bash.
+- Python is not available in this code_execution tool; choose Node.js, PowerShell on Windows, or Bash.
 
 ### Package Installation
 Avoid installing packages. Most simple file-processing tasks should be completed with Node.js built-ins and shell tools.
@@ -427,8 +429,9 @@ Read file content from the sandbox with line-based pagination.
 - Absolute paths outside the sandbox may read user filesystem files when the user provided or clearly requested that path. Use write_file/edit_file for modifications so the user can approve real filesystem changes.
 
 ### code_execution
-Execute focused Node.js or Bash snippets. Keep scripts small and task-oriented:
+Execute focused Node.js, PowerShell, or Bash snippets. Keep scripts small and task-oriented:
 - Use Node.js for most file-processing tasks.
+- On Windows, prefer PowerShell for terminal commands and native filesystem operations. Use Bash only for POSIX-specific scripts.
 - Read uploaded files from <SANDBOX_PATH> or <PARSED_SANDBOX_PATH>; do not guess alternate filenames.
 - Prefer producing explicit result files for transformed data, reports, charts, or exports.
 - Avoid long-running services, project scaffolding, dependency installation, and broad environment exploration.

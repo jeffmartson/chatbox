@@ -25,6 +25,14 @@ describe('buildSandboxStdinScript', () => {
     expect(buildSandboxStdinScript(code, 'node', '/path/to/electron', true)).toBe(code)
   })
 
+  test('powershell language configures UTF-8 before executing the code from stdin', () => {
+    const code = "[Console]::Out.WriteLine('hello from PowerShell')"
+    const script = buildSandboxStdinScript(code, 'powershell', 'unused', false, true)
+    expect(script).toContain('[Console]::InputEncoding = [Text.UTF8Encoding]::new($false)')
+    expect(script).toContain('[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)')
+    expect(script.endsWith(code)).toBe(true)
+  })
+
   test('bash language prepends a node() shim and executes the parsed program with stdin closed', () => {
     const nodePath = '/Applications/My App/electron'
     const script = buildSandboxStdinScript('node -e "1"', 'bash', nodePath, true)
@@ -42,6 +50,22 @@ describe('buildSandboxStdinScript', () => {
     expect(script).not.toContain('node()')
     expect(script).not.toContain('Chatbox.exe')
     expect(script).toBe('{\n:\nnode -e "1"\n\n} </dev/null')
+  })
+
+  test.skipIf(process.platform === 'win32')('converts native Windows paths passed to the Bash cd builtin', () => {
+    for (const pathConverter of ['cygpath', 'wslpath']) {
+      const code = [
+        `${pathConverter}() { printf '%s\\n' "$PWD"; }`,
+        'cd "C:\\Users\\themez\\workspace\\chatbox-pro"',
+        "printf 'windows-cd-ok\\n'",
+      ].join('\n')
+      const script = buildSandboxStdinScript(code, 'bash', process.execPath, false, true)
+      const result = spawnSync('bash', [], { input: script, encoding: 'utf8' })
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toBe('windows-cd-ok\n')
+      expect(result.stderr).toBe('')
+    }
   })
 
   test.skipIf(process.platform === 'win32')('empty and comment-only bash programs remain valid', () => {

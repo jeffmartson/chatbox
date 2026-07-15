@@ -46,12 +46,13 @@ describe('buildCodeExecutionTools', () => {
     expect(result.description.length).toBeGreaterThan(0)
   })
 
-  test('description explains Node/Bash runtime and discourages installs', () => {
+  test('description explains Node/PowerShell/Bash runtime and discourages installs', () => {
     const result = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
 
     expect(result.description).toContain('Available Runtime')
     expect(result.description).toContain('Node.js')
     expect(result.description).toContain('Bash')
+    expect(result.description).toContain('PowerShell')
     expect(result.description).toContain('Node.js built-ins')
     expect(result.description).toContain('standalone HTML with inline SVG or Canvas')
     expect(result.description).toContain('Python is not available')
@@ -112,6 +113,21 @@ describe('buildCodeExecutionTools', () => {
     expect(mockProvider.exec).toHaveBeenCalledWith({
       code: 'console.log("hello world")',
       language: 'node',
+      timeout: expect.any(Number),
+    })
+  })
+
+  test('code_execution forwards PowerShell as a first-class execution language', async () => {
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.code_execution as {
+      execute: (input: Record<string, unknown>, opts: Record<string, unknown>) => Promise<unknown>
+    }
+
+    await tool.execute({ code: "Write-Output 'hello'", language: 'powershell' }, {})
+
+    expect(mockProvider.exec).toHaveBeenCalledWith({
+      code: "Write-Output 'hello'",
+      language: 'powershell',
       timeout: expect.any(Number),
     })
   })

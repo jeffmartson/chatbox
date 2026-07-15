@@ -1,4 +1,5 @@
 import type {
+  SandboxExecLanguage,
   SandboxExecResult,
   SandboxProvider,
   SandboxSearchParams,
@@ -60,7 +61,7 @@ export class CloudSandboxProvider implements SandboxProvider {
     return { success: false, error: 'Cloud sandbox not yet implemented' }
   }
 
-  async exec(_params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult> {
+  async exec(_params: { code: string; language: SandboxExecLanguage; timeout?: number }): Promise<SandboxExecResult> {
     return { stdout: '', stderr: 'Cloud sandbox not yet implemented', exitCode: 1 }
   }
 

@@ -25,7 +25,7 @@ describe('builtinSkills', () => {
 
     expect(skill).toBeDefined()
     expect(skill?.body).toContain('code_execution')
-    expect(skill?.body).toContain('Node.js or Bash')
+    expect(skill?.body).toContain('Node.js, PowerShell on Windows, or Bash')
     expect(skill?.body).toContain('create_download')
     expect(skill?.body).toContain('Python, pandas, matplotlib, R, and system package managers are not available')
   })

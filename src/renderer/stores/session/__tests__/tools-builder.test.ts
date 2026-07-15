@@ -343,6 +343,41 @@ describe('buildToolsForSession', () => {
     expect(result.initialActiveTools).toBeUndefined()
   })
 
+  test('normalizes Windows paths and prefers PowerShell without redundant directory changes', async () => {
+    const model = createMockModel()
+    const provider = createMockSandboxProvider()
+    vi.mocked(provider.resolveWorkingDirectory).mockResolvedValue('C:\\Users\\themez\\workspace\\chatbox-pro')
+
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { workingDirectories: ['D:\\Projects\\shared folder'] },
+      codeExecution: {
+        sessionId: 'session-1',
+        provider,
+        files: [],
+      },
+    })
+
+    expect(result.instructions).toContain('C:/Users/themez/workspace/chatbox-pro')
+    expect(result.instructions).toContain('D:/Projects/shared folder')
+    expect(result.instructions).not.toContain('C:\\Users\\themez')
+    expect(result.instructions).toContain('Do not prepend `cd <working-directory>`')
+    expect(result.instructions).toContain(
+      'On Windows, prefer PowerShell for terminal commands and native filesystem paths'
+    )
+    expect(result.instructions).toContain('do not prepend `Set-Location <working-directory>`')
+    expect(result.instructions).toContain('Use Bash only for POSIX-specific scripts')
+    expect(result.instructions).toContain('When using Bash on Windows, use Unix shell syntax and forward slashes')
+    expect(result.instructions).toContain('For files inside the working directory, prefer relative paths')
+    expect(result.instructions).toContain('Use an absolute path when the target is outside the working directory')
+    expect(result.instructions).toContain(
+      'Git Bash accepts `C:/Users/name/...`, while WSL uses `/mnt/c/Users/name/...`'
+    )
+    expect(result.instructions).toContain('structured file tools for host paths outside it')
+  })
+
   test('webBrowsing=true exposes parse_link when configured search provider supports it', async () => {
     const model = createMockModel()
     const result = await buildToolsForSession(model, {
@@ -957,6 +992,35 @@ describe('user_exec tool', () => {
     const result = await buildToolsForSession(model, options)
     expect(result.tools.user_exec).toBeDefined()
     expect(result.initialActiveTools).not.toContain('user_exec')
+  })
+
+  test('uses the first granted directory as cwd and describes the platform shell', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: {
+        agentFullAccess: true,
+        workingDirectories: ['C:\\Users\\themez\\workspace\\chatbox-pro', 'D:\\other'],
+      },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    expect(result.instructions).toContain('On Windows, user_exec runs PowerShell commands')
+    expect(result.instructions).toContain('instead of Bash-only operators such as &&')
+    expect(result.instructions).toContain('user_exec already starts in the first user-granted working directory')
+    await result.tools.user_exec.execute({ command: 'git status' }, {
+      toolCallId: 'tool-call-windows-cwd',
+      messages: [],
+    } as never)
+
+    expect(userExecMock).toHaveBeenCalledWith('git status', {
+      cwd: 'C:\\Users\\themez\\workspace\\chatbox-pro',
+      sessionId: undefined,
+      toolCallId: 'tool-call-windows-cwd',
+      approvalSource: 'full_access',
+    })
   })
 
   test('maps command results to readable model text', async () => {

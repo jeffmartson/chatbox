@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <any> */
-import type { SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
+import type { SandboxExecLanguage, SandboxExecResult, SandboxOperationResult } from '@shared/sandbox-provider'
 import type { Config, Language, Settings, ShortcutSetting } from '@shared/types'
 import type { ImageGenerationStorage } from '@/storage/ImageGenerationStorage'
 import type { SessionMetaStorage } from '@/storage/SessionMetaStorage'
@@ -142,7 +142,7 @@ export interface Platform extends Storage {
   // via stdin (macOS/Linux under SRT confinement, Windows natively with no OS sandbox).
   sandboxExecCode?(params: {
     code: string
-    language: 'bash' | 'node'
+    language: SandboxExecLanguage
     timeout?: number
     sessionId?: string
   }): Promise<SandboxExecResult>

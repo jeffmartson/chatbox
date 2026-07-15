@@ -1,6 +1,7 @@
 import { lstat as fsLstat, readFile as fsReadFile, realpath as fsRealpath } from 'node:fs/promises'
 import path from 'node:path'
 import { ipcMain } from 'electron'
+import type { SandboxExecLanguage } from '../../shared/sandbox-provider'
 import { getLogger } from '../util'
 import {
   checkAvailability,
@@ -34,7 +35,7 @@ export function registerSandboxIPCHandlers() {
   // Windows natively with no OS sandbox). No base64 encoding or host-shell command building.
   ipcMain.handle(
     'sandbox:exec-code',
-    async (_event, params: { code: string; language: 'bash' | 'node'; timeout?: number; sessionId?: string }) => {
+    async (_event, params: { code: string; language: SandboxExecLanguage; timeout?: number; sessionId?: string }) => {
       try {
         log.debug(`sandbox:exec-code language=${params.language} bytes=${params.code.length}`)
         return await execCode(params)

@@ -1,6 +1,6 @@
 # Windows 原生代码执行
 
-> Last updated: 2026-06
+> Last updated: 2026-07
 >
 > 状态：**已实现最小原生支持（放弃文件隔离）**。本文记录 Windows 上代码执行的根因分析、
 > 方案对比，以及当前落地方案与未来的强隔离演进方向。
@@ -90,7 +90,18 @@ OpenAI Codex（**Apache-2.0**，`openai/codex` → `codex-rs/windows-sandbox-rs`
   0.0.54 通过且已含 Windows 后端，为未来留门）。此升级**只惠及 macOS/Linux**，已在 macOS 实测无回归。
 - **Windows 原生执行（无沙箱）**：`code_execution` 在会话工作目录里直接跑：
   - `node`：用打包的 Electron 二进制 + `ELECTRON_RUN_AS_NODE`，程序经 **stdin** 喂入（无需 shell 转义/路径转换）。
-  - `bash`：用 PATH 上的 `bash`（Git Bash / MSYS），回退到 `wsl bash`；脚本同样经 stdin 喂入。无 bash 时返回清晰错误。
+  - `powershell`：优先使用 `CHATBOX_POWERSHELL_PATH` 指定的程序或 PowerShell 7（`pwsh.exe`），再回退到
+    Windows 自带的 `powershell.exe`。使用 `-NoLogo -NoProfile -NonInteractive -Command -` 从 stdin 执行，
+    原生继承 `spawn({ cwd })` 的 Windows 工作目录和路径语义。
+  - `bash`：优先使用 `CHATBOX_GIT_BASH_PATH` 指定的 Git Bash，然后检查 Git for Windows、
+    PortableGit / Scoop 等常见位置和 `git.exe` 旁的 `bash.exe`；再兼容 PATH 上的其他 POSIX shell，
+    最后才回退到 `wsl bash`。解析结果显式区分 `git-bash` / `path-bash` / `wsl`，脚本均经 stdin
+    喂入。无 bash 时返回清晰错误。
+  - 工作目录通过 `spawn({ cwd })` 传入，不要求模型先执行 `cd` / `Set-Location`。Windows 上优先提示模型
+    使用 PowerShell 执行终端命令和原生路径操作；Bash 只用于 POSIX 专属脚本。工作目录内部优先使用相对路径，
+    工作目录外（包括用户授权的真实目录）使用绝对路径和结构化文件工具。Bash 提示会区分 Git Bash 的
+    `C:/...` 与 WSL 的 `/mnt/c/...`，并禁止直接传入 `C:\\...`。若模型仍用原生路径执行 `cd`，shim 会通过
+    `cygpath` / `wslpath` 做窄范围兜底。
 - **`checkAvailability(win32)` → available**（原生、无隔离），移除旧的 `wsl --status` 探测。
 - **不做** env 级网络关闭（容易绕过，价值低）。
 
@@ -192,18 +203,22 @@ PR #813（已合并，commit `c955cbf94`）基于错误的 WSL 前提。本次�
 
 - `release/app/package.json`：SRT `^0.0.34` → `^0.0.54`。
 - `manager.ts`：win32 `initSandbox` 跳过 SRT；新增 `execCode`（node 经 execPath+ELECTRON_RUN_AS_NODE、
-  bash 经 `resolveWindowsBash()`，均经 stdin 喂入）；`checkAvailability(win32)` 返回 available；清理 WSL 遗留。
+  PowerShell 经 `resolveWindowsPowerShell()`、bash 经 `resolveWindowsBash()`，均经 stdin 喂入）；PowerShell 7
+  优先并回退 Windows PowerShell，Git Bash 优先并显式区分 PATH Bash / WSL；
+  `checkAvailability(win32)` 返回 available；清理 WSL 遗留。
 - `ipc-handlers.ts`：`sandbox:exec-code` 成为全平台唯一代码执行入口，移除 `sandbox:exec` 与
   `sandbox:node-command`。
 - `interfaces.ts` / `desktop_platform.ts`：桌面端统一使用 `sandboxExecCode`。
 - `local-provider.ts`：`exec()` 在所有桌面平台路由到 `sandboxExecCode`；Windows bash 保留其 PATH 中的
   `node`，避免 WSL 执行宿主 Electron 路径。
-- 测试：`resolveWindowsBash` 决策单测；macOS SRT 路径与 stdin 执行机制已实测。
+- 测试：`resolveWindowsPowerShell` / `resolveWindowsBash` 决策单测；macOS SRT 路径与 stdin 执行机制已实测。
 
 ## 9. 验证状态与后续
 
 - ✅ macOS：SRT 0.0.54 升级实测无回归（init/wrap/exec 跑通）；40+ sandbox 单测通过。
-- ✅ 机制：node（无参 + stdin）与 bash（stdin）执行已在本机验证。
-- ⚠️ **Windows 实机未验证**（无 Windows 环境）：`execCode` 的 node/bash 路径需在 Win11 / Win10 1809+ 上实测，
-  含 `ELECTRON_RUN_AS_NODE` + stdin 执行、`resolveWindowsBash` 解析、ConPTY 行为。
+- ✅ 机制：node（无参 + stdin）、PowerShell（stdin）与 bash（stdin）执行均有聚焦测试覆盖。
+- ✅ Windows：GitHub Actions `windows-2022` 已覆盖原生 Node/PowerShell/Bash stdin 执行、PowerShell 7
+  / Windows PowerShell 解析、Git Bash 解析、原生 `C:\\...` 路径、空格/中文目录、文件读写/搜索以及
+  shell 路径回转；WSL 仍只做决策单测，
+  未在 hosted runner 上安装发行版做端到端验证。
 - 后续（如需补回隔离）：按 §3.3 / §4 的 Codex unelevated 方向实现受限令牌 + ACL。

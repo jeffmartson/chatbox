@@ -126,18 +126,36 @@ describe('persistSandboxArtifact', () => {
     expect(second.artifactPath).toBe(first.artifactPath)
   })
 
-  test('persists a file from a sandbox-writable temp dir (e.g. /tmp)', async () => {
-    // The sandbox can legitimately write to the OS temp dir / /tmp, so create_download
-    // must be able to persist files produced there even though they live outside the
-    // per-session working directory.
-    const tempFile = path.join(tmpdir(), `persist-tmp-${process.pid}.txt`)
-    writeFileSync(tempFile, 'from-tmp', 'utf-8')
+  test.skipIf(process.platform === 'win32')(
+    'persists a file from a sandbox-writable temp dir (e.g. /tmp)',
+    async () => {
+      // The sandbox can legitimately write to the OS temp dir / /tmp, so create_download
+      // must be able to persist files produced there even though they live outside the
+      // per-session working directory.
+      const tempFile = path.join(tmpdir(), `persist-tmp-${process.pid}.txt`)
+      writeFileSync(tempFile, 'from-tmp', 'utf-8')
+      try {
+        const result = await persistSandboxArtifact(realpathSync(tempFile), SESSION_ID)
+        expect(result.success).toBe(true)
+        const artifactsRoot = realpathSync(getSandboxArtifactsRoot())
+        expect(result.artifactPath?.startsWith(artifactsRoot + path.sep)).toBe(true)
+        expect(readFileSync(result.artifactPath!, 'utf-8')).toBe('from-tmp')
+      } finally {
+        rmSync(tempFile, { force: true })
+      }
+    }
+  )
+
+  test.runIf(process.platform === 'win32')('rejects files from the unrestricted Windows temp directory', async () => {
+    // Windows code execution redirects TMP/TEMP to the per-session working directory and
+    // does not grant the unrestricted OS temp root. Accepting it here would let an agent
+    // persist files created by unrelated processes as sandbox artifacts.
+    const tempFile = path.join(tmpdir(), `persist-windows-tmp-${process.pid}.txt`)
+    writeFileSync(tempFile, 'outside-session', 'utf-8')
     try {
       const result = await persistSandboxArtifact(realpathSync(tempFile), SESSION_ID)
-      expect(result.success).toBe(true)
-      const artifactsRoot = realpathSync(getSandboxArtifactsRoot())
-      expect(result.artifactPath?.startsWith(artifactsRoot + path.sep)).toBe(true)
-      expect(readFileSync(result.artifactPath!, 'utf-8')).toBe('from-tmp')
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/outside the sandbox/i)
     } finally {
       rmSync(tempFile, { force: true })
     }

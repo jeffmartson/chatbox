@@ -27,6 +27,20 @@ describe('createUserExecRunner', () => {
     expect(execute).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects a reused identity with a different working directory', async () => {
+    const execute = vi.fn(async () => SUCCESS_RESULT)
+    const runner = createUserExecRunner(execute)
+
+    await runner.run({ command: 'git status', cwd: 'C:\\repo-a', sessionId: 'session-a', toolCallId: 'tool-a' })
+    await expect(
+      runner.run({ command: 'git status', cwd: 'C:\\repo-b', sessionId: 'session-a', toolCallId: 'tool-a' })
+    ).resolves.toMatchObject({
+      success: false,
+      stderr: expect.stringContaining('different command or working directory'),
+    })
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
   it('does not deduplicate calls without a toolCallId', async () => {
     const execute = vi.fn(async () => SUCCESS_RESULT)
     const runner = createUserExecRunner(execute)

@@ -75,19 +75,26 @@ export interface BuildToolsResult {
  * on failed writes. workingDir may be null when the path is not yet known (e.g. cloud).
  */
 function buildWorkingDirectoryInstruction(workingDir: string | null, userWorkingDirectories?: string[]): string {
+  // Forward slashes remain valid for native Windows file APIs while avoiding copied native paths
+  // that POSIX shells interpret differently.
+  const formatPathForModel = (filePath: string) => filePath.replace(/\\/g, '/')
   const dirLine = workingDir
-    ? `Your sandbox working directory is: ${workingDir}`
+    ? `Your sandbox working directory is: ${formatPathForModel(workingDir)}`
     : 'You have a sandbox working directory.'
   // Directories the user explicitly granted access to (the working-directory feature).
   // These are real paths on the user's machine, readable and writable without approval.
   const grantedDirsBlock = userWorkingDirectories?.length
-    ? `\nThe user has granted you read/write access to these real directories (use their absolute paths; no approval needed):\n${userWorkingDirectories.map((dir) => `- ${dir}`).join('\n')}\n`
+    ? `\nThe user has granted you read/write access to these real directories (use their absolute paths; no approval needed):\n${userWorkingDirectories.map((dir) => `- ${formatPathForModel(dir)}`).join('\n')}\n`
     : ''
   return `
 ## Working Directory & File Paths
 ${dirLine}
-- Prefer relative paths for file operations — they resolve to the working directory. This is the simplest and most reliable approach.
-- \`~\` and \`$HOME\` also point to the working directory.
+- For files inside the working directory, prefer relative paths. They resolve from the working directory at the start of each tool call.
+- Use an absolute path when the target is outside the working directory, including a user-granted real directory. For these host paths, prefer the structured file tools instead of passing the path to shell code.
+- \`code_execution\` already starts in the working directory. Do not prepend \`cd <working-directory>\` to commands.
+- On Windows, prefer PowerShell for terminal commands and native filesystem paths. PowerShell accepts native paths such as \`C:\\Users\\name\` and also starts in the working directory, so do not prepend \`Set-Location <working-directory>\`. Use Bash only for POSIX-specific scripts.
+- When using Bash on Windows, use Unix shell syntax and forward slashes; never paste a backslash path such as \`C:\\Users\\name\` into Bash. Git Bash accepts \`C:/Users/name/...\`, while WSL uses \`/mnt/c/Users/name/...\`. Because the active shell may differ, use relative paths for targets inside the working directory and structured file tools for host paths outside it.
+- In Bash, \`~\` and \`$HOME\` point to the working directory. In PowerShell, use relative paths or \`$PWD\`; do not assume \`$HOME\` is the working directory.
 - Do NOT use absolute paths like /home/user or /root — they do not exist here. Write to the working directory instead.
 - To create or modify files, prefer the write_file and edit_file tools over writing through code_execution (echo, heredoc, fs.writeFileSync). The structured tools are more reliable and let the user see what changed.
 ${grantedDirsBlock}`
@@ -106,7 +113,8 @@ When you are about to call one or more tools, first include one short visible se
 
 function buildSkillToolsInstruction(
   enabledSkills: Array<{ name: string; description: string }>,
-  agentFullAccess: boolean
+  agentFullAccess: boolean,
+  userExecWorkingDirectory?: string
 ): string {
   let instruction = `
 ## Skills
@@ -132,6 +140,8 @@ No skills are currently enabled.
 **user_exec** runs commands in the user's real environment with full system access. This is a privileged tool.
 Only use user_exec when a loaded skill explicitly instructs you to run a command in the user's environment.
 Do NOT use user_exec on your own initiative — use code_execution (sandbox) for file processing, data analysis, downloading files, and all other tasks.
+On Windows, user_exec runs PowerShell commands; on macOS/Linux, it runs Bash commands. Write PowerShell syntax directly on Windows, and use newlines or semicolons instead of Bash-only operators such as && so the command also works with Windows PowerShell 5.1. Do not invoke PowerShell from Bash or paste a Windows path into Bash.
+${userExecWorkingDirectory ? `user_exec already starts in the first user-granted working directory: ${userExecWorkingDirectory.replace(/\\/g, '/')}. Use relative paths there and do not prepend cd or Set-Location.\n` : 'Without a user-granted working directory, user_exec starts in the user home directory.\n'}
 ${agentFullAccess ? 'Full Access is enabled, so user_exec commands run without per-command approval.\n' : ''}
 
 ### Installing Skills
@@ -329,7 +339,12 @@ In long conversations, earlier tool call results may be automatically compressed
     const allSkills = await getDiscoveredSkills()
     const skillSettings = settingsStore.getState().getSettings().skills
     const enabledSkills = allSkills.filter((s) => skillSettings.enabledSkillNames.includes(s.name))
-    instructions += buildSkillToolsInstruction(enabledSkills, options.sessionSettings?.agentFullAccess === true)
+    const userExecWorkingDirectory = options.sessionSettings?.workingDirectories?.find((dir) => dir.trim().length > 0)
+    instructions += buildSkillToolsInstruction(
+      enabledSkills,
+      options.sessionSettings?.agentFullAccess === true,
+      userExecWorkingDirectory
+    )
     tools.load_skill = buildLoadSkillTool(options)
     if (enabledSkills.some((skill) => skill.name === 'chatbox-product-info')) {
       const chatboxCliToolSet = buildChatboxCliToolSet({
@@ -484,6 +499,7 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
 
 function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
   const agentFullAccess = options.sessionSettings?.agentFullAccess === true
+  const userExecWorkingDirectory = options.sessionSettings?.workingDirectories?.find((dir) => dir.trim().length > 0)
   type UserExecResult = { success: boolean; exitCode: number | null; stdout: string; stderr: string }
   const executionCache = new Map<string, { command: string; promise: Promise<UserExecResult> }>()
 
@@ -492,7 +508,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
       "Execute a command in the user's real environment (not sandbox). " +
       'RESTRICTED: Only use when a loaded skill explicitly requires running a command in the user environment. ' +
       'Do NOT use for general tasks — use code_execution (sandbox) instead. ' +
-      "Runs in the user's login shell with full system access. " +
+      'Runs PowerShell on Windows and Bash on macOS/Linux with full system access. ' +
       (agentFullAccess
         ? 'Full Access is enabled, so commands run without per-command approval.'
         : 'Clearly safe commands may be approved automatically; other commands require user approval.'),
@@ -501,7 +517,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
       properties: {
         command: {
           type: 'string',
-          description: 'Shell command to execute',
+          description: 'PowerShell command on Windows; Bash command on macOS/Linux',
         },
       },
       required: ['command'],
@@ -557,6 +573,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
         throwIfAborted(toolOptions.abortSignal)
         hostExecutionStarted = true
         const result = await skillsController.userExec(execInput.command, {
+          ...(userExecWorkingDirectory ? { cwd: userExecWorkingDirectory } : {}),
           sessionId: options.sessionId ?? options.codeExecution?.sessionId,
           toolCallId: toolOptions.toolCallId,
           approvalSource,

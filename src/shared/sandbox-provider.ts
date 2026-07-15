@@ -7,9 +7,11 @@ export const DEFAULT_EXEC_TIMEOUT = 120_000
 
 export const SANDBOX_EXEC_ERROR_CODES = {
   BASH_NOT_AVAILABLE: 'BASH_NOT_AVAILABLE',
+  POWERSHELL_NOT_AVAILABLE: 'POWERSHELL_NOT_AVAILABLE',
 } as const
 
 export type SandboxExecErrorCode = (typeof SANDBOX_EXEC_ERROR_CODES)[keyof typeof SANDBOX_EXEC_ERROR_CODES]
+export type SandboxExecLanguage = 'node' | 'powershell' | 'bash'
 
 export interface SandboxExecResult {
   stdout: string
@@ -92,7 +94,7 @@ export interface SandboxProvider {
   ): Promise<{ success: boolean; artifactPath?: string; error?: string }>
 
   /** Execute code in the sandbox */
-  exec(params: { code: string; language: 'bash' | 'node'; timeout?: number }): Promise<SandboxExecResult>
+  exec(params: { code: string; language: SandboxExecLanguage; timeout?: number }): Promise<SandboxExecResult>
 
   /** Search file contents inside the sandbox with the shared bounded search engine. */
   search(params: SandboxSearchParams): Promise<SandboxSearchResult>
