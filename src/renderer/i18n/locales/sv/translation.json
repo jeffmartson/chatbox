@@ -128,6 +128,8 @@
   "Back to Login": "Tillbaka till inloggning",
   "Back to previous message": "Tillbaka till föregående meddelande",
   "Back to Tasks": "Tillbaka till uppgifter",
+  "Backup files exported here can only be imported in Chatbox 1.22 or later.": "Säkerhetskopior som exporteras här kan endast importeras i Chatbox 1.22 eller senare.",
+  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "Säkerhetskopian importerades med {{count}} varningar. Fortsätt för att starta om Chatbox.",
   "Background Image": "Bakgrundsbild",
   "Background Settings": "Bakgrundsinställningar",
   "Balanced: Good balance between cost and context preservation": "Balanserad: Bra balans mellan kostnad och bevarande av kontext",

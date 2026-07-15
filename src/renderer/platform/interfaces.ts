@@ -231,4 +231,10 @@ export interface Exporter {
   exportImageFile: (basename: string, base64: string) => Promise<void>
   exportByUrl: (filename: string, url: string) => Promise<void>
   exportStreamingJson: (filename: string, dataCallback: () => AsyncGenerator<string, void, unknown>) => Promise<void>
+  exportStreamingFile: (
+    filename: string,
+    dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
+    mimeType: string,
+    signal?: AbortSignal
+  ) => Promise<{ boundedMemory: boolean }>
 }

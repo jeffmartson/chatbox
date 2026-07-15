@@ -128,6 +128,8 @@
   "Back to Login": "Voltar ao Início de Sessão",
   "Back to previous message": "Voltar à mensagem anterior",
   "Back to Tasks": "Voltar às Tarefas",
+  "Backup files exported here can only be imported in Chatbox 1.22 or later.": "Os ficheiros de cópia de segurança exportados aqui só podem ser importados no Chatbox 1.22 ou posterior.",
+  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "A cópia de segurança foi importada com {{count}} avisos. Continue para reiniciar o Chatbox.",
   "Background Image": "Imagem de fundo",
   "Background Settings": "Definições de fundo",
   "Balanced: Good balance between cost and context preservation": "Equilibrado: Bom equilíbrio entre custo e preservação de contexto",

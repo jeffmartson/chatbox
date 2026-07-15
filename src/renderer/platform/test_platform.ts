@@ -96,6 +96,29 @@ class TestExporter implements Exporter {
     this.exports.set(filename, content)
   }
 
+  async exportStreamingFile(
+    filename: string,
+    dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
+    _mimeType: string,
+    signal?: AbortSignal
+  ): Promise<{ boundedMemory: boolean }> {
+    const chunks: Uint8Array[] = []
+    let total = 0
+    for await (const chunk of dataCallback()) {
+      if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
+      chunks.push(chunk)
+      total += chunk.length
+    }
+    const output = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      output.set(chunk, offset)
+      offset += chunk.length
+    }
+    this.exports.set(filename, output)
+    return { boundedMemory: true }
+  }
+
   getExport(filename: string): any {
     return this.exports.get(filename)
   }

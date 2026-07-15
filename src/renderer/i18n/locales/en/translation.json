@@ -128,6 +128,8 @@
   "Back to Login": "Back to Login",
   "Back to previous message": "Back to previous message",
   "Back to Tasks": "Back to Tasks",
+  "Backup files exported here can only be imported in Chatbox 1.22 or later.": "Backup files exported here can only be imported in Chatbox 1.22 or later.",
+  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "Backup imported with {{count}} warning(s). Continue to restart Chatbox.",
   "Background Image": "Background Image",
   "Background Settings": "Background Settings",
   "Balanced: Good balance between cost and context preservation": "Balanced: Good balance between cost and context preservation",

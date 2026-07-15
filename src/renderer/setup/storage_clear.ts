@@ -1,4 +1,5 @@
-import type { Message, Session } from '@shared/types'
+import type { Session } from '@shared/types'
+import { collectSessionResourceReferences } from '@/packages/backup/resources'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
 import { listSessionsMetaPage } from '@/stores/chatStore'
 import { settingsStore } from '@/stores/settingsStore'
@@ -33,40 +34,10 @@ export async function tickStorageTask() {
       if (!session) {
         continue
       }
-      for (const msg of session.messages) {
-        for (const pic of (msg as Message & { pictures: { storageKey: string }[] }).pictures || []) {
-          if (pic.storageKey) {
-            needDeletedSet.delete(pic.storageKey)
-          }
-        }
-        for (const file of msg.files || []) {
-          if (file.storageKey) {
-            needDeletedSet.delete(file.storageKey)
-          }
-        }
-        for (const part of msg.contentParts || []) {
-          if (part.type === 'image' && part.storageKey) {
-            needDeletedSet.delete(part.storageKey)
-          }
-        }
-        for (const link of msg.links || []) {
-          if (link.storageKey) {
-            needDeletedSet.delete(link.storageKey)
-          }
-        }
-        if (needDeletedSet.size === 0) {
-          return
-        }
+      for (const reference of collectSessionResourceReferences(session).references) {
+        needDeletedSet.delete(reference.storageKey)
       }
-
-      // 会话助手头像不需要删除
-      if (session.assistantAvatarKey) {
-        needDeletedSet.delete(session.assistantAvatarKey)
-      }
-      // 会话背景图片不需要删除
-      if (session.backgroundImage?.type === 'storage-key') {
-        needDeletedSet.delete(session.backgroundImage.storageKey)
-      }
+      if (needDeletedSet.size === 0) return
     }
 
     sessionCursor = page.nextCursor

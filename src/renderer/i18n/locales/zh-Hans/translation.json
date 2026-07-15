@@ -128,6 +128,8 @@
   "Back to Login": "返回登录",
   "Back to previous message": "定位到上一条消息",
   "Back to Tasks": "返回任务",
+  "Backup files exported here can only be imported in Chatbox 1.22 or later.": "此处导出的备份文件仅支持在 Chatbox 1.22 及以上版本中导入。",
+  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "备份已导入，但有 {{count}} 条警告。继续以重启 Chatbox。",
   "Background Image": "背景图片",
   "Background Settings": "背景设置",
   "Balanced: Good balance between cost and context preservation": "均衡：在成本和上下文保留之间取得良好平衡",

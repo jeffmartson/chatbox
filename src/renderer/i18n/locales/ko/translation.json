@@ -128,6 +128,8 @@
   "Back to Login": "로그인으로 돌아가기",
   "Back to previous message": "이전 메시지로 돌아가기",
   "Back to Tasks": "작업으로 돌아가기",
+  "Backup files exported here can only be imported in Chatbox 1.22 or later.": "여기에서 내보낸 백업 파일은 Chatbox 1.22 이상에서만 가져올 수 있습니다.",
+  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "백업을 가져오는 동안 경고 {{count}}개가 발생했습니다. 계속하여 Chatbox를 다시 시작하세요.",
   "Background Image": "배경 이미지",
   "Background Settings": "배경 설정",
   "Balanced: Good balance between cost and context preservation": "균형 잡힘: 비용과 컨텍스트 보존 간의 적절한 균형",

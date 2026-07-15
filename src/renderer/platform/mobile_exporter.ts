@@ -197,6 +197,91 @@ export default class MobileExporter implements Exporter {
     }
   }
 
+  async exportStreamingFile(
+    filename: string,
+    dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
+    mimeType: string,
+    signal?: AbortSignal
+  ): Promise<{ boundedMemory: boolean }> {
+    try {
+      await this.writeStreamingBinaryContent(filename, dataCallback, signal)
+      return { boundedMemory: true }
+    } catch (error) {
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : new DOMException('Operation canceled', 'AbortError')
+      }
+      if (error instanceof DOMException && error.name === 'AbortError') throw error
+      if (isSaveCanceledError(error)) throw new DOMException('Operation canceled', 'AbortError')
+      if (this.writer instanceof AndroidFilterWriter) {
+        try {
+          await this.writer.exportStreamingBinaryFileWithSystemPicker(filename, dataCallback, mimeType, signal)
+          return { boundedMemory: true }
+        } catch (fallbackError) {
+          if (signal?.aborted) {
+            throw signal.reason instanceof Error ? signal.reason : new DOMException('Operation canceled', 'AbortError')
+          }
+          if (fallbackError instanceof DOMException && fallbackError.name === 'AbortError') throw fallbackError
+          if (isSaveCanceledError(fallbackError)) throw new DOMException('Operation canceled', 'AbortError')
+          await Toast.show({ text: i18n.t('Failed to export file: {{error}}', { error: fallbackError }) })
+          throw fallbackError
+        }
+      }
+      await Toast.show({ text: i18n.t('Failed to export file: {{error}}', { error }) })
+      throw error
+    }
+  }
+
+  private async writeStreamingBinaryContent(
+    filename: string,
+    dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
+    signal?: AbortSignal
+  ) {
+    const chunkSize = 1024 * 1024
+    let bufferedChunks: Uint8Array[] = []
+    let bufferedBytes = 0
+    let actualPath: string | undefined
+    let isFirstWrite = true
+
+    const flush = async (final: boolean) => {
+      if (bufferedBytes === 0 && !final) return
+      const content = new Uint8Array(bufferedBytes)
+      let offset = 0
+      for (const chunk of bufferedChunks) {
+        content.set(chunk, offset)
+        offset += chunk.length
+      }
+      bufferedChunks = []
+      bufferedBytes = 0
+      if (isFirstWrite) {
+        actualPath = await this.writer.writeFirstBinaryChunk(filename, content)
+        isFirstWrite = false
+        if (final) await this.writer.completeExport(filename, actualPath)
+      } else if (final) {
+        if (content.length === 0) await this.writer.completeExport(filename, actualPath)
+        else await this.writer.finishBinaryWriting(filename, content, actualPath)
+      } else {
+        await this.writer.appendBinaryChunk(filename, content, actualPath)
+      }
+    }
+
+    try {
+      for await (const chunk of dataCallback()) {
+        if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
+        if (chunk.length === 0) continue
+        bufferedChunks.push(chunk)
+        bufferedBytes += chunk.length
+        if (bufferedBytes >= chunkSize) await flush(false)
+      }
+      await flush(true)
+      if (this.writer instanceof IOSFilterWriter) {
+        await this.writer.cleanupPartialExport(filename, actualPath)
+      }
+    } catch (error) {
+      if (!isFirstWrite || actualPath) await this.writer.cleanupPartialExport(filename, actualPath)
+      throw error
+    }
+  }
+
   private async writeStreamingContent(filename: string, dataCallback: () => AsyncGenerator<string, void, unknown>) {
     let tempContent = ''
     let isFirstWrite = true
