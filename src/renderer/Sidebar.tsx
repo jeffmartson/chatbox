@@ -29,6 +29,7 @@ import { useIsSmallScreen, useSidebarWidth } from './hooks/useScreenChange'
 import useVersion from './hooks/useVersion'
 import { navigateToSettings } from './modals/Settings'
 import { trackingEvent } from './packages/event'
+import { getSidebarModalSx } from './sidebar-drawer'
 import icon from './static/icon.png'
 import { useLanguage } from './stores/settingsStore'
 import { useUIStore } from './stores/uiStore'
@@ -143,6 +144,7 @@ export default function Sidebar() {
       ModalProps={{
         keepMounted: true, // Better open performance on mobile.
         disableEnforceFocus: true, // 关闭 focus trap，避免在侧边栏打开时弹出的 modal 中 input 无法点击
+        sx: getSidebarModalSx(showSidebar),
       }}
       sx={{
         '& .MuiDrawer-paper': {
