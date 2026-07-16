@@ -183,14 +183,28 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
                     </Stack>
                   }
                 />
-                {status === 'loading' && <Badge size="xs">{t('Installing')}</Badge>}
+                {status === 'loading' && (
+                  <Badge size="xs" style={{ flexShrink: 0 }}>
+                    {t('Installing')}
+                  </Badge>
+                )}
                 {status === 'success' && (
-                  <Badge size="xs" color="green" leftSection={<ScalableIcon icon={IconCheck} size={12} />}>
+                  <Badge
+                    size="xs"
+                    color="green"
+                    leftSection={<ScalableIcon icon={IconCheck} size={12} />}
+                    style={{ flexShrink: 0 }}
+                  >
                     {t('Installed')}
                   </Badge>
                 )}
                 {status === 'error' && (
-                  <Badge size="xs" color="red" leftSection={<ScalableIcon icon={IconX} size={12} />}>
+                  <Badge
+                    size="xs"
+                    color="red"
+                    leftSection={<ScalableIcon icon={IconX} size={12} />}
+                    style={{ flexShrink: 0 }}
+                  >
                     {t('Failed')}
                   </Badge>
                 )}
