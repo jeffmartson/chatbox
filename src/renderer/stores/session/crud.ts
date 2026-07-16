@@ -6,6 +6,7 @@ import {
   type Session,
   type SessionMeta,
 } from '@shared/types'
+import { areSessionsInSamePinGroup } from '@shared/utils/session-sort'
 import { getDefaultStore } from 'jotai'
 import { omit } from 'lodash'
 import platform from '@/platform'
@@ -157,7 +158,7 @@ export async function reorderSessions(oldIndex: number, newIndex: number) {
   const targetSession = reorderedSessions[newIndex]
   const nextStarred = targetSession?.starred ?? movedSession.starred
 
-  const comparableReordered = reorderedSessions.filter((s) => s.starred === nextStarred)
+  const comparableReordered = reorderedSessions.filter((s) => areSessionsInSamePinGroup(s, movedSession))
   const targetGroupIndex = comparableReordered.findIndex((s) => s.id === movedSession.id)
   const before = comparableReordered[targetGroupIndex - 1]
   const after = comparableReordered[targetGroupIndex + 1]

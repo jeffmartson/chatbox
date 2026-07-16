@@ -1,5 +1,12 @@
 import type { SessionMeta, SessionMetaRecord } from '../types/session'
 
+export function areSessionsInSamePinGroup(
+  first: Pick<SessionMeta, 'starred'> | undefined,
+  second: Pick<SessionMeta, 'starred'> | undefined
+): boolean {
+  return first !== undefined && second !== undefined && (first.starred === true) === (second.starred === true)
+}
+
 /**
  * Session list ordering shared by the renderer sidebar and the native mobile
  * drawer: hidden sessions are dropped, starred sessions pin to the top, the

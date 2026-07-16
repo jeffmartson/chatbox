@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Flex, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import type { SessionMetaRecord } from '@shared/types'
+import { areSessionsInSamePinGroup } from '@shared/utils/session-sort'
 import { IconLoader2 } from '@tabler/icons-react'
 import { useRouterState } from '@tanstack/react-router'
 import { type CSSProperties, type MutableRefObject, useCallback, useMemo, useState } from 'react'
@@ -96,6 +97,21 @@ export default function SessionList(props: Props) {
     [activeDragId, sortedSessions]
   )
   const sortableSessionIds = useMemo(() => sortedSessions?.map((session) => session.id) ?? [], [sortedSessions])
+  const moveSession = useCallback(
+    async (sessionIndex: number, offset: -1 | 1) => {
+      if (!sortedSessions) {
+        return
+      }
+      const targetIndex = sessionIndex + offset
+      const session = sortedSessions[sessionIndex]
+      const targetSession = sortedSessions[targetIndex]
+      if (!areSessionsInSamePinGroup(session, targetSession)) {
+        return
+      }
+      await reorderSessions(sessionIndex, targetIndex)
+    },
+    [sortedSessions]
+  )
   const displayItems = useMemo<SessionListItem[]>(() => {
     if (!sortedSessions) {
       return []
@@ -156,20 +172,31 @@ export default function SessionList(props: Props) {
             }}
             endReached={onEndReached}
             components={virtuosoComponents}
-            itemContent={(_index, item) =>
-              item.type === 'section' ? (
-                <Text px="md" pt="sm" pb={4} size="xs" fw={600} c="chatbox-tertiary">
-                  {item.label}
-                </Text>
-              ) : (
+            itemContent={(_index, item) => {
+              if (item.type === 'section') {
+                return (
+                  <Text px="md" pt="sm" pb={4} size="xs" fw={600} c="chatbox-tertiary">
+                    {item.label}
+                  </Text>
+                )
+              }
+
+              const sessionIndex = sortedSessions.findIndex((session) => session.id === item.session.id)
+              const previousSession = sortedSessions[sessionIndex - 1]
+              const nextSession = sortedSessions[sessionIndex + 1]
+              return (
                 <SortableItem id={item.session.id}>
                   <SessionItem
                     selected={routerState.location.pathname === `/session/${item.session.id}`}
                     session={item.session}
+                    canMoveUp={areSessionsInSamePinGroup(previousSession, item.session)}
+                    canMoveDown={areSessionsInSamePinGroup(nextSession, item.session)}
+                    onMoveUp={() => moveSession(sessionIndex, -1)}
+                    onMoveDown={() => moveSession(sessionIndex, 1)}
                   />
                 </SortableItem>
               )
-            }
+            }}
           />
           <DragOverlay>
             {activeDragSession ? (

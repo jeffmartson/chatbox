@@ -2,7 +2,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
 import type { SessionMetaRecord } from '@shared/types'
-import { IconArchive, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
+import { IconArchive, IconArrowDown, IconArrowUp, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
 import dayjs from 'dayjs'
 import { type MouseEvent, memo, type PointerEvent, useRef, useState } from 'react'
@@ -50,6 +50,10 @@ function triggerLongPressHaptic() {
 export interface Props {
   session: SessionMetaRecord
   selected: boolean
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  onMoveUp?: () => void | Promise<void>
+  onMoveDown?: () => void | Promise<void>
 }
 
 function SessionItem(props: Props) {
@@ -183,6 +187,18 @@ function SessionItem(props: Props) {
       onClick: () => {
         void updateSessionStore(session.id, { starred: !session.starred })
       },
+    },
+    {
+      text: t('Move up') || '',
+      icon: IconArrowUp,
+      disabled: !props.canMoveUp || !props.onMoveUp,
+      onClick: props.onMoveUp,
+    },
+    {
+      text: t('Move down') || '',
+      icon: IconArrowDown,
+      disabled: !props.canMoveDown || !props.onMoveDown,
+      onClick: props.onMoveDown,
     },
     {
       text: t('Archive') || '',
