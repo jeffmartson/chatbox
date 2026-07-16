@@ -271,11 +271,7 @@ export default defineConfig(({ mode }) => {
                 if (isNodeModulePackage('@mantine') || isNodeModulePackage('@tabler')) {
                   return 'vendor-ui'
                 }
-                if (
-                  isNodeModulePackage('mermaid') ||
-                  isNodeModulePackage('d3') ||
-                  /\/node_modules\/d3-[^/]+\//.test(normalizedId)
-                ) {
+                if (isNodeModulePackage('d3') || /\/node_modules\/d3-[^/]+\//.test(normalizedId)) {
                   return 'vendor-charts'
                 }
               }

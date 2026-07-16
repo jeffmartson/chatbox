@@ -1,7 +1,6 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: <explanation> */
 import DataObjectIcon from '@mui/icons-material/DataObject'
 import { ChartBarStacked } from 'lucide-react'
-import mermaid from 'mermaid'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gallery, Item } from 'react-photoswipe-gallery'
@@ -186,6 +185,10 @@ export function SVGPreview(props: { xmlCode: string; className?: string; generat
 }
 
 async function mermaidCodeToSvgCode(source: string, theme: 'light' | 'dark') {
+  if (typeof structuredClone !== 'function') {
+    await import('core-js/actual/structured-clone.js')
+  }
+  const { default: mermaid } = await import('mermaid')
   mermaid.initialize({ theme: theme === 'light' ? 'default' : 'dark' })
   const id = 'mermaidtmp' + Math.random().toString(36).substring(2, 15)
   const result = await mermaid.render(id, source)
