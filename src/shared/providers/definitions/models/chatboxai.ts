@@ -105,17 +105,24 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
     return true
   }
 
-  protected getProvider(options: CallChatCompletionOptions) {
+  private getChatHeaders(options: CallChatCompletionOptions): Record<string, string> {
     const license = this.options.licenseKey || ''
     const instanceId = (this.options.licenseInstances ? this.options.licenseInstances[license] : '') || ''
+    return {
+      'Instance-Id': instanceId,
+      'chatbox-session-id': options.sessionId || '',
+      'chatbox-agent-mode': String(options.agentMode === true),
+    }
+  }
+
+  protected getProvider(options: CallChatCompletionOptions) {
     if (this.options.model.apiStyle === 'google') {
       const provider = createGoogleGenerativeAI({
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/google-ai-studio/v1beta`,
         headers: {
-          'Instance-Id': instanceId,
+          ...this.getChatHeaders(options),
           Authorization: `Bearer ${this.options.licenseKey || ''}`,
-          'chatbox-session-id': options.sessionId,
         },
         fetch: this.chatboxAIFetch.bind(this),
       })
@@ -124,10 +131,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       const provider = createAnthropic({
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/anthropic/v1`,
-        headers: {
-          'Instance-Id': instanceId,
-          'chatbox-session-id': options.sessionId || '',
-        },
+        headers: this.getChatHeaders(options),
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider
@@ -135,10 +139,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       const provider = createOpenAI({
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/openai-responses/v1`,
-        headers: {
-          'Instance-Id': instanceId,
-          'chatbox-session-id': options.sessionId || '',
-        },
+        headers: this.getChatHeaders(options),
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider
@@ -146,10 +147,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       const provider = createDeepSeek({
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/openai/v1`,
-        headers: {
-          'Instance-Id': instanceId,
-          'chatbox-session-id': options.sessionId || '',
-        },
+        headers: this.getChatHeaders(options),
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider
@@ -158,10 +156,7 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
         name: 'ChatboxAI',
         apiKey: this.options.licenseKey || '',
         baseURL: `${getChatboxAPIOrigin()}/gateway/openai/v1`,
-        headers: {
-          'Instance-Id': instanceId,
-          'chatbox-session-id': options.sessionId || '',
-        },
+        headers: this.getChatHeaders(options),
         fetch: this.chatboxAIFetch.bind(this),
       })
       return provider

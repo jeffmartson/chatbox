@@ -258,6 +258,7 @@ describe('prepareAgentGenerationHarness', () => {
     expect(serializedCoreMessages).toContain('Available Skills')
 
     expect(prepared.chatOptions.tools).toBe(prepared.tools)
+    expect(prepared.chatOptions.agentMode).toBe(true)
     expect(prepared.chatOptions.prepareStep).toBeUndefined()
   })
 
@@ -291,6 +292,7 @@ describe('prepareAgentGenerationHarness', () => {
     })
 
     expect(prepared.debug.effectiveAgentMode).toBe('off')
+    expect(prepared.chatOptions.agentMode).toBe(false)
     expect(prepared.debug.instructions).not.toContain('## Response Language')
     expect(prepared.tools.code_execution).toBeUndefined()
     expect(prepared.tools.load_skill).toBeUndefined()

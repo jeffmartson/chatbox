@@ -175,7 +175,7 @@ describe('ChatboxAI openai-responses models', () => {
       capabilities: ['reasoning', 'tool_use'],
     })
 
-    model.exposeProvider({ sessionId: 'session-123' })
+    model.exposeProvider({ sessionId: 'session-123', agentMode: true })
 
     expect(openAIMocks.createOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -184,8 +184,28 @@ describe('ChatboxAI openai-responses models', () => {
         headers: {
           'Instance-Id': 'test-instance',
           'chatbox-session-id': 'session-123',
+          'chatbox-agent-mode': 'true',
         },
         fetch: expect.any(Function),
+      })
+    )
+  })
+
+  it('marks normal Chatbox AI requests as outside agent mode', () => {
+    const model = createModel({
+      modelId: 'gpt-5-mini',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+      capabilities: ['reasoning', 'tool_use'],
+    })
+
+    model.exposeProvider({ sessionId: 'session-123' })
+
+    expect(openAIMocks.createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'chatbox-agent-mode': 'false',
+        }),
       })
     )
   })

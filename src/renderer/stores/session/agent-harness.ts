@@ -325,6 +325,7 @@ export async function prepareAgentGenerationHarness(
 
   const chatOptions: ChatStreamOptions = {
     sessionId: session.id,
+    agentMode: effectiveAgentMode === 'on',
     signal,
     providerOptions,
   }
