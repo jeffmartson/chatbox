@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { localFilePathToUrl } from './local-file-url'
+import { getLocalFileName, localFilePathToUrl } from './local-file-url'
+
+describe('getLocalFileName', () => {
+  it('extracts a file name from a Windows path', () => {
+    expect(getLocalFileName('C:\\Users\\Alice\\chatbox-sandbox\\artifacts\\screenshot.png')).toBe('screenshot.png')
+  })
+
+  it('extracts a file name from a POSIX path', () => {
+    expect(getLocalFileName('/tmp/chatbox-sandbox/artifacts/report.pdf')).toBe('report.pdf')
+  })
+})
 
 describe('localFilePathToUrl', () => {
   it('creates a valid file URL for a Windows drive path', () => {

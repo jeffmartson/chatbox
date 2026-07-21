@@ -1,3 +1,7 @@
+export function getLocalFileName(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() || filePath
+}
+
 export function localFilePathToUrl(filePath: string): string {
   const normalizedPath = filePath.replace(/\\/g, '/')
   const url = new URL('file:///')

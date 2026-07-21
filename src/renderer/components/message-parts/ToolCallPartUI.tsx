@@ -55,7 +55,7 @@ import platform from '@/platform'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
-import { localFilePathToUrl } from './local-file-url'
+import { getLocalFileName, localFilePathToUrl } from './local-file-url'
 
 // ─── Tool Error Result ──────────────────────────────────────────────
 
@@ -657,7 +657,7 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bm
 const HTML_EXTENSIONS = new Set(['.html', '.htm'])
 
 function getFileExtension(filePath: string): string {
-  const name = filePath.split(/[\\/]/).pop() || filePath
+  const name = getLocalFileName(filePath)
   const dotIndex = name.lastIndexOf('.')
   return dotIndex >= 0 ? name.slice(dotIndex).toLowerCase() : ''
 }
@@ -688,7 +688,7 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const isError = part.state === 'error'
   const result = part.result as Record<string, unknown> | undefined
   const filePath = (result?.file_path as string) || ((part.args as Record<string, unknown>)?.file_path as string) || ''
-  const fileName = filePath ? filePath.split('/').pop() || 'File' : 'File'
+  const fileName = filePath ? getLocalFileName(filePath) : 'File'
   const isDownloadable = result?.downloadable === true
   const isSandboxPath = filePath.includes('/chatbox-sandbox/') || filePath.includes('\\chatbox-sandbox\\')
   const canPreview = isDownloadable && !!filePath && isImageFile(filePath) && isSandboxPath
@@ -805,7 +805,7 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
         style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}
       >
         <IconFile size={18} color="var(--chatbox-tint-brand)" style={{ flexShrink: 0 }} />
-        <Text size="sm" fw={500} style={{ flex: '1 1 0', minWidth: 0, overflowWrap: 'anywhere' }}>
+        <Text size="sm" fw={500} truncate title={filePath} style={{ flex: '1 1 0', minWidth: 0 }}>
           {fileName}
         </Text>
         <Group gap={8} wrap="nowrap" style={{ flexShrink: 0 }}>
