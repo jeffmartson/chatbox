@@ -218,7 +218,17 @@ const _Message: FC<Props> = (props) => {
               }
             }
           }
-          trackAgentModeSuggestionAction({ action, hasFiles: fileCount > 0, fileCount })
+          trackAgentModeSuggestionAction({
+            action,
+            hasFiles: fileCount > 0,
+            fileCount,
+            context: {
+              sessionId,
+              mode: action === 'accept' ? 'work_mode' : 'chat_mode',
+              provider: session?.settings?.provider,
+              model: session?.settings?.modelId,
+            },
+          })
         })
         .catch(() => {})
     },

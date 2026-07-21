@@ -1695,6 +1695,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 {platform.type === 'desktop' && (
                   <AgentModeButton
                     sessionId={currentSessionId || 'new'}
+                    providerId={model?.provider}
+                    modelId={model?.modelId}
                     iconSize={toolbarIconSize}
                     modelSupportsAgentMode={model ? modelSupportsAgentMode : true}
                     webBrowsingMode={webBrowsingMode}

@@ -10,6 +10,8 @@ import { getAgentModeUIState } from './agentModeState'
 
 interface AgentModeButtonProps {
   sessionId: string
+  providerId?: string
+  modelId?: string
   iconSize?: number
   modelSupportsAgentMode?: boolean
   webBrowsingMode: boolean
@@ -30,6 +32,8 @@ const CLOSE_DELAY = 250
 
 const AgentModeButton: FC<AgentModeButtonProps> = ({
   sessionId,
+  providerId,
+  modelId,
   iconSize = 18,
   modelSupportsAgentMode = true,
   webBrowsingMode,
@@ -127,6 +131,8 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
       >
         <AgentModePanel
           sessionId={sessionId}
+          providerId={providerId}
+          modelId={modelId}
           modelSupportsAgentMode={modelSupportsAgentMode}
           webBrowsingMode={webBrowsingMode}
           onWebBrowsingChange={onWebBrowsingChange}

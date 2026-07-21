@@ -17,6 +17,12 @@ import { Link } from '@tanstack/react-router'
 import { PlusIcon } from 'lucide-react'
 import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  trackAgentModeSelect,
+  trackCodeExecutionClick,
+  trackSmartSwitchingClick,
+  trackWebSearchClick,
+} from '@/analytics/agent-mode'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
@@ -42,6 +48,8 @@ const supportsWorkingDirectories = platform.type === 'desktop' && !!platform.ope
 
 export interface AgentModePanelProps {
   sessionId: string
+  providerId?: string
+  modelId?: string
   modelSupportsAgentMode?: boolean
   webBrowsingMode: boolean
   onWebBrowsingChange: (enabled: boolean) => void
@@ -89,6 +97,8 @@ const MCPServerItem: FC<{
 
 const AgentModePanel: FC<AgentModePanelProps> = ({
   sessionId,
+  providerId,
+  modelId,
   modelSupportsAgentMode = true,
   webBrowsingMode,
   onWebBrowsingChange,
@@ -184,16 +194,32 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
 
   const handleModeChange = useCallback(
     (value: AgentModeValue) => {
+      if (entry.value === value) return
+      trackAgentModeSelect({
+        sessionId,
+        mode: value === 'on' ? 'work_mode' : 'chat_mode',
+        provider: providerId,
+        model: modelId,
+      })
       void setSessionAgentMode(sessionId, value)
     },
-    [sessionId]
+    [entry.value, modelId, providerId, sessionId]
   )
   const handleSmartSwitchingChange = useCallback(
     (enabled: boolean) => {
+      trackSmartSwitchingClick(
+        {
+          sessionId,
+          mode: 'chat_mode',
+          provider: providerId,
+          model: modelId,
+        },
+        enabled
+      )
       setAgentModeSmartSwitchingDefault(enabled)
       void setSessionAgentMode(sessionId, enabled ? 'auto' : 'off')
     },
-    [sessionId, setAgentModeSmartSwitchingDefault]
+    [modelId, providerId, sessionId, setAgentModeSmartSwitchingDefault]
   )
 
   // Working directories (desktop only): real local dirs the sandbox may read/write freely.
@@ -248,6 +274,16 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
 
   const updateAgentFullAccess = useCallback(
     async (enabled: boolean) => {
+      if (enabled === agentFullAccess) return
+      trackCodeExecutionClick(
+        {
+          sessionId,
+          mode: 'work_mode',
+          provider: providerId,
+          model: modelId,
+        },
+        enabled ? 'full_access' : 'approval'
+      )
       const value = enabled || undefined
       if (isNewSession) {
         setNewSessionState((prev) => ({ ...prev, agentFullAccess: value }))
@@ -264,7 +300,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
         console.error('Failed to update agent full access:', err)
       }
     },
-    [isNewSession, sessionId, setNewSessionState]
+    [agentFullAccess, isNewSession, modelId, providerId, sessionId, setNewSessionState]
   )
 
   const selectedKB = useMemo(
@@ -913,7 +949,18 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                   disabled={capabilitiesDisabled}
                   onChange={(e) => {
                     e.stopPropagation()
-                    onWebBrowsingChange(e.currentTarget.checked)
+                    const enabled = e.currentTarget.checked
+                    trackWebSearchClick(
+                      {
+                        sessionId,
+                        mode: 'work_mode',
+                        provider: providerId,
+                        model: modelId,
+                      },
+                      enabled,
+                      webSearchProvider
+                    )
+                    onWebBrowsingChange(enabled)
                   }}
                 />
                 <IconChevronRight size={14} className="text-[var(--chatbox-tint-tertiary)]" />

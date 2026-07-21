@@ -11,6 +11,14 @@ export const JK_EVENTS = {
   LIST_MODEL_CLICK: 'list_model_click',
   SELECT_MODEL_CLICK: 'select_model_click',
   UPGRADE_MODEL_CLICK: 'upgrade_model_click',
+  LEAD_CHAT_CARD_CLICK: 'lead_chat_card_click',
+  AGENT_MODE_SELECT: 'agent_mode_select',
+  SMART_SWITCHING_CLICK: 'smart_switching_click',
+  CODE_EXECUTION_CLICK: 'code_execution_click',
+  WORK_MODE_SUGGEST: 'work_mode_suggest',
+  WORK_MODE_SUGGESTION_ACT: 'work_mode_suggestion_act',
+  WEB_SEARCH_CLICK: 'web_search_click',
+  WORK_MODE_PAUSE_ACT: 'work_mode_pause_act',
 } as const
 
 export const JK_PAGE_NAMES = {

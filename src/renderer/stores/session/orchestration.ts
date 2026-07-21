@@ -17,6 +17,7 @@ import {
   captureAgentModeException,
   trackAgentModePauseAction,
   trackAgentModeSuggested,
+  trackWorkModeSuggestionDecision,
 } from '@/analytics/agent-mode'
 import * as appleAppStore from '@/packages/apple_app_store'
 import { estimateTokensFromMessages } from '@/packages/token'
@@ -318,6 +319,14 @@ function isApprovalPauseReason(pauseReason: MessageContentToolCallPart['pauseRea
   return pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval'
 }
 
+function getApprovalTrackingTarget(part: MessageToolCallPart) {
+  if (part.pauseReason?.type === 'user_exec_approval') return 'user_exec' as const
+  if (part.pauseReason?.type !== 'file_mutation_approval') return undefined
+  if (part.toolName === 'write_file') return 'file_write' as const
+  if (part.toolName === 'edit_file') return 'file_edit' as const
+  return undefined
+}
+
 function findPausedApprovalBatch(message: Message, toolCallId: string): MessageContentToolCallPart[] {
   const selected = findToolCallPart(message, toolCallId)
   if (!selected || selected.state !== 'paused' || !isApprovalPauseReason(selected.pauseReason)) return []
@@ -460,6 +469,17 @@ export async function orchestrateGeneration(
         await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
         return
       }
+
+      trackWorkModeSuggestionDecision(
+        {
+          sessionId,
+          mode: 'chat_mode',
+          provider: settings.provider,
+          model: settings.modelId,
+        },
+        decision.suggest,
+        lastUserMessage.files?.length ?? 0
+      )
 
       if (decision.suggest) {
         trackAgentModeSuggested({
@@ -727,7 +747,10 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
 }
 
 export async function stopPausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
-  const session = await chatStore.getSession(sessionId)
+  const [session, settings] = await Promise.all([
+    chatStore.getSession(sessionId),
+    chatStore.getSessionSettings(sessionId),
+  ])
   if (!session) return
   const location = findMessageLocation(session, messageId)
   const message = location ? location.list[location.index] : undefined
@@ -736,9 +759,20 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
   if (!part || part.state !== 'paused') return
 
   const isApproval = isApprovalPauseReason(part.pauseReason)
+  const approvalTarget = getApprovalTrackingTarget(part)
   trackAgentModePauseAction({
     type: isApproval ? 'approval' : 'tool_limit',
     action: isApproval ? 'deny' : 'stop',
+    context:
+      isApproval && approvalTarget
+        ? {
+            sessionId,
+            mode: 'work_mode',
+            provider: settings?.provider,
+            model: settings?.modelId,
+          }
+        : undefined,
+    approvalTarget,
   })
 
   const pauseReason = part.pauseReason
@@ -816,9 +850,20 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
   if (!part || part.state !== 'paused') return
 
   const isApproval = isApprovalPauseReason(part.pauseReason)
+  const approvalTarget = getApprovalTrackingTarget(part)
   trackAgentModePauseAction({
     type: isApproval ? 'approval' : 'tool_limit',
     action: isApproval ? 'approve' : 'continue',
+    context:
+      isApproval && approvalTarget
+        ? {
+            sessionId,
+            mode: 'work_mode',
+            provider: settings.provider,
+            model: settings.modelId,
+          }
+        : undefined,
+    approvalTarget,
   })
 
   // A tool_call_limit continue resumes the whole paused batch; an approval continue targets
