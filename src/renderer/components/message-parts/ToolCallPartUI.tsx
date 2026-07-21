@@ -55,6 +55,7 @@ import platform from '@/platform'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
+import { localFilePathToUrl } from './local-file-url'
 
 // ─── Tool Error Result ──────────────────────────────────────────────
 
@@ -692,7 +693,7 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const isSandboxPath = filePath.includes('/chatbox-sandbox/') || filePath.includes('\\chatbox-sandbox\\')
   const canPreview = isDownloadable && !!filePath && isImageFile(filePath) && isSandboxPath
   const canPreviewHtml = isDownloadable && !!filePath && isHtmlFile(filePath) && isSandboxPath
-  const imageUrl = canPreview ? `file://${encodeURI(filePath)}` : null
+  const imageUrl = canPreview ? localFilePathToUrl(filePath) : null
 
   const handleSave = useCallback(async () => {
     if (!filePath) return
