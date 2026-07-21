@@ -81,7 +81,7 @@ describe('smooth follow output controller', () => {
     expect(scrollToBottom).toHaveBeenCalledOnce()
   })
 
-  it('respects reduced motion through the configured instant behavior', () => {
+  it('uses the configured instant scroll behavior', () => {
     const { controller, runFrames, scrollToBottom } = createHarness('auto')
 
     controller.resume()

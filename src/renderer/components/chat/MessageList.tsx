@@ -33,6 +33,7 @@ import { type StateSnapshot, Virtuoso, type VirtuosoHandle } from 'react-virtuos
 import { platformTypeAtom } from '@/hooks/useNeedRoomForWinControls'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { cn } from '@/lib/utils'
+import platform from '@/platform'
 import * as atoms from '@/stores/atoms'
 import {
   deleteFork,
@@ -212,6 +213,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const [smoothFollowOutput] = useState(() =>
     createSmoothFollowOutputController({
       scrollToBottom: (behavior) => virtuoso.current?.scrollTo({ top: Infinity, behavior }),
+      // Mobile WebViews can fall behind when a smooth scroll is retargeted on every streaming height change.
+      getScrollBehavior: platform.type === 'mobile' ? () => 'auto' : undefined,
     })
   )
   const messageListRef = useRef<HTMLDivElement>(null)
