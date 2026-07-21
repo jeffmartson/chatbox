@@ -272,6 +272,7 @@
   "Copilot Settings": "Copilot 設定",
   "copy": "複製",
   "Copy": "複製",
+  "Copy Conversation ID": "複製對話 ID",
   "Copy reasoning content": "複製推理內容",
   "Cost": "成本",
   "Cost Priority: Compacts early to save tokens, may lose some context": "成本優先：較早壓縮以節省 Token，可能會遺失部分上下文",

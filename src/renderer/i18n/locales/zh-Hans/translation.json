@@ -272,6 +272,7 @@
   "Copilot Settings": "搭档设置",
   "copy": "复制",
   "Copy": "复制",
+  "Copy Conversation ID": "复制对话ID",
   "Copy reasoning content": "复制思考内容",
   "Cost": "成本",
   "Cost Priority: Compacts early to save tokens, may lose some context": "成本优先：提前压缩以节省 token，可能会丢失部分上下文",

@@ -7,6 +7,7 @@ import {
   IconDeviceFloppy,
   IconDots,
   IconHistory,
+  IconId,
   IconSearch,
   IconTrash,
 } from '@tabler/icons-react'
@@ -14,10 +15,12 @@ import { useSetAtom } from 'jotai'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsLargeScreen, useIsSmallScreen } from '@/hooks/useScreenChange'
+import { copyToClipboard } from '@/packages/navigator'
 import { router } from '@/router'
 import * as atoms from '@/stores/atoms'
 import { confirmSessionDeletion, deleteSession, getSession } from '@/stores/chatStore'
 import { clear as clearSession, copyAndSwitchSession } from '@/stores/sessionActions'
+import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
 import ActionMenu from '../ActionMenu'
 import { ScalableIcon } from '../common/ScalableIcon'
@@ -70,6 +73,11 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
       await copyAndSwitchSession(session)
     }
   }, [sessionId])
+
+  const handleCopySessionId = useCallback(() => {
+    copyToClipboard(sessionId)
+    toastActions.add(t('copied to clipboard'), 2000)
+  }, [sessionId, t])
 
   return !isSmallScreen ? (
     <Flex align="center" gap="md" className="controls">
@@ -127,6 +135,11 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
             text: t('Duplicate Conversation'),
             icon: IconCopy,
             onClick: handleCopySession,
+          },
+          {
+            text: t('Copy Conversation ID'),
+            icon: IconId,
+            onClick: handleCopySessionId,
           },
           {
             text: t('Export Chat'),
@@ -187,6 +200,11 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
             text: t('Duplicate Conversation'),
             icon: IconCopy,
             onClick: handleCopySession,
+          },
+          {
+            text: t('Copy Conversation ID'),
+            icon: IconId,
+            onClick: handleCopySessionId,
           },
           {
             text: t('Export Chat'),

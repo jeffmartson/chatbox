@@ -272,6 +272,7 @@
   "Copilot Settings": "Copilot設定",
   "copy": "コピー",
   "Copy": "コピー",
+  "Copy Conversation ID": "会話IDをコピー",
   "Copy reasoning content": "推論内容をコピー",
   "Cost": "コスト",
   "Cost Priority: Compacts early to save tokens, may lose some context": "コスト優先：Tokenを節約するために早期に圧縮しますが、一部のコンテキストが失われる可能性があります",

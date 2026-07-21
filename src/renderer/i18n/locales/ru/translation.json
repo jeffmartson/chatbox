@@ -272,6 +272,7 @@
   "Copilot Settings": "Настройки Copilot",
   "copy": "копировать",
   "Copy": "Копировать",
+  "Copy Conversation ID": "Копировать ID беседы",
   "Copy reasoning content": "Копировать содержание рассуждений",
   "Cost": "Стоимость",
   "Cost Priority: Compacts early to save tokens, may lose some context": "Приоритет стоимости: сжимает раньше для экономии Token, может привести к потере части контекста",

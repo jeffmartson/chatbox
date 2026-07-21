@@ -272,6 +272,7 @@
   "Copilot Settings": "Copilot 설정",
   "copy": "복사",
   "Copy": "복사",
+  "Copy Conversation ID": "대화 ID 복사",
   "Copy reasoning content": "추론 내용 복사",
   "Cost": "비용",
   "Cost Priority: Compacts early to save tokens, may lose some context": "비용 우선: Token 절약을 위해 조기에 압축하며 일부 컨텍스트가 손실될 수 있음",
