@@ -1,3 +1,4 @@
+import { isTextFilePath } from '@shared/file-extensions'
 import type { CopilotDetail, Message, MessageFile, Session, SessionMetaRecord, Settings } from '@shared/types'
 import type { BackupResourceEntry, BackupWarning } from './types'
 
@@ -52,7 +53,8 @@ function collectMessageReferences(
           }
         : undefined
     )
-    if (file.localPath && !file.rawStorageKey) {
+    const parsedTextIsCompleteAttachment = isTextFilePath(file.name) && Boolean(file.storageKey)
+    if (file.localPath && !file.rawStorageKey && !parsedTextIsCompleteAttachment) {
       warnings.push({
         code: 'external-resource-skipped',
         itemType: 'resource',

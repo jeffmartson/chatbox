@@ -26,6 +26,7 @@ import { languageNameMap, languages } from '@/i18n/locales'
 import {
   type BackupExportItem,
   type BackupProgress,
+  type BackupWarning,
   exportBackupArchive,
   importBackupArchive,
   importLegacyJsonBackup,
@@ -308,6 +309,38 @@ const DataRecoverySection = () => {
 const ImportExportDataSection = () => {
   const { t } = useTranslation()
 
+  const formatBackupWarning = (warning: BackupWarning) => {
+    switch (warning.code) {
+      case 'session-read-failed':
+        return t('Conversation data could not be read and was not included.')
+      case 'resource-read-failed':
+        return t('Managed attachment or image data could not be read and was not included.')
+      case 'external-resource-skipped':
+        return t('The original external file is not managed by Chatbox and was not included.')
+      case 'rag-rebuild-failed':
+        return t('The attachment search index could not be restored.')
+    }
+  }
+
+  const formatBackupProgressPhase = (phase: BackupProgress['phase']) => {
+    switch (phase) {
+      case 'preparing':
+        return t('Preparing backup')
+      case 'sessions':
+        return t('Exporting conversations')
+      case 'resources':
+        return t('Exporting attachments')
+      case 'packing':
+        return t('Creating backup archive')
+      case 'reading':
+        return t('Reading backup')
+      case 'validating':
+        return t('Validating backup')
+      case 'restoring':
+        return t('Restoring data')
+    }
+  }
+
   const [importTips, setImportTips] = useState('')
   const [importDetails, setImportDetails] = useState('')
   const [importRequiresRestart, setImportRequiresRestart] = useState(false)
@@ -358,7 +391,7 @@ const ImportExportDataSection = () => {
       const warningCount = result.manifest.warnings.length
       const warningSummary = result.manifest.warnings
         .slice(0, 3)
-        .map((warning) => `${warning.itemId ? `${warning.itemId}: ` : ''}${warning.message}`)
+        .map((warning) => `${warning.itemId ? `${warning.itemId}: ` : ''}${formatBackupWarning(warning)}`)
         .join('\n')
       const warningBody = [
         warningCount > 0
@@ -419,7 +452,7 @@ const ImportExportDataSection = () => {
         if (result.warnings.length > 0) {
           const warningSummary = result.warnings
             .slice(0, 3)
-            .map((warning) => `${warning.itemId ? `${warning.itemId}: ` : ''}${warning.message}`)
+            .map((warning) => `${warning.itemId ? `${warning.itemId}: ` : ''}${formatBackupWarning(warning)}`)
             .join('\n')
           setImportTips(
             String(
@@ -532,7 +565,7 @@ const ImportExportDataSection = () => {
         {progress && (
           <Text size="sm" c="chatbox-tertiary">
             {t('{{phase}}: {{current}} / {{total}}', {
-              phase: progress.phase,
+              phase: formatBackupProgressPhase(progress.phase),
               current: progress.current,
               total: progress.total,
             })}

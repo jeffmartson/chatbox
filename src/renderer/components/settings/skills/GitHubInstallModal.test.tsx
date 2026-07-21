@@ -70,6 +70,7 @@ describe('GitHubInstallModal install status badges', () => {
     fireEvent.click(screen.getByRole('button', { name: installSelected }))
 
     const badge = screen.getByText(installing).parentElement
-    expect(badge?.getAttribute('style')).toContain('flex-shrink: 0')
+    expect(badge?.getAttribute('style')).toContain('flex: 0 0 auto')
+    expect(badge?.getAttribute('style')).toContain('width: max-content')
   })
 })

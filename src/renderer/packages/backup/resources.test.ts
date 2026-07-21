@@ -75,6 +75,58 @@ describe('backup resource graph', () => {
     )
   })
 
+  it('does not warn when a text attachment is included through its parsed text', () => {
+    const session = createSession()
+    session.messages[0].files = [
+      {
+        id: 'text-file',
+        name: 'notes.txt',
+        fileType: 'text/plain',
+        storageKey: 'file:text',
+        localPath: '/Users/example/notes.txt',
+      },
+    ]
+
+    const collected = collectSessionResourceReferences(session)
+    expect(collected.references).toContainEqual(
+      expect.objectContaining({ storageKey: 'file:text', kind: 'parsed-attachment' })
+    )
+    expect(collected.warnings).toEqual([])
+  })
+
+  it('still warns when a text attachment has no managed content to include', () => {
+    const session = createSession()
+    session.messages[0].files = [
+      {
+        id: 'missing-text-file',
+        name: 'missing.txt',
+        fileType: 'text/plain',
+        localPath: '/Users/example/missing.txt',
+      },
+    ]
+
+    expect(collectSessionResourceReferences(session).warnings).toContainEqual(
+      expect.objectContaining({ code: 'external-resource-skipped', itemId: 'missing.txt' })
+    )
+  })
+
+  it('still warns when only parsed text from a non-text attachment can be included', () => {
+    const session = createSession()
+    session.messages[0].files = [
+      {
+        id: 'external-pdf',
+        name: 'report.pdf',
+        fileType: 'application/pdf',
+        storageKey: 'file:parsed',
+        localPath: '/Users/example/report.pdf',
+      },
+    ]
+
+    expect(collectSessionResourceReferences(session).warnings).toContainEqual(
+      expect.objectContaining({ code: 'external-resource-skipped', itemId: 'report.pdf' })
+    )
+  })
+
   it('remaps every managed reference and clears non-portable RAG state', () => {
     const remapped = remapSessionResourceKeys(
       createSession(),

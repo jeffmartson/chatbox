@@ -59,6 +59,8 @@ export interface Props {
 function SessionItem(props: Props) {
   const { session, selected } = props
   const { t } = useTranslation()
+  const pinActionLabel = session.starred ? t('Unpin') : t('Pin')
+  const archiveActionLabel = t('Archive')
   const setShowSidebar = useUIStore((s) => s.setShowSidebar)
   const onClick = () => {
     if (longPressTriggeredRef.current) {
@@ -74,6 +76,7 @@ function SessionItem(props: Props) {
   // const smallSize = theme.typography.pxToRem(20)
 
   const [archiving, setArchiving] = useState(false)
+  const [actionTooltipDismissed, setActionTooltipDismissed] = useState(false)
   const [mobileMenuOpened, setMobileMenuOpened] = useState(false)
   const [longPressing, setLongPressing] = useState(false)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -83,6 +86,10 @@ function SessionItem(props: Props) {
   const stopItemClick = (event: MouseEvent | PointerEvent) => {
     event.stopPropagation()
     event.preventDefault()
+  }
+
+  const dismissActionTooltip = () => {
+    setActionTooltipDismissed(true)
   }
 
   const showArchiveTipOncePerDay = () => {
@@ -165,6 +172,11 @@ function SessionItem(props: Props) {
     }
   }
 
+  const handlePointerLeave = () => {
+    clearLongPressTimer()
+    setActionTooltipDismissed(false)
+  }
+
   const handleContextMenu = (event: MouseEvent) => {
     if (!isSmallScreen) {
       return
@@ -182,7 +194,7 @@ function SessionItem(props: Props) {
 
   const mobileMenuItems: ActionMenuItemProps[] = [
     {
-      text: (session.starred ? t('Unpin') : t('Pin')) || '',
+      text: pinActionLabel || '',
       icon: session.starred ? IconPinnedFilled : IconPinned,
       onClick: () => {
         void updateSessionStore(session.id, { starred: !session.starred })
@@ -201,7 +213,7 @@ function SessionItem(props: Props) {
       onClick: props.onMoveDown,
     },
     {
-      text: t('Archive') || '',
+      text: archiveActionLabel || '',
       icon: IconArchive,
       disabled: archiving,
       onClick: () => {
@@ -233,7 +245,7 @@ function SessionItem(props: Props) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={clearLongPressTimer}
-      onPointerLeave={clearLongPressTimer}
+      onPointerLeave={handlePointerLeave}
       onPointerCancel={clearLongPressTimer}
     >
       <AssistantAvatar
@@ -260,14 +272,16 @@ function SessionItem(props: Props) {
       )}
 
       <Flex gap={2} className={clsx(isSmallScreen ? 'hidden' : 'group-hover/session-item:flex hidden')}>
-        <Tooltip label={session.starred ? t('Unpin') : t('Pin')} openDelay={1000} withArrow>
+        <Tooltip label={pinActionLabel} openDelay={1000} withArrow disabled={actionTooltipDismissed}>
           <ActionIcon
+            aria-label={pinActionLabel}
             variant="transparent"
             size={20}
             color={session.starred ? 'chatbox-brand' : 'chatbox-tertiary'}
             onPointerDown={stopItemClick}
             onClick={(event) => {
               stopItemClick(event)
+              dismissActionTooltip()
               void updateSessionStore(session.id, { starred: !session.starred })
             }}
           >
@@ -279,8 +293,9 @@ function SessionItem(props: Props) {
           </ActionIcon>
         </Tooltip>
 
-        <Tooltip label={t('Archive')} openDelay={1000} withArrow>
+        <Tooltip label={archiveActionLabel} openDelay={1000} withArrow disabled={actionTooltipDismissed}>
           <ActionIcon
+            aria-label={archiveActionLabel}
             variant="transparent"
             size={20}
             color="chatbox-tertiary"
@@ -291,6 +306,7 @@ function SessionItem(props: Props) {
               if (archiving) {
                 return
               }
+              dismissActionTooltip()
               await archiveCurrentSession()
             }}
           >

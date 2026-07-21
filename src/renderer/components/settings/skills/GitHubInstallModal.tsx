@@ -1,6 +1,6 @@
 import { Badge, Button, Checkbox, Flex, Modal, Paper, Stack, Text } from '@mantine/core'
 import { IconCheck, IconX } from '@tabler/icons-react'
-import { type FC, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, type FC, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { skillsController } from '@/packages/skills/controller'
@@ -25,6 +25,8 @@ type InstallStatus = {
   state: 'idle' | 'loading' | 'success' | 'error'
   error?: string
 }
+
+const statusBadgeStyle = { flex: '0 0 auto', width: 'max-content' } satisfies CSSProperties
 
 export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
   opened,
@@ -163,6 +165,7 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
             <Paper key={skill.path} withBorder radius="md" p="sm">
               <Flex align="flex-start" justify="space-between" gap="sm">
                 <Checkbox
+                  style={{ flex: '1 1 0', minWidth: 0 }}
                   checked={selectedPaths.includes(skill.path)}
                   onChange={(event) => {
                     const checked = event.currentTarget.checked
@@ -184,7 +187,7 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
                   }
                 />
                 {status === 'loading' && (
-                  <Badge size="xs" style={{ flexShrink: 0 }}>
+                  <Badge size="xs" style={statusBadgeStyle}>
                     {t('Installing')}
                   </Badge>
                 )}
@@ -193,7 +196,7 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
                     size="xs"
                     color="green"
                     leftSection={<ScalableIcon icon={IconCheck} size={12} />}
-                    style={{ flexShrink: 0 }}
+                    style={statusBadgeStyle}
                   >
                     {t('Installed')}
                   </Badge>
@@ -203,7 +206,7 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
                     size="xs"
                     color="red"
                     leftSection={<ScalableIcon icon={IconX} size={12} />}
-                    style={{ flexShrink: 0 }}
+                    style={statusBadgeStyle}
                   >
                     {t('Failed')}
                   </Badge>
