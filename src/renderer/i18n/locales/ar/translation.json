@@ -129,7 +129,7 @@
   "Back to previous message": "العودة إلى الرسالة السابقة",
   "Back to Tasks": "العودة إلى المهام",
   "Backup files exported here can only be imported in Chatbox 1.22 or later.": "لا يمكن استيراد ملفات النسخ الاحتياطي المُصدَّرة هنا إلا في Chatbox 1.22 أو إصدار أحدث.",
-  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "تم استيراد النسخة الاحتياطية مع {{count}} تحذيرًا. تابع لإعادة تشغيل Chatbox.",
+  "Backup restore is almost complete, with {{count}} warning(s). Select Continue to restart Chatbox and finish restoring.": "شارفت استعادة النسخة الاحتياطية على الاكتمال، مع {{count}} تحذيرًا. اختر «متابعة» لإعادة تشغيل Chatbox وإكمال الاستعادة.",
   "Backup exported successfully": "تم تصدير النسخة الاحتياطية بنجاح",
   "Backup exported with warnings": "تم تصدير النسخة الاحتياطية مع تحذيرات",
   "Conversation data could not be read and was not included.": "تعذرت قراءة بيانات المحادثة، لذلك لم تُضمّن في النسخة الاحتياطية.",

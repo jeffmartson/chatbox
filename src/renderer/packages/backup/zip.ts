@@ -1,10 +1,10 @@
 import { Unzip, UnzipInflate, Zip, ZipDeflate, ZipPassThrough } from 'fflate'
 
 export const DEFAULT_ZIP_LIMITS = {
-  maxEntries: 50_000,
+  maxEntries: 100_004,
   maxEntryUncompressedBytes: 512 * 1024 * 1024,
   maxTotalUncompressedBytes: 4 * 1024 * 1024 * 1024,
-  maxCompressionRatio: 250,
+  maxCompressionRatio: 2_000,
 } as const
 
 const EMPTY_BYTES = new Uint8Array(0)
@@ -22,6 +22,12 @@ export interface ZipReadLimits {
   maxEntryUncompressedBytes?: number
   maxTotalUncompressedBytes?: number
   maxCompressionRatio?: number
+}
+
+export interface ZipReadOptions {
+  limits?: ZipReadLimits
+  entryLimits?: (path: string) => Partial<Pick<ZipReadLimits, 'maxEntryUncompressedBytes' | 'maxCompressionRatio'>>
+  signal?: AbortSignal
 }
 
 function throwIfAborted(signal?: AbortSignal) {
@@ -171,16 +177,16 @@ async function validateZipEndOfCentralDirectory(file: File) {
   let recordOffset = -1
   for (let index = tail.length - minimumRecordSize; index >= 0; index--) {
     if (tail[index] === 0x50 && tail[index + 1] === 0x4b && tail[index + 2] === 0x05 && tail[index + 3] === 0x06) {
-      recordOffset = index
-      break
+      const candidateView = new DataView(tail.buffer, tail.byteOffset + index, tail.length - index)
+      const commentLength = candidateView.getUint16(20, true)
+      if (index + minimumRecordSize + commentLength === tail.length) {
+        recordOffset = index
+        break
+      }
     }
   }
   if (recordOffset < 0) throw new Error('ZIP archive is missing its central directory')
   const view = new DataView(tail.buffer, tail.byteOffset + recordOffset, tail.length - recordOffset)
-  const commentLength = view.getUint16(20, true)
-  if (recordOffset + minimumRecordSize + commentLength !== tail.length) {
-    throw new Error('ZIP archive central directory is truncated')
-  }
   const centralDirectorySize = view.getUint32(12, true)
   const centralDirectoryOffset = view.getUint32(16, true)
   if (centralDirectoryOffset + centralDirectorySize > file.size - (tail.length - recordOffset)) {
@@ -201,7 +207,7 @@ function combineChunks(chunks: Uint8Array[], totalSize: number): Uint8Array {
 export async function readZipFileEntries(
   file: File,
   onEntry: (entry: ReadZipEntry) => Promise<void> | void,
-  options: { limits?: ZipReadLimits; signal?: AbortSignal } = {}
+  options: ZipReadOptions = {}
 ): Promise<void> {
   await validateZipEndOfCentralDirectory(file)
   const limits = { ...DEFAULT_ZIP_LIMITS, ...options.limits }
@@ -219,14 +225,15 @@ export async function readZipFileEntries(
       seenPaths.add(entry.name)
       entryCount++
       if (entryCount > limits.maxEntries) throw new Error('ZIP contains too many entries')
-      if (entry.originalSize !== undefined && entry.originalSize > limits.maxEntryUncompressedBytes) {
+      const entryLimits = { ...limits, ...options.entryLimits?.(entry.name) }
+      if (entry.originalSize !== undefined && entry.originalSize > entryLimits.maxEntryUncompressedBytes) {
         throw new Error(`ZIP entry is too large: ${entry.name}`)
       }
       if (
         entry.size !== undefined &&
         entry.originalSize !== undefined &&
         entry.originalSize > 1024 * 1024 &&
-        entry.originalSize > Math.max(1, entry.size) * limits.maxCompressionRatio
+        entry.originalSize > Math.max(1, entry.size) * entryLimits.maxCompressionRatio
       ) {
         throw new Error(`ZIP entry compression ratio is unsafe: ${entry.name}`)
       }
@@ -241,7 +248,7 @@ export async function readZipFileEntries(
         }
         entryBytes += data.length
         totalUncompressedBytes += data.length
-        if (entryBytes > limits.maxEntryUncompressedBytes) {
+        if (entryBytes > entryLimits.maxEntryUncompressedBytes) {
           fatalError = new Error(`ZIP entry is too large: ${entry.name}`)
           entry.terminate()
           return

@@ -17,6 +17,9 @@ patchedDependencies:
   '@ai-sdk/deepseek@2.0.17':
     hash: 38ca8fe1e6bf5a471413f4cbe6d1fe49d0cd4e74e9494fe802c3a7036497eb41
     path: patches/@ai-sdk__deepseek@2.0.17.patch
+  fflate@0.8.3:
+    hash: d911137eb72db9dddccc301e63a76bbc221a180ce91960f39a925726bf3bcba5
+    path: patches/fflate@0.8.3.patch
   libsql@0.5.22:
     hash: 1cd6cac4cce1855ac60c054495f98b9ba467098185ea666dff300e0245a4c75f
     path: patches/libsql@0.5.22.patch
@@ -520,7 +523,7 @@ importers:
         version: 6.2.5
       fflate:
         specifier: ^0.8.3
-        version: 0.8.3
+        version: 0.8.3(patch_hash=d911137eb72db9dddccc301e63a76bbc221a180ce91960f39a925726bf3bcba5)
       file-loader:
         specifier: ^6.2.0
         version: 6.2.0(webpack@5.104.1)
@@ -20558,7 +20561,7 @@ snapshots:
   '@vitest/ui@4.0.18(vitest@4.0.18)':
     dependencies:
       '@vitest/utils': 4.0.18
-      fflate: 0.8.3
+      fflate: 0.8.3(patch_hash=d911137eb72db9dddccc301e63a76bbc221a180ce91960f39a925726bf3bcba5)
       flatted: 3.3.3
       pathe: 2.0.3
       sirv: 3.0.2
@@ -23256,7 +23259,7 @@ snapshots:
       node-domexception: 1.0.0
       web-streams-polyfill: 3.3.3
 
-  fflate@0.8.3: {}
+  fflate@0.8.3(patch_hash=d911137eb72db9dddccc301e63a76bbc221a180ce91960f39a925726bf3bcba5): {}
 
   file-loader@6.2.0(webpack@5.104.1):
     dependencies:

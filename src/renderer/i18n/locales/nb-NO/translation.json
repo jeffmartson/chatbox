@@ -129,7 +129,7 @@
   "Back to previous message": "Tilbake til forrige melding",
   "Back to Tasks": "Tilbake til oppgaver",
   "Backup files exported here can only be imported in Chatbox 1.22 or later.": "Sikkerhetskopifiler som eksporteres her, kan bare importeres i Chatbox 1.22 eller nyere.",
-  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "Sikkerhetskopien ble importert med {{count}} advarsler. Fortsett for å starte Chatbox på nytt.",
+  "Backup restore is almost complete, with {{count}} warning(s). Select Continue to restart Chatbox and finish restoring.": "Gjenopprettingen av sikkerhetskopien er nesten fullført, med {{count}} advarsler. Velg Fortsett for å starte Chatbox på nytt og fullføre gjenopprettingen.",
   "Backup exported successfully": "Sikkerhetskopien ble eksportert",
   "Backup exported with warnings": "Sikkerhetskopien ble eksportert med advarsler",
   "Conversation data could not be read and was not included.": "Samtaledataene kunne ikke leses og ble derfor ikke tatt med i sikkerhetskopien.",

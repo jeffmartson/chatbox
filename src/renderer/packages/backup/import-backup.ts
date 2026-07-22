@@ -1,10 +1,18 @@
 import type { CopilotDetail, Session, Settings } from '@shared/types'
+import {
+  BACKUP_MANIFEST_PATH,
+  backupEntryByteLimit,
+  isBackupJsonPath,
+  isBackupResourcePath,
+  isBackupSession,
+  isBackupSessionPath,
+} from './archive-layout'
 import { base64ToBytes, bytesToBase64, decodeStoredBlob, sha256Checksum } from './codec'
 import {
-  remapCopilotResourceKeys,
-  remapSessionMetaResourceKeys,
-  remapSessionResourceKeys,
-  remapSettingsResourceKeys,
+  restoreCopilotResourceKeys,
+  restoreSessionMetaResourceKeys,
+  restoreSessionResourceKeys,
+  restoreSettingsResourceKeys,
 } from './resources'
 import { BackupStorageKey, backupSessionStorageKey } from './storage-keys'
 import {
@@ -15,11 +23,10 @@ import {
   type BackupResourceEntry,
   type BackupStorage,
   type BackupWarning,
+  MAX_BACKUP_JSON_ENTRY_BYTES,
+  validateBackupManifestGraph,
 } from './types'
 import { readZipFileEntries } from './zip'
-
-const MANIFEST_PATH = 'manifest.json'
-const MAX_JSON_ENTRY_BYTES = 128 * 1024 * 1024
 
 interface StagedEntry {
   path: string
@@ -64,37 +71,12 @@ function throwIfAborted(signal?: AbortSignal) {
   }
 }
 
-function isSession(value: unknown): value is Session {
-  return Boolean(
-    value &&
-      typeof value === 'object' &&
-      'id' in value &&
-      typeof value.id === 'string' &&
-      'name' in value &&
-      typeof value.name === 'string' &&
-      'messages' in value &&
-      Array.isArray(value.messages)
-  )
-}
-
 function parseJson(bytes: Uint8Array, path: string): unknown {
-  if (bytes.length > MAX_JSON_ENTRY_BYTES) throw new Error(`Backup JSON entry is too large: ${path}`)
+  if (bytes.length > MAX_BACKUP_JSON_ENTRY_BYTES) throw new Error(`Backup JSON entry is too large: ${path}`)
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
 }
 
-function isResourcePath(path: string) {
-  return path.startsWith('resources/') || /^sessions\/[^/]+\/resources\/.+/.test(path)
-}
-
-function isSessionPath(path: string) {
-  return /^sessions\/[^/]+\/session\.json$/.test(path)
-}
-
 function validateManifestEntries(manifest: BackupManifest, stagedEntries: Map<string, StagedEntry>) {
-  const missingResources = manifest.warnings.filter((warning) => warning.code === 'resource-read-failed')
-  if (missingResources.length > 0) {
-    throw new Error(`Backup is incomplete: ${missingResources.length} managed resource(s) could not be exported`)
-  }
   const descriptors = [
     manifest.data.settings,
     manifest.data.copilots,
@@ -102,7 +84,7 @@ function validateManifestEntries(manifest: BackupManifest, stagedEntries: Map<st
     ...manifest.sessions,
     ...manifest.resources,
   ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-  const expectedPaths = new Set<string>([MANIFEST_PATH])
+  const expectedPaths = new Set<string>([BACKUP_MANIFEST_PATH])
   for (const descriptor of descriptors) {
     if (expectedPaths.has(descriptor.path)) throw new Error(`Manifest contains a duplicate path: ${descriptor.path}`)
     expectedPaths.add(descriptor.path)
@@ -117,66 +99,7 @@ function validateManifestEntries(manifest: BackupManifest, stagedEntries: Map<st
     if (!expectedPaths.has(path)) throw new Error(`Backup contains an entry not listed in manifest: ${path}`)
   }
   if (expectedPaths.size !== stagedEntries.size) throw new Error('Backup manifest entry list is incomplete')
-
-  const resourceIds = new Set<string>()
-  const resourceKeys = new Set<string>()
-  const sessionIds = new Set<string>()
-  for (const session of manifest.sessions) {
-    if (sessionIds.has(session.id)) throw new Error(`Duplicate session id in manifest: ${session.id}`)
-    sessionIds.add(session.id)
-    if (session.meta.id !== session.id) throw new Error(`Session metadata id does not match: ${session.id}`)
-  }
-  for (const resource of manifest.resources) {
-    if (resourceIds.has(resource.id)) throw new Error(`Duplicate resource id in manifest: ${resource.id}`)
-    resourceIds.add(resource.id)
-    const ownResourceKeys = new Set<string>()
-    for (const key of resource.originalStorageKeys) {
-      if (ownResourceKeys.has(key)) throw new Error(`Resource contains a duplicate storage key: ${resource.id}`)
-      ownResourceKeys.add(key)
-      if (resourceKeys.has(key)) throw new Error(`Duplicate resource storage key in manifest: ${key}`)
-      resourceKeys.add(key)
-    }
-    const ownSessionIds = new Set<string>()
-    for (const sessionId of resource.sessionIds) {
-      if (ownSessionIds.has(sessionId)) throw new Error(`Resource contains a duplicate session id: ${resource.id}`)
-      ownSessionIds.add(sessionId)
-      if (!sessionIds.has(sessionId)) throw new Error(`Resource references an unknown session: ${sessionId}`)
-    }
-    if (resource.scope === 'session' && resource.sessionIds.length !== 1) {
-      throw new Error(`Session-scoped resource must reference exactly one session: ${resource.id}`)
-    }
-    if (resource.scope === 'global' && resource.sessionIds.length !== 0) {
-      throw new Error(`Global resource must not reference a session: ${resource.id}`)
-    }
-  }
-  const resourcesById = new Map(manifest.resources.map((resource) => [resource.id, resource]))
-  const sessionsById = new Map(manifest.sessions.map((session) => [session.id, session]))
-  for (const session of manifest.sessions) {
-    const ownResourceIds = new Set<string>()
-    for (const resourceId of session.resourceIds) {
-      if (ownResourceIds.has(resourceId)) throw new Error(`Session contains a duplicate resource id: ${session.id}`)
-      ownResourceIds.add(resourceId)
-      if (!resourceIds.has(resourceId)) throw new Error(`Session references an unknown resource: ${resourceId}`)
-      if (!resourcesById.get(resourceId)?.sessionIds.includes(session.id)) {
-        throw new Error(`Session/resource mapping is inconsistent: ${session.id}/${resourceId}`)
-      }
-    }
-  }
-  for (const resource of manifest.resources) {
-    for (const sessionId of resource.sessionIds) {
-      const session = sessionsById.get(sessionId)
-      if (!session?.resourceIds.includes(resource.id)) {
-        throw new Error(`Resource/session mapping is inconsistent: ${resource.id}/${sessionId}`)
-      }
-    }
-  }
-  if (
-    manifest.stats.sessionCount !== manifest.sessions.length ||
-    manifest.stats.resourceCount !== manifest.resources.length ||
-    manifest.stats.warningCount !== manifest.warnings.length
-  ) {
-    throw new Error('Backup manifest statistics do not match its entries')
-  }
+  validateBackupManifestGraph(manifest)
 }
 
 async function readStagedResource(storage: BackupStorage, plan: Pick<ResourceWritePlan, 'resource' | 'tempKey'>) {
@@ -308,21 +231,16 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
         })
         const checksum = await sha256Checksum(entry.data)
         const staged: StagedEntry = { path: entry.path, size: entry.uncompressedSize, checksum }
-        if (
-          entry.path === MANIFEST_PATH ||
-          entry.path === 'settings.json' ||
-          entry.path === 'copilots.json' ||
-          entry.path === 'session-settings.json'
-        ) {
+        if (isBackupJsonPath(entry.path) && !isBackupSessionPath(entry.path)) {
           staged.value = parseJson(entry.data, entry.path)
-        } else if (isSessionPath(entry.path)) {
+        } else if (isBackupSessionPath(entry.path)) {
           const value = parseJson(entry.data, entry.path)
-          if (!isSession(value)) throw new Error(`Invalid session entry: ${entry.path}`)
+          if (!isBackupSession(value)) throw new Error(`Invalid session entry: ${entry.path}`)
           const tempKey = `${tempPrefix}:session:${stagedSessionCount++}`
           await options.storage.setItemNow(tempKey, value)
           tempStoreKeys.push(tempKey)
           staged.tempKey = tempKey
-        } else if (isResourcePath(entry.path)) {
+        } else if (isBackupResourcePath(entry.path)) {
           const tempKey = `${tempPrefix}:resource:${stagedResourceCount++}`
           await options.storage.setBlob(tempKey, bytesToBase64(entry.data))
           tempBlobKeys.push(tempKey)
@@ -334,12 +252,12 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
       },
       {
         signal: options.signal,
-        limits: { maxEntryUncompressedBytes: MAX_JSON_ENTRY_BYTES },
+        entryLimits: (path) => ({ maxEntryUncompressedBytes: backupEntryByteLimit(path) }),
       }
     )
 
     options.onProgress?.({ phase: 'validating', current: 0, total: 1 })
-    const manifestValue = stagedEntries.get(MANIFEST_PATH)?.value
+    const manifestValue = stagedEntries.get(BACKUP_MANIFEST_PATH)?.value
     const manifest = BackupManifestSchema.parse(manifestValue)
     validateManifestEntries(manifest, stagedEntries)
     const { plans: resourcePlans, resourceKeyMap } = await createResourcePlans(manifest, stagedEntries, options.storage)
@@ -392,10 +310,10 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
       const tempKey = stagedEntries.get(descriptor.path)?.tempKey
       if (!tempKey) throw new Error(`Session was not staged: ${descriptor.path}`)
       const stagedSession = await options.storage.getItem<Session | null>(tempKey, null)
-      if (!isSession(stagedSession) || stagedSession.id !== descriptor.id) {
+      if (!isBackupSession(stagedSession) || stagedSession.id !== descriptor.id) {
         throw new Error(`Session id does not match manifest: ${descriptor.path}`)
       }
-      let session = remapSessionResourceKeys(stagedSession, resourceKeyMap)
+      let session = restoreSessionResourceKeys(stagedSession, resourceKeyMap)
       if (options.rehydrateSession) {
         const rehydrated = await options.rehydrateSession(session)
         session = rehydrated.session
@@ -404,7 +322,7 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
       }
       await options.storage.setItemNow(backupSessionStorageKey(session.id), session)
 
-      const meta = remapSessionMetaResourceKeys(descriptor.meta, resourceKeyMap)
+      const meta = restoreSessionMetaResourceKeys(descriptor.meta, resourceKeyMap)
       const existingMeta = await options.metaStorage.getById(session.id)
       previousMeta.set(session.id, existingMeta)
       changedMetaIds.push(session.id)
@@ -423,7 +341,7 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings entry')
       await options.storage.setItemNow(
         BackupStorageKey.Settings,
-        remapSettingsResourceKeys(value as Partial<Settings>, resourceKeyMap)
+        restoreSettingsResourceKeys(value as Partial<Settings>, resourceKeyMap)
       )
     }
     if (manifest.data.copilots) {
@@ -431,7 +349,7 @@ export async function importBackupArchive(file: File, options: BackupImportOptio
       if (!Array.isArray(value)) throw new Error('Invalid copilots entry')
       await options.storage.setItemNow(
         BackupStorageKey.MyCopilots,
-        remapCopilotResourceKeys(value as CopilotDetail[], resourceKeyMap)
+        restoreCopilotResourceKeys(value as CopilotDetail[], resourceKeyMap)
       )
     }
     if (manifest.data.sessionSettings) {

@@ -129,7 +129,7 @@
   "Back to previous message": "Torna al messaggio precedente",
   "Back to Tasks": "Torna ai Task",
   "Backup files exported here can only be imported in Chatbox 1.22 or later.": "I file di backup esportati qui possono essere importati solo in Chatbox 1.22 o versioni successive.",
-  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "Il backup è stato importato con {{count}} avvisi. Continua per riavviare Chatbox.",
+  "Backup restore is almost complete, with {{count}} warning(s). Select Continue to restart Chatbox and finish restoring.": "Il ripristino del backup è quasi completo, con {{count}} avvisi. Seleziona Continua per riavviare Chatbox e completare il ripristino.",
   "Backup exported successfully": "Backup esportato correttamente",
   "Backup exported with warnings": "Backup esportato con avvisi",
   "Conversation data could not be read and was not included.": "Non è stato possibile leggere i dati della conversazione, che pertanto non sono stati inclusi nel backup.",

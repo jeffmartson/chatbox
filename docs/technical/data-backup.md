@@ -31,6 +31,7 @@ chatbox-backup-YYYY-M-D.zip
 - session、资源、去重资源和 warning 数量。
 
 Schema 的单一实现位于 `src/renderer/packages/backup/types.ts`。导入端只接受明确支持的格式版本，不对未知版本做猜测性恢复。
+导出端在报告成功前也会用同一 schema 校验最终 manifest，并执行与导入端一致的 entry 数量、单项大小和总大小限制，避免生成自身无法导入的归档。超长 session id 仅在归档路径中替换为内容哈希，manifest 与恢复后的 session id 保持原值。
 
 ## 资源边界
 
@@ -46,15 +47,17 @@ Schema 的单一实现位于 `src/renderer/packages/backup/types.ts`。导入端
 
 仅导出 Chatbox blob storage 中的受管内容。`localPath` 等外部绝对路径不会进入备份，也不会递归读取用户目录；缺少受管原文时会写入 warning。session attachment RAG 的 attachment id、索引状态、chunk 和 embedding 等派生状态会从 session JSON 中移除。原始/解析附件恢复后，桌面端重新创建 RAG 索引任务；不支持该能力的平台降级为 inline 附件。
 
+未选择“API KEY 与许可证”时，设置备份会移除许可证、模型提供商 API/OAuth/AWS 凭据、自定义提供商默认凭据、联网搜索密钥、MinerU token、VibeDrop 发布密钥，以及 MCP 的环境变量和请求头。许可证运行时状态无论是否选择该项都不会写入备份。
+
 ## 有界内存与跨平台输出
 
-`fflate` 的 streaming `Zip`/`Unzip` API 负责逐 entry 压缩和解压。ZIP writer 将单个输入 entry 切成 1 MiB 块，输出队列使用 4 MiB 高水位背压。导出内存上限由“单个 session JSON 或单个资源”决定，不随完整归档大小线性增长。
+`fflate` 的 streaming `Zip`/`Unzip` API 负责逐 entry 压缩和解压。ZIP writer 将单个输入 entry 切成 1 MiB 块，输出队列使用 4 MiB 高水位背压。DOCX、PPTX、XLSX 等本身为 ZIP 容器的附件仍作为不透明的单个资源 entry 保存；streaming Unzip 会按已读取的压缩字节数验证 data descriptor 边界，不把附件内部的 `PK` 签名误认为外层 entry。导出内存上限由“单个 session JSON 或单个资源”决定，不随完整归档大小线性增长。
 
 - Desktop/Web：优先使用 File System Access 可写流；不支持时退化为 Blob 下载，并在 UI 明确提示本次保存需要缓冲完整归档。
 - Android：分块写入 Documents；权限或目录能力不足时流式写入 Cache，再交给系统文件选择器，结束后删除临时文件。
 - iOS：分块写入 Cache 后打开系统分享面板，完成或失败后清理临时文件。
 
-导出取消会终止 ZIP producer，并删除已创建的部分文件。资源或 session 读取失败不会被静默吞掉：manifest 和设置页都会显示 warning；包含缺失受管资源的归档会被导入端拒绝，避免恢复出只有 storage key、没有实际内容的引用。
+导出取消会终止 ZIP producer，并删除已创建的部分文件。资源或 session 读取失败不会被静默吞掉：manifest 和设置页都会显示 warning。导入包含缺失受管资源的归档时，会依据 manifest 中实际声明的资源清理所有不可用 storage key、图片和装饰引用，继续恢复其余数据，并在重启前向用户显示 warning。
 
 ## 导入事务
 
@@ -72,10 +75,10 @@ ZIP 导入分为三个阶段：
 
 - 绝对路径、反斜杠、空路径段、`.` / `..` 和 Windows drive path；
 - 重复 entry path、缺少 central directory 或截断归档；
-- entry 数量（默认 50,000）；
-- 单 entry 解压大小（备份导入为 128 MiB）；
+- entry 数量（最多 50,000 个 session、50,000 个资源和 4 个全局 JSON entry）；
+- 单 entry 解压大小（JSON 为 128 MiB，资源为 512 MiB）；
 - 总解压大小（默认 4 GiB）；
-- 高压缩比 entry（默认上限 250 倍）；
+- 高压缩比 entry（默认上限 2,000 倍；单项和总解压硬上限仍同时生效）；
 - manifest 未声明的 entry、缺失 entry、size/checksum 不一致和映射不一致。
 
 这些限制在写入正式存储前生效。

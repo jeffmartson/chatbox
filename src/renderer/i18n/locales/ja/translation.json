@@ -129,7 +129,7 @@
   "Back to previous message": "前のメッセージに戻る",
   "Back to Tasks": "タスクに戻る",
   "Backup files exported here can only be imported in Chatbox 1.22 or later.": "ここでエクスポートしたバックアップファイルは、Chatbox 1.22 以降でのみインポートできます。",
-  "Backup imported with {{count}} warning(s). Continue to restart Chatbox.": "バックアップは {{count}} 件の警告付きでインポートされました。続行して Chatbox を再起動してください。",
+  "Backup restore is almost complete, with {{count}} warning(s). Select Continue to restart Chatbox and finish restoring.": "バックアップの復元はまもなく完了しますが、{{count}} 件の警告があります。「続行」を選択して Chatbox を再起動し、復元を完了してください。",
   "Backup exported successfully": "バックアップをエクスポートしました",
   "Backup exported with warnings": "警告付きでバックアップをエクスポートしました",
   "Conversation data could not be read and was not included.": "会話データを読み取れなかったため、バックアップに含まれませんでした。",

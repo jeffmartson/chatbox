@@ -1,5 +1,13 @@
 import type { CopilotDetail, Session, SessionMetaRecord, Settings } from '@shared/types'
 import { cleanSettingsForBackup } from '@shared/utils/backup'
+import {
+  BACKUP_COPILOTS_PATH,
+  BACKUP_MANIFEST_PATH,
+  BACKUP_SESSION_SETTINGS_PATH,
+  BACKUP_SETTINGS_PATH,
+  backupEntryByteLimit,
+  isBackupSession,
+} from './archive-layout'
 import { encodeStoredBlob, sha256Checksum, shouldCompressMimeType } from './codec'
 import {
   collectGlobalResourceReferences,
@@ -14,19 +22,18 @@ import {
   type BackupExportItem,
   type BackupJsonEntry,
   type BackupManifest,
+  BackupManifestSchema,
   type BackupMetaStorage,
   type BackupProgress,
   type BackupResourceEntry,
   type BackupSessionEntry,
   type BackupStorage,
   type BackupWarning,
+  MAX_BACKUP_JSON_ENTRY_BYTES,
+  MAX_BACKUP_RESOURCE_ENTRY_BYTES,
+  validateBackupManifestGraph,
 } from './types'
-import { createZipStream, type ZipArchiveEntry } from './zip'
-
-const SETTINGS_PATH = 'settings.json'
-const COPILOTS_PATH = 'copilots.json'
-const SESSION_SETTINGS_PATH = 'session-settings.json'
-const MANIFEST_PATH = 'manifest.json'
+import { createZipStream, DEFAULT_ZIP_LIMITS, type ZipArchiveEntry } from './zip'
 
 interface ResourceCandidate {
   references: ResourceReference[]
@@ -60,8 +67,11 @@ function throwIfAborted(signal?: AbortSignal) {
   }
 }
 
-function safeSessionPathComponent(sessionId: string): string {
-  return encodeURIComponent(sessionId).replaceAll('.', '%2E')
+async function safeSessionPathComponent(sessionId: string): Promise<string> {
+  const encoded = encodeURIComponent(sessionId).replaceAll('.', '%2E')
+  if (new TextEncoder().encode(encoded).length <= 200) return encoded
+  const checksum = await sha256Checksum(new TextEncoder().encode(sessionId))
+  return `id-${checksum.value}`
 }
 
 function deriveSessionMeta(session: Session, existing?: SessionMetaRecord): SessionMetaRecord {
@@ -85,9 +95,47 @@ async function jsonEntry(
   value: unknown
 ): Promise<{ archive: ZipArchiveEntry; descriptor: BackupJsonEntry }> {
   const bytes = new TextEncoder().encode(JSON.stringify(value))
+  if (bytes.length > MAX_BACKUP_JSON_ENTRY_BYTES) throw new Error(`Backup JSON entry is too large: ${path}`)
   return {
     archive: { path, data: bytes, compress: true },
     descriptor: { path, size: bytes.length, checksum: await sha256Checksum(bytes) },
+  }
+}
+
+async function* enforceArchiveLimits(
+  entries: AsyncIterable<ZipArchiveEntry>
+): AsyncGenerator<ZipArchiveEntry, void, unknown> {
+  let entryCount = 0
+  let totalUncompressedBytes = 0
+  for await (const entry of entries) {
+    entryCount++
+    if (entryCount > DEFAULT_ZIP_LIMITS.maxEntries) throw new Error('Backup contains too many entries')
+    const maxEntryBytes = backupEntryByteLimit(entry.path)
+    if (entry.data instanceof Uint8Array) {
+      if (entry.data.length > maxEntryBytes) throw new Error(`Backup entry is too large: ${entry.path}`)
+      totalUncompressedBytes += entry.data.length
+      if (totalUncompressedBytes > DEFAULT_ZIP_LIMITS.maxTotalUncompressedBytes) {
+        throw new Error('Backup uncompressed size exceeds the safety limit')
+      }
+      yield entry
+      continue
+    }
+    let entryBytes = 0
+    const data = entry.data
+    yield {
+      ...entry,
+      data: (async function* () {
+        for await (const chunk of data) {
+          entryBytes += chunk.length
+          totalUncompressedBytes += chunk.length
+          if (entryBytes > maxEntryBytes) throw new Error(`Backup entry is too large: ${entry.path}`)
+          if (totalUncompressedBytes > DEFAULT_ZIP_LIMITS.maxTotalUncompressedBytes) {
+            throw new Error('Backup uncompressed size exceeds the safety limit')
+          }
+          yield chunk
+        }
+      })(),
+    }
   }
 }
 
@@ -116,29 +164,16 @@ function resolveResourceScope(candidate: ResourceCandidate): BackupResourceEntry
   return 'shared'
 }
 
-function resourcePath(
+async function resourcePath(
   id: string,
   extension: string,
   scope: BackupResourceEntry['scope'],
   sessionIds: string[]
-): string {
+): Promise<string> {
   if (scope === 'session' && sessionIds.length === 1) {
-    return `sessions/${safeSessionPathComponent(sessionIds[0])}/resources/${id}.${extension}`
+    return `sessions/${await safeSessionPathComponent(sessionIds[0])}/resources/${id}.${extension}`
   }
   return `resources/${id}.${extension}`
-}
-
-function isSession(value: unknown): value is Session {
-  return Boolean(
-    value &&
-      typeof value === 'object' &&
-      'id' in value &&
-      typeof value.id === 'string' &&
-      'name' in value &&
-      typeof value.name === 'string' &&
-      'messages' in value &&
-      Array.isArray(value.messages)
-  )
 }
 
 export async function exportBackupArchive(options: BackupExportOptions): Promise<BackupExportResult> {
@@ -172,7 +207,7 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
           resourceCandidates,
           collectGlobalResourceReferences(cleanedSettings as Partial<Settings>, undefined)
         )
-        const { archive, descriptor } = await jsonEntry(SETTINGS_PATH, cleanedSettings)
+        const { archive, descriptor } = await jsonEntry(BACKUP_SETTINGS_PATH, cleanedSettings)
         data.settings = descriptor
         yield archive
       }
@@ -182,7 +217,7 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
       const copilots = await options.storage.getItem<CopilotDetail[] | null>(BackupStorageKey.MyCopilots, null)
       if (copilots) {
         addResourceReferences(resourceCandidates, collectGlobalResourceReferences(undefined, copilots))
-        const { archive, descriptor } = await jsonEntry(COPILOTS_PATH, copilots)
+        const { archive, descriptor } = await jsonEntry(BACKUP_COPILOTS_PATH, copilots)
         data.copilots = descriptor
         yield archive
       }
@@ -196,7 +231,7 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
         if (value !== null) sessionSettings[key] = value
       }
       if (Object.keys(sessionSettings).length > 0) {
-        const { archive, descriptor } = await jsonEntry(SESSION_SETTINGS_PATH, sessionSettings)
+        const { archive, descriptor } = await jsonEntry(BACKUP_SESSION_SETTINGS_PATH, sessionSettings)
         data.sessionSettings = descriptor
         yield archive
       }
@@ -221,13 +256,14 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
         try {
           const session = await options.storage.getItem<Session | null>(backupSessionStorageKey(sessionId), null)
           if (session === null && !metaById.has(sessionId)) continue
-          if (!isSession(session)) throw new Error('Session is missing or invalid')
+          if (!isBackupSession(session)) throw new Error('Session is missing or invalid')
+          if (session.id !== sessionId) throw new Error('Session id does not match its storage key')
           const collected = collectSessionResourceReferences(session)
           const preparedSession = prepareSessionForBackup(session)
+          const path = `sessions/${await safeSessionPathComponent(session.id)}/session.json`
+          const { archive, descriptor } = await jsonEntry(path, preparedSession)
           warnings.push(...collected.warnings)
           addResourceReferences(resourceCandidates, collected.references)
-          const path = `sessions/${safeSessionPathComponent(session.id)}/session.json`
-          const { archive, descriptor } = await jsonEntry(path, preparedSession)
           sessions.push({
             entry: {
               ...descriptor,
@@ -263,10 +299,13 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
       try {
         const storedValue = await options.storage.getBlob(storageKey)
         if (storedValue === null) throw new Error('Managed resource is missing from blob storage')
-        successfullyReadResourceKeys++
         const firstReference = candidate.references[0]
         const encoded = encodeStoredBlob(storedValue, firstReference)
+        if (encoded.bytes.length > MAX_BACKUP_RESOURCE_ENTRY_BYTES) {
+          throw new Error('Managed resource exceeds the backup size limit')
+        }
         const checksum = await sha256Checksum(encoded.bytes)
+        successfullyReadResourceKeys++
         const dedupeKey = `${checksum.value}:${encoded.encoding}:${encoded.mimeType}`
         const existingResource = deduplicatedResources.get(dedupeKey)
         const sessionIds = unique(
@@ -288,7 +327,7 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
 
         const id = `resource-${String(resources.length + 1).padStart(6, '0')}`
         const scope = resolveResourceScope(candidate)
-        const path = resourcePath(id, encoded.extension, scope, sessionIds)
+        const path = await resourcePath(id, encoded.extension, scope, sessionIds)
         const resource: BackupResourceEntry = {
           id,
           path,
@@ -333,7 +372,7 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
       )
     }
 
-    completedManifest = {
+    const manifest = BackupManifestSchema.parse({
       format: BACKUP_FORMAT,
       formatVersion: BACKUP_FORMAT_VERSION,
       exportedAt: exportedAt.toISOString(),
@@ -354,14 +393,18 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
         deduplicatedResourceCount: Math.max(0, successfullyReadResourceKeys - resources.length),
         warningCount: warnings.length,
       },
-    }
+    })
+    validateBackupManifestGraph(manifest)
+    completedManifest = manifest
     options.onProgress?.({ phase: 'packing', current: 0, total: 1 })
-    const manifestEntry = await jsonEntry(MANIFEST_PATH, completedManifest)
+    const manifestEntry = await jsonEntry(BACKUP_MANIFEST_PATH, completedManifest)
     yield manifestEntry.archive
     options.onProgress?.({ phase: 'packing', current: 1, total: 1 })
   }
 
-  const writeResult = await options.writeArchive(() => createZipStream(generateEntries(), options.signal))
+  const writeResult = await options.writeArchive(() =>
+    createZipStream(enforceArchiveLimits(generateEntries()), options.signal)
+  )
   if (!completedManifest) throw new Error('Backup archive was not fully generated')
   return { manifest: completedManifest, boundedMemory: writeResult.boundedMemory }
 }

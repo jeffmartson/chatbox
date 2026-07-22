@@ -10,7 +10,7 @@ export interface ResourceReference {
   filename?: string
 }
 
-type LegacyMessage = Message & { pictures?: Array<{ storageKey?: string }> }
+type LegacyMessage = Message & { pictures?: Array<{ storageKey?: string; url?: string; loading?: boolean }> }
 
 function addReference(references: ResourceReference[], reference: ResourceReference | undefined) {
   if (reference?.storageKey) references.push(reference)
@@ -139,8 +139,12 @@ export function collectGlobalResourceReferences(settings?: Partial<Settings>, co
   return references
 }
 
-function remapKey(value: string | undefined, resourceKeyMap: ReadonlyMap<string, string>): string | undefined {
-  return value ? (resourceKeyMap.get(value) ?? value) : value
+function restoreResourceKey(
+  value: string | undefined,
+  resourceKeyMap: ReadonlyMap<string, string>
+): string | undefined {
+  if (value === undefined || !resourceKeyMap.has(value)) return undefined
+  return resourceKeyMap.get(value)
 }
 
 function resetRagState(file: MessageFile) {
@@ -165,69 +169,120 @@ export function prepareSessionForBackup(session: Session): Session {
   return prepared
 }
 
-function remapMessage(message: Message, resourceKeyMap: ReadonlyMap<string, string>) {
+function restoreMessageResourceKeys(message: Message, resourceKeyMap: ReadonlyMap<string, string>) {
   const legacyMessage = message as LegacyMessage
-  for (const picture of legacyMessage.pictures ?? []) picture.storageKey = remapKey(picture.storageKey, resourceKeyMap)
+  if (legacyMessage.pictures) {
+    legacyMessage.pictures = legacyMessage.pictures.flatMap((picture) => {
+      if (picture.storageKey === undefined) return picture.url ? [picture] : []
+      const restoredStorageKey = restoreResourceKey(picture.storageKey, resourceKeyMap)
+      if (restoredStorageKey !== undefined) return [{ ...picture, storageKey: restoredStorageKey }]
+      const { storageKey: _storageKey, ...fallback } = picture
+      return fallback.url ? [fallback] : []
+    })
+  }
   for (const file of message.files ?? []) {
-    file.storageKey = remapKey(file.storageKey, resourceKeyMap)
-    file.rawStorageKey = remapKey(file.rawStorageKey, resourceKeyMap)
+    if (file.storageKey !== undefined) {
+      const restoredStorageKey = restoreResourceKey(file.storageKey, resourceKeyMap)
+      if (restoredStorageKey === undefined) delete file.storageKey
+      else file.storageKey = restoredStorageKey
+    }
+    if (file.rawStorageKey !== undefined) {
+      const restoredStorageKey = restoreResourceKey(file.rawStorageKey, resourceKeyMap)
+      if (restoredStorageKey === undefined) delete file.rawStorageKey
+      else file.rawStorageKey = restoredStorageKey
+    }
     if (file.ragMode === 'session-retrieval') resetRagState(file)
   }
-  for (const link of message.links ?? []) link.storageKey = remapKey(link.storageKey, resourceKeyMap)
-  for (const part of message.contentParts ?? []) {
+  for (const link of message.links ?? []) {
+    if (link.storageKey === undefined) continue
+    const restoredStorageKey = restoreResourceKey(link.storageKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete link.storageKey
+    else link.storageKey = restoredStorageKey
+  }
+  message.contentParts = (message.contentParts ?? []).flatMap((part) => {
     if (part.type === 'image') {
-      part.storageKey = remapKey(part.storageKey, resourceKeyMap) ?? part.storageKey
-    } else if (part.type === 'tool-call') {
-      part.resultStorageKey = remapKey(part.resultStorageKey, resourceKeyMap)
+      const restoredStorageKey = restoreResourceKey(part.storageKey, resourceKeyMap)
+      if (restoredStorageKey === undefined) return []
+      part.storageKey = restoredStorageKey
+    } else if (part.type === 'tool-call' && part.resultStorageKey !== undefined) {
+      const restoredStorageKey = restoreResourceKey(part.resultStorageKey, resourceKeyMap)
+      if (restoredStorageKey === undefined) delete part.resultStorageKey
+      else part.resultStorageKey = restoredStorageKey
     }
-  }
+    return [part]
+  })
 }
 
-export function remapSessionResourceKeys(session: Session, resourceKeyMap: ReadonlyMap<string, string>): Session {
-  const remapped = JSON.parse(JSON.stringify(session)) as Session
-  remapped.assistantAvatarKey = remapKey(remapped.assistantAvatarKey, resourceKeyMap)
-  if (remapped.backgroundImage?.type === 'storage-key') {
-    remapped.backgroundImage.storageKey =
-      remapKey(remapped.backgroundImage.storageKey, resourceKeyMap) ?? remapped.backgroundImage.storageKey
+export function restoreSessionResourceKeys(session: Session, resourceKeyMap: ReadonlyMap<string, string>): Session {
+  const restored = JSON.parse(JSON.stringify(session)) as Session
+  if (restored.assistantAvatarKey !== undefined) {
+    const restoredStorageKey = restoreResourceKey(restored.assistantAvatarKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete restored.assistantAvatarKey
+    else restored.assistantAvatarKey = restoredStorageKey
   }
-  visitSessionMessages(remapped, (message) => remapMessage(message, resourceKeyMap))
-  return remapped
+  if (restored.backgroundImage?.type === 'storage-key') {
+    const restoredStorageKey = restoreResourceKey(restored.backgroundImage.storageKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete restored.backgroundImage
+    else restored.backgroundImage.storageKey = restoredStorageKey
+  }
+  visitSessionMessages(restored, (message) => restoreMessageResourceKeys(message, resourceKeyMap))
+  return restored
 }
 
-export function remapSessionMetaResourceKeys(
+export function restoreSessionMetaResourceKeys(
   meta: SessionMetaRecord,
   resourceKeyMap: ReadonlyMap<string, string>
 ): SessionMetaRecord {
-  const remapped = { ...meta }
-  remapped.assistantAvatarKey = remapKey(remapped.assistantAvatarKey, resourceKeyMap)
-  if (remapped.backgroundImage?.type === 'storage-key') {
-    remapped.backgroundImage = {
-      ...remapped.backgroundImage,
-      storageKey: remapKey(remapped.backgroundImage.storageKey, resourceKeyMap) ?? remapped.backgroundImage.storageKey,
-    }
+  const restored = { ...meta }
+  if (restored.assistantAvatarKey !== undefined) {
+    const restoredStorageKey = restoreResourceKey(restored.assistantAvatarKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete restored.assistantAvatarKey
+    else restored.assistantAvatarKey = restoredStorageKey
   }
-  return remapped
+  if (restored.backgroundImage?.type === 'storage-key') {
+    const restoredStorageKey = restoreResourceKey(restored.backgroundImage.storageKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete restored.backgroundImage
+    else restored.backgroundImage = { ...restored.backgroundImage, storageKey: restoredStorageKey }
+  }
+  return restored
 }
 
-export function remapSettingsResourceKeys(settings: Partial<Settings>, resourceKeyMap: ReadonlyMap<string, string>) {
-  const remapped = { ...settings }
-  remapped.userAvatarKey = remapKey(remapped.userAvatarKey, resourceKeyMap)
-  remapped.defaultAssistantAvatarKey = remapKey(remapped.defaultAssistantAvatarKey, resourceKeyMap)
-  remapped.backgroundImageKey = remapKey(remapped.backgroundImageKey, resourceKeyMap)
-  return remapped
+export function restoreSettingsResourceKeys(
+  settings: Partial<Settings>,
+  resourceKeyMap: ReadonlyMap<string, string>
+): Partial<Settings> {
+  const restored = { ...settings }
+  for (const key of ['userAvatarKey', 'defaultAssistantAvatarKey', 'backgroundImageKey'] as const) {
+    const storageKey = restored[key]
+    if (storageKey === undefined) continue
+    const restoredStorageKey = restoreResourceKey(storageKey, resourceKeyMap)
+    if (restoredStorageKey === undefined) delete restored[key]
+    else restored[key] = restoredStorageKey
+  }
+  return restored
 }
 
-function remapImageSource(source: CopilotDetail['avatar'], resourceKeyMap: ReadonlyMap<string, string>) {
+function restoreImageSource<T extends CopilotDetail['avatar']>(
+  source: T,
+  resourceKeyMap: ReadonlyMap<string, string>
+): T | undefined {
   if (source?.type !== 'storage-key') return source
-  return { ...source, storageKey: remapKey(source.storageKey, resourceKeyMap) ?? source.storageKey }
+  const restoredStorageKey = restoreResourceKey(source.storageKey, resourceKeyMap)
+  return restoredStorageKey === undefined ? undefined : ({ ...source, storageKey: restoredStorageKey } as T)
 }
 
-export function remapCopilotResourceKeys(copilots: CopilotDetail[], resourceKeyMap: ReadonlyMap<string, string>) {
+export function restoreCopilotResourceKeys(
+  copilots: CopilotDetail[],
+  resourceKeyMap: ReadonlyMap<string, string>
+): CopilotDetail[] {
   return copilots.map((copilot) => ({
     ...copilot,
-    avatar: remapImageSource(copilot.avatar, resourceKeyMap),
-    backgroundImage: remapImageSource(copilot.backgroundImage, resourceKeyMap),
-    screenshots: copilot.screenshots?.map((source) => remapImageSource(source, resourceKeyMap) ?? source),
+    avatar: restoreImageSource(copilot.avatar, resourceKeyMap),
+    backgroundImage: restoreImageSource(copilot.backgroundImage, resourceKeyMap),
+    screenshots: copilot.screenshots?.flatMap((source) => {
+      const restored = restoreImageSource(source, resourceKeyMap)
+      return restored === undefined ? [] : [restored]
+    }),
   }))
 }
 

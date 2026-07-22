@@ -456,9 +456,12 @@ const ImportExportDataSection = () => {
             .join('\n')
           setImportTips(
             String(
-              t('Backup imported with {{count}} warning(s). Continue to restart Chatbox.', {
-                count: result.warnings.length,
-              })
+              t(
+                'Backup restore is almost complete, with {{count}} warning(s). Select Continue to restart Chatbox and finish restoring.',
+                {
+                  count: result.warnings.length,
+                }
+              )
             )
           )
           setImportDetails(warningSummary)

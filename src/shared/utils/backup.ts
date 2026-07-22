@@ -1,5 +1,15 @@
 import type { Settings } from '../types'
 
+function withoutProviderCredentials(provider: object): Record<string, unknown> {
+  const cleanedProvider: Record<string, unknown> = { ...provider }
+  delete cleanedProvider.apiKey
+  delete cleanedProvider.oauth
+  delete cleanedProvider.accessKey
+  delete cleanedProvider.secretKey
+  delete cleanedProvider.sessionToken
+  return cleanedProvider
+}
+
 /**
  * Strip sensitive data from settings before writing a backup
  * (`chatbox-backup-*.zip`). License runtime state is always dropped;
@@ -12,17 +22,52 @@ export function cleanSettingsForBackup(settings: Settings, includeKeys: boolean)
   delete cleaned.licenseInstances
   if (!includeKeys) {
     delete cleaned.licenseKey
+    delete cleaned.lastSelectedLicenseByUser
+    delete cleaned.memorizedManualLicenseKey
+    delete cleaned.vibedropPublishKey
     if (settings.providers) {
       cleaned.providers = Object.fromEntries(
-        Object.entries(settings.providers).map(([id, provider]) => {
-          const cleanedProvider: Record<string, unknown> = { ...provider }
-          delete cleanedProvider.apiKey
-          delete cleanedProvider.accessKey
-          delete cleanedProvider.secretKey
-          delete cleanedProvider.sessionToken
-          return [id, cleanedProvider]
-        })
+        Object.entries(settings.providers).map(([id, provider]) => [id, withoutProviderCredentials(provider)])
       )
+    }
+    if (settings.customProviders) {
+      cleaned.customProviders = settings.customProviders.map((provider) => ({
+        ...provider,
+        defaultSettings: provider.defaultSettings
+          ? withoutProviderCredentials(provider.defaultSettings)
+          : provider.defaultSettings,
+      }))
+    }
+    if (settings.extension) {
+      const extension = { ...settings.extension }
+      if (settings.extension.webSearch) {
+        const webSearch = { ...settings.extension.webSearch }
+        delete webSearch.tavilyApiKey
+        delete webSearch.bochaApiKey
+        delete webSearch.queritApiKey
+        extension.webSearch = webSearch
+      }
+      if (settings.extension.documentParser?.mineru) {
+        const documentParser = { ...settings.extension.documentParser }
+        delete documentParser.mineru
+        extension.documentParser = documentParser
+      }
+      cleaned.extension = extension
+    }
+    if (settings.mcp) {
+      cleaned.mcp = {
+        ...settings.mcp,
+        servers: settings.mcp.servers.map((server) => {
+          if (server.transport.type === 'stdio') {
+            const transport = { ...server.transport }
+            delete transport.env
+            return { ...server, transport }
+          }
+          const transport = { ...server.transport }
+          delete transport.headers
+          return { ...server, transport }
+        }),
+      }
     }
   }
   return cleaned

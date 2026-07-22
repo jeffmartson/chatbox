@@ -1,6 +1,13 @@
-import type { Session } from '@shared/types'
+import type { CopilotDetail, Session, SessionMetaRecord, Settings } from '@shared/types'
 import { describe, expect, it } from 'vitest'
-import { collectSessionResourceReferences, prepareSessionForBackup, remapSessionResourceKeys } from './resources'
+import {
+  collectSessionResourceReferences,
+  prepareSessionForBackup,
+  restoreCopilotResourceKeys,
+  restoreSessionMetaResourceKeys,
+  restoreSessionResourceKeys,
+  restoreSettingsResourceKeys,
+} from './resources'
 
 function createSession(): Session {
   return {
@@ -128,8 +135,9 @@ describe('backup resource graph', () => {
   })
 
   it('remaps every managed reference and clears non-portable RAG state', () => {
-    const remapped = remapSessionResourceKeys(
-      createSession(),
+    const source = createSession()
+    const remapped = restoreSessionResourceKeys(
+      source,
       new Map([
         ['picture:shared', 'picture:restored'],
         ['file:parsed', 'file:parsed:restored'],
@@ -148,6 +156,81 @@ describe('backup resource graph', () => {
     expect(remapped.messages[0].files?.[0].sessionAttachmentId).toBeUndefined()
     expect(remapped.threads?.[0].messages[0].contentParts[0]).toMatchObject({ resultStorageKey: 'tool:restored' })
     expect(remapped.assistantAvatarKey).toBe('picture:avatar:restored')
+    expect(source.messages[0].contentParts[1]).toMatchObject({ storageKey: 'picture:shared' })
+    expect(source.messages[0].files?.[0].sessionAttachmentId).toBe(42)
+  })
+
+  it('removes missing managed resource keys without dropping recoverable message metadata', () => {
+    const cleaned = restoreSessionResourceKeys(createSession(), new Map([['file:parsed', 'file:parsed']]))
+
+    expect(cleaned.messages[0].contentParts).toEqual([{ type: 'text', text: 'hello' }])
+    expect(cleaned.messages[0].files?.[0]).toMatchObject({ storageKey: 'file:parsed', name: 'report.pdf' })
+    expect(cleaned.messages[0].files?.[0].rawStorageKey).toBeUndefined()
+    expect(cleaned.messages[0].links?.[0]).toMatchObject({ url: 'https://example.com', title: 'Example' })
+    expect(cleaned.messages[0].links?.[0].storageKey).toBeUndefined()
+    expect(cleaned.threads?.[0].messages[0].contentParts[0]).not.toHaveProperty('resultStorageKey')
+    expect(cleaned.assistantAvatarKey).toBeUndefined()
+    expect(cleaned.backgroundImage).toBeUndefined()
+  })
+
+  it('keeps a legacy picture URL when its managed storage key is unavailable', () => {
+    const session = createSession()
+    const message = session.messages[0] as (typeof session.messages)[number] & {
+      pictures?: Array<{ storageKey?: string; url?: string; loading?: boolean }>
+    }
+    message.pictures = [
+      { storageKey: 'picture:missing', url: 'https://example.com/fallback.png' },
+      { storageKey: 'picture:missing-only' },
+      { loading: true },
+      {},
+    ]
+
+    const cleaned = restoreSessionResourceKeys(session, new Map())
+    const cleanedMessage = cleaned.messages[0] as (typeof cleaned.messages)[number] & {
+      pictures?: Array<{ storageKey?: string; url?: string; loading?: boolean }>
+    }
+    expect(cleanedMessage.pictures).toEqual([{ url: 'https://example.com/fallback.png' }])
+  })
+
+  it('removes missing resource keys from metadata, settings, and copilots', () => {
+    const resourceKeyMap = new Map([['picture:kept', 'picture:kept']])
+    const meta: SessionMetaRecord = {
+      id: 'session-1',
+      name: 'Backup test',
+      sortOrder: 1,
+      createdAt: 1,
+      assistantAvatarKey: 'picture:avatar',
+      backgroundImage: { type: 'storage-key', storageKey: 'picture:background' },
+    }
+    const settings: Partial<Settings> = {
+      userAvatarKey: 'picture:avatar',
+      defaultAssistantAvatarKey: 'picture:kept',
+      backgroundImageKey: 'picture:background',
+    }
+    const copilots: CopilotDetail[] = [
+      {
+        id: 'copilot-1',
+        name: 'Copilot',
+        prompt: 'Help',
+        avatar: { type: 'storage-key', storageKey: 'picture:avatar' },
+        backgroundImage: { type: 'url', url: 'https://example.com/background.png' },
+        screenshots: [
+          { type: 'storage-key', storageKey: 'picture:background' },
+          { type: 'url', url: 'https://example.com/screenshot.png' },
+        ],
+      },
+    ]
+
+    expect(restoreSessionMetaResourceKeys(meta, resourceKeyMap)).not.toHaveProperty('assistantAvatarKey')
+    expect(restoreSessionMetaResourceKeys(meta, resourceKeyMap)).not.toHaveProperty('backgroundImage')
+    expect(restoreSettingsResourceKeys(settings, resourceKeyMap)).toEqual({
+      defaultAssistantAvatarKey: 'picture:kept',
+    })
+    expect(restoreCopilotResourceKeys(copilots, resourceKeyMap)[0]).toMatchObject({
+      avatar: undefined,
+      backgroundImage: { type: 'url' },
+      screenshots: [{ type: 'url', url: 'https://example.com/screenshot.png' }],
+    })
   })
 
   it('removes local paths and derived RAG state from serialized sessions', () => {

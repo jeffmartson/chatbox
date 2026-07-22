@@ -1,9 +1,10 @@
-import type { Session, SessionMetaRecord } from '@shared/types'
+import type { CopilotDetail, Session, SessionMetaRecord, Settings } from '@shared/types'
 import { unzipSync, zipSync } from 'fflate'
 import { describe, expect, it, vi } from 'vitest'
+import { bytesToBase64 } from './codec'
 import { exportBackupArchive } from './export-backup'
 import { importBackupArchive } from './import-backup'
-import { backupSessionStorageKey } from './storage-keys'
+import { BackupStorageKey, backupSessionStorageKey } from './storage-keys'
 import type { BackupMetaStorage, BackupStorage } from './types'
 
 class MemoryStorage implements BackupStorage {
@@ -199,6 +200,68 @@ describe('ZIP backup round trip', () => {
     expect(destinationMeta.records.size).toBe(2)
   })
 
+  it('round-trips global settings, copilots, and session settings while pruning unavailable images', async () => {
+    const source = new MemoryStorage()
+    const sourceSettings = {
+      userAvatarKey: 'picture:missing',
+      defaultAssistantAvatarKey: 'picture:kept',
+      licenseKey: 'secret-license',
+      providers: { custom: { apiKey: 'secret-api-key', apiHost: 'https://example.com' } },
+    } as unknown as Settings
+    const copilots: CopilotDetail[] = [
+      {
+        id: 'copilot-1',
+        name: 'Copilot',
+        prompt: 'Help',
+        avatar: { type: 'storage-key', storageKey: 'picture:missing' },
+        backgroundImage: { type: 'storage-key', storageKey: 'picture:kept' },
+      },
+    ]
+    source.values.set(BackupStorageKey.Settings, sourceSettings)
+    source.values.set(BackupStorageKey.MyCopilots, copilots)
+    source.values.set(BackupStorageKey.ChatSessionSettings, { model: 'model-a' })
+    source.values.set(BackupStorageKey.PictureSessionSettings, { model: 'model-b' })
+    source.blobs.set('picture:kept', 'data:image/png;base64,AAECAw==')
+    const chunks: Uint8Array[] = []
+
+    const exported = await exportBackupArchive({
+      exportItems: ['setting', 'conversations', 'copilot'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: new MemoryMetaStorage(),
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+    expect(exported.manifest.warnings).toContainEqual(
+      expect.objectContaining({ code: 'resource-read-failed', itemId: 'picture:missing' })
+    )
+
+    const destination = new MemoryStorage()
+    const imported = await importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'global.zip'), {
+      storage: destination,
+      metaStorage: new MemoryMetaStorage(),
+    })
+    expect(imported.warnings).toHaveLength(1)
+    expect(destination.values.get(BackupStorageKey.Settings)).toEqual({
+      defaultAssistantAvatarKey: 'picture:kept',
+      providers: { custom: { apiHost: 'https://example.com' } },
+    })
+    expect(destination.values.get(BackupStorageKey.MyCopilots)).toEqual([
+      {
+        id: 'copilot-1',
+        name: 'Copilot',
+        prompt: 'Help',
+        backgroundImage: { type: 'storage-key', storageKey: 'picture:kept' },
+      },
+    ])
+    expect(destination.values.get(BackupStorageKey.ChatSessionSettings)).toEqual({ model: 'model-a' })
+    expect(destination.values.get(BackupStorageKey.PictureSessionSettings)).toEqual({ model: 'model-b' })
+    expect(destination.blobs.get('picture:kept')).toBe('data:image/png;base64,AAECAw==')
+  })
+
   it('round-trips parsed and raw attachments while dropping non-portable metadata', async () => {
     const source = new MemoryStorage()
     const sourceMeta = new MemoryMetaStorage()
@@ -240,6 +303,139 @@ describe('ZIP backup round trip', () => {
     expect(destination.blobs.get(restoredFile?.rawStorageKey ?? '')).toBe('data:application/pdf;base64,JVBERi0xLjQ=')
   })
 
+  it('round-trips DOCX, PPTX, and XLSX attachments without parsing their nested ZIP entries', async () => {
+    const attachments = [
+      {
+        extension: 'docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        innerDirectory: 'word/media/',
+      },
+      {
+        extension: 'pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        innerDirectory: 'ppt/media/',
+      },
+      {
+        extension: 'xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        innerDirectory: 'xl/media/',
+      },
+    ]
+    const session: Session = {
+      id: 'office-files',
+      name: 'Office files',
+      messages: [
+        {
+          id: 'message-office-files',
+          role: 'user',
+          contentParts: [{ type: 'text', text: 'read these' }],
+          files: attachments.map(({ extension, mimeType }) => ({
+            id: `file-${extension}`,
+            name: `report.${extension}`,
+            fileType: mimeType,
+            storageKey: `file:${extension}:parsed`,
+            rawStorageKey: `file:${extension}:raw`,
+          })),
+        },
+      ],
+    }
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    source.values.set(backupSessionStorageKey(session.id), session)
+    sourceMeta.records.set(session.id, createMeta(session, 1))
+    const expectedRawValues = new Map<string, string>()
+    for (const { extension, mimeType, innerDirectory } of attachments) {
+      source.blobs.set(`file:${extension}:parsed`, `parsed ${extension}`)
+      const officeDocument = zipSync({
+        '[Content_Types].xml': new TextEncoder().encode('<Types />'),
+        [innerDirectory]: new Uint8Array(),
+        [`${innerDirectory}image1.png`]: new Uint8Array([0, 1, 2, 3]),
+      })
+      const rawValue = `data:${mimeType};base64,${bytesToBase64(officeDocument)}`
+      source.blobs.set(`file:${extension}:raw`, rawValue)
+      expectedRawValues.set(extension, rawValue)
+    }
+    const chunks: Uint8Array[] = []
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+
+    expect(
+      exported.manifest.resources
+        .filter((resource) => resource.kind === 'raw-attachment')
+        .map((resource) => resource.path)
+    ).toEqual(
+      expect.arrayContaining(attachments.map(({ extension }) => expect.stringMatching(new RegExp(`\\.${extension}$`))))
+    )
+
+    const destination = new MemoryStorage()
+    await importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'backup.zip'), {
+      storage: destination,
+      metaStorage: new MemoryMetaStorage(),
+    })
+    const restored = destination.values.get(backupSessionStorageKey(session.id)) as Session
+    for (const file of restored.messages[0].files ?? []) {
+      const extension = file.name.split('.').pop() ?? ''
+      expect(destination.blobs.get(file.rawStorageKey ?? '')).toBe(expectedRawValues.get(extension))
+    }
+  })
+
+  it('round-trips highly compressible sessions and long URL-based storage keys', async () => {
+    const storageKey = `link:https://example.com/?payload=${'a'.repeat(20_000)}`
+    const sessionId = `session-${'s'.repeat(5_000)}`
+    const session: Session = {
+      id: sessionId,
+      name: 'Compressible session',
+      messages: [
+        {
+          id: 'compressible-message',
+          role: 'user',
+          contentParts: [{ type: 'text', text: 'a'.repeat(2 * 1024 * 1024) }],
+          links: [{ id: 'long-link', url: 'https://example.com', title: 'Long link', storageKey }],
+        },
+      ],
+    }
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    source.values.set(backupSessionStorageKey(session.id), session)
+    sourceMeta.records.set(session.id, createMeta(session, 1))
+    source.blobs.set(storageKey, 'parsed link')
+    const chunks: Uint8Array[] = []
+
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+
+    expect(exported.manifest.sessions[0].path.length).toBeLessThan(200)
+    expect(exported.manifest.resources[0].path.length).toBeLessThan(200)
+
+    const destination = new MemoryStorage()
+    await importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'backup.zip'), {
+      storage: destination,
+      metaStorage: new MemoryMetaStorage(),
+    })
+    const restored = destination.values.get(backupSessionStorageKey(session.id)) as Session
+    expect(restored.messages[0].contentParts[0]).toEqual({ type: 'text', text: 'a'.repeat(2 * 1024 * 1024) })
+    expect(restored.messages[0].links?.[0].storageKey).toBe(storageKey)
+    expect(destination.blobs.get(storageKey)).toBe('parsed link')
+  })
+
   it('deduplicates identical resource content and preserves the resource graph', async () => {
     const source = new MemoryStorage()
     const sourceMeta = new MemoryMetaStorage()
@@ -278,7 +474,7 @@ describe('ZIP backup round trip', () => {
     expect(exported.manifest.sessions.every((entry) => entry.resourceIds.length === 1)).toBe(true)
   })
 
-  it('records missing managed resources instead of silently claiming a complete backup', async () => {
+  it('imports the available data and removes references to managed resources that could not be exported', async () => {
     const source = new MemoryStorage()
     const sourceMeta = new MemoryMetaStorage()
     const session = createSession('missing')
@@ -299,12 +495,154 @@ describe('ZIP backup round trip', () => {
     expect(result.manifest.warnings).toContainEqual(
       expect.objectContaining({ code: 'resource-read-failed', itemId: 'picture:shared' })
     )
+    const destination = new MemoryStorage()
+    const imported = await importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'incomplete.zip'), {
+      storage: destination,
+      metaStorage: new MemoryMetaStorage(),
+    })
+    expect(imported.warnings).toContainEqual(
+      expect.objectContaining({ code: 'resource-read-failed', itemId: 'picture:shared' })
+    )
+    expect(imported.restoredSessionCount).toBe(1)
+    expect(destination.values.get(backupSessionStorageKey(session.id))).toMatchObject({
+      messages: [{ contentParts: [{ type: 'text', text: 'look' }] }],
+    })
+  })
+
+  it('preserves legacy message content when a ZIP v2 session has no contentParts', async () => {
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    const session = {
+      id: 'legacy-content',
+      name: 'Legacy content',
+      messages: [{ id: 'legacy-message', role: 'user', content: 'keep legacy content' }],
+    } as unknown as Session
+    source.values.set(backupSessionStorageKey(session.id), session)
+    sourceMeta.records.set(session.id, createMeta(session, 1))
+    const chunks: Uint8Array[] = []
+
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+    expect(exported.manifest.formatVersion).toBe(2)
+
+    const destination = new MemoryStorage()
     await expect(
-      importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'incomplete.zip'), {
-        storage: new MemoryStorage(),
+      importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'legacy-content.zip'), {
+        storage: destination,
         metaStorage: new MemoryMetaStorage(),
       })
-    ).rejects.toThrow('Backup is incomplete')
+    ).resolves.toMatchObject({ restoredSessionCount: 1 })
+    const restored = destination.values.get(backupSessionStorageKey(session.id)) as Session & {
+      messages: Array<Session['messages'][number] & { content?: string }>
+    }
+    expect(restored.messages[0].content).toBe('keep legacy content')
+    expect(restored.messages[0].contentParts).toEqual([])
+  })
+
+  it('does not count unreadable resource payloads as deduplicated exports', async () => {
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    const session = createSession('invalid-resource')
+    source.values.set(backupSessionStorageKey(session.id), session)
+    sourceMeta.records.set(session.id, createMeta(session, 1))
+    source.blobs.set('picture:shared', 'data:image/png;base64,%%%')
+
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const _chunk of dataCallback()) {
+          // Consume the stream so resource warnings and stats are finalized.
+        }
+        return { boundedMemory: true }
+      },
+    })
+
+    expect(exported.manifest.resources).toEqual([])
+    expect(exported.manifest.stats.deduplicatedResourceCount).toBe(0)
+    expect(exported.manifest.warnings).toContainEqual(
+      expect.objectContaining({ code: 'resource-read-failed', itemId: 'picture:shared' })
+    )
+  })
+
+  it('removes undeclared empty resource references even when the export did not emit a warning', async () => {
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    const session: Session = {
+      id: 'empty-resource-keys',
+      name: 'Empty resource keys',
+      messages: [
+        {
+          id: 'empty-resource-message',
+          role: 'user',
+          contentParts: [
+            { type: 'text', text: 'keep me' },
+            { type: 'image', storageKey: '' },
+          ],
+          files: [{ id: 'empty-file', name: 'missing.pdf', fileType: 'application/pdf', storageKey: '' }],
+          links: [{ id: 'empty-link', url: 'https://example.com', title: 'Example', storageKey: '' }],
+        },
+      ],
+    }
+    source.values.set(backupSessionStorageKey(session.id), session)
+    sourceMeta.records.set(session.id, createMeta(session, 1))
+    const chunks: Uint8Array[] = []
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+    expect(exported.manifest.warnings).toEqual([])
+    expect(exported.manifest.resources).toEqual([])
+
+    const destination = new MemoryStorage()
+    await importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'empty-keys.zip'), {
+      storage: destination,
+      metaStorage: new MemoryMetaStorage(),
+    })
+    const restored = destination.values.get(backupSessionStorageKey(session.id)) as Session
+    expect(restored.messages[0].contentParts).toEqual([{ type: 'text', text: 'keep me' }])
+    expect(restored.messages[0].files?.[0].storageKey).toBeUndefined()
+    expect(restored.messages[0].links?.[0].storageKey).toBeUndefined()
+  })
+
+  it('validates the generated manifest before reporting export success', async () => {
+    const source = new MemoryStorage()
+    source.values.set(BackupStorageKey.ConfigVersion, -1)
+
+    await expect(
+      exportBackupArchive({
+        exportItems: [],
+        includeKeys: false,
+        storage: source,
+        metaStorage: new MemoryMetaStorage(),
+        application: { version: 'test', platform: 'test' },
+        writeArchive: async (dataCallback) => {
+          for await (const _chunk of dataCallback()) {
+            // Consume the stream so final manifest validation runs.
+          }
+          return { boundedMemory: true }
+        },
+      })
+    ).rejects.toThrow()
   })
 
   it('ignores null orphan session slots that do not have session metadata', async () => {
@@ -326,6 +664,76 @@ describe('ZIP backup round trip', () => {
 
     expect(result.manifest.sessions).toEqual([])
     expect(result.manifest.warnings).toEqual([])
+  })
+
+  it('skips a corrupt session slot whose embedded id does not match its storage key', async () => {
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    const session = createSession('embedded-id')
+    source.values.set(backupSessionStorageKey('storage-id'), session)
+    sourceMeta.records.set('storage-id', { ...createMeta(session, 1), id: 'storage-id' })
+    const chunks: Uint8Array[] = []
+
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+
+    expect(exported.manifest.sessions).toEqual([])
+    expect(exported.manifest.warnings).toContainEqual(
+      expect.objectContaining({ code: 'session-read-failed', itemId: 'storage-id' })
+    )
+    const imported = await importBackupArchive(
+      new File([Uint8Array.from(combine(chunks)).buffer], 'corrupt-slot.zip'),
+      {
+        storage: new MemoryStorage(),
+        metaStorage: new MemoryMetaStorage(),
+      }
+    )
+    expect(imported.restoredSessionCount).toBe(0)
+    expect(imported.warnings).toHaveLength(1)
+  })
+
+  it('does not export resource references from a session that fails after resource collection', async () => {
+    const source = new MemoryStorage()
+    const sourceMeta = new MemoryMetaStorage()
+    const invalidId = 'invalid-\ud800-session'
+    const session = createSession(invalidId)
+    source.values.set(backupSessionStorageKey(invalidId), session)
+    sourceMeta.records.set(invalidId, createMeta(session, 1))
+    source.blobs.set('picture:shared', 'data:image/png;base64,AAECAw==')
+    const chunks: Uint8Array[] = []
+
+    const exported = await exportBackupArchive({
+      exportItems: ['conversations'],
+      includeKeys: false,
+      storage: source,
+      metaStorage: sourceMeta,
+      application: { version: 'test', platform: 'test' },
+      writeArchive: async (dataCallback) => {
+        for await (const chunk of dataCallback()) chunks.push(chunk)
+        return { boundedMemory: true }
+      },
+    })
+
+    expect(exported.manifest.sessions).toEqual([])
+    expect(exported.manifest.resources).toEqual([])
+    expect(exported.manifest.warnings).toContainEqual(
+      expect.objectContaining({ code: 'session-read-failed', itemId: invalidId })
+    )
+    await expect(
+      importBackupArchive(new File([Uint8Array.from(combine(chunks)).buffer], 'failed-session.zip'), {
+        storage: new MemoryStorage(),
+        metaStorage: new MemoryMetaStorage(),
+      })
+    ).resolves.toMatchObject({ restoredSessionCount: 0, restoredResourceCount: 0 })
   })
 
   it('rejects a resource checksum mismatch before changing destination data', async () => {
