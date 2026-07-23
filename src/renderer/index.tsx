@@ -72,7 +72,9 @@ async function initializeApp() {
 
   // Migrate persisted consent before any settings-backed telemetry initializes.
   await initSentry()
-  void initPlausibleTracking()
+  void initPlausibleTracking((onResolved) => {
+    router.subscribe('onResolved', ({ hrefChanged }) => onResolved(hrefChanged))
+  })
   void initJkTracking()
 
   if (migrationError !== undefined) {
