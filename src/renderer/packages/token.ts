@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/react'
+import { reportError } from '@/utils/sentry'
 import type { Message, MessageFile, MessageLink } from '../../shared/types'
 import { TOKEN_CACHE_KEYS, type TokenCacheKey } from '../../shared/types/session'
 import { getMessageText, isEmptyMessage } from '../../shared/utils/message'
@@ -90,7 +90,10 @@ export function estimateTokensFromMessages(
     // ret += 3 // every reply is primed with <|start|>assistant<|message|>
     return ret
   } catch (e) {
-    Sentry.captureException(e)
+    reportError(e, {
+      domain: 'token-estimation',
+      operation: 'estimate_messages',
+    })
     return 0
   }
 }
@@ -328,7 +331,10 @@ export function estimateTokensFromMessagesForSendPayload(
 
     return total
   } catch (e) {
-    Sentry.captureException(e)
+    reportError(e, {
+      domain: 'token-estimation',
+      operation: 'estimate_send_payload',
+    })
     return 0
   }
 }

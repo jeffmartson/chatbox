@@ -1,5 +1,5 @@
-import * as Sentry from '@sentry/react'
-import { AIProviderNoImplementedPaintError, ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
+import { isExpectedGenerationError } from '@shared/models/error-classification'
+import { ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
 import type {
   AgentModeValue,
   Message,
@@ -19,6 +19,7 @@ import {
 } from '@/analytics/agent-mode'
 import { getModelDisplayName } from '@/packages/model-setting-utils'
 import platform from '@/platform'
+import { reportError } from '@/utils/sentry'
 import { trackEvent } from '@/utils/track'
 import { uiStore } from '../uiStore'
 import { getSessionAgentModeEntry } from './agent-mode'
@@ -161,16 +162,7 @@ export function handleGenerationError(
   sentryContext?: { operationType?: 'send_message' | 'regenerate'; agentMode?: AgentModeValue }
 ): Message {
   const error = !(err instanceof Error) ? new Error(`${err}`) : err
-  const isExpectedOCRError = error instanceof OCRError && error.cause instanceof BaseError
-
-  if (
-    !(
-      error instanceof ApiError ||
-      error instanceof NetworkError ||
-      error instanceof AIProviderNoImplementedPaintError ||
-      isExpectedOCRError
-    )
-  ) {
+  if (!isExpectedGenerationError(error)) {
     if (sentryContext?.agentMode === 'on') {
       captureAgentModeException(error, {
         operation: 'generation',
@@ -181,7 +173,16 @@ export function handleGenerationError(
         operationType: sentryContext.operationType,
       })
     } else {
-      Sentry.captureException(error)
+      reportError(error, {
+        domain: 'ai-generation',
+        operation: sentryContext?.operationType ?? 'generation',
+        priority: 'high',
+        tags: settings.provider
+          ? {
+              provider: settings.provider.startsWith('custom-provider-') ? 'custom' : settings.provider,
+            }
+          : undefined,
+      })
     }
   }
 

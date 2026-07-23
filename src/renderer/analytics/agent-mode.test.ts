@@ -1,4 +1,11 @@
-import { AIProviderNoImplementedPaintError, ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
+import {
+  AIProviderNoImplementedPaintError,
+  ApiError,
+  BaseError,
+  ChatboxAIAPIError,
+  NetworkError,
+  OCRError,
+} from '@shared/models/errors'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const captureExceptionMock = vi.fn()
@@ -58,6 +65,7 @@ describe('isExpectedGenerationError', () => {
   it('treats provider/network errors as expected', () => {
     expect(isExpectedGenerationError(new ApiError('rate limited'))).toBe(true)
     expect(isExpectedGenerationError(new NetworkError('offline', 'https://example.com'))).toBe(true)
+    expect(isExpectedGenerationError(ChatboxAIAPIError.fromCodeName('quota', 'token_quota_exhausted'))).toBe(true)
     expect(isExpectedGenerationError(new AIProviderNoImplementedPaintError('openai'))).toBe(true)
     expect(isExpectedGenerationError(new OCRError('builtin', new BaseError('bad image')))).toBe(true)
   })

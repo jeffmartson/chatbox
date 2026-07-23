@@ -33,6 +33,7 @@ import type {
 } from '../types'
 import type { ModelDependencies } from '../types/adapters'
 import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
+import { isExpectedGenerationError } from './error-classification'
 import { ApiError, ChatboxAIAPIError } from './errors'
 import { repairToolCallJson } from './tool-call-json-repair'
 import type {
@@ -232,13 +233,23 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
         }
       }
 
-      // 添加请求信息到 Sentry
-      this.dependencies.sentry.withScope((scope) => {
-        scope.setTag('provider_name', this.name)
-        scope.setExtra('messages', JSON.stringify(messages))
-        scope.setExtra('options', JSON.stringify(options))
-        this.dependencies.sentry.captureException(e)
-      })
+      // Provider/API/network failures are expected user-facing outcomes. Report only
+      // unexpected client/runtime failures, and never attach prompts or request options.
+      if (!isExpectedGenerationError(e)) {
+        const providerId = this.options.model.providerId
+        const providerTag = providerId?.startsWith('custom-provider-') ? 'custom' : providerId || 'unknown'
+        this.dependencies.sentry.withScope((scope) => {
+          scope.setTag('component', 'ai-provider')
+          scope.setTag('operation', 'chat_completion')
+          scope.setTag('error_domain', 'ai-provider')
+          scope.setTag('error_operation', 'chat_completion')
+          scope.setTag('error_priority', 'high')
+          scope.setTag('error_handled', 'true')
+          scope.setTag('provider_name', providerTag)
+          scope.setExtra('messageCount', messages.length)
+          this.dependencies.sentry.captureException(e)
+        })
+      }
       throw e
     }
   }

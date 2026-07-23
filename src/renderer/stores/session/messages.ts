@@ -1,11 +1,5 @@
-import * as Sentry from '@sentry/react'
-import {
-  AIProviderNoImplementedPaintError,
-  ApiError,
-  BaseError,
-  ChatboxAIAPIError,
-  NetworkError,
-} from '@shared/models/errors'
+import { isExpectedGenerationError } from '@shared/models/error-classification'
+import { BaseError, ChatboxAIAPIError } from '@shared/models/errors'
 import { createMessage, type Message } from '@shared/types'
 import { countMessageWords } from '@shared/utils/message'
 import { createModel } from '@/adapters'
@@ -14,6 +8,7 @@ import { runCompactionWithUIState } from '@/packages/context-management'
 import { getModelDisplayName } from '@/packages/model-setting-utils'
 import { estimateTokensFromMessages } from '@/packages/token'
 import platform from '@/platform'
+import { reportError } from '@/utils/sentry'
 import { SESSION_ATTACHMENT_RAG_LOG_PREFIX } from '../../../shared/session-attachment-rag/logging'
 import * as chatStore from '../chatStore'
 import { ensureMessageFileSessionAttachment } from '../sessionAttachmentRagIndexing'
@@ -271,14 +266,12 @@ export async function submitNewUserMessage(
   } catch (err: unknown) {
     // 如果文件上传失败，一定会出现带有错误信息的回复消息
     const error = !(err instanceof Error) ? new Error(`${err}`) : err
-    if (
-      !(
-        error instanceof ApiError ||
-        error instanceof NetworkError ||
-        error instanceof AIProviderNoImplementedPaintError
-      )
-    ) {
-      Sentry.captureException(error) // unexpected error should be reported
+    if (!isExpectedGenerationError(error)) {
+      reportError(error, {
+        domain: 'session',
+        operation: 'submit_message',
+        priority: 'high',
+      })
     }
     let errorCode: number | undefined
     if (err instanceof BaseError) {

@@ -1,23 +1,29 @@
 // @vitest-environment jsdom
 
-import type { SessionSettings, Settings } from '@shared/types'
+import { ChatboxAIAPIError } from '@shared/models/errors'
+import type { Message, SessionSettings, Settings } from '@shared/types'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-const { trackEventMock } = vi.hoisted(() => ({ trackEventMock: vi.fn() }))
+const { reportErrorMock, trackEventMock } = vi.hoisted(() => ({
+  reportErrorMock: vi.fn(),
+  trackEventMock: vi.fn(),
+}))
 
 vi.mock('@/platform', () => ({ default: { type: 'desktop' } }))
 vi.mock('@/utils/track', () => ({ trackEvent: trackEventMock }))
+vi.mock('@/utils/sentry', () => ({ reportError: reportErrorMock }))
 vi.mock('@/packages/model-setting-utils', () => ({ getModelDisplayName: vi.fn() }))
 vi.mock('../chatStore', () => ({
   useSession: vi.fn(() => ({ session: null })),
 }))
 
 import { uiStore } from '../uiStore'
-import { trackGenerateEvent } from './utils'
+import { handleGenerationError, trackGenerateEvent } from './utils'
 
 describe('trackGenerateEvent', () => {
   beforeEach(() => {
     trackEventMock.mockClear()
+    reportErrorMock.mockClear()
     uiStore.setState({ sessionAgentModeMap: {} })
   })
 
@@ -38,5 +44,22 @@ describe('trackGenerateEvent', () => {
         agent_mode_entry_source: 'locked_session',
       })
     )
+  })
+
+  test('does not report expected Chatbox API errors as high-priority failures', () => {
+    const error = ChatboxAIAPIError.fromCodeName('quota', 'token_quota_exhausted')
+    const message = {
+      id: 'message-1',
+      role: 'assistant',
+      contentParts: [],
+    } as Message
+    const settings = {
+      modelId: 'chatboxai-4',
+      provider: 'chatboxai',
+    } as SessionSettings
+
+    handleGenerationError(error, message, settings, { operationType: 'send_message' })
+
+    expect(reportErrorMock).not.toHaveBeenCalled()
   })
 })

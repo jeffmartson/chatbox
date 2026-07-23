@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react'
 import {
   LEGACY_PROVIDER_MODEL_KEYS,
   type LegacyFlatSettings,
@@ -38,6 +37,7 @@ import { createSessionMetaRecordsFromLegacyList } from '@/utils/session-utils'
 import * as defaults from '../../shared/defaults'
 import { getLogger } from '../lib/utils'
 import { migrationProcessAtom } from './atoms/utilAtoms'
+import { withMigrationErrorContext } from './migration-error'
 import { getSessionMeta } from './sessionHelpers'
 
 const log = getLogger('migration')
@@ -189,8 +189,6 @@ export async function migrateOnData(dataStore: MigrateStore, canRelaunch = true)
     return
   }
 
-  const scope = Sentry.getCurrentScope()
-  scope.setTag('configVersion', configVersion)
   log.info(`migrateOnData: ${configVersion}, canRelaunch: ${canRelaunch}`)
 
   const migrateFunctions = [
@@ -212,9 +210,15 @@ export async function migrateOnData(dataStore: MigrateStore, canRelaunch = true)
   ]
 
   for (; configVersion < CurrentVersion; configVersion++) {
-    const _needRelaunch = await migrateFunctions[configVersion]?.(dataStore)
+    const _needRelaunch = await withMigrationErrorContext(
+      { configVersion, targetConfigVersion: configVersion + 1 },
+      async () => {
+        const result = await migrateFunctions[configVersion]?.(dataStore)
+        await dataStore.setData(StorageKey.ConfigVersion, configVersion + 1)
+        return result
+      }
+    )
     needRelaunch ||= !!_needRelaunch
-    await dataStore.setData(StorageKey.ConfigVersion, configVersion + 1)
     log.info(`migrate_${configVersion}_to_${configVersion + 1}, needRelaunch: ${needRelaunch}`)
   }
 

@@ -1,7 +1,8 @@
 import { isFirstDay } from '../hooks/useVersion'
-import { initSettingsStore } from '../stores/settingsStore'
 import platform from '../platform'
-;(async () => {
+import { initSettingsStore } from '../stores/settingsStore'
+
+export async function initPlausibleTracking(): Promise<void> {
   try {
     const settings = await initSettingsStore()
     if (!settings.allowReportingAndTracking) {
@@ -37,4 +38,4 @@ import platform from '../platform'
   } catch (e) {
     console.error('Failed to initialize Plausible with version:', e)
   }
-})()
+}

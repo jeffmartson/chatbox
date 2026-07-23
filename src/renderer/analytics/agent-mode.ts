@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react'
-import { AIProviderNoImplementedPaintError, ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
+import { isExpectedGenerationError } from '@shared/models/error-classification'
 import platform from '@/platform'
 import { trackEvent } from '@/utils/track'
 import { trackJkAutoEvent, trackJkClickEvent } from './jk'
@@ -131,14 +131,7 @@ export function trackAgentModeFullAccessBypass(props: { tool: 'user_exec' | 'wri
 
 // Same expected-error set as handleGenerationError: provider/network failures are
 // user-environment noise, not defects, and their messages can echo request content.
-export function isExpectedGenerationError(error: unknown): boolean {
-  return (
-    error instanceof ApiError ||
-    error instanceof NetworkError ||
-    error instanceof AIProviderNoImplementedPaintError ||
-    (error instanceof OCRError && error.cause instanceof BaseError)
-  )
-}
+export { isExpectedGenerationError }
 
 function sanitizeProviderTag(provider: string): string {
   return provider.startsWith('custom-provider-') ? 'custom' : provider
@@ -178,6 +171,10 @@ export function captureAgentModeException(
   Sentry.withScope((scope) => {
     scope.setTag('component', 'agent-mode')
     scope.setTag('operation', context.operation)
+    scope.setTag('error_domain', 'agent-mode')
+    scope.setTag('error_operation', context.operation)
+    scope.setTag('error_priority', 'high')
+    scope.setTag('error_handled', 'true')
     if (context.provider) scope.setTag('provider', sanitizeProviderTag(context.provider))
     // Custom-provider model IDs are user-typed free text; skip them.
     if (context.model && !customProvider) scope.setTag('model', context.model)
