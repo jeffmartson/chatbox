@@ -346,6 +346,7 @@ In long conversations, earlier tool call results may be automatically compressed
     tools.load_skill = buildLoadSkillTool(options)
     if (enabledSkills.some((skill) => skill.name === 'chatbox-product-info')) {
       const chatboxCliToolSet = buildChatboxCliToolSet({
+        sessionId: options.sessionId,
         onUsed: options.onAgentModeActivated,
       })
       instructions += chatboxCliToolSet.description

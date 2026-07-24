@@ -1,6 +1,7 @@
 import { buildContext } from '@shared/context'
 import type { ModelInterface, ModelStreamPart } from '@shared/models/types'
 import type {
+  AppActionApprovalDetails,
   Message,
   MessageContentParts,
   MessageContentToolCallPart,
@@ -19,6 +20,7 @@ import {
   trackAgentModeSuggested,
   trackWorkModeSuggestionDecision,
 } from '@/analytics/agent-mode'
+import { AppActionApprovalPausedError } from '@/packages/app-action-approval'
 import * as appleAppStore from '@/packages/apple_app_store'
 import { estimateTokensFromMessages } from '@/packages/token'
 import { FileMutationApprovalPausedError, UserExecApprovalPausedError } from '@/packages/user-exec-approval'
@@ -43,6 +45,7 @@ import {
 } from './agent-mode-suggestion'
 import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
+import { withSessionGenerationLock } from './generation-lock'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
 import { createInitialState, processStreamChunk } from './stream-chunk-processor'
 import { buildToolsForSession } from './tools-builder'
@@ -57,7 +60,10 @@ import {
 const MAX_TOOL_CALLS_BEFORE_CONFIRMATION = 25
 
 type ExecutableTool = {
-  execute?: (input: unknown, context: { toolCallId?: string; approved?: boolean }) => unknown
+  execute?: (
+    input: unknown,
+    context: { toolCallId?: string; approved?: boolean; approvalDetails?: AppActionApprovalDetails }
+  ) => unknown
 }
 
 class ToolCallLimitPausedError extends Error {
@@ -121,6 +127,26 @@ function isFileMutationApprovalPausedError(error: unknown): error is FileMutatio
   )
 }
 
+function isAppActionApprovalPausedError(error: unknown): error is AppActionApprovalPausedError {
+  return (
+    error instanceof AppActionApprovalPausedError ||
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        error.name === 'AppActionApprovalPausedError' &&
+        'toolCallId' in error &&
+        typeof error.toolCallId === 'string' &&
+        'action' in error &&
+        typeof error.action === 'string' &&
+        'title' in error &&
+        typeof error.title === 'string' &&
+        'preview' in error &&
+        typeof error.preview === 'string'
+    )
+  )
+}
+
 function getToolCallPause(error: unknown): {
   toolCallId: string
   pauseReason: MessageToolCallPart['pauseReason']
@@ -146,6 +172,18 @@ function getToolCallPause(error: unknown): {
     return {
       toolCallId: error.toolCallId,
       pauseReason: { type: 'file_mutation_approval', title: error.title, preview: error.preview },
+    }
+  }
+  if (isAppActionApprovalPausedError(error)) {
+    return {
+      toolCallId: error.toolCallId,
+      pauseReason: {
+        type: 'app_action_approval',
+        action: error.action,
+        title: error.title,
+        preview: error.preview,
+        details: error.details,
+      },
     }
   }
   return null
@@ -316,7 +354,11 @@ function findPausedToolCallLimitBatch(message: Message, toolCallId: string): Mes
 }
 
 function isApprovalPauseReason(pauseReason: MessageContentToolCallPart['pauseReason']): boolean {
-  return pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval'
+  return (
+    pauseReason?.type === 'user_exec_approval' ||
+    pauseReason?.type === 'file_mutation_approval' ||
+    pauseReason?.type === 'app_action_approval'
+  )
 }
 
 function getApprovalTrackingTarget(part: MessageToolCallPart) {
@@ -746,7 +788,13 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   return { tools }
 }
 
-export async function stopPausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+export function stopPausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+  return withSessionGenerationLock(sessionId, () =>
+    stopPausedToolCallWithoutSessionLock(sessionId, messageId, toolCallId)
+  )
+}
+
+async function stopPausedToolCallWithoutSessionLock(sessionId: string, messageId: string, toolCallId: string) {
   const [session, settings] = await Promise.all([
     chatStore.getSession(sessionId),
     chatStore.getSessionSettings(sessionId),
@@ -776,11 +824,17 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
   })
 
   const pauseReason = part.pauseReason
-  if (pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval') {
+  if (
+    pauseReason?.type === 'user_exec_approval' ||
+    pauseReason?.type === 'file_mutation_approval' ||
+    pauseReason?.type === 'app_action_approval'
+  ) {
     const deniedResult =
       pauseReason.type === 'user_exec_approval'
         ? { success: false, exitCode: null, stdout: '', stderr: 'Command denied by user.' }
-        : { success: false, error: 'File mutation denied by user.' }
+        : pauseReason.type === 'file_mutation_approval'
+          ? { success: false, error: 'File mutation denied by user.' }
+          : { success: false, error: 'Chatbox action denied by user.' }
     // Denying one call intentionally denies its whole parallel batch: the model should see
     // one consistent refusal and react once, not a mix of denied and still-pending siblings.
     // Approving stays per-call (each approval is reviewed individually in continuePausedToolCall).
@@ -838,7 +892,13 @@ export async function stopPausedToolCall(sessionId: string, messageId: string, t
   )
 }
 
-export async function continuePausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+export function continuePausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
+  return withSessionGenerationLock(sessionId, () =>
+    continuePausedToolCallWithoutSessionLock(sessionId, messageId, toolCallId)
+  )
+}
+
+async function continuePausedToolCallWithoutSessionLock(sessionId: string, messageId: string, toolCallId: string) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)
   if (!session || !settings) return
@@ -879,7 +939,9 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
     (batchPart) => ({
       ...batchPart,
       state: 'call',
-      pauseReason: undefined,
+      // Keep structured app-action approval details until execution finishes so an
+      // interrupted continuation can still retry the exact request the user reviewed.
+      pauseReason: batchPart.pauseReason?.type === 'app_action_approval' ? batchPart.pauseReason : undefined,
       result: undefined,
       resultStorageKey: undefined,
       // Restart the timer at continuation so the reported duration excludes the
@@ -905,10 +967,13 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
         const result = await executableTool.execute(batchPart.args, {
           toolCallId: batchPart.toolCallId,
           approved: !isLimitContinue,
+          approvalDetails:
+            batchPart.pauseReason?.type === 'app_action_approval' ? batchPart.pauseReason.details : undefined,
         })
         message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) => ({
           ...toolPart,
           state: 'result',
+          pauseReason: undefined,
           result,
           duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
         }))
@@ -929,6 +994,7 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
             : {
                 ...toolPart,
                 state: 'error',
+                pauseReason: undefined,
                 result: { error: error instanceof Error ? error.message : String(error) },
                 duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
               }
@@ -967,6 +1033,7 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
         (batchPart) => ({
           ...batchPart,
           state: 'error',
+          pauseReason: undefined,
           result: { error: errorMessage },
           duration: batchPart.startTime ? Date.now() - batchPart.startTime : undefined,
         })
@@ -976,7 +1043,17 @@ export async function continuePausedToolCall(sessionId: string, messageId: strin
   }
 }
 
-export async function retryFromLastToolCallAfterApiError(sessionId: string, messageId: string, toolCallId: string) {
+export function retryFromLastToolCallAfterApiError(sessionId: string, messageId: string, toolCallId: string) {
+  return withSessionGenerationLock(sessionId, () =>
+    retryFromLastToolCallAfterApiErrorWithoutSessionLock(sessionId, messageId, toolCallId)
+  )
+}
+
+async function retryFromLastToolCallAfterApiErrorWithoutSessionLock(
+  sessionId: string,
+  messageId: string,
+  toolCallId: string
+) {
   const session = await chatStore.getSession(sessionId)
   if (!session) return
 
@@ -1021,10 +1098,15 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
         throw new Error(`Tool "${part.toolName}" is not available`)
       }
 
-      const result = await executableTool.execute(part.args, { toolCallId, approved: true })
+      const result = await executableTool.execute(part.args, {
+        toolCallId,
+        approved: true,
+        approvalDetails: part.pauseReason?.type === 'app_action_approval' ? part.pauseReason.details : undefined,
+      })
       retryMessage = updateToolCallPart(retryMessage, toolCallId, (toolPart) => ({
         ...toolPart,
         state: 'result',
+        pauseReason: undefined,
         result,
         duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
       }))
@@ -1050,6 +1132,7 @@ export async function retryFromLastToolCallAfterApiError(sessionId: string, mess
         updateToolCallPart(retryMessage, toolCallId, (toolPart) => ({
           ...toolPart,
           state: 'error',
+          pauseReason: undefined,
           result: { error: errorMessage },
           duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
         })),

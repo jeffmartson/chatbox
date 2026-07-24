@@ -1182,7 +1182,7 @@ export async function pollImageTask(
   return ImageGenerationTaskResponseSchema.parse(json)
 }
 
-const POLL_INTERVAL_MS = 2000
+export const IMAGE_GENERATION_POLL_INTERVAL_MS = 2000
 
 export async function pollTaskUntilComplete(
   taskId: string,
@@ -1204,6 +1204,6 @@ export async function pollTaskUntilComplete(
       return result
     }
 
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+    await new Promise((resolve) => setTimeout(resolve, IMAGE_GENERATION_POLL_INTERVAL_MS))
   }
 }

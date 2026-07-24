@@ -674,6 +674,34 @@ describe('load_skill tool', () => {
 })
 
 describe('chatbox_cli tool', () => {
+  test('uses an OpenAI-compatible top-level function schema', async () => {
+    const model = createMockModel()
+    getSettingsMock.mockReturnValue({
+      skills: { enabledSkillNames: ['chatbox-product-info'] },
+    })
+
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+    const inputSchema = result.tools.chatbox_cli.inputSchema as unknown as {
+      jsonSchema: Record<string, unknown>
+    }
+
+    expect(inputSchema.jsonSchema).toMatchObject({
+      type: 'object',
+      properties: {
+        command: { type: 'string' },
+        argv: { type: 'array' },
+      },
+      additionalProperties: false,
+    })
+    expect(inputSchema.jsonSchema).not.toHaveProperty('oneOf')
+    expect(inputSchema.jsonSchema).not.toHaveProperty('anyOf')
+    expect(inputSchema.jsonSchema).not.toHaveProperty('allOf')
+  })
+
   test('is available only when chatbox-product-info is enabled', async () => {
     const model = createMockModel()
     const options: BuildToolsOptions = {
@@ -724,6 +752,28 @@ describe('chatbox_cli tool', () => {
       plan: { name: 'Chatbox AI Pro' },
     })
     expect(JSON.stringify(executeResult)).not.toContain('license-key-secret-1234')
+  })
+
+  test('advertises the structured command hierarchy through capabilities', async () => {
+    const model = createMockModel()
+    getSettingsMock.mockReturnValue({
+      skills: { enabledSkillNames: ['chatbox-product-info'] },
+    })
+
+    const result = await buildToolsForSession(model, {
+      sessionId: 'session-1',
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+    })
+    if (!result.tools.chatbox_cli.execute) throw new Error('chatbox_cli execute missing')
+
+    const executeResult = await result.tools.chatbox_cli.execute({ argv: ['capabilities'] }, {} as never)
+    expect(executeResult).toMatchObject({
+      ok: true,
+      command: 'capabilities',
+      domains: ['account', 'settings', 'chats', 'image'],
+    })
   })
 })
 

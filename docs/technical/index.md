@@ -1,6 +1,6 @@
 # Chatbox Pro 技术设计文档
 
-> Last updated: 2026-03
+> Last updated: 2026-07
 
 本目录包含 Chatbox Pro 的系统设计与技术决策文档，面向工程师和技术负责人。
 
@@ -22,6 +22,7 @@
 | [知识库（RAG 系统）](./knowledge-base.md) | 向量数据库、文档索引、语义搜索、跨平台限制 |
 | [Session Attachment RAG 评测](./session-attachment-rag-eval.md) | 大文件问答 RAG 的模型工具调用评测、真实 Chatbox 流程与 fixture 策略 |
 | [工具与集成系统](./tools-and-integrations.md) | MCP 服务器、Web 搜索、内置工具集、Tool 构建 |
+| [Chatbox Virtual CLI](./chatbox-virtual-cli.md) | 内置 Skill 的应用操作命令、权限边界、异步生图与会话 follow-up |
 | [Agent Skills 技术设计](./agent-skills.md) | Skills 发现/解析、IPC 通道、上下文注入与会话级配置 |
 | [Chat 代码执行](./code-execution.md) | Agent Mode、Code Execution 工具集、SandboxProvider 抽象、会话隔离 |
 | [Windows 原生代码执行](./windows-sandbox.md) | Windows 代码执行根因分析、SRT/Codex 方案对比、当前最小原生支持（放弃隔离）与未来强隔离演进 |

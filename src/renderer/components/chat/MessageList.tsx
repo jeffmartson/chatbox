@@ -56,6 +56,7 @@ import ForkMarkerMessage from './ForkMarkerMessage'
 import Message from './Message'
 import MessageMinimapRail, { type MessageMinimapAnchor } from './MessageMinimapRail'
 import MessageNavigation, { ScrollToBottomButton } from './MessageNavigation'
+import { isUserNavigationMessage } from './message-navigation-utils'
 import SummaryMessage from './SummaryMessage'
 import { createSmoothFollowOutputController } from './smooth-follow-output'
 
@@ -180,7 +181,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
 
     for (let i = 0; i < currentMessageList.length; i++) {
       const message = currentMessageList[i]
-      if (message.role !== 'user' || message.isSummary) {
+      if (!isUserNavigationMessage(message)) {
         continue
       }
 
@@ -197,14 +198,12 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     }
 
     return renderItems.flatMap((item, itemIndex) =>
-      item.messages
-        .filter((message) => message.role === 'user' && !message.isSummary)
-        .map((message) => ({
-          messageId: message.id,
-          itemIndex,
-          text: getMessageText(message, true, false).trim(),
-          assistantText: assistantTextByUserId.get(message.id),
-        }))
+      item.messages.filter(isUserNavigationMessage).map((message) => ({
+        messageId: message.id,
+        itemIndex,
+        text: getMessageText(message, true, false).trim(),
+        assistantText: assistantTextByUserId.get(message.id),
+      }))
     )
   }, [currentMessageList, renderItems])
   const showMinimap = !isSmallScreen && userMessageAnchors.length > 0
@@ -265,7 +264,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
             // If the current element's top is scrolled above the viewport and it
             // contains a user message (e.g. a long assistant response in a group),
             // scroll to the top of THIS element first to bring the question back.
-            if (rect.top < containerRect.top - 2 && renderItems[i].messages.some((msg) => msg.role === 'user')) {
+            if (rect.top < containerRect.top - 2 && renderItems[i].messages.some(isUserNavigationMessage)) {
               virtuoso.current.scrollToIndex({
                 index: i,
                 align: 'start',
@@ -275,7 +274,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
               return
             }
             for (let j = i - 1; j >= 0; j--) {
-              if (renderItems[j].messages.some((msg) => msg.role === 'user')) {
+              if (renderItems[j].messages.some(isUserNavigationMessage)) {
                 virtuoso.current.scrollToIndex({
                   index: j,
                   align: 'start',
@@ -308,7 +307,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
           // +2 tolerance: see handleScrollToPrev comment
           if (rect.bottom > containerRect.top + 2) {
             for (let j = i + 1; j < renderItems.length; j++) {
-              if (renderItems[j].messages.some((msg) => msg.role === 'user')) {
+              if (renderItems[j].messages.some(isUserNavigationMessage)) {
                 virtuoso.current.scrollToIndex({ index: j, align: 'start', behavior: 'smooth' })
                 return
               }

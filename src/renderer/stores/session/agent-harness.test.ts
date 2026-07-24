@@ -385,4 +385,67 @@ describe('prepareAgentGenerationHarness', () => {
     expect(prepared.chatOptions.tools).toBeUndefined()
     expect(JSON.stringify(prepared.coreMessages)).not.toContain('SANDBOX_MODE')
   })
+
+  test('disables chatbox_cli while a resumed image task waits for its callback', async () => {
+    discoverSkillsMock.mockResolvedValue([
+      { name: 'chatbox-product-info', description: 'Operate Chatbox product features' },
+    ])
+    getSettingsMock.mockReturnValue({
+      skills: { enabledSkillNames: ['chatbox-product-info'] },
+    })
+    const messages: Message[] = [
+      {
+        id: 'user-1',
+        role: MessageRoleEnum.User,
+        contentParts: [{ type: 'text', text: 'Generate a red fox image.' }],
+      },
+      {
+        id: 'assistant-1',
+        role: MessageRoleEnum.Assistant,
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'tool-1',
+            toolName: 'chatbox_cli',
+            args: { argv: ['image', 'generate', '--prompt', 'red fox'] },
+            result: {
+              ok: true,
+              command: 'image generate',
+              accepted: true,
+              background: true,
+              recordId: 'record-1',
+              status: 'pending',
+              startedAt: 1_000,
+              wait: { mode: 'callback', managedBy: 'chatbox', modelShouldPoll: false, pollIntervalMs: 2_000 },
+            },
+          },
+        ],
+      },
+    ]
+
+    const prepared = await prepareAgentGenerationHarness({
+      session: createSession(),
+      settings: { provider: ModelProviderEnum.ChatboxAI, modelId: 'test-model' } as SessionSettings,
+      globalSettings: {} as Settings,
+      configs: { uuid: 'config-1' } as Config,
+      messages,
+      targetMsgIx: messages.length,
+      model: createMockModel(),
+      dependencies: {} as never,
+      webBrowsing: false,
+      agentModeValue: 'on',
+      agentModeLocked: true,
+      agentModeSupported: true,
+      signal: new AbortController().signal,
+      preserveLastPromptMessageToolCalls: true,
+      sandboxProviderFactory: () => sandboxProviderMock as unknown as SandboxProvider,
+      isPro: () => true,
+    })
+
+    expect(prepared.tools.chatbox_cli).toBeDefined()
+    expect(prepared.chatOptions.prepareStep).toBeDefined()
+    const stepSettings = await prepared.chatOptions.prepareStep?.({ steps: [] } as never)
+    expect(stepSettings?.activeTools).not.toContain('chatbox_cli')
+  })
 })

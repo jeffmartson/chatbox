@@ -55,6 +55,26 @@ describe('hasPendingApprovalToolCall', () => {
         messageWithPart(toolCallPart('paused', { type: 'file_mutation_approval', title: 'Edit file', preview: '' })),
       ])
     ).toBe(true)
+    expect(
+      hasPendingApprovalToolCall([
+        messageWithPart(
+          toolCallPart('paused', {
+            type: 'app_action_approval',
+            action: 'image.generate',
+            title: 'Generate image',
+            preview: 'A cat in watercolor',
+            details: {
+              type: 'image_generation',
+              provider: 'chatbox-ai',
+              modelId: 'gpt-image-1.5',
+              prompt: 'A cat in watercolor',
+              count: 1,
+              billing: 'chatbox_quota',
+            },
+          })
+        ),
+      ])
+    ).toBe(true)
   })
 
   it('returns false for non-approval pauses and completed tool calls', () => {

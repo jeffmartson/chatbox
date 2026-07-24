@@ -19,6 +19,10 @@ import { sequenceMessages } from '@shared/utils/message'
 import type { ToolSet } from 'ai'
 import { t } from 'i18next'
 import { getLogger } from '@/lib/utils'
+import {
+  hasAcceptedCallbackBackgroundTask,
+  hasAcceptedCallbackBackgroundTaskResult,
+} from '@/packages/chatbox-cli/background-task-result'
 import { convertToModelMessages, injectModelSystemPrompt } from '@/packages/model-calls/message-utils'
 import platform from '@/platform'
 import { createSandboxProvider } from '@/sandbox'
@@ -193,6 +197,9 @@ export async function prepareAgentGenerationHarness(
   } = options
 
   const allMessages = messages.slice(0, targetMsgIx)
+  const resumedMessage = preserveLastPromptMessageToolCalls ? messages[targetMsgIx - 1] : undefined
+  const resumedMessageWaitsForCallback =
+    Boolean(resumedMessage) && hasAcceptedCallbackBackgroundTaskResult(resumedMessage?.contentParts ?? [])
 
   if (agentModeSupported && agentModeValue === 'on' && !agentModeLocked) {
     sideEffects?.lockAgentMode?.('message_sent')
@@ -332,6 +339,18 @@ export async function prepareAgentGenerationHarness(
 
   if (Object.keys(tools).length > 0) {
     chatOptions.tools = tools as ToolSet
+  }
+
+  const allToolNames = Object.keys(tools)
+  if (allToolNames.includes('chatbox_cli')) {
+    chatOptions.prepareStep = ({ steps }) => {
+      return {
+        activeTools:
+          resumedMessageWaitsForCallback || hasAcceptedCallbackBackgroundTask(steps)
+            ? allToolNames.filter((toolName) => toolName !== 'chatbox_cli')
+            : allToolNames,
+      }
+    }
   }
 
   return {

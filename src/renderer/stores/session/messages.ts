@@ -14,6 +14,7 @@ import * as chatStore from '../chatStore'
 import { ensureMessageFileSessionAttachment } from '../sessionAttachmentRagIndexing'
 import * as settingActions from '../settingActions'
 import { settingsStore } from '../settingsStore'
+import { withSessionGenerationLock } from './generation-lock'
 import { getSessionWebBrowsing } from './utils'
 
 const log = getLogger('session-messages')
@@ -173,13 +174,20 @@ export async function removeMessage(sessionId: string, messageId: string) {
  * 在会话中发送新用户消息，并根据需要生成回复
  * @param params
  */
-export async function submitNewUserMessage(
+export function submitNewUserMessage(
   sessionId: string,
   params: { newUserMsg: Message; needGenerating: boolean; onUserMessageReady?: () => void }
 ) {
-  // Import generate lazily to avoid circular dependency
-  // generate will be moved to generation.ts in US-006, then this import will change
-  const { generate } = await import('../sessionActions.js')
+  return withSessionGenerationLock(sessionId, () => submitNewUserMessageUnlocked(sessionId, params))
+}
+
+async function submitNewUserMessageUnlocked(
+  sessionId: string,
+  params: { newUserMsg: Message; needGenerating: boolean; onUserMessageReady?: () => void }
+) {
+  // Import the unlocked generation helper lazily to avoid a circular dependency and
+  // avoid reacquiring the session lock already held by submitNewUserMessage().
+  const { _generateWithoutSessionLock } = await import('./generation.js')
 
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)
@@ -297,6 +305,6 @@ export async function submitNewUserMessage(
   }
   // 根据需要，生成这条回复消息
   if (needGenerating) {
-    return generate(sessionId, newAssistantMsg, { operationType: 'send_message' })
+    return _generateWithoutSessionLock(sessionId, newAssistantMsg, { operationType: 'send_message' })
   }
 }

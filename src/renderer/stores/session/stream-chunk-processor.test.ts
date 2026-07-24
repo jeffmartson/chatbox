@@ -627,7 +627,7 @@ describe('processStreamChunk', () => {
     })
   })
 
-  it.each(['UserExecApprovalPausedError', 'FileMutationApprovalPausedError'])(
+  it.each(['UserExecApprovalPausedError', 'FileMutationApprovalPausedError', 'AppActionApprovalPausedError'])(
     'throws %s instead of storing it as a tool result',
     async (errorName) => {
       const state = createInitialState()

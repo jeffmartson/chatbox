@@ -18,6 +18,11 @@ describe('builtinSkills', () => {
     expect(skill?.metadata.description).toContain('pricing')
     expect(skill?.body).toContain('https://chatboxai.app/llms.txt')
     expect(skill?.body).toContain('https://chatboxai.app/pricing.md')
+    expect(skill?.body).toContain('["settings", "get", "<key>"]')
+    expect(skill?.body).not.toContain('["settings", "set"')
+    expect(skill?.body).toContain('guide the user to change it manually')
+    expect(skill?.body).toContain('["chats", "read", "<session-id>"]')
+    expect(skill?.body).toContain('automated user-role notification')
   })
 
   it('keeps data analysis aligned with the sandbox harness', () => {

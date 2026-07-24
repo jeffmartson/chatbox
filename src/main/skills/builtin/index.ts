@@ -17,7 +17,7 @@ export interface BuiltinSeed {
 
 export const builtinSkills: BuiltinSeed[] = [
   { metadata: dataAnalysis.metadata, body: dataAnalysis.body, version: 1 },
-  { metadata: chatboxProductInfo.metadata, body: chatboxProductInfo.body, version: 1 },
+  { metadata: chatboxProductInfo.metadata, body: chatboxProductInfo.body, version: 4 },
   { metadata: vibedrop.metadata, body: vibedrop.body, version: 1 },
   { metadata: frontendDesign.metadata, body: frontendDesign.body, version: 1 },
 ]

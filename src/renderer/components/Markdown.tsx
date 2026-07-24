@@ -61,6 +61,7 @@ import { visit } from 'unist-util-visit'
 import { useCopied } from '@/hooks/useCopied'
 import { highlight, highlightSync, type ShikiTheme } from '../packages/shiki'
 import { ScalableIcon } from './common/ScalableIcon'
+import { ImageViewer, ImageViewerItem } from './ImageViewer'
 import IconDart from './icons/Dart'
 import IconJava from './icons/Java'
 import { MessageMermaid, SVGPreview } from './Mermaid'
@@ -127,64 +128,120 @@ function Markdown(props: {
   )
 
   return (
-    <ReactMarkdown
-      className={`break-words [overflow-wrap:anywhere] ${className || ''}`}
-      remarkPlugins={
-        enableLaTeXRendering
-          ? [remarkGfm, remarkMath, remarkBreaks, remarkAddCodeIndex]
-          : [remarkGfm, remarkBreaks, remarkAddCodeIndex]
-      }
-      rehypePlugins={rehypePlugins}
-      // react-markdown's default defaultUrlTransform will incorrectly encode query parameters in URLs (e.g. & becomes &amp;)
-      // Use sanitizeUrl here to avoid that and to prevent XSS attacks
-      urlTransform={(url) => sanitizeUrl(url)}
-      components={useMemo(
-        () => ({
-          // biome-ignore lint/suspicious/noExplicitAny: react-markdown code component props are loosely typed
-          code: (props: any) => {
-            const codeIndex = typeof props['data-code-index'] === 'number' ? props['data-code-index'] : -1
-            return (
-              <CodeRenderer
+    <ImageViewer>
+      <ReactMarkdown
+        className={`break-words [overflow-wrap:anywhere] ${className || ''}`}
+        remarkPlugins={
+          enableLaTeXRendering
+            ? [remarkGfm, remarkMath, remarkBreaks, remarkAddCodeIndex]
+            : [remarkGfm, remarkBreaks, remarkAddCodeIndex]
+        }
+        rehypePlugins={rehypePlugins}
+        // react-markdown's default defaultUrlTransform will incorrectly encode query parameters in URLs (e.g. & becomes &amp;)
+        // Use sanitizeUrl here to avoid that and to prevent XSS attacks
+        urlTransform={(url) => sanitizeUrl(url)}
+        components={useMemo(
+          () => ({
+            // biome-ignore lint/suspicious/noExplicitAny: react-markdown code component props are loosely typed
+            code: (props: any) => {
+              const codeIndex = typeof props['data-code-index'] === 'number' ? props['data-code-index'] : -1
+              return (
+                <CodeRenderer
+                  {...props}
+                  uniqueId={uniqueId ? `${uniqueId}-code-${codeIndex}` : undefined}
+                  hiddenCodeCopyButton={hiddenCodeCopyButton}
+                  enableMermaidRendering={enableMermaidRendering}
+                  generating={generating && generatingCodeIndex === codeIndex}
+                  forceColorScheme={forceColorScheme}
+                  onCodeCopy={onCodeCopy}
+                  onPreviewWebpage={onPreviewWebpage}
+                />
+              )
+            },
+            a: ({ node, ...props }) => (
+              <a
                 {...props}
-                uniqueId={uniqueId ? `${uniqueId}-code-${codeIndex}` : undefined}
-                hiddenCodeCopyButton={hiddenCodeCopyButton}
-                enableMermaidRendering={enableMermaidRendering}
-                generating={generating && generatingCodeIndex === codeIndex}
-                forceColorScheme={forceColorScheme}
-                onCodeCopy={onCodeCopy}
-                onPreviewWebpage={onPreviewWebpage}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                }}
               />
-            )
-          },
-          a: ({ node, ...props }) => (
-            <a
-              {...props}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => {
-                e.stopPropagation()
-              }}
-            />
-          ),
-        }),
-        [
-          uniqueId,
-          hiddenCodeCopyButton,
-          enableMermaidRendering,
-          generating,
-          generatingCodeIndex,
-          forceColorScheme,
-          onCodeCopy,
-          onPreviewWebpage,
-        ]
-      )}
-    >
-      {processedChildren}
-    </ReactMarkdown>
+            ),
+            img: ({ node, ...props }) => <MarkdownImage {...props} />,
+          }),
+          [
+            uniqueId,
+            hiddenCodeCopyButton,
+            enableMermaidRendering,
+            generating,
+            generatingCodeIndex,
+            forceColorScheme,
+            onCodeCopy,
+            onPreviewWebpage,
+          ]
+        )}
+      >
+        {processedChildren}
+      </ReactMarkdown>
+    </ImageViewer>
   )
 }
 
 export default memo(Markdown)
+
+function parseImageDimension(value: number | string | undefined): number | undefined {
+  if (typeof value === 'number') return value > 0 ? value : undefined
+  if (typeof value !== 'string') return undefined
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
+
+function MarkdownImage({ src, alt, width, height, className, onLoad, onClick, ...props }: ComponentProps<'img'>) {
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>()
+
+  if (!src) return <img {...props} alt={alt} width={width} height={height} className={className} />
+
+  const viewerWidth = naturalSize?.width ?? parseImageDimension(width) ?? 1024
+  const viewerHeight = naturalSize?.height ?? parseImageDimension(height) ?? 1024
+
+  return (
+    <ImageViewerItem
+      original={src}
+      thumbnail={src}
+      width={viewerWidth}
+      height={viewerHeight}
+      alt={alt}
+      caption={props.title}
+    >
+      {({ ref, open }) => (
+        <img
+          {...props}
+          ref={ref}
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          className={clsx(className, 'cursor-zoom-in')}
+          onLoad={(event) => {
+            onLoad?.(event)
+            const image = event.currentTarget
+            if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+              setNaturalSize({ width: image.naturalWidth, height: image.naturalHeight })
+            }
+          }}
+          onClick={(event) => {
+            onClick?.(event)
+            if (event.defaultPrevented) return
+            event.preventDefault()
+            event.stopPropagation()
+            open(event)
+          }}
+        />
+      )}
+    </ImageViewerItem>
+  )
+}
 
 export const CodeRenderer = memo(
   (props: {

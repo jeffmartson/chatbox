@@ -1,6 +1,6 @@
 # 工具与集成系统
 
-> Last updated: 2026-03
+> Last updated: 2026-07
 
 本文档描述 Chatbox Pro 的工具（Tool）与外部集成系统的产品设计。关于整体架构和进程模型，请参阅 [`./architecture.md`](./architecture.md)。
 
@@ -199,7 +199,7 @@ Agent Mode 下注册 Skills 相关工具：
 | 工具 | 说明 | 门控 |
 |------|------|------|
 | `load_skill` | 按名称加载技能全文指令 | 始终可用（auto 模式初始即可调用） |
-| `chatbox_cli` | Chatbox 产品帮助 Skill 的受控查询接口 | 仅当内置产品帮助 Skill 启用时注入 |
+| `chatbox_cli` | Chatbox 产品 Skill 的受控虚拟 CLI（账号、只读设置、历史会话、异步生图） | 仅当内置产品 Skill 启用时注入；设置修改由模型引导用户在 UI 中完成；生图使用专属本地化审批卡，批准后等待后台回调而非模型轮询 |
 | `user_exec` | 在用户真实环境执行命令，内置审批机制 | Auto 初始隐藏，加载 Skill 后可用 |
 | `install_skill` | 从沙箱路径安装技能（需 codeExecution） | code execution 可用时注入，Auto 初始可见 |
 

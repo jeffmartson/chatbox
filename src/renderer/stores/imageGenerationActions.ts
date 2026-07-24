@@ -5,6 +5,7 @@ import { ModelProviderEnum } from '@shared/types'
 import { createModelDependencies } from '@/adapters'
 import { getLogger } from '@/lib/utils'
 import {
+  IMAGE_GENERATION_POLL_INTERVAL_MS,
   type ImageGenerationTaskResponse,
   pollImageTask,
   pollTaskUntilComplete,
@@ -94,7 +95,30 @@ export function isGenerating(): boolean {
   return imageGenerationStore.getState().currentGeneratingId !== null
 }
 
-export async function createAndGenerate(params: GenerateImageParams): Promise<string> {
+export interface ImageGenerationHandle {
+  recordId: string
+  startedAt: number
+  monitoring: { mode: 'polling'; intervalMs: number } | { mode: 'direct' }
+  completion: Promise<ImageGeneration | null>
+}
+
+export interface StartImageGenerationOptions {
+  /**
+   * Runs after the local record is durable and before any potentially billable
+   * provider request starts. Callers can use this to persist their own retry key.
+   */
+  onRecordCreated?: (record: ImageGeneration) => Promise<void>
+}
+
+/**
+ * Starts image generation without waiting for the provider task to finish.
+ * Callers that need background-task notifications can observe `completion`;
+ * existing UI callers can keep using `createAndGenerate` and only consume the id.
+ */
+export async function startImageGeneration(
+  params: GenerateImageParams,
+  options: StartImageGenerationOptions = {}
+): Promise<ImageGenerationHandle> {
   const store = imageGenerationStore.getState()
 
   // Normalize: 'auto' means no aspect ratio constraint
@@ -116,20 +140,39 @@ export async function createAndGenerate(params: GenerateImageParams): Promise<st
     aspectRatio: params.aspectRatio,
   })
 
+  try {
+    await options.onRecordCreated?.(record)
+  } catch (error) {
+    await updateRecord(record.id, getErrorRecordUpdate(error))
+    throw error
+  }
+
   store.setCurrentGeneratingId(record.id)
   store.setCurrentRecordId(record.id)
   queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, record.id], record)
 
   const generateFn = shouldUseAsyncPath(params.model.provider) ? generateImages : generateImagesDirect
-  void generateFn(record.id, params).finally(() => {
+  const generation = generateFn(record.id, params).finally(() => {
     imageGenerationStore.getState().setCurrentGeneratingId(null)
     queryClient.invalidateQueries({ queryKey: [IMAGE_GEN_LIST_QUERY_KEY] })
   })
 
-  return record.id
+  return {
+    recordId: record.id,
+    startedAt: record.createdAt,
+    monitoring: shouldUseAsyncPath(params.model.provider)
+      ? { mode: 'polling', intervalMs: IMAGE_GENERATION_POLL_INTERVAL_MS }
+      : { mode: 'direct' },
+    completion: generation,
+  }
 }
 
-async function generateImages(recordId: string, params: GenerateImageParams): Promise<void> {
+export async function createAndGenerate(params: GenerateImageParams): Promise<string> {
+  const handle = await startImageGeneration(params)
+  return handle.recordId
+}
+
+async function generateImages(recordId: string, params: GenerateImageParams): Promise<ImageGeneration | null> {
   const licenseKey = getLicenseKey()
   const num = params.imageGenerateNum || 1
 
@@ -235,11 +278,12 @@ async function generateImages(recordId: string, params: GenerateImageParams): Pr
     }
 
     log.debug('Image generation completed:', recordId, 'urls:', completedUrls.length)
+    return currentRecord
   } catch (err: unknown) {
     // Don't report abort errors as failures
     if (err instanceof Error && err.name === 'AbortError') {
       log.debug('Image generation aborted:', recordId)
-      return
+      return null
     }
 
     log.error('Image generation failed:', err)
@@ -248,12 +292,13 @@ async function generateImages(recordId: string, params: GenerateImageParams): Pr
     if (updatedRecord) {
       queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, updatedRecord.id], updatedRecord)
     }
+    return updatedRecord
   } finally {
     currentAbortController = null
   }
 }
 
-async function generateImagesDirect(recordId: string, params: GenerateImageParams): Promise<void> {
+async function generateImagesDirect(recordId: string, params: GenerateImageParams): Promise<ImageGeneration | null> {
   const num = params.imageGenerateNum || 1
 
   currentAbortController = new AbortController()
@@ -344,10 +389,11 @@ async function generateImagesDirect(recordId: string, params: GenerateImageParam
     }
 
     log.debug('Direct image generation completed:', recordId, 'images:', resultDataUrls.length)
+    return currentRecord
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {
       log.debug('Direct image generation aborted:', recordId)
-      return
+      return null
     }
 
     log.error('Direct image generation failed:', err)
@@ -356,6 +402,7 @@ async function generateImagesDirect(recordId: string, params: GenerateImageParam
     if (updatedRecord) {
       queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, updatedRecord.id], updatedRecord)
     }
+    return updatedRecord
   } finally {
     currentAbortController = null
   }

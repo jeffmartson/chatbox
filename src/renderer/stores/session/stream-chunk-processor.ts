@@ -393,9 +393,12 @@ function isPersistentToolCallPauseError(error: unknown): boolean {
     error &&
       typeof error === 'object' &&
       'name' in error &&
-      ['ToolCallLimitPausedError', 'UserExecApprovalPausedError', 'FileMutationApprovalPausedError'].includes(
-        String(error.name)
-      )
+      [
+        'ToolCallLimitPausedError',
+        'UserExecApprovalPausedError',
+        'FileMutationApprovalPausedError',
+        'AppActionApprovalPausedError',
+      ].includes(String(error.name))
   )
 }
 

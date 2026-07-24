@@ -134,6 +134,28 @@ export const MessageReasoningPartSchema = z.object({
   duration: z.number().optional(),
 })
 
+export const ImageGenerationApprovalDetailsSchema = z.object({
+  type: z.literal('image_generation'),
+  provider: z.string(),
+  modelId: z.string(),
+  prompt: z.string(),
+  count: z.number(),
+  aspectRatio: z.string().optional(),
+  style: z.enum(['vivid', 'natural']).optional(),
+  billing: z.enum(['chatbox_quota', 'provider']),
+  imageQuota: z
+    .object({
+      remaining: z.number(),
+      total: z.number(),
+    })
+    .optional(),
+  computePointsRemainingRatio: z.number().optional(),
+  // Backward compatibility for approvals persisted by early virtual-CLI builds.
+  computePointsRemaining: z.number().optional(),
+})
+
+export const AppActionApprovalDetailsSchema = z.discriminatedUnion('type', [ImageGenerationApprovalDetailsSchema])
+
 export const MessageToolCallPartSchema = z.object({
   type: z.literal('tool-call'),
   state: z.enum(['call', 'result', 'error', 'paused']),
@@ -169,6 +191,13 @@ export const MessageToolCallPartSchema = z.object({
         type: z.literal('file_mutation_approval'),
         title: z.string(),
         preview: z.string(),
+      }),
+      z.object({
+        type: z.literal('app_action_approval'),
+        action: z.string(),
+        title: z.string(),
+        preview: z.string(),
+        details: AppActionApprovalDetailsSchema.optional(),
       }),
     ])
     .optional(),
@@ -227,6 +256,17 @@ export const MessageStatusSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+export const MessageBackgroundTaskSchema = z.object({
+  id: z.string(),
+  type: z.literal('image_generation'),
+  status: z.enum(['completed', 'failed']),
+  recordId: z.string(),
+  startedAt: z.number(),
+  finishedAt: z.number(),
+  elapsedMs: z.number(),
+  summary: z.string(),
+})
+
 // Main Message schema
 // Define a custom function type for cancel
 const CancelFunctionSchema = z.custom<(() => void) | undefined>(
@@ -274,6 +314,8 @@ export const MessageSchema = z.object({
   error: z.string().optional(),
   errorExtra: z.record(z.string(), z.unknown()).optional(),
   status: z.array(MessageStatusSchema).optional(),
+  /** App-generated wake-up metadata. The message remains user-role for model turn sequencing. */
+  backgroundTask: MessageBackgroundTaskSchema.optional(),
   wordCount: z.number().optional(),
   tokenCount: z.number().optional(), // output token count
   tokensUsed: z.number().optional(), // deprecated, use `usage` instead
@@ -388,6 +430,8 @@ export type MessageImagePart = z.infer<typeof MessageImagePartSchema>
 export type MessageInfoPart = z.infer<typeof MessageInfoPartSchema>
 export type MessageAgentModeSuggestionPart = z.infer<typeof MessageAgentModeSuggestionPartSchema>
 export type MessageReasoningPart = z.infer<typeof MessageReasoningPartSchema>
+export type ImageGenerationApprovalDetails = z.infer<typeof ImageGenerationApprovalDetailsSchema>
+export type AppActionApprovalDetails = z.infer<typeof AppActionApprovalDetailsSchema>
 export type MessageToolCallPart<Args = unknown, Result = unknown> = Omit<
   z.infer<typeof MessageToolCallPartSchema>,
   'args' | 'result'
@@ -403,6 +447,7 @@ export type StreamTextResult = z.infer<typeof StreamTextResultSchema>
 export type ToolUseScope = z.infer<typeof ToolUseScopeSchema>
 export type ModelProvider = z.infer<typeof ModelProviderSchema>
 export type MessageStatus = z.infer<typeof MessageStatusSchema>
+export type MessageBackgroundTask = z.infer<typeof MessageBackgroundTaskSchema>
 export type Message = z.infer<typeof MessageSchema>
 export type SessionType = z.infer<typeof SessionTypeSchema>
 export type CompactionPoint = z.infer<typeof CompactionPointSchema>

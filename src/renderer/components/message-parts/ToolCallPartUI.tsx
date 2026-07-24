@@ -14,12 +14,17 @@ import {
 } from '@mantine/core'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
-import type { Message, MessageReasoningPart, MessageTextPart, MessageToolCallPart } from '@shared/types'
+import type {
+  ImageGenerationApprovalDetails,
+  Message,
+  MessageReasoningPart,
+  MessageTextPart,
+  MessageToolCallPart,
+} from '@shared/types'
 import {
   IconBulb,
   IconCheck,
   IconChevronDown,
-  IconChevronRight,
   IconCircleXFilled,
   IconCode,
   IconCopy,
@@ -36,6 +41,7 @@ import {
   IconInfoCircle,
   IconLoader,
   IconMessage,
+  IconPhoto,
   IconPlayerPlay,
   IconSparkles,
   IconTerminal,
@@ -46,12 +52,16 @@ import {
 import clsx from 'clsx'
 import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ImageGenerationResultGallery } from '@/components/chat/ImageGenerationResultGallery'
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hooks/useThinkingTimer'
+import { getAcceptedImageBackgroundTaskResult } from '@/packages/chatbox-cli/background-task-result'
+import { formatComputePointsRemainingRatio } from '@/packages/chatbox-cli/compute-points'
 import { getToolName } from '@/packages/tools'
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
+import { useCurrentGeneratingId, useImageGenerationRecord } from '@/stores/imageGenerationStore'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
@@ -201,6 +211,7 @@ const toolIconMap: Record<string, React.ElementType> = {
   sandbox_ls: IconFolderSearch,
   sandbox_find: IconFolderSearch,
   load_skill: IconSparkles,
+  chatbox_cli: IconSparkles,
   user_exec: IconTerminal,
 }
 
@@ -264,7 +275,7 @@ const ToolCallPill: FC<{
       >
         <InlineToolIcon icon={Icon} size={13} color={iconColor} />
         <Text size="xs" fw={500} c={isError ? 'chatbox-error' : undefined} lh="13px" truncate="end">
-          {getToolName(part.toolName)}
+          {getToolName(part.toolName, part.args)}
         </Text>
         {isLoading ? (
           <InlineToolIcon icon={IconLoader} size={11} color="var(--chatbox-tint-brand)" className="animate-spin" />
@@ -512,7 +523,7 @@ const ParseLinkUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
         >
           <IconExternalLink size={16} color="var(--chatbox-tint-success)" style={{ flexShrink: 0 }} />
           <Text size="sm" fw={600} c={isError ? 'chatbox-error' : 'chatbox-secondary'} lh={1}>
-            {getToolName(part.toolName)}
+            {getToolName(part.toolName, part.args)}
           </Text>
           {isLoading ? (
             <IconLoader
@@ -596,10 +607,13 @@ const GeneralToolCallUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const isBashNotAvailable = isBashNotAvailableResult(part)
   const isError = part.state === 'error' || isBashNotAvailable
   const [expanded, setExpanded] = useAutoExpandOnSignal(isBashNotAvailable)
+  const acceptedImageTask = getAcceptedImageBackgroundTaskResult(part.result)
+  const { data: imageRecord } = useImageGenerationRecord(acceptedImageTask?.recordId ?? null)
 
   return (
     <Stack gap={6} mb="xs">
       <ToolCallPill part={part} onClick={() => setExpanded((prev) => !prev)} expanded={expanded} />
+      <ImageGenerationResultGallery images={imageRecord?.generatedImages ?? []} />
       <Collapse in={expanded}>
         <Box
           ml={4}
@@ -923,7 +937,7 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
             style={{ flexShrink: 0 }}
           />
           <Text size="xs" fw={500} lh={1}>
-            {getToolName(part.toolName)}
+            {getToolName(part.toolName, part.args)}
           </Text>
           {isExecuting && (
             <IconLoader
@@ -1042,6 +1056,116 @@ const ToolCallRunningDots: FC = () => (
   </Group>
 )
 
+const ImageGenerationApprovalCard: FC<{
+  details: ImageGenerationApprovalDetails
+  disabled: boolean
+  onApprove: () => void
+  onDeny: () => void
+}> = ({ details, disabled, onApprove, onDeny }) => {
+  const { t, i18n } = useTranslation()
+  const usesChatboxQuota = details.billing === 'chatbox_quota'
+  const computePointsRemainingRatio = details.computePointsRemainingRatio ?? details.computePointsRemaining
+
+  return (
+    <Stack gap="sm">
+      <Group gap="xs" wrap="nowrap">
+        <Box className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-chatbox-background-brand-secondary">
+          <IconPhoto size={18} color="var(--chatbox-tint-brand)" />
+        </Box>
+        <Box className="min-w-0">
+          <Text size="sm" fw={600} c="chatbox-primary">
+            {t('Generate images')}
+          </Text>
+          <Text size="xs" c="chatbox-tertiary" truncate="end">
+            {details.provider} · {details.modelId}
+          </Text>
+        </Box>
+      </Group>
+
+      <Paper p="xs" radius="md" bg="var(--chatbox-background-primary)" withBorder>
+        <Text size="xs" c="chatbox-tertiary" mb={3}>
+          {t('Prompt')}
+        </Text>
+        <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
+          <Text size="sm" c="chatbox-primary" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {details.prompt}
+          </Text>
+        </Box>
+      </Paper>
+
+      <Group gap="lg">
+        <Box>
+          <Text size="xs" c="chatbox-tertiary">
+            {t('Number of images')}
+          </Text>
+          <Text size="sm" fw={500}>
+            {details.count}
+          </Text>
+        </Box>
+        {details.aspectRatio && (
+          <Box>
+            <Text size="xs" c="chatbox-tertiary">
+              {t('Aspect ratio')}
+            </Text>
+            <Text size="sm" fw={500}>
+              {details.aspectRatio}
+            </Text>
+          </Box>
+        )}
+        {details.style && (
+          <Box>
+            <Text size="xs" c="chatbox-tertiary">
+              {t('Image style')}
+            </Text>
+            <Text size="sm" fw={500}>
+              {details.style}
+            </Text>
+          </Box>
+        )}
+      </Group>
+
+      <Alert color="yellow" variant="light" icon={<IconInfoCircle size={16} />} p="xs">
+        <Stack gap={3}>
+          <Text size="xs" fw={500}>
+            {usesChatboxQuota
+              ? t('This request will consume {{count}} image quota and compute points.', { count: details.count })
+              : t('This request may incur charges from {{provider}}.', { provider: details.provider })}
+          </Text>
+          {usesChatboxQuota && details.imageQuota && (
+            <Text size="xs" c="chatbox-secondary">
+              {t('Image quota remaining: {{remaining}} / {{total}}', {
+                remaining: details.imageQuota.remaining.toLocaleString(),
+                total: details.imageQuota.total.toLocaleString(),
+              })}
+            </Text>
+          )}
+          {usesChatboxQuota && computePointsRemainingRatio !== undefined && (
+            <Text size="xs" c="chatbox-secondary">
+              {t('Compute points remaining: {{points}}', {
+                points: formatComputePointsRemainingRatio(computePointsRemainingRatio, i18n.language),
+              })}
+            </Text>
+          )}
+          <Text size="xs" c="chatbox-tertiary">
+            {usesChatboxQuota
+              ? t('Exact compute point usage is calculated after generation.')
+              : t('Chatbox AI image quota will not be used.')}
+          </Text>
+        </Stack>
+      </Alert>
+
+      <Group gap="xs">
+        <Button size="compact-sm" color="chatbox-brand" disabled={disabled} onClick={onApprove}>
+          {t('Approve and generate')}
+        </Button>
+        <Button size="compact-sm" variant="light" color="gray" disabled={disabled} onClick={onDeny}>
+          {t('Cancel')}
+        </Button>
+      </Group>
+    </Stack>
+  )
+}
+
 const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionContext> = ({
   part,
   sessionId,
@@ -1049,7 +1173,25 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
 }) => {
   const { t } = useTranslation()
   const pauseReason = part.pauseReason
-  const isApproval = pauseReason?.type === 'user_exec_approval' || pauseReason?.type === 'file_mutation_approval'
+  if (
+    pauseReason?.type === 'app_action_approval' &&
+    pauseReason.action === 'image.generate' &&
+    pauseReason.details?.type === 'image_generation'
+  ) {
+    return (
+      <ImageGenerationApprovalCard
+        details={pauseReason.details}
+        disabled={!sessionId || !messageId}
+        onApprove={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
+        onDeny={() => sessionId && messageId && stopPausedToolCall(sessionId, messageId, part.toolCallId)}
+      />
+    )
+  }
+
+  const isApproval =
+    pauseReason?.type === 'user_exec_approval' ||
+    pauseReason?.type === 'file_mutation_approval' ||
+    pauseReason?.type === 'app_action_approval'
   const title =
     pauseReason?.type === 'tool_call_limit'
       ? t('Paused after {{count}} steps. Check whether the task is on track, then continue or stop to adjust.', {
@@ -1059,13 +1201,17 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         ? t('Approval required before executing this command.')
         : pauseReason?.type === 'file_mutation_approval'
           ? t('Approval required before modifying files.')
-          : t('Tool execution is paused.')
+          : pauseReason?.type === 'app_action_approval'
+            ? pauseReason.title
+            : t('Tool execution is paused.')
   const payload =
     pauseReason?.type === 'user_exec_approval'
       ? pauseReason.command
       : pauseReason?.type === 'file_mutation_approval'
         ? `${pauseReason.title}\n\n${pauseReason.preview}`
-        : stringifyToolPayload(part.args)
+        : pauseReason?.type === 'app_action_approval'
+          ? pauseReason.preview
+          : stringifyToolPayload(part.args)
   return (
     <Stack gap="xs">
       <Text size="xs" c="chatbox-secondary">
@@ -1225,34 +1371,53 @@ const TimelineToolCallStep: FC<
   } & ToolCallActionContext
 > = ({ part, isFirst, isLast, sessionId, messageId, showPausedActionDetails = true }) => {
   const { t } = useTranslation()
+  const acceptedImageTask = getAcceptedImageBackgroundTaskResult(part.result)
+  const { data: imageRecord } = useImageGenerationRecord(acceptedImageTask?.recordId ?? null)
+  const currentGeneratingId = useCurrentGeneratingId()
+  const imageStatus = imageRecord?.status ?? acceptedImageTask?.status
+  const isBackgroundWaiting = imageStatus === 'pending' || imageStatus === 'generating'
+  const isBackgroundActive =
+    Boolean(acceptedImageTask) && isBackgroundWaiting && currentGeneratingId === acceptedImageTask?.recordId
+  const isBackgroundInterrupted = Boolean(acceptedImageTask) && isBackgroundWaiting && !isBackgroundActive
+  const backgroundElapsed = useThinkingTimer(imageRecord?.createdAt ?? acceptedImageTask?.startedAt, isBackgroundActive)
   const isPaused = part.state === 'paused'
-  const isLoading = part.state === 'call'
+  const isLoading = part.state === 'call' || isBackgroundActive
   const isBashNotAvailable = isBashNotAvailableResult(part)
-  const isError = part.state === 'error' || isBashNotAvailable
-  const isDone = part.state === 'result' && !isBashNotAvailable
+  const isError = part.state === 'error' || isBashNotAvailable || imageStatus === 'error'
+  const isDone = part.state === 'result' && !isBashNotAvailable && !isBackgroundWaiting && imageStatus !== 'error'
   const [expanded, setExpanded] = useAutoExpandOnSignal(isPaused || isBashNotAvailable)
   const Icon = getToolIcon(part.toolName)
 
   // Per-step elapsed time: prefer the persisted duration, fall back to a live
   // timer while the call is still running. Hidden below the 2s threshold.
   const liveElapsed = useThinkingTimer(part.startTime, isLoading)
-  const stepDuration = part.duration && part.duration > 0 ? part.duration : isLoading ? liveElapsed : 0
+  const stepDuration = acceptedImageTask
+    ? isBackgroundActive
+      ? backgroundElapsed
+      : 0
+    : part.duration && part.duration > 0
+      ? part.duration
+      : isLoading
+        ? liveElapsed
+        : 0
   const showTime = stepDuration >= MIN_STEP_DURATION_MS
 
-  const stateColor = isPaused
-    ? 'var(--chatbox-tint-warning)'
-    : isLoading
-      ? 'var(--chatbox-tint-brand)'
-      : isError
-        ? 'var(--chatbox-tint-error)'
-        : 'var(--chatbox-tint-success)'
-  const dotBg = isPaused
-    ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
-    : isLoading
-      ? 'var(--chatbox-background-brand-secondary)'
-      : isError
-        ? 'color-mix(in srgb, var(--chatbox-tint-error) 10%, transparent)'
-        : 'color-mix(in srgb, var(--chatbox-tint-success) 10%, transparent)'
+  const stateColor =
+    isPaused || isBackgroundInterrupted
+      ? 'var(--chatbox-tint-warning)'
+      : isLoading
+        ? 'var(--chatbox-tint-brand)'
+        : isError
+          ? 'var(--chatbox-tint-error)'
+          : 'var(--chatbox-tint-success)'
+  const dotBg =
+    isPaused || isBackgroundInterrupted
+      ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
+      : isLoading
+        ? 'var(--chatbox-background-brand-secondary)'
+        : isError
+          ? 'color-mix(in srgb, var(--chatbox-tint-error) 10%, transparent)'
+          : 'color-mix(in srgb, var(--chatbox-tint-success) 10%, transparent)'
 
   const argSummary =
     part.toolName === 'user_exec'
@@ -1268,15 +1433,27 @@ const TimelineToolCallStep: FC<
       ? getFirstStringValue(part.result, ['summary', 'title', 'content', 'stdout', 'stderr'])
       : undefined
 
-  const summary = isPaused
-    ? t('Paused')
-    : isLoading
-      ? t('Running')
-      : isBashNotAvailable
-        ? t('Bash is not available on this Windows device.')
-        : isError
-          ? t('Failed')
-          : truncateSummary(argSummary || resultSummary || t('Completed'))
+  const summary = acceptedImageTask
+    ? isBackgroundActive
+      ? acceptedImageTask.wait.pollIntervalMs
+        ? `${t('Generating image')} · ${t('Checking every {{time}}', {
+            time: formatElapsedTime(acceptedImageTask.wait.pollIntervalMs),
+          })}`
+        : t('Generating image')
+      : isBackgroundInterrupted
+        ? t('Waiting to resume image generation')
+        : imageStatus === 'error'
+          ? t('Image generation failed')
+          : t('Image generated')
+    : isPaused
+      ? t('Paused')
+      : isLoading
+        ? t('Running')
+        : isBashNotAvailable
+          ? t('Bash is not available on this Windows device.')
+          : isError
+            ? t('Failed')
+            : truncateSummary(argSummary || resultSummary || t('Completed'))
 
   const hasDetail = isPaused ? showPausedActionDetails : part.state !== 'call'
 
@@ -1298,7 +1475,7 @@ const TimelineToolCallStep: FC<
           style={{ height: TIMELINE_NODE_CENTER * 2, maxWidth: '100%', transform: 'translateY(-1px)' }}
         >
           <Text size="sm" fw={500} c={isError ? 'chatbox-error' : 'chatbox-primary'} lh="20px" className="shrink-0">
-            {getToolName(part.toolName)}
+            {getToolName(part.toolName, part.args)}
           </Text>
           {summary && (
             <Text size="xs" c="chatbox-tertiary" lh="20px" truncate="end" style={{ minWidth: 0 }}>
@@ -1327,6 +1504,7 @@ const TimelineToolCallStep: FC<
           )}
         </Group>
       </UnstyledButton>
+      <ImageGenerationResultGallery images={imageRecord?.generatedImages ?? []} />
       <Collapse in={expanded && hasDetail}>
         <Box
           mt={6}

@@ -4,7 +4,6 @@ import {
   type ActionIconProps,
   Button,
   Flex,
-  Image as Img,
   Loader,
   Modal,
   Stack,
@@ -15,7 +14,7 @@ import { Box, Grid, useTheme } from '@mui/material'
 import { findMessageLocation } from '@shared/session/message-forks'
 import type {
   Message,
-  MessagePicture,
+  MessageBackgroundTask,
   MessageReasoningPart,
   MessageTextPart,
   MessageToolCallPart,
@@ -40,11 +39,8 @@ import {
   IconRobot,
   IconTrash,
 } from '@tabler/icons-react'
-import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import * as dateFns from 'date-fns'
-import { concat } from 'lodash'
-import type { UIElementData } from 'photoswipe'
 import type React from 'react'
 import {
   type FC,
@@ -58,13 +54,11 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Gallery, Item as GalleryItem } from 'react-photoswipe-gallery'
 import { trackAgentModeSuggestionAction } from '@/analytics/agent-mode'
 import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import Markdown from '@/components/Markdown'
 import StreamingTextFade from '@/components/StreamingTextFade'
-import { useFetchBlob } from '@/hooks/useBlob'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { formatElapsedTime } from '@/hooks/useThinkingTimer'
 import { cn } from '@/lib/utils'
@@ -102,6 +96,7 @@ import {
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
+import { PictureGallery } from './PictureGallery'
 
 // Reset an assistant message back to a clean generating state, reusing the same
 // message slot (e.g. when acting on an agent-mode suggestion callout).
@@ -130,6 +125,36 @@ interface Props {
   small?: boolean
   assistantAvatarKey?: string
   sessionPicUrl?: string
+}
+
+const BackgroundTaskNotificationUI: FC<{ task: MessageBackgroundTask; className?: string }> = ({ task, className }) => {
+  const { t } = useTranslation()
+  const failed = task.status === 'failed'
+  return (
+    <Box className={cn('w-full px-2 py-1.5', className)} role="status">
+      <Flex justify="center">
+        <Flex
+          align="center"
+          gap={6}
+          px="sm"
+          py={5}
+          className="max-w-full rounded-full bg-chatbox-background-gray-secondary"
+        >
+          <ScalableIcon
+            icon={failed ? IconInfoCircle : IconPhotoPlus}
+            size={14}
+            className={failed ? 'text-chatbox-tint-error' : 'text-chatbox-tint-success'}
+          />
+          <Text size="xs" c={failed ? 'chatbox-error' : 'chatbox-secondary'} fw={500} truncate="end">
+            {failed ? t('Image generation failed') : t('Image generated')}
+          </Text>
+          <Text size="xs" c="chatbox-tertiary" className="shrink-0 tabular-nums">
+            · {t('Waited {{time}}', { time: formatElapsedTime(task.elapsedMs) })}
+          </Text>
+        </Flex>
+      </Flex>
+    </Box>
+  )
 }
 
 const _Message: FC<Props> = (props) => {
@@ -1041,6 +1066,10 @@ const _Message: FC<Props> = (props) => {
     </Flex>
   )
 
+  if (msg.backgroundTask) {
+    return <BackgroundTaskNotificationUI task={msg.backgroundTask} className={className} />
+  }
+
   if (isBubbleLayout && msg.role === 'user') {
     return (
       <Box
@@ -1149,166 +1178,6 @@ const _Message: FC<Props> = (props) => {
 }
 
 export default memo(_Message)
-
-function getBase64ImageSize(base64: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const cleanup = () => {
-      img.onload = null
-      img.onerror = null
-      try {
-        img.src = ''
-      } catch {
-        // ignore
-      }
-    }
-    img.onload = () => {
-      const size = { width: img.width, height: img.height }
-      cleanup()
-      resolve(size)
-    }
-    img.onerror = (err) => {
-      cleanup()
-      reject(err)
-    }
-    img.src = base64
-  })
-}
-
-type PictureGalleryProps = {
-  pictures: MessagePicture[]
-  compact?: boolean
-  onReport?(picture: MessagePicture): void
-}
-
-const PictureGallery = memo(({ pictures, compact, onReport }: PictureGalleryProps) => {
-  const isSmallScreen = useIsSmallScreen()
-  const imageHeight = compact ? (isSmallScreen ? 60 : 100) : isSmallScreen ? 100 : 200
-  const fetchBlob = useFetchBlob()
-  const uiElements: UIElementData[] = concat(
-    [
-      {
-        name: 'custom-download-button',
-        ariaLabel: 'Download',
-        order: 9,
-        isButton: true,
-        html: {
-          isCustomSVG: true,
-          inner:
-            '<path d="M20.5 14.3 17.1 18V10h-2.2v7.9l-3.4-3.6L10 16l6 6.1 6-6.1ZM23 23H9v2h14Z" id="pswp__icn-download"/>',
-          outlineID: 'pswp__icn-download',
-        },
-        appendTo: 'bar',
-        onClick: async (_e: MouseEvent, _el: HTMLElement, pswp: import('photoswipe').default) => {
-          const picture = pictures[pswp.currIndex]
-          if (picture.storageKey) {
-            const base64 = await fetchBlob(picture.storageKey)
-            if (!base64) {
-              return
-            }
-            // storageKey中含有冒号，会在android端导致存储失败，且android端在同文件名的情况下不会再次保存图片，也无提示，可能对用户造成困扰，所以增加随机后缀
-            const filename =
-              platform.type === 'mobile'
-                ? `${picture.storageKey.replaceAll(':', '_')}_${Math.random().toString(36).substring(7)}`
-                : picture.storageKey
-            platform.exporter.exportImageFile(filename, base64)
-          } else if (picture.url) {
-            platform.exporter.exportByUrl(`image_${Math.random().toString(36).substring(7)}`, picture.url)
-          }
-        },
-      },
-    ],
-    onReport
-      ? [
-          {
-            name: 'report-button',
-            ariaLabel: 'Report',
-            order: 8,
-            isButton: true,
-            html: {
-              isCustomSVG: true,
-              inner:
-                '<path d="M 16 6 A 10 10 0 0 1 16 26 L 16 24 A 8 8 0 0 0 16 8 L 16 6 A 10 10 0 0 0 16 26 L 16 24 A 8 8 0 0 1 16 8 M 15 11 A 1 1 0 0 1 17 11 L 17 16 A 1 1 0 0 1 15 16 M 16 19 A 1.5 1.5 0 0 1 16 22 A 1.5 1.5 0 0 1 16 19 Z" id="pswp__icn-report">',
-              outlineID: 'pswp__icn-report',
-            },
-            appendTo: 'bar',
-            onClick: (_e, _el, pswp) => {
-              const picture = pictures[pswp.currIndex]
-              pswp.close()
-              onReport(picture)
-            },
-          },
-        ]
-      : []
-  )
-  return (
-    <Flex gap="sm" wrap="wrap">
-      <Gallery uiElements={uiElements}>
-        {pictures.map((p) =>
-          p.storageKey ? (
-            <ImageInStorageGalleryItem key={p.storageKey} storageKey={p.storageKey} height={imageHeight} />
-          ) : p.url ? (
-            <GalleryItem key={p.url} original={p.url} thumbnail={p.url} width={1024} height={1024}>
-              {({ ref, open }) => (
-                <Img
-                  src={p.url}
-                  h={imageHeight}
-                  w="auto"
-                  fit="contain"
-                  radius="md"
-                  ref={ref}
-                  onClick={open}
-                  className="cursor-pointer"
-                />
-              )}
-            </GalleryItem>
-          ) : undefined
-        )}
-      </Gallery>
-    </Flex>
-  )
-})
-
-const ImageInStorageGalleryItem = ({ storageKey, height }: { storageKey: string; height?: number }) => {
-  const isSmallScreen = useIsSmallScreen()
-  const fallbackHeight = isSmallScreen ? 100 : 200
-  const fetchBlob = useFetchBlob()
-  const { data: pic } = useQuery({
-    queryKey: ['image-in-storage-gallery-item', storageKey],
-    queryFn: async ({ queryKey: [, key] }) => {
-      const blob = await fetchBlob(key as string)
-      if (!blob) {
-        return null
-      }
-      const base64 = blob.startsWith('data:image/') ? blob : `data:image/png;base64,${blob}`
-      const size = await getBase64ImageSize(base64)
-      return {
-        storageKey,
-        ...size,
-        data: base64,
-      }
-    },
-    staleTime: Infinity,
-    gcTime: 60 * 1000,
-  })
-
-  return pic ? (
-    <GalleryItem original={pic.data} thumbnail={pic.data} width={pic.width} height={pic.height}>
-      {({ ref, open }) => (
-        <Img
-          src={pic.data}
-          h={height ?? fallbackHeight}
-          w="auto"
-          fit="contain"
-          radius="md"
-          ref={ref}
-          onClick={open}
-          className="cursor-pointer"
-        />
-      )}
-    </GalleryItem>
-  ) : null
-}
 
 export const MessageActionIcon = forwardRef<
   HTMLButtonElement,
