@@ -52,7 +52,7 @@ export function settings(): Settings {
     // groqModel: 'llama3-70b-8192',
 
     // deepseekAPIKey: '',
-    // deepseekModel: 'deepseek-chat',
+    // deepseekModel: 'deepseek-v4-flash',
 
     // siliconCloudKey: '',
     // siliconCloudModel: 'Qwen/Qwen2.5-7B-Instruct',

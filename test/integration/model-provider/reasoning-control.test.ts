@@ -72,6 +72,9 @@ interface ThinkingCallCase {
   level: ReasoningControlLevel
   expectedProviderOptions: ProviderOptions
   maxTokens: number
+  temperature?: number
+  topP?: number
+  expectedSamplingParameters?: 'included' | 'omitted'
   prompt?: string
   expectReasoning?: boolean
   expectNoReasoning?: boolean
@@ -203,24 +206,58 @@ const CALL_CASES: ThinkingCallCase[] = [
     skipProviderCallReason: 'Gemini 3 preview availability varies by key/host; mapping is covered here.',
   },
   {
-    name: 'DeepSeek reasoner off disables thinking',
+    name: 'DeepSeek V4 Flash off disables thinking',
     provider: ModelProviderEnum.DeepSeek,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    modelId: 'deepseek-reasoner',
+    modelId: 'deepseek-v4-flash',
     level: 'off',
     expectedProviderOptions: { deepseek: { thinking: { type: 'disabled' } } },
     maxTokens: 1024,
+    temperature: 0.7,
+    topP: 0.9,
+    expectedSamplingParameters: 'included',
     prompt: REASONING_PROMPT,
     expectNoReasoning: true,
   },
   {
-    name: 'DeepSeek reasoner on enables thinking',
+    name: 'DeepSeek V4 Flash on enables thinking',
     provider: ModelProviderEnum.DeepSeek,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    modelId: 'deepseek-reasoner',
+    modelId: 'deepseek-v4-flash',
     level: 'high',
     expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' } } },
     maxTokens: 2048,
+    temperature: 0.7,
+    topP: 0.9,
+    expectedSamplingParameters: 'omitted',
+    prompt: REASONING_PROMPT,
+    expectReasoning: true,
+  },
+  {
+    name: 'DeepSeek V4 Pro off disables thinking',
+    provider: ModelProviderEnum.DeepSeek,
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    modelId: 'deepseek-v4-pro',
+    level: 'off',
+    expectedProviderOptions: { deepseek: { thinking: { type: 'disabled' } } },
+    maxTokens: 1024,
+    temperature: 0.7,
+    topP: 0.9,
+    expectedSamplingParameters: 'included',
+    prompt: REASONING_PROMPT,
+    expectNoReasoning: true,
+  },
+  {
+    name: 'DeepSeek V4 Pro on enables thinking',
+    provider: ModelProviderEnum.DeepSeek,
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    modelId: 'deepseek-v4-pro',
+    level: 'high',
+    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' } } },
+    maxTokens: 2048,
+    temperature: 0.7,
+    topP: 0.9,
+    expectedSamplingParameters: 'omitted',
     prompt: REASONING_PROMPT,
     expectReasoning: true,
   },
@@ -472,6 +509,43 @@ function createGlobalSettings(
   }
 }
 
+interface CapturedDeepSeekRequest {
+  temperature?: number
+  top_p?: number
+  thinking?: {
+    type?: string
+  }
+}
+
+async function captureDeepSeekRequests<T>(
+  enabled: boolean,
+  operation: () => Promise<T>
+): Promise<{ result: T; requests: CapturedDeepSeekRequest[] }> {
+  if (!enabled) {
+    return { result: await operation(), requests: [] }
+  }
+
+  const originalFetch = globalThis.fetch
+  const requests: CapturedDeepSeekRequest[] = []
+  globalThis.fetch = (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input instanceof Request ? input.url : ''
+    if (url.startsWith('https://api.deepseek.com/') && typeof init?.body === 'string') {
+      const parsed: unknown = JSON.parse(init.body)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        requests.push(parsed as CapturedDeepSeekRequest)
+      }
+    }
+    return originalFetch(input, init)
+  }
+
+  try {
+    return { result: await operation(), requests }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
 const activeCases = getActiveCases()
 
 describe.skipIf(activeCases.length > 0)('Thinking control provider integration tests', () => {
@@ -504,7 +578,8 @@ describe.runIf(activeCases.length > 0)('Thinking control provider integration te
       const sessionSettings: SessionSettings = {
         provider: testCase.provider,
         modelId: testCase.modelId,
-        temperature: undefined,
+        temperature: testCase.temperature,
+        topP: testCase.topP,
         maxTokens: testCase.maxTokens,
         stream: true,
       }
@@ -514,7 +589,28 @@ describe.runIf(activeCases.length > 0)('Thinking control provider integration te
         { role: 'user', content: testCase.prompt || 'Reply with exactly: OK' },
       ]
 
-      const result = await model.chat(messages, { providerOptions })
+      const shouldCaptureDeepSeekRequest =
+        testCase.provider === ModelProviderEnum.DeepSeek && testCase.expectedSamplingParameters !== undefined
+      const { result, requests: deepseekRequests } = await captureDeepSeekRequests(shouldCaptureDeepSeekRequest, () =>
+        model.chat(messages, { providerOptions })
+      )
+
+      if (shouldCaptureDeepSeekRequest) {
+        expect(deepseekRequests.length).toBeGreaterThan(0)
+        for (const request of deepseekRequests) {
+          expect(request.thinking).toEqual({
+            type: testCase.expectedSamplingParameters === 'included' ? 'disabled' : 'enabled',
+          })
+          if (testCase.expectedSamplingParameters === 'included') {
+            expect(request.temperature).toBe(testCase.temperature)
+            expect(request.top_p).toBe(testCase.topP)
+          } else {
+            expect(request).not.toHaveProperty('temperature')
+            expect(request).not.toHaveProperty('top_p')
+          }
+        }
+      }
+
       const text = result.contentParts
         .filter((part) => part.type === 'text')
         .map((part) => part.text)

@@ -38,18 +38,18 @@ export default class DeepSeek extends AbstractAISDKModel {
   }
 
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
-    const isReasonerModel = this.options.model.modelId === 'deepseek-reasoner'
+    const thinkingType = options.providerOptions?.deepseek?.thinking?.type
+    const isThinkingMode = this.isSupportReasoning() && thinkingType !== 'disabled'
     const settings: CallSettings = {
       maxOutputTokens: this.options.maxOutputTokens,
     }
 
-    // reasoner model doesn't support temperature and topP
-    if (!isReasonerModel) {
+    // DeepSeek thinking mode does not support temperature or topP.
+    if (!isThinkingMode) {
       settings.temperature = this.options.temperature
       settings.topP = this.options.topP
     }
 
-    const thinkingType = options.providerOptions?.deepseek?.thinking?.type
     if (this.isSupportReasoning() && thinkingType) {
       settings.providerOptions = {
         deepseek: {

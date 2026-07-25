@@ -191,11 +191,14 @@ describe('reasoning request options', () => {
     const deepseek = new TestDeepSeek(
       {
         apiKey: 'test-key',
-        model: reasoningModel('deepseek-v3.2-thinking'),
+        model: reasoningModel('deepseek-v4-pro'),
+        temperature: 0.7,
+        topP: 0.9,
       },
       createDependencies()
     )
 
+    const defaultThinking = deepseek.exposeCallSettings({})
     const enabled = deepseek.exposeCallSettings({
       providerOptions: {
         deepseek: {
@@ -215,6 +218,10 @@ describe('reasoning request options', () => {
       },
     })
 
+    expect(defaultThinking.temperature).toBeUndefined()
+    expect(defaultThinking.topP).toBeUndefined()
+    expect(enabled.temperature).toBeUndefined()
+    expect(enabled.topP).toBeUndefined()
     expect(enabled.providerOptions).toEqual({
       deepseek: {
         thinking: {
@@ -222,6 +229,8 @@ describe('reasoning request options', () => {
         },
       },
     })
+    expect(disabled.temperature).toBe(0.7)
+    expect(disabled.topP).toBe(0.9)
     expect(disabled.providerOptions).toEqual({
       deepseek: {
         thinking: {
