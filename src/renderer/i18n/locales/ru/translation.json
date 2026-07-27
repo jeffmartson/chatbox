@@ -1206,5 +1206,16 @@
   "List Settings": "Показать настройки",
   "Read Conversation": "Прочитать диалог",
   "Read Setting": "Прочитать настройку",
-  "Refresh Account Status": "Обновить статус аккаунта"
+  "Refresh Account Status": "Обновить статус аккаунта",
+  "Your points are used up. Claim free reward quota to continue.": "Баллы закончились. Получите бесплатный бонусный лимит, чтобы продолжить.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "Режим работы расходует больше баллов. Получите разовую бесплатную награду, чтобы продолжить прерванную задачу.",
+  "Claim reward and continue": "Получить награду и продолжить",
+  "Could not claim the reward. Please try again.": "Не удалось получить награду. Повторите попытку.",
+  "Reward claimed successfully": "Награда получена",
+  "You received {{points}} reward points, valid until {{expiry}}.": "Вы получили {{points}} бонусных баллов, действительных до {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "Награда получена, но задачу не удалось возобновить автоматически. Повторите попытку.",
+  "Your points are used up": "Ваши баллы закончились",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Квота на текущий период исчерпана. Обновите план, чтобы продолжить.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Бесплатные баллы на сегодня закончились. Они сбрасываются ежедневно; обновите план, чтобы продолжить сейчас.",
+  "Upgrade plan": "Обновить план"
 }

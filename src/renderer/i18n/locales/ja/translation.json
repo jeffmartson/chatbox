@@ -1206,5 +1206,16 @@
   "List Settings": "設定を一覧表示",
   "Read Conversation": "会話を読む",
   "Read Setting": "設定を読む",
-  "Refresh Account Status": "アカウント状況を更新"
+  "Refresh Account Status": "アカウント状況を更新",
+  "Your points are used up. Claim free reward quota to continue.": "ポイントを使い切りました。無料の特典枠を受け取って続行できます。",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "ワークモードはポイントを多く消費します。1回限りの無料特典を受け取り、中断したタスクを続行できます。",
+  "Claim reward and continue": "特典を受け取って続行",
+  "Could not claim the reward. Please try again.": "特典を受け取れませんでした。もう一度お試しください。",
+  "Reward claimed successfully": "特典を受け取りました",
+  "You received {{points}} reward points, valid until {{expiry}}.": "{{points}} ポイントを受け取りました。有効期限は {{expiry}} です。",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "報酬は受け取りましたが、タスクを自動的に再開できませんでした。再試行してください。",
+  "Your points are used up": "ポイントを使い切りました",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "現在の期間のポイントを使い切りました。続行するにはプランをアップグレードしてください。",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "本日の無料ポイントを使い切りました。無料ポイントは毎日リセットされます。今すぐ続行するにはプランをアップグレードしてください。",
+  "Upgrade plan": "プランをアップグレード"
 }

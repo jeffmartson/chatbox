@@ -96,6 +96,7 @@ import {
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
+import { isMessageReminderPresentation, resolveMessageErrorPresentation } from './message-error-presentation'
 import { PictureGallery } from './PictureGallery'
 
 // Reset an assistant message back to a clean generating state, reusing the same
@@ -217,13 +218,13 @@ const _Message: FC<Props> = (props) => {
     setQuote(input)
   }, [msg, setQuote])
 
-  const handleStop = useCallback(() => {
-    modifyMessage(sessionId, { ...msg, generating: false }, true)
+  const handleStop = useCallback(async () => {
+    await modifyMessage(sessionId, { ...msg, generating: false }, true)
   }, [sessionId, msg])
 
-  const handleRefresh = useCallback(() => {
-    handleStop()
-    regenerateInNewFork(sessionId, msg)
+  const handleRefresh = useCallback(async () => {
+    await handleStop()
+    await regenerateInNewFork(sessionId, msg)
   }, [handleStop, sessionId, msg])
 
   // Tracking is best-effort and must never block or break the accept/decline
@@ -305,31 +306,31 @@ const _Message: FC<Props> = (props) => {
     return undefined
   }, [msg.contentParts])
 
-  const handleRetryWholeMessage = useCallback(() => {
+  const handleRetryWholeMessage = useCallback(async () => {
     setRetryChoiceOpened(false)
-    handleRefresh()
+    await handleRefresh()
   }, [handleRefresh])
 
-  const handleRetryLastStep = useCallback(() => {
+  const handleRetryLastStep = useCallback(async () => {
     if (!lastStepForRetry) return
     setRetryChoiceOpened(false)
-    retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
+    await retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
   }, [lastStepForRetry, sessionId, msg.id])
 
-  const handleErrorTipRetry = useCallback(() => {
+  const handleErrorTipRetry = useCallback(async () => {
     if (lastStepForRetry) {
-      retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
+      await retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
       return
     }
-    handleRefresh()
+    await handleRefresh()
   }, [handleRefresh, lastStepForRetry, sessionId, msg.id])
 
-  const handleMessageRetry = useCallback(() => {
+  const handleMessageRetry = useCallback(async () => {
     if (lastStepForRetry) {
       setRetryChoiceOpened(true)
       return
     }
-    handleRefresh()
+    await handleRefresh()
   }, [handleRefresh, lastStepForRetry])
 
   const onGenerateMore = useCallback(() => {
@@ -698,6 +699,7 @@ const _Message: FC<Props> = (props) => {
   const [actionMenuOpened, setActionMenuOpened] = useState(false)
 
   const isUserBubble = isBubbleLayout && msg.role === 'user'
+  const isErrorReminder = msg.error ? isMessageReminderPresentation(resolveMessageErrorPresentation(msg)) : false
   const statusElements = <MessageStatuses statuses={leadingStatuses} />
   const errorTipsElement = (
     <MessageErrTips
@@ -719,7 +721,9 @@ const _Message: FC<Props> = (props) => {
                   ? 'bg-[var(--mantine-color-chatbox-brand-filled)] text-white'
                   : msg.role === 'assistant'
                     ? msg.error
-                      ? 'bg-chatbox-background-error-secondary border border-solid border-chatbox-border-error'
+                      ? isErrorReminder
+                        ? '!p-0 !bg-transparent'
+                        : 'bg-chatbox-background-error-secondary border border-solid border-chatbox-border-error'
                       : 'bg-chatbox-background-secondary'
                     : 'bg-chatbox-background-secondary rounded-lg'
               )

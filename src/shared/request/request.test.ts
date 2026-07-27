@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ApiError, ChatboxAIAPIError } from '../models/errors'
+import { type ApiError, type ChatboxAIAPIError } from '../models/errors'
 import { createAfetch } from './request'
 
 const platformInfo = {

@@ -1206,5 +1206,16 @@
   "List Settings": "List opp innstillinger",
   "Read Conversation": "Les samtale",
   "Read Setting": "Les innstilling",
-  "Refresh Account Status": "Oppdater kontostatus"
+  "Refresh Account Status": "Oppdater kontostatus",
+  "Your points are used up. Claim free reward quota to continue.": "Poengene dine er brukt opp. Hent en gratis bonuskvote for å fortsette.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "Arbeidsmodus bruker flere poeng. Hent en kostnadsfri engangsbelønning for å fortsette den avbrutte oppgaven.",
+  "Claim reward and continue": "Hent belønning og fortsett",
+  "Could not claim the reward. Please try again.": "Kunne ikke hente belønningen. Prøv igjen.",
+  "Reward claimed successfully": "Belønningen er hentet",
+  "You received {{points}} reward points, valid until {{expiry}}.": "Du har fått {{points}} bonuspoeng, gyldige til {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "Belønningen er hentet, men oppgaven kunne ikke fortsette automatisk. Prøv igjen.",
+  "Your points are used up": "Poengene dine er brukt opp",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Kvoten for inneværende periode er brukt opp. Oppgrader planen for å fortsette.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Dagens gratispoeng er brukt opp. De tilbakestilles daglig; oppgrader planen for å fortsette nå.",
+  "Upgrade plan": "Oppgrader planen"
 }

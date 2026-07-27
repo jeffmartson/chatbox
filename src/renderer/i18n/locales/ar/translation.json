@@ -1206,5 +1206,16 @@
   "List Settings": "سرد الإعدادات",
   "Read Conversation": "قراءة المحادثة",
   "Read Setting": "قراءة الإعداد",
-  "Refresh Account Status": "تحديث حالة الحساب"
+  "Refresh Account Status": "تحديث حالة الحساب",
+  "Your points are used up. Claim free reward quota to continue.": "نفدت نقاطك. احصل على رصيد مكافأة مجاني للمتابعة.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "يستهلك وضع العمل نقاطًا أكثر. احصل على مكافأة مجانية لمرة واحدة لمتابعة المهمة المتوقفة.",
+  "Claim reward and continue": "الحصول على المكافأة والمتابعة",
+  "Could not claim the reward. Please try again.": "تعذر الحصول على المكافأة. يرجى المحاولة مرة أخرى.",
+  "Reward claimed successfully": "تم الحصول على المكافأة",
+  "You received {{points}} reward points, valid until {{expiry}}.": "حصلت على {{points}} من نقاط المكافأة، صالحة حتى {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "تم استلام المكافأة، ولكن تعذر استئناف المهمة تلقائيًا. يُرجى المحاولة مرة أخرى.",
+  "Your points are used up": "نفدت نقاطك",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "نفدت حصتك للفترة الحالية. قم بترقية خطتك للمتابعة.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "نفدت نقاطك المجانية لهذا اليوم. تتم إعادة تعيينها يوميًا؛ قم بترقية خطتك للمتابعة الآن.",
+  "Upgrade plan": "ترقية الخطة"
 }

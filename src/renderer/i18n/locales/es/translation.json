@@ -1206,5 +1206,16 @@
   "List Settings": "Listar configuración",
   "Read Conversation": "Leer conversación",
   "Read Setting": "Leer ajuste",
-  "Refresh Account Status": "Actualizar estado de la cuenta"
+  "Refresh Account Status": "Actualizar estado de la cuenta",
+  "Your points are used up. Claim free reward quota to continue.": "Tus puntos se han agotado. Reclama un saldo extra gratuito para continuar.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "El modo Trabajo consume más puntos. Reclama una recompensa gratuita de un solo uso para continuar la tarea interrumpida.",
+  "Claim reward and continue": "Reclamar recompensa y continuar",
+  "Could not claim the reward. Please try again.": "No se pudo reclamar la recompensa. Inténtalo de nuevo.",
+  "Reward claimed successfully": "Recompensa reclamada",
+  "You received {{points}} reward points, valid until {{expiry}}.": "Has recibido {{points}} puntos de recompensa, válidos hasta {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "La recompensa se reclamó, pero la tarea no pudo reanudarse automáticamente. Inténtalo de nuevo.",
+  "Your points are used up": "Tus puntos se han agotado",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Has agotado la cuota del periodo actual. Actualiza tu plan para continuar.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Has agotado los puntos gratuitos de hoy. Se restablecen cada día; actualiza tu plan para continuar ahora.",
+  "Upgrade plan": "Actualizar plan"
 }

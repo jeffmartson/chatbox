@@ -1,17 +1,11 @@
 import { ofetch } from 'ofetch'
 import { z } from 'zod'
 import { getLogger } from '@/lib/utils'
+import { type ClaimedAgentModeReward, ClaimFreeAgentModeRewardResponseSchema } from '@/packages/agent-mode-reward'
 import { VibedropEmailRequiredError } from '@/packages/vibedrop'
 import platform from '@/platform'
 import { authInfoStore } from '@/stores/authInfoStore'
-import {
-  CHATBOX_BUILD_CHANNEL,
-  USE_BETA_API,
-  USE_BETA_CHATBOX,
-  USE_LOCAL_API,
-  USE_LOCAL_CHATBOX,
-  USE_NEWDB_API,
-} from '@/variables'
+import { CHATBOX_BUILD_CHANNEL, USE_BETA_CHATBOX, USE_LOCAL_CHATBOX } from '@/variables'
 import { ApiError } from '../../shared/models/errors'
 import * as chatboxaiAPI from '../../shared/request/chatboxai_pool'
 import { createAfetch, createAuthenticatedAfetch, uploadFile } from '../../shared/request/request'
@@ -109,15 +103,7 @@ async function getAuthenticatedAfetch() {
 
 // const RELEASE_ORIGIN = 'https://releases.chatboxai.app'
 export function getAPIOrigin() {
-  if (USE_LOCAL_API) {
-    return 'http://localhost:8002'
-  } else if (USE_BETA_API) {
-    return 'https://api-beta.chatboxai.app'
-  } else if (USE_NEWDB_API) {
-    return 'https://beta-new-db.chatboxai.app'
-  } else {
-    return chatboxaiAPI.getChatboxAPIOrigin()
-  }
+  return chatboxaiAPI.getChatboxAPIOrigin()
 }
 
 export function getChatboxOrigin() {
@@ -1091,6 +1077,30 @@ export async function listLicensesByUser(): Promise<UserLicense[]> {
   )
   const json: Response = await res.json()
   return json.data
+}
+
+export async function claimFreeAgentModeReward(licenseKey: string): Promise<ClaimedAgentModeReward> {
+  const normalizedLicenseKey = licenseKey.trim()
+  if (!normalizedLicenseKey) {
+    throw new Error('A license key is required to claim the Agent Mode reward')
+  }
+
+  const afetch = await getAfetch()
+  const res = await afetch(
+    `${getAPIOrigin()}/api/license/claim-free-agent-mode-reward`,
+    {
+      method: 'POST',
+      headers: {
+        ...(await getChatboxHeaders()),
+        Authorization: `Bearer ${normalizedLicenseKey}`,
+      },
+    },
+    {
+      parseChatboxRemoteError: true,
+      retry: 0,
+    }
+  )
+  return ClaimFreeAgentModeRewardResponseSchema.parse(await res.json())
 }
 
 // ========== Image Generation API ==========

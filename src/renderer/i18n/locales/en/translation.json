@@ -1206,5 +1206,16 @@
   "List Settings": "List Settings",
   "Read Conversation": "Read Conversation",
   "Read Setting": "Read Setting",
-  "Refresh Account Status": "Refresh Account Status"
+  "Refresh Account Status": "Refresh Account Status",
+  "Your points are used up. Claim free reward quota to continue.": "Your points are used up. Claim free reward quota to continue.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.",
+  "Claim reward and continue": "Claim reward and continue",
+  "Could not claim the reward. Please try again.": "Could not claim the reward. Please try again.",
+  "Reward claimed successfully": "Reward claimed successfully",
+  "You received {{points}} reward points, valid until {{expiry}}.": "You received {{points}} reward points, valid until {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "Reward claimed, but the task could not resume automatically. Please retry.",
+  "Your points are used up": "Your points are used up",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Your quota for the current period is used up. Upgrade your plan to continue.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.",
+  "Upgrade plan": "Upgrade plan"
 }

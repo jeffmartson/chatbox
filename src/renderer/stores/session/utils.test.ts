@@ -58,8 +58,9 @@ describe('trackGenerateEvent', () => {
       provider: 'chatboxai',
     } as SessionSettings
 
-    handleGenerationError(error, message, settings, { operationType: 'send_message' })
+    const result = handleGenerationError(error, message, settings, { operationType: 'send_message' })
 
     expect(reportErrorMock).not.toHaveBeenCalled()
+    expect(result.errorCode).toBe(10004)
   })
 })

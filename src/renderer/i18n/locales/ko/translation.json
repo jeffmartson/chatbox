@@ -1206,5 +1206,16 @@
   "List Settings": "설정 목록 보기",
   "Read Conversation": "대화 읽기",
   "Read Setting": "설정 읽기",
-  "Refresh Account Status": "계정 상태 새로고침"
+  "Refresh Account Status": "계정 상태 새로고침",
+  "Your points are used up. Claim free reward quota to continue.": "포인트를 모두 사용했습니다. 무료 보상 한도를 받고 계속하세요.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "작업 모드는 더 많은 포인트를 사용합니다. 일회성 무료 보상을 받고 중단된 작업을 계속하세요.",
+  "Claim reward and continue": "보상 받고 계속하기",
+  "Could not claim the reward. Please try again.": "보상을 받을 수 없습니다. 다시 시도해 주세요.",
+  "Reward claimed successfully": "보상을 받았습니다",
+  "You received {{points}} reward points, valid until {{expiry}}.": "{{points}} 보상 포인트를 받았습니다. {{expiry}}까지 유효합니다.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "보상은 수령했지만 작업을 자동으로 다시 시작하지 못했습니다. 다시 시도해 주세요.",
+  "Your points are used up": "포인트를 모두 사용했습니다",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "현재 기간의 포인트를 모두 사용했습니다. 계속하려면 플랜을 업그레이드하세요.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "오늘의 무료 포인트를 모두 사용했습니다. 무료 포인트는 매일 초기화됩니다. 지금 계속하려면 플랜을 업그레이드하세요.",
+  "Upgrade plan": "플랜 업그레이드"
 }

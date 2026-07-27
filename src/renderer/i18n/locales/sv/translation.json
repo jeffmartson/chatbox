@@ -1206,5 +1206,16 @@
   "List Settings": "Lista inställningar",
   "Read Conversation": "Läs konversation",
   "Read Setting": "Läs inställning",
-  "Refresh Account Status": "Uppdatera kontostatus"
+  "Refresh Account Status": "Uppdatera kontostatus",
+  "Your points are used up. Claim free reward quota to continue.": "Dina poäng är slut. Hämta en kostnadsfri bonuskvot för att fortsätta.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "Arbetsläget använder fler poäng. Hämta en kostnadsfri engångsbelöning för att fortsätta den avbrutna uppgiften.",
+  "Claim reward and continue": "Hämta belöning och fortsätt",
+  "Could not claim the reward. Please try again.": "Det gick inte att hämta belöningen. Försök igen.",
+  "Reward claimed successfully": "Belöningen har hämtats",
+  "You received {{points}} reward points, valid until {{expiry}}.": "Du fick {{points}} bonuspoäng, giltiga till {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "Belöningen har hämtats, men uppgiften kunde inte återupptas automatiskt. Försök igen.",
+  "Your points are used up": "Dina poäng är slut",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Din kvot för den aktuella perioden är slut. Uppgradera planen för att fortsätta.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Dagens kostnadsfria poäng är slut. De återställs dagligen; uppgradera planen för att fortsätta nu.",
+  "Upgrade plan": "Uppgradera planen"
 }

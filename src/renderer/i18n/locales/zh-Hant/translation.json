@@ -1206,5 +1206,16 @@
   "List Settings": "列出設定",
   "Read Conversation": "讀取對話",
   "Read Setting": "讀取設定",
-  "Refresh Account Status": "重新整理帳戶狀態"
+  "Refresh Account Status": "重新整理帳戶狀態",
+  "Your points are used up. Claim free reward quota to continue.": "點數已用完，可免費領取獎勵額度",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "工作模式消耗點數較多。領取一次性免費獎勵額度，即可繼續目前中斷的任務。",
+  "Claim reward and continue": "領取獎勵並繼續",
+  "Could not claim the reward. Please try again.": "獎勵領取失敗，請重試。",
+  "Reward claimed successfully": "獎勵額度領取成功",
+  "You received {{points}} reward points, valid until {{expiry}}.": "已獲得 {{points}} 點數，有效期至 {{expiry}}。",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "獎勵已領取，但任務未能自動繼續，請重試。",
+  "Your points are used up": "點數已用完",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "目前額度週期的點數已用完。升級方案後即可繼續使用。",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "今日免費點數已用完。免費點數每日重置；升級方案後可立即繼續使用。",
+  "Upgrade plan": "升級方案"
 }

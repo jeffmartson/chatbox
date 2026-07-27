@@ -1206,5 +1206,16 @@
   "List Settings": "Einstellungen auflisten",
   "Read Conversation": "Konversation lesen",
   "Read Setting": "Einstellung lesen",
-  "Refresh Account Status": "Kontostatus aktualisieren"
+  "Refresh Account Status": "Kontostatus aktualisieren",
+  "Your points are used up. Claim free reward quota to continue.": "Deine Punkte sind aufgebraucht. Sichere dir ein kostenloses Bonuskontingent, um fortzufahren.",
+  "Work mode uses more points. Claim a one-time free reward to continue this interrupted task.": "Der Arbeitsmodus verbraucht mehr Punkte. Hole dir eine einmalige kostenlose Belohnung, um die unterbrochene Aufgabe fortzusetzen.",
+  "Claim reward and continue": "Belohnung holen und fortfahren",
+  "Could not claim the reward. Please try again.": "Die Belohnung konnte nicht abgeholt werden. Bitte versuche es erneut.",
+  "Reward claimed successfully": "Belohnung erfolgreich abgeholt",
+  "You received {{points}} reward points, valid until {{expiry}}.": "Du hast {{points}} Bonuspunkte erhalten, gültig bis {{expiry}}.",
+  "Reward claimed, but the task could not resume automatically. Please retry.": "Die Belohnung wurde beansprucht, aber die Aufgabe konnte nicht automatisch fortgesetzt werden. Bitte versuchen Sie es erneut.",
+  "Your points are used up": "Deine Punkte sind aufgebraucht",
+  "Your quota for the current period is used up. Upgrade your plan to continue.": "Dein Kontingent für den aktuellen Zeitraum ist aufgebraucht. Aktualisiere deinen Plan, um fortzufahren.",
+  "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Deine kostenlosen Punkte für heute sind aufgebraucht. Sie werden täglich zurückgesetzt. Aktualisiere deinen Plan, um sofort fortzufahren.",
+  "Upgrade plan": "Plan aktualisieren"
 }
