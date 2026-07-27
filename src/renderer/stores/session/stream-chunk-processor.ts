@@ -1,4 +1,5 @@
 import { BaseError } from '@shared/models/errors'
+import { isPersistentToolCallPauseError } from '@shared/models/persistent-tool-call-pause'
 import type { ModelStreamPart } from '@shared/models/types'
 import type {
   Message,
@@ -92,7 +93,12 @@ export async function processStreamChunk(
   chunk: ModelStreamPart<ToolSet>,
   state: StreamProcessorState,
   callbacks: StreamProcessorCallbacks
-): Promise<{ state: StreamProcessorState; skipUpdate: boolean; statusChunk?: ModelStreamPart<ToolSet> }> {
+): Promise<{
+  state: StreamProcessorState
+  skipUpdate: boolean
+  statusChunk?: ModelStreamPart<ToolSet>
+  persistentToolCallPause?: unknown
+}> {
   const { contentParts } = state
   let { currentTextPart, currentReasoningPart, preparingToolInput, usage, finishReason, stepIndex } = state
 
@@ -327,7 +333,11 @@ export async function processStreamChunk(
         contentParts.push(toolCallPart)
       }
       if (isPersistentToolCallPauseError(chunk.error)) {
-        throw chunk.error
+        return {
+          state: nextState(),
+          skipUpdate: false,
+          persistentToolCallPause: chunk.error,
+        }
       }
       toolCallPart.state = 'error'
       finalizeToolCallDuration(toolCallPart)
@@ -386,20 +396,6 @@ export async function processStreamChunk(
     state: nextState(),
     skipUpdate: false,
   }
-}
-
-function isPersistentToolCallPauseError(error: unknown): boolean {
-  return Boolean(
-    error &&
-      typeof error === 'object' &&
-      'name' in error &&
-      [
-        'ToolCallLimitPausedError',
-        'UserExecApprovalPausedError',
-        'FileMutationApprovalPausedError',
-        'AppActionApprovalPausedError',
-      ].includes(String(error.name))
-  )
 }
 
 function getToolInputId(chunk: ModelStreamPart<ToolSet>): string | undefined {

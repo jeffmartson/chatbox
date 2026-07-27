@@ -22,6 +22,7 @@ import {
 } from '@/analytics/agent-mode'
 import { AppActionApprovalPausedError } from '@/packages/app-action-approval'
 import * as appleAppStore from '@/packages/apple_app_store'
+import { wakeBackgroundTaskFollowUps } from '@/packages/chatbox-cli/background-follow-up'
 import { estimateTokensFromMessages } from '@/packages/token'
 import { FileMutationApprovalPausedError, UserExecApprovalPausedError } from '@/packages/user-exec-approval'
 import platform from '@/platform'
@@ -64,6 +65,19 @@ type ExecutableTool = {
     input: unknown,
     context: { toolCallId?: string; approved?: boolean; approvalDetails?: AppActionApprovalDetails }
   ) => unknown
+}
+
+export function createPausedToolCallExecutionContext(
+  part: Pick<MessageContentToolCallPart, 'toolCallId' | 'pauseReason'>,
+  approvedToolCallId: string | undefined
+): { toolCallId: string; approved: boolean; approvalDetails?: AppActionApprovalDetails } {
+  const approved = part.toolCallId === approvedToolCallId
+  return {
+    toolCallId: part.toolCallId,
+    approved,
+    approvalDetails:
+      approved && part.pauseReason?.type === 'app_action_approval' ? part.pauseReason.details : undefined,
+  }
 }
 
 class ToolCallLimitPausedError extends Error {
@@ -187,6 +201,18 @@ function getToolCallPause(error: unknown): {
     }
   }
   return null
+}
+
+export function applyPersistentToolCallPause(
+  state: ReturnType<typeof createInitialState>,
+  error: unknown
+): ReturnType<typeof createInitialState> {
+  const pause = getToolCallPause(error)
+  if (!pause) throw error
+  return {
+    ...state,
+    contentParts: markToolCallPaused(state.contentParts, pause.toolCallId, pause.pauseReason),
+  }
 }
 
 async function shouldSuggestAgentMode(options: {
@@ -606,6 +632,9 @@ export async function orchestrateGeneration(
     for await (const chunk of stream) {
       const result = await processStreamChunk(chunk, processorState, streamCallbacks)
       processorState = result.state
+      if (result.persistentToolCallPause) {
+        processorState = applyPersistentToolCallPause(processorState, result.persistentToolCallPause)
+      }
 
       if (result.skipUpdate) {
         if (result.statusChunk && result.statusChunk.type === 'status') {
@@ -643,6 +672,21 @@ export async function orchestrateGeneration(
       if (shouldPersist) {
         lastPersistTimestamp = Date.now()
       }
+    }
+
+    if (processorState.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')) {
+      targetMsg = {
+        ...targetMsg,
+        generating: false,
+        cancel: undefined,
+        contentParts: [...infoParts, ...processorState.contentParts],
+        tokensUsed: targetMsg.tokensUsed ?? estimateTokensFromMessages([...promptMsgs, targetMsg]),
+        status: [],
+        finishReason: 'tool-call-paused',
+        usage: processorState.usage,
+      }
+      await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+      return
     }
 
     for (const part of processorState.contentParts) {
@@ -791,7 +835,7 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
 export function stopPausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
   return withSessionGenerationLock(sessionId, () =>
     stopPausedToolCallWithoutSessionLock(sessionId, messageId, toolCallId)
-  )
+  ).finally(() => wakeBackgroundTaskFollowUps(sessionId))
 }
 
 async function stopPausedToolCallWithoutSessionLock(sessionId: string, messageId: string, toolCallId: string) {
@@ -895,7 +939,7 @@ async function stopPausedToolCallWithoutSessionLock(sessionId: string, messageId
 export function continuePausedToolCall(sessionId: string, messageId: string, toolCallId: string) {
   return withSessionGenerationLock(sessionId, () =>
     continuePausedToolCallWithoutSessionLock(sessionId, messageId, toolCallId)
-  )
+  ).finally(() => wakeBackgroundTaskFollowUps(sessionId))
 }
 
 async function continuePausedToolCallWithoutSessionLock(sessionId: string, messageId: string, toolCallId: string) {
@@ -931,6 +975,7 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
   const toolCallLimitBatch = findPausedToolCallLimitBatch(message, toolCallId)
   const isLimitContinue = toolCallLimitBatch.length > 0
   const batch = isLimitContinue ? toolCallLimitBatch : [part]
+  const approvedToolCallId = isApproval ? toolCallId : undefined
   const batchIds = new Set(batch.map((batchPart) => batchPart.toolCallId))
 
   message = updateToolCallParts(
@@ -962,14 +1007,12 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
       }
 
       try {
-        // Only an approval continue carries approved:true (the user just reviewed that exact
-        // call). Limit-paused calls were never reviewed, so their own approval gates must run.
-        const result = await executableTool.execute(batchPart.args, {
-          toolCallId: batchPart.toolCallId,
-          approved: !isLimitContinue,
-          approvalDetails:
-            batchPart.pauseReason?.type === 'app_action_approval' ? batchPart.pauseReason.details : undefined,
-        })
+        // Bind approval to the exact call the user reviewed. Never infer authorization from
+        // batch membership: a sibling call must pass through its own approval gate.
+        const result = await executableTool.execute(
+          batchPart.args,
+          createPausedToolCallExecutionContext(batchPart, approvedToolCallId)
+        )
         message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) => ({
           ...toolPart,
           state: 'result',

@@ -35,6 +35,7 @@ import type { ModelDependencies } from '../types/adapters'
 import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
 import { isExpectedGenerationError } from './error-classification'
 import { ApiError, ChatboxAIAPIError } from './errors'
+import { stopWhenPersistentToolCallPause } from './persistent-tool-call-pause'
 import { repairToolCallJson } from './tool-call-json-repair'
 import type {
   CallChatCompletionOptions,
@@ -319,7 +320,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     const result = streamText({
       model,
       messages,
-      stopWhen: stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER),
+      stopWhen: [stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER), stopWhenPersistentToolCallPause<T>()],
       tools: options.tools as T | undefined,
       prepareStep: options.prepareStep as PrepareStepFunction<T> | undefined,
       experimental_repairToolCall: repairToolCallJson as ToolCallRepairFunction<T>,
@@ -753,7 +754,7 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     const result = streamText({
       model,
       messages: coreMessages,
-      stopWhen: stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER),
+      stopWhen: [stepCountIs(options.maxSteps || Number.MAX_SAFE_INTEGER), stopWhenPersistentToolCallPause<T>()],
       tools: options.tools,
       experimental_repairToolCall: repairToolCallJson as ToolCallRepairFunction<T>,
       abortSignal: options.signal,

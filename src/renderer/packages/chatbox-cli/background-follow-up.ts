@@ -17,6 +17,7 @@ interface QueuedNotification {
   notification: BackgroundTaskNotification
   originToolCallId: string
   attempts: number
+  deferrals: number
   reservedAssistantMessage?: Message
 }
 
@@ -48,7 +49,7 @@ function rememberId(id: string): boolean {
 }
 
 function scheduleDrain(sessionId: string, delay = 0): void {
-  if (timers.has(sessionId) || draining.has(sessionId)) return
+  if (!queues.get(sessionId)?.length || timers.has(sessionId) || draining.has(sessionId)) return
   const timer = setTimeout(() => {
     timers.delete(sessionId)
     void drainQueue(sessionId)
@@ -56,12 +57,42 @@ function scheduleDrain(sessionId: string, delay = 0): void {
   timers.set(sessionId, timer)
 }
 
-function clearStaleGeneratingFlags(messages: Message[]): Message[] {
-  return messages.map((message) => (message.generating ? { ...message, generating: false } : message))
-}
-
 function containsToolCall(message: Message, toolCallId: string): boolean {
   return message.contentParts.some((part) => part.type === 'tool-call' && part.toolCallId === toolCallId)
+}
+
+function originBatchHasPausedToolCalls(session: Session, originToolCallId: string): boolean {
+  const messageLists = [session.messages, ...(session.threads?.map((thread) => thread.messages) ?? [])]
+  for (const messages of messageLists) {
+    const originMessage = messages.find((message) => containsToolCall(message, originToolCallId))
+    if (!originMessage) continue
+    return originMessage.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')
+  }
+  return false
+}
+
+function prepareMessagesForFollowUp(messages: Message[], originToolCallId: string): Message[] {
+  const now = Date.now()
+  return messages.map((message) => {
+    const isOriginMessage = containsToolCall(message, originToolCallId)
+    const contentParts = isOriginMessage
+      ? message.contentParts.map((part) =>
+          part.type === 'tool-call' && part.state === 'call'
+            ? {
+                ...part,
+                state: 'error' as const,
+                result: { error: 'Tool execution was interrupted before its result was persisted.' },
+                pauseReason: undefined,
+                duration: part.startTime ? now - part.startTime : undefined,
+              }
+            : part
+        )
+      : message.contentParts
+
+    return message.generating || contentParts !== message.contentParts
+      ? { ...message, contentParts, generating: false }
+      : message
+  })
 }
 
 function prepareMessage(message: Message): Message {
@@ -81,10 +112,10 @@ function appendFollowUpMessages(
   // The session generation lock is held while this updater runs, so no live
   // generation can be active here. Any persisted generating flag is stale
   // crash/interruption state and must not block a completed-task callback.
-  const messages = clearStaleGeneratingFlags(session.messages)
+  const messages = prepareMessagesForFollowUp(session.messages, originToolCallId)
   const threads = session.threads?.map((thread) => ({
     ...thread,
-    messages: clearStaleGeneratingFlags(thread.messages),
+    messages: prepareMessagesForFollowUp(thread.messages, originToolCallId),
   }))
 
   if (messages.some((message) => containsToolCall(message, originToolCallId))) {
@@ -112,8 +143,15 @@ function appendFollowUpMessages(
 function deliverNotification(
   sessionId: string,
   queued: QueuedNotification
-): Promise<'delivered' | 'target-missing' | 'discard'> {
+): Promise<'delivered' | 'deferred' | 'target-missing' | 'discard'> {
   return withSessionGenerationLock(sessionId, async () => {
+    const session = await chatStore.getSession(sessionId)
+    if (!session) return 'discard'
+    // A completion callback must not start a potentially long model follow-up while another
+    // tool call is still waiting for approval. A persisted `call` cannot still be executing
+    // after this lock is acquired; appendFollowUpMessages settles that interrupted state.
+    if (originBatchHasPausedToolCalls(session, queued.originToolCallId)) return 'deferred'
+
     if (!queued.reservedAssistantMessage) {
       const userMessage = prepareMessage({
         ...createMessage('user', formatBackgroundTaskNotification(queued.notification)),
@@ -129,8 +167,8 @@ function deliverNotification(
         queued.reservedAssistantMessage = assistantMessage
       } catch (error) {
         if (error instanceof BackgroundFollowUpTargetNotFoundError) return 'target-missing'
-        const session = await chatStore.getSession(sessionId).catch(() => undefined)
-        if (!session) return 'discard'
+        const latestSession = await chatStore.getSession(sessionId)
+        if (!latestSession) return 'discard'
         throw error
       }
     }
@@ -144,11 +182,6 @@ function deliverNotification(
   })
 }
 
-function removeQueueHead(sessionId: string, queue: QueuedNotification[]): void {
-  queue.shift()
-  if (queue.length === 0) queues.delete(sessionId)
-}
-
 function retryDelay(attempts: number): number {
   return Math.min(RETRY_DELAY_MS * 2 ** Math.min(attempts, 5), MAX_RETRY_DELAY_MS)
 }
@@ -156,30 +189,63 @@ function retryDelay(attempts: number): number {
 async function drainQueue(sessionId: string): Promise<void> {
   if (draining.has(sessionId)) return
   const queue = queues.get(sessionId)
-  const next = queue?.[0]
-  if (!queue || !next) return
+  if (!queue?.length) return
 
   draining.add(sessionId)
-  let delay = 0
+  const candidates = queue.length
+  let inspected = 0
+  let deferredCount = 0
+  let stoppedForFailure = false
+  let delay: number | undefined
   try {
-    const outcome = await deliverNotification(sessionId, next)
-    if (outcome === 'delivered' || outcome === 'target-missing' || outcome === 'discard') {
-      removeQueueHead(sessionId, queue)
-    } else {
-      next.attempts += 1
-      delay = retryDelay(next.attempts)
+    while (inspected < candidates) {
+      const next = queue.shift()
+      if (!next) break
+      inspected += 1
+
+      try {
+        const outcome = await deliverNotification(sessionId, next)
+        if (outcome === 'deferred') {
+          next.deferrals += 1
+          deferredCount += 1
+          queue.push(next)
+          const nextDelay = retryDelay(Math.max(next.deferrals - 1, 0))
+          delay = delay === undefined ? nextDelay : Math.min(delay, nextDelay)
+          continue
+        }
+
+        if (outcome === 'delivered') {
+          // Keep model follow-ups serialized, but schedule another immediate pass when
+          // this snapshot still contains uninspected notifications.
+          if (inspected < candidates) delay = 0
+          break
+        }
+      } catch (error) {
+        next.attempts += 1
+        log.error('Failed to deliver background task follow-up:', error)
+        if (next.attempts < MAX_DELIVERY_ATTEMPTS) {
+          // Real delivery failures preserve FIFO ordering. Only approval deferrals are
+          // allowed to rotate, because retrying a reserved assistant message must finish
+          // before a later model follow-up is appended.
+          queue.unshift(next)
+          delay = retryDelay(next.attempts)
+          stoppedForFailure = true
+          break
+        }
+
+        log.error('Dropping background task follow-up after repeated delivery failures:', next.notification.id)
+      }
     }
-  } catch (error) {
-    next.attempts += 1
-    delay = retryDelay(next.attempts)
-    log.error('Failed to deliver background task follow-up:', error)
   } finally {
-    if (next.attempts >= MAX_DELIVERY_ATTEMPTS && queues.get(sessionId)?.[0] === next) {
-      log.error('Dropping background task follow-up after repeated delivery failures:', next.notification.id)
-      removeQueueHead(sessionId, queue)
-    }
     draining.delete(sessionId)
-    if (queues.get(sessionId)?.length) scheduleDrain(sessionId, delay)
+    if (queue.length === 0) {
+      queues.delete(sessionId)
+    } else {
+      // New arrivals and original items left uninspected behind a successful delivery
+      // should run immediately. A real delivery failure intentionally remains FIFO.
+      if (!stoppedForFailure && queue.length > deferredCount) delay = 0
+      scheduleDrain(sessionId, delay ?? 0)
+    }
   }
 }
 
@@ -190,8 +256,18 @@ export function queueBackgroundTaskNotification(
 ): void {
   if (!rememberId(`${sessionId}:${notification.id}`)) return
   const queue = queues.get(sessionId) ?? []
-  queue.push({ notification, originToolCallId, attempts: 0 })
+  queue.push({ notification, originToolCallId, attempts: 0, deferrals: 0 })
   queues.set(sessionId, queue)
+  scheduleDrain(sessionId)
+}
+
+export function wakeBackgroundTaskFollowUps(sessionId: string): void {
+  if (!queues.get(sessionId)?.length) return
+  const timer = timers.get(sessionId)
+  if (timer) {
+    clearTimeout(timer)
+    timers.delete(sessionId)
+  }
   scheduleDrain(sessionId)
 }
 

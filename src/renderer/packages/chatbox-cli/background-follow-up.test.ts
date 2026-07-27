@@ -22,6 +22,7 @@ import {
   formatBackgroundTaskNotification,
   queueBackgroundTaskNotification,
   resetBackgroundTaskFollowUpsForTests,
+  wakeBackgroundTaskFollowUps,
 } from './background-follow-up'
 
 const notification = {
@@ -142,16 +143,134 @@ describe('background task follow-up queue', () => {
     expect(generateMock).toHaveBeenCalledTimes(2)
   })
 
-  it('drops a missing target so a later valid notification can be delivered', async () => {
+  it('defers the follow-up while a sibling tool call is paused', async () => {
+    currentSession.messages[0].contentParts.push({
+      type: 'tool-call',
+      state: 'paused',
+      toolCallId: 'tool-2',
+      toolName: 'chatbox_cli',
+      args: { command: 'image generate --prompt "second image"' },
+      pauseReason: {
+        type: 'app_action_approval',
+        action: 'image.generate',
+        title: 'Generate image',
+        preview: 'second image',
+      },
+    })
+
+    queueBackgroundTaskNotification('session-1', 'tool-1', notification)
+    await runNextDrain()
+
+    expect(generateMock).not.toHaveBeenCalled()
+    expect(updateSessionWithMessagesMock).not.toHaveBeenCalled()
+
+    currentSession.messages[0].contentParts = currentSession.messages[0].contentParts.map((part) =>
+      part.type === 'tool-call' && part.toolCallId === 'tool-2'
+        ? {
+            ...part,
+            state: 'result',
+            pauseReason: undefined,
+            result: { accepted: true },
+          }
+        : part
+    )
+    await runNextDrain()
+
+    expect(generateMock).toHaveBeenCalledOnce()
+    expect(currentSession.messages.at(-2)?.backgroundTask).toEqual(notification)
+  })
+
+  it('delivers a ready notification behind a deferred head and wakes the head after approval resolves', async () => {
+    currentSession.messages[0].contentParts.push({
+      type: 'tool-call',
+      state: 'paused',
+      toolCallId: 'tool-2',
+      toolName: 'chatbox_cli',
+      args: { command: 'image generate --prompt "second image"' },
+      pauseReason: {
+        type: 'app_action_approval',
+        action: 'image.generate',
+        title: 'Generate image',
+        preview: 'second image',
+      },
+    })
+    currentSession.messages.push(originMessage('tool-3'))
+    const laterNotification = {
+      ...notification,
+      id: 'image-generation:record-2:done',
+      recordId: 'record-2',
+    }
+
+    queueBackgroundTaskNotification('session-1', 'tool-1', notification)
+    queueBackgroundTaskNotification('session-1', 'tool-3', laterNotification)
+    await runNextDrain()
+
+    expect(generateMock).toHaveBeenCalledOnce()
+    expect(
+      currentSession.messages.filter((message) => message.backgroundTask).map((message) => message.backgroundTask?.id)
+    ).toEqual([laterNotification.id])
+
+    currentSession.messages[0].contentParts = currentSession.messages[0].contentParts.map((part) =>
+      part.type === 'tool-call' && part.toolCallId === 'tool-2'
+        ? {
+            ...part,
+            state: 'result',
+            pauseReason: undefined,
+            result: { accepted: true },
+          }
+        : part
+    )
+    wakeBackgroundTaskFollowUps('session-1')
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(generateMock).toHaveBeenCalledTimes(2)
+    expect(
+      currentSession.messages.filter((message) => message.backgroundTask).map((message) => message.backgroundTask?.id)
+    ).toEqual([laterNotification.id, notification.id])
+  })
+
+  it('settles stale call states under the generation lock instead of deferring forever', async () => {
+    currentSession.messages[0].contentParts.push({
+      type: 'tool-call',
+      state: 'call',
+      toolCallId: 'tool-2',
+      toolName: 'chatbox_cli',
+      args: { command: 'image generate --prompt "second image"' },
+      startTime: 1_000,
+    })
+
+    queueBackgroundTaskNotification('session-1', 'tool-1', notification)
+    await runNextDrain()
+
+    expect(generateMock).toHaveBeenCalledOnce()
+    expect(currentSession.messages[0].contentParts.find((part) => part.type === 'tool-call')).toBeDefined()
+    expect(
+      currentSession.messages[0].contentParts.find((part) => part.type === 'tool-call' && part.toolCallId === 'tool-2')
+    ).toMatchObject({
+      state: 'error',
+      result: { error: 'Tool execution was interrupted before its result was persisted.' },
+    })
+  })
+
+  it('retries a transient session read failure instead of discarding the notification', async () => {
+    getSessionMock.mockRejectedValueOnce(new Error('temporary storage failure'))
+
+    queueBackgroundTaskNotification('session-1', 'tool-1', notification)
+    await runNextDrain()
+    expect(generateMock).not.toHaveBeenCalled()
+
+    await runNextDrain()
+    expect(generateMock).toHaveBeenCalledOnce()
+    expect(currentSession.messages.at(-2)?.backgroundTask).toEqual(notification)
+  })
+
+  it('drops a missing target and delivers a later valid notification in the same pass', async () => {
     queueBackgroundTaskNotification('session-1', 'deleted-tool', {
       ...notification,
       id: 'image-generation:deleted:done',
       recordId: 'deleted',
     })
     queueBackgroundTaskNotification('session-1', 'tool-1', notification)
-
-    await runNextDrain()
-    expect(generateMock).not.toHaveBeenCalled()
 
     await runNextDrain()
     expect(generateMock).toHaveBeenCalledOnce()

@@ -581,7 +581,7 @@ describe('processStreamChunk', () => {
     expect(part.result.error).toBe('failed')
   })
 
-  it('throws tool-call limit pause errors instead of storing them as tool results', async () => {
+  it('returns tool-call limit pauses for orchestration instead of storing them as tool results', async () => {
     const state = createInitialState()
     const r1 = await processStreamChunk(
       chunk('tool-call', { toolCallId: 'tc1', toolName: 'code_execution', args: {} }),
@@ -591,13 +591,12 @@ describe('processStreamChunk', () => {
     const error = new Error('Tool call limit reached before executing code_execution')
     error.name = 'ToolCallLimitPausedError'
 
-    await expect(
-      processStreamChunk(
-        chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'code_execution' }),
-        r1.state,
-        callbacks
-      )
-    ).rejects.toBe(error)
+    const result = await processStreamChunk(
+      chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'code_execution' }),
+      r1.state,
+      callbacks
+    )
+    expect(result.persistentToolCallPause).toBe(error)
     expect((r1.state.contentParts[0] as { state: string }).state).toBe('call')
   })
 
@@ -611,14 +610,13 @@ describe('processStreamChunk', () => {
     const error = new Error('Tool call limit reached before executing code_execution')
     error.name = 'ToolCallLimitPausedError'
 
-    await expect(
-      processStreamChunk(
-        chunk('tool-error', { toolCallId: 'tc1', error, input: { code: '1' }, toolName: 'code_execution' }),
-        start.state,
-        callbacks
-      )
-    ).rejects.toBe(error)
+    const result = await processStreamChunk(
+      chunk('tool-error', { toolCallId: 'tc1', error, input: { code: '1' }, toolName: 'code_execution' }),
+      start.state,
+      callbacks
+    )
 
+    expect(result.persistentToolCallPause).toBe(error)
     expect(start.state.contentParts[0]).toMatchObject({
       type: 'tool-call',
       state: 'call',
@@ -628,7 +626,7 @@ describe('processStreamChunk', () => {
   })
 
   it.each(['UserExecApprovalPausedError', 'FileMutationApprovalPausedError', 'AppActionApprovalPausedError'])(
-    'throws %s instead of storing it as a tool result',
+    'returns %s for orchestration instead of storing it as a tool result',
     async (errorName) => {
       const state = createInitialState()
       const r1 = await processStreamChunk(
@@ -639,13 +637,12 @@ describe('processStreamChunk', () => {
       const error = new Error('approval required')
       error.name = errorName
 
-      await expect(
-        processStreamChunk(
-          chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'user_exec' }),
-          r1.state,
-          callbacks
-        )
-      ).rejects.toBe(error)
+      const result = await processStreamChunk(
+        chunk('tool-error', { toolCallId: 'tc1', error, input: {}, toolName: 'user_exec' }),
+        r1.state,
+        callbacks
+      )
+      expect(result.persistentToolCallPause).toBe(error)
       expect((r1.state.contentParts[0] as { state: string }).state).toBe('call')
     }
   )
