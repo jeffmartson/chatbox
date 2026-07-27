@@ -8,7 +8,15 @@ import {
   type ReasoningControlLevel,
   type ReasoningControlOption,
 } from '@shared/utils/reasoning-control'
-import { IconBrain } from '@tabler/icons-react'
+import {
+  type Icon,
+  IconAntennaBars1,
+  IconAntennaBars3,
+  IconAntennaBars5,
+  IconBrain,
+  IconCircleOff,
+  IconSparkles,
+} from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -17,6 +25,7 @@ interface ReasoningControlButtonProps {
   model?: ProviderModelInfo | null
   providerOptions?: ProviderOptions
   iconSize: number
+  compact?: boolean
   onChange: (level: ReasoningControlLevel) => void
 }
 
@@ -33,6 +42,7 @@ export default function ReasoningControlButton({
   model,
   providerOptions,
   iconSize,
+  compact = false,
   onChange,
 }: ReasoningControlButtonProps) {
   const { t } = useTranslation()
@@ -84,11 +94,18 @@ export default function ReasoningControlButton({
               'hover:bg-[var(--chatbox-background-tertiary)] transition-colors'
             }
             style={{ color: LEVEL_COLORS[level] }}
+            aria-label={t('Thinking: {{level}}', { level: levelLabel })}
           >
-            <IconBrain size={iconSize} strokeWidth={1.8} />
-            <Text span size="xs" fw={500} className="whitespace-nowrap" c="inherit">
-              {levelLabel}
-            </Text>
+            {compact ? (
+              <CompactReasoningLevelIcon level={level} size={iconSize} />
+            ) : (
+              <>
+                <IconBrain size={iconSize} strokeWidth={1.8} />
+                <Text span size="xs" fw={500} className="whitespace-nowrap" c="inherit">
+                  {levelLabel}
+                </Text>
+              </>
+            )}
           </UnstyledButton>
         </Tooltip>
       </Menu.Target>
@@ -105,6 +122,31 @@ export default function ReasoningControlButton({
         ))}
       </Menu.Dropdown>
     </Menu>
+  )
+}
+
+const COMPACT_LEVEL_ICONS: Record<ReasoningControlLevel, Icon> = {
+  default: IconSparkles,
+  off: IconCircleOff,
+  low: IconAntennaBars1,
+  medium: IconAntennaBars3,
+  high: IconAntennaBars5,
+}
+
+function CompactReasoningLevelIcon({ level, size }: { level: ReasoningControlLevel; size: number }) {
+  const StatusIcon = COMPACT_LEVEL_ICONS[level]
+  const statusSize = Math.max(10, Math.round(size * 0.5))
+
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} data-reasoning-level={level}>
+      <IconBrain size={size} strokeWidth={1.8} />
+      <StatusIcon
+        aria-hidden
+        size={statusSize}
+        strokeWidth={2.4}
+        className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[var(--chatbox-background-secondary)]"
+      />
+    </span>
   )
 }
 
