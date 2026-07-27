@@ -30,15 +30,15 @@ vi.mock('react-i18next', () => ({
 }))
 
 const model: ProviderModelInfo = { modelId: 'gpt-5.1' }
-const highReasoning: ProviderOptions = { openai: { reasoningEffort: 'high' } }
 
-function renderButton(compact: boolean) {
+function renderButton(compact: boolean, reasoningEffort: 'low' | 'medium' | 'high' = 'high') {
+  const providerOptions: ProviderOptions = { openai: { reasoningEffort } }
   return render(
     <MantineProvider>
       <ReasoningControlButton
         provider={ModelProviderEnum.OpenAIResponses}
         model={model}
-        providerOptions={highReasoning}
+        providerOptions={providerOptions}
         iconSize={22}
         compact={compact}
         onChange={vi.fn()}
@@ -54,6 +54,18 @@ describe('ReasoningControlButton', () => {
     expect(screen.getByRole('button', { name: 'Thinking: High' })).toBeTruthy()
     expect(view.container.querySelector('[data-reasoning-level="high"]')).toBeTruthy()
     expect(view.container.querySelector('button')?.textContent).toBe('')
+  })
+
+  test.each([
+    ['low', 1],
+    ['medium', 2],
+    ['high', 3],
+  ] as const)('shows %s effort with %i active dots', (level, activeDotCount) => {
+    const view = renderButton(true, level)
+    const status = view.container.querySelector(`[data-reasoning-status="${level}"]`)
+
+    expect(status?.querySelectorAll('[data-reasoning-dot="active"]')).toHaveLength(activeDotCount)
+    expect(status?.querySelectorAll('[data-reasoning-dot="inactive"]')).toHaveLength(3 - activeDotCount)
   })
 
   test('keeps the level text in regular mode', () => {

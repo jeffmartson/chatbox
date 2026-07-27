@@ -8,15 +8,7 @@ import {
   type ReasoningControlLevel,
   type ReasoningControlOption,
 } from '@shared/utils/reasoning-control'
-import {
-  type Icon,
-  IconAntennaBars1,
-  IconAntennaBars3,
-  IconAntennaBars5,
-  IconBrain,
-  IconCircleOff,
-  IconSparkles,
-} from '@tabler/icons-react'
+import { IconBrain, IconCircleOff, IconSparkles } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -114,6 +106,7 @@ export default function ReasoningControlButton({
         {options.map((item) => (
           <Menu.Item
             key={item.level}
+            leftSection={<ReasoningLevelStatusIcon level={item.level} size={14} />}
             onClick={() => onChange(item.level)}
             color={item.level === level ? 'chatbox-brand' : undefined}
           >
@@ -125,27 +118,72 @@ export default function ReasoningControlButton({
   )
 }
 
-const COMPACT_LEVEL_ICONS: Record<ReasoningControlLevel, Icon> = {
-  default: IconSparkles,
-  off: IconCircleOff,
-  low: IconAntennaBars1,
-  medium: IconAntennaBars3,
-  high: IconAntennaBars5,
+type ReasoningEffortLevel = Exclude<ReasoningControlLevel, 'default' | 'off'>
+
+const REASONING_LEVEL_DOT_COUNTS: Record<ReasoningEffortLevel, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
 }
 
 function CompactReasoningLevelIcon({ level, size }: { level: ReasoningControlLevel; size: number }) {
-  const StatusIcon = COMPACT_LEVEL_ICONS[level]
   const statusSize = Math.max(10, Math.round(size * 0.5))
 
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} data-reasoning-level={level}>
       <IconBrain size={size} strokeWidth={1.8} />
+      <ReasoningLevelStatusIcon
+        level={level}
+        size={statusSize}
+        className="absolute -bottom-0.5 -right-0.5 bg-[var(--chatbox-background-secondary)]"
+      />
+    </span>
+  )
+}
+
+function ReasoningLevelStatusIcon({
+  level,
+  size,
+  className = '',
+}: {
+  level: ReasoningControlLevel
+  size: number
+  className?: string
+}) {
+  if (level === 'default' || level === 'off') {
+    const StatusIcon = level === 'default' ? IconSparkles : IconCircleOff
+    return (
       <StatusIcon
         aria-hidden
-        size={statusSize}
+        size={size}
         strokeWidth={2.4}
-        className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[var(--chatbox-background-secondary)]"
+        className={`rounded-full ${className}`}
+        data-reasoning-status={level}
       />
+    )
+  }
+
+  const activeDotCount = REASONING_LEVEL_DOT_COUNTS[level]
+  const dotSize = Math.max(2, Math.round(size * 0.2))
+
+  return (
+    <span
+      aria-hidden
+      className={`inline-flex items-center justify-center gap-px rounded-full ${className}`}
+      style={{ width: size, height: size }}
+      data-reasoning-status={level}
+    >
+      {[0, 1, 2].map((index) => {
+        const active = index < activeDotCount
+        return (
+          <span
+            key={index}
+            className="rounded-full bg-current"
+            style={{ width: dotSize, height: dotSize, opacity: active ? 1 : 0.25 }}
+            data-reasoning-dot={active ? 'active' : 'inactive'}
+          />
+        )
+      })}
     </span>
   )
 }
