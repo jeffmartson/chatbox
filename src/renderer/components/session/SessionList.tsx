@@ -18,15 +18,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Flex, Text } from '@mantine/core'
-import { useMediaQuery } from '@mantine/hooks'
+import { Button, Flex, Text } from '@mantine/core'
 import type { SessionMetaRecord } from '@shared/types'
 import { areSessionsInSamePinGroup } from '@shared/utils/session-sort'
-import { IconLoader2 } from '@tabler/icons-react'
+import { IconArrowsMoveVertical, IconGripVertical, IconLoader2 } from '@tabler/icons-react'
 import { useRouterState } from '@tanstack/react-router'
 import { type CSSProperties, type MutableRefObject, useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
+import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { useSessionList } from '@/stores/chatStore'
 import { reorderSessions } from '@/stores/sessionActions'
 import SessionItem from './SessionItem'
@@ -51,11 +51,12 @@ export default function SessionList(props: Props) {
   const { t } = useTranslation()
   const { sessionMetaList: sortedSessions, fetchNextPage, hasNextPage, isFetchingNextPage } = useSessionList()
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const isSmallScreen = useMediaQuery('(max-width: 768px)')
+  const [isReordering, setIsReordering] = useState(false)
+  const isSmallScreen = useIsSmallScreen()
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 250,
-      tolerance: 10,
+      delay: 150,
+      tolerance: 8,
     },
   })
   const mouseSensor = useSensor(MouseSensor, {
@@ -66,16 +67,13 @@ export default function SessionList(props: Props) {
   const keyboardSensor = useSensor(KeyboardSensor, {
     coordinateGetter: sortableKeyboardCoordinates,
   })
-  const sensors = useSensors(...(isSmallScreen ? [] : [touchSensor]), mouseSensor, keyboardSensor)
+  const sensors = useSensors(...(!isSmallScreen || isReordering ? [touchSensor] : []), mouseSensor, keyboardSensor)
   const onDragStart = (event: DragStartEvent) => {
     setActiveDragId(String(event.active.id))
   }
   const onDragEnd = async (event: DragEndEvent) => {
     setActiveDragId(null)
-    if (!event.over) {
-      return
-    }
-    if (!sortedSessions) {
+    if (!event.over || !sortedSessions) {
       return
     }
     const activeId = String(event.active.id)
@@ -83,7 +81,9 @@ export default function SessionList(props: Props) {
     if (activeId !== overId) {
       const oldIndex = sortedSessions.findIndex((s) => s.id === activeId)
       const newIndex = sortedSessions.findIndex((s) => s.id === overId)
-      if (oldIndex < 0 || newIndex < 0) {
+      const activeSession = sortedSessions[oldIndex]
+      const overSession = sortedSessions[newIndex]
+      if (oldIndex < 0 || newIndex < 0 || !areSessionsInSamePinGroup(activeSession, overSession)) {
         return
       }
       await reorderSessions(oldIndex, newIndex)
@@ -97,21 +97,6 @@ export default function SessionList(props: Props) {
     [activeDragId, sortedSessions]
   )
   const sortableSessionIds = useMemo(() => sortedSessions?.map((session) => session.id) ?? [], [sortedSessions])
-  const moveSession = useCallback(
-    async (sessionIndex: number, offset: -1 | 1) => {
-      if (!sortedSessions) {
-        return
-      }
-      const targetIndex = sessionIndex + offset
-      const session = sortedSessions[sessionIndex]
-      const targetSession = sortedSessions[targetIndex]
-      if (!areSessionsInSamePinGroup(session, targetSession)) {
-        return
-      }
-      await reorderSessions(sessionIndex, targetIndex)
-    },
-    [sortedSessions]
-  )
   const displayItems = useMemo<SessionListItem[]>(() => {
     if (!sortedSessions) {
       return []
@@ -161,6 +146,27 @@ export default function SessionList(props: Props) {
     >
       {sortedSessions && (
         <SortableContext items={sortableSessionIds} strategy={verticalListSortingStrategy}>
+          {isSmallScreen && isReordering && (
+            <Flex
+              align="center"
+              justify="space-between"
+              mx="xs"
+              mb={2}
+              px="xs"
+              py={6}
+              className="rounded-sm bg-chatbox-background-gray-secondary"
+            >
+              <Flex align="center" gap={6}>
+                <IconArrowsMoveVertical size={16} className="text-chatbox-tertiary" />
+                <Text size="sm" fw={500} c="chatbox-secondary">
+                  {t('Adjust order')}
+                </Text>
+              </Flex>
+              <Button variant="subtle" size="compact-sm" onClick={() => setIsReordering(false)}>
+                {t('Done')}
+              </Button>
+            </Flex>
+          )}
           <Virtuoso
             style={{ flex: 1 }}
             data={displayItems}
@@ -181,18 +187,18 @@ export default function SessionList(props: Props) {
                 )
               }
 
-              const sessionIndex = sortedSessions.findIndex((session) => session.id === item.session.id)
-              const previousSession = sortedSessions[sessionIndex - 1]
-              const nextSession = sortedSessions[sessionIndex + 1]
               return (
-                <SortableItem id={item.session.id}>
+                <SortableItem
+                  id={item.session.id}
+                  disabled={Boolean(isSmallScreen && !isReordering)}
+                  showDragHandle={Boolean(isSmallScreen && isReordering)}
+                  dragHandleLabel={t('Adjust order') || undefined}
+                >
                   <SessionItem
                     selected={routerState.location.pathname === `/session/${item.session.id}`}
                     session={item.session}
-                    canMoveUp={areSessionsInSamePinGroup(previousSession, item.session)}
-                    canMoveDown={areSessionsInSamePinGroup(nextSession, item.session)}
-                    onMoveUp={() => moveSession(sessionIndex, -1)}
-                    onMoveDown={() => moveSession(sessionIndex, 1)}
+                    isReordering={Boolean(isSmallScreen && isReordering)}
+                    onStartReordering={() => setIsReordering(true)}
                   />
                 </SortableItem>
               )
@@ -204,6 +210,7 @@ export default function SessionList(props: Props) {
                 <SessionItem
                   selected={routerState.location.pathname === `/session/${activeDragSession.id}`}
                   session={activeDragSession}
+                  isReordering={Boolean(isSmallScreen && isReordering)}
                 />
               </div>
             ) : null}
@@ -214,17 +221,45 @@ export default function SessionList(props: Props) {
   )
 }
 
-function SortableItem(props: { id: string; children?: React.ReactNode }) {
-  const { id, children } = props
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id })
+function SortableItem(props: {
+  id: string
+  children?: React.ReactNode
+  disabled?: boolean
+  showDragHandle?: boolean
+  dragHandleLabel?: string
+}) {
+  const { id, children, disabled = false, showDragHandle = false, dragHandleLabel } = props
+  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({
+    id,
+    disabled,
+  })
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0 : undefined,
   }
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative"
+      {...(!disabled && !showDragHandle ? attributes : {})}
+      {...(!disabled && !showDragHandle ? listeners : {})}
+    >
       {children}
+      {showDragHandle && (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={dragHandleLabel}
+          className="absolute right-3 top-1/2 flex size-8 -translate-y-1/2 touch-none items-center justify-center rounded-sm border-0 bg-transparent text-chatbox-tertiary active:cursor-grabbing"
+          onClick={(event) => event.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          <IconGripVertical size={18} />
+        </button>
+      )}
     </div>
   )
 }

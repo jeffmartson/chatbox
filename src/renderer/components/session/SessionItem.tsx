@@ -2,7 +2,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
 import type { SessionMetaRecord } from '@shared/types'
-import { IconArchive, IconArrowDown, IconArrowUp, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
+import { IconArchive, IconArrowsMoveVertical, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
 import dayjs from 'dayjs'
 import { type MouseEvent, memo, type PointerEvent, useRef, useState } from 'react'
@@ -50,10 +50,8 @@ function triggerLongPressHaptic() {
 export interface Props {
   session: SessionMetaRecord
   selected: boolean
-  canMoveUp?: boolean
-  canMoveDown?: boolean
-  onMoveUp?: () => void | Promise<void>
-  onMoveDown?: () => void | Promise<void>
+  isReordering?: boolean
+  onStartReordering?: () => void
 }
 
 function SessionItem(props: Props) {
@@ -63,6 +61,9 @@ function SessionItem(props: Props) {
   const archiveActionLabel = t('Archive')
   const setShowSidebar = useUIStore((s) => s.setShowSidebar)
   const onClick = () => {
+    if (props.isReordering) {
+      return
+    }
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false
       return
@@ -146,7 +147,7 @@ function SessionItem(props: Props) {
   }
 
   const handlePointerDown = (event: PointerEvent) => {
-    if (!isSmallScreen) {
+    if (!isSmallScreen || props.isReordering) {
       return
     }
     clearLongPressTimer()
@@ -201,16 +202,10 @@ function SessionItem(props: Props) {
       },
     },
     {
-      text: t('Move up') || '',
-      icon: IconArrowUp,
-      disabled: !props.canMoveUp || !props.onMoveUp,
-      onClick: props.onMoveUp,
-    },
-    {
-      text: t('Move down') || '',
-      icon: IconArrowDown,
-      disabled: !props.canMoveDown || !props.onMoveDown,
-      onClick: props.onMoveDown,
+      text: t('Adjust order') || '',
+      icon: IconArrowsMoveVertical,
+      disabled: !props.onStartReordering,
+      onClick: props.onStartReordering,
     },
     {
       text: archiveActionLabel || '',
@@ -228,16 +223,20 @@ function SessionItem(props: Props) {
       className={clsx(
         'cursor-pointer rounded-sm group/session-item',
         'select-none',
+        props.isReordering && 'cursor-default',
         isSmallScreen
-          ? longPressing
-            ? 'bg-chatbox-background-gray-secondary'
-            : ''
+          ? props.isReordering
+            ? 'bg-chatbox-background-primary'
+            : longPressing
+              ? 'bg-chatbox-background-gray-secondary'
+              : ''
           : selected
             ? 'bg-chatbox-background-brand-secondary'
             : 'hover:bg-chatbox-background-gray-secondary'
       )}
       mx="xs"
-      px="xs"
+      pl="xs"
+      pr={props.isReordering ? 44 : 'xs'}
       py={10}
       gap={10}
       onClick={onClick}
