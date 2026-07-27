@@ -1,5 +1,6 @@
 import type { CopilotDetail, Session, SessionMetaRecord, Settings } from '@shared/types'
 import { cleanSettingsForBackup } from '@shared/utils/backup'
+import type { StreamingExportResult } from '@/platform/interfaces'
 import {
   BACKUP_COPILOTS_PATH,
   BACKUP_MANIFEST_PATH,
@@ -53,12 +54,11 @@ export interface BackupExportOptions {
   application: { version: string | Promise<string>; platform: string | Promise<string> }
   signal?: AbortSignal
   onProgress?: (progress: BackupProgress) => void
-  writeArchive: (dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>) => Promise<{ boundedMemory: boolean }>
+  writeArchive: (dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>) => Promise<StreamingExportResult>
 }
 
-export interface BackupExportResult {
+export interface BackupExportResult extends StreamingExportResult {
   manifest: BackupManifest
-  boundedMemory: boolean
 }
 
 function throwIfAborted(signal?: AbortSignal) {
@@ -406,5 +406,9 @@ export async function exportBackupArchive(options: BackupExportOptions): Promise
     createZipStream(enforceArchiveLimits(generateEntries()), options.signal)
   )
   if (!completedManifest) throw new Error('Backup archive was not fully generated')
-  return { manifest: completedManifest, boundedMemory: writeResult.boundedMemory }
+  return {
+    manifest: completedManifest,
+    boundedMemory: writeResult.boundedMemory,
+    pendingDownload: writeResult.pendingDownload,
+  }
 }

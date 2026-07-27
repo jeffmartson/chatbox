@@ -236,6 +236,14 @@ export interface Platform extends Storage {
   onMaximizedChange(callback: (isMaximized: boolean) => void): () => void
 }
 
+export interface StreamingExportResult {
+  boundedMemory: boolean
+  pendingDownload?: {
+    filename: string
+    blob: Blob
+  }
+}
+
 export interface Exporter {
   exportBlob: (filename: string, blob: Blob, encoding?: 'utf8' | 'ascii' | 'utf16') => Promise<void>
   exportTextFile: (filename: string, content: string) => Promise<void>
@@ -247,5 +255,5 @@ export interface Exporter {
     dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
     mimeType: string,
     signal?: AbortSignal
-  ) => Promise<{ boundedMemory: boolean }>
+  ) => Promise<StreamingExportResult>
 }

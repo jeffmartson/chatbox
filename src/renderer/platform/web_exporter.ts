@@ -1,5 +1,14 @@
 import * as base64 from '@/packages/base64'
-import type { Exporter } from './interfaces'
+import type { Exporter, StreamingExportResult } from './interfaces'
+
+function isMobileBrowser() {
+  const { userAgent, platform, maxTouchPoints } = navigator
+  return /Android|iPhone|iPad|iPod/i.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1)
+}
+
+function isAbortError(error: unknown): error is DOMException {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
 
 export default class WebExporter implements Exporter {
   exportBlob(filename: string, blob: Blob, _encoding?: 'utf8' | 'ascii' | 'utf16'): Promise<void> {
@@ -86,30 +95,45 @@ export default class WebExporter implements Exporter {
     dataCallback: () => AsyncGenerator<Uint8Array, void, unknown>,
     mimeType: string,
     signal?: AbortSignal
-  ): Promise<{ boundedMemory: boolean }> {
+  ): Promise<StreamingExportResult> {
     const pickerWindow = window as Window & {
       showSaveFilePicker?: (options: {
         suggestedName: string
         types: Array<{ description: string; accept: Record<string, string[]> }>
       }) => Promise<FileSystemFileHandle>
     }
-    if (pickerWindow.showSaveFilePicker) {
+    // Mobile browser implementations of showSaveFilePicker are inconsistent:
+    // some expose the method but reject it before showing a usable save surface.
+    // Build the Blob first and require a fresh user click to download it instead.
+    if (pickerWindow.showSaveFilePicker && !isMobileBrowser()) {
       const extension = filename.includes('.') ? `.${filename.split('.').pop()}` : ''
-      const handle = await pickerWindow.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{ description: 'Chatbox backup', accept: { [mimeType]: extension ? [extension] : [] } }],
-      })
-      const writable = await handle.createWritable()
+      let writable: FileSystemWritableFileStream | undefined
       try {
-        for await (const chunk of dataCallback()) {
-          if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
-          await writable.write(Uint8Array.from(chunk).buffer)
-        }
-        await writable.close()
-        return { boundedMemory: true }
+        const handle = await pickerWindow.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'Chatbox backup', accept: { [mimeType]: extension ? [extension] : [] } }],
+        })
+        writable = await handle.createWritable()
       } catch (error) {
-        await writable.abort(error).catch(() => undefined)
-        throw error
+        // A rejected picker means "cancel" only when the browser explicitly
+        // reports AbortError. Other setup failures happen before the generator
+        // is consumed, so it is safe to fall back to an explicit download.
+        if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
+        if (isAbortError(error)) throw error
+      }
+
+      if (writable) {
+        try {
+          for await (const chunk of dataCallback()) {
+            if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
+            await writable.write(Uint8Array.from(chunk).buffer)
+          }
+          await writable.close()
+          return { boundedMemory: true }
+        } catch (error) {
+          await writable.abort(error).catch(() => undefined)
+          throw error
+        }
       }
     }
 
@@ -121,7 +145,12 @@ export default class WebExporter implements Exporter {
       if (signal?.aborted) throw signal.reason ?? new DOMException('Operation canceled', 'AbortError')
       parts.push(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer)
     }
-    await this.exportBlob(filename, new Blob(parts, { type: mimeType }))
-    return { boundedMemory: false }
+    return {
+      boundedMemory: false,
+      pendingDownload: {
+        filename,
+        blob: new Blob(parts, { type: mimeType }),
+      },
+    }
   }
 }

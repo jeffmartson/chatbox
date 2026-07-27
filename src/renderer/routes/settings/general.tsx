@@ -34,6 +34,7 @@ import {
   rehydrateImportedSession,
 } from '@/packages/backup'
 import platform from '@/platform'
+import { canShareFile, shareFile } from '@/platform/web_file_share'
 import storage from '@/storage'
 import { getMetaStorage, recoverSessionList } from '@/stores/chatStore'
 import { migrateOnData } from '@/stores/migration'
@@ -352,6 +353,8 @@ const ImportExportDataSection = () => {
     title: string
     body?: string
   }>()
+  const [pendingDownload, setPendingDownload] = useState<{ filename: string; blob: Blob }>()
+  const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string>()
   const operationAbortRef = useRef<AbortController | null>(null)
   const [exportItems, setExportItems] = useState<ExportDataItem[]>([
     ExportDataItem.Setting,
@@ -360,6 +363,39 @@ const ImportExportDataSection = () => {
   ])
 
   const isLoading = isExporting || isImporting || importRequiresRestart
+  const pendingDownloadFile = useMemo(
+    () =>
+      pendingDownload
+        ? new File([pendingDownload.blob], pendingDownload.filename, {
+            type: pendingDownload.blob.type,
+          })
+        : undefined,
+    [pendingDownload]
+  )
+  const canSharePendingDownload = useMemo(() => {
+    return pendingDownloadFile ? canShareFile(pendingDownloadFile) : false
+  }, [pendingDownloadFile])
+
+  useEffect(() => {
+    if (!pendingDownload) {
+      setPendingDownloadUrl(undefined)
+      return
+    }
+
+    const url = URL.createObjectURL(pendingDownload.blob)
+    setPendingDownloadUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [pendingDownload])
+
+  const onSharePendingDownload = async () => {
+    if (!pendingDownloadFile || !canSharePendingDownload) return
+    try {
+      await shareFile(pendingDownloadFile)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error('Failed to share backup:', error)
+    }
+  }
 
   const onExport = async () => {
     if (isLoading) return
@@ -369,6 +405,7 @@ const ImportExportDataSection = () => {
     setIsExporting(true)
     setProgress(null)
     setExportNotice(undefined)
+    setPendingDownload(undefined)
     try {
       const date = new Date()
       const result = await exportBackupArchive({
@@ -393,6 +430,7 @@ const ImportExportDataSection = () => {
         .slice(0, 3)
         .map((warning) => `${warning.itemId ? `${warning.itemId}: ` : ''}${formatBackupWarning(warning)}`)
         .join('\n')
+      setPendingDownload(result.pendingDownload)
       const warningBody = [
         warningCount > 0
           ? String(
@@ -402,20 +440,32 @@ const ImportExportDataSection = () => {
             )
           : '',
         warningSummary,
-        !result.boundedMemory
-          ? String(t('This browser does not support streaming downloads, so the backup was buffered before saving.'))
-          : '',
+        result.pendingDownload
+          ? String(
+              t(
+                "Your backup was created in memory. Select Download, then confirm it appears in your browser's downloads."
+              )
+            )
+          : !result.boundedMemory
+            ? String(t('This browser does not support streaming downloads, so the backup was buffered before saving.'))
+            : '',
       ]
         .filter(Boolean)
         .join('\n')
       setExportNotice(
-        warningCount > 0 || !result.boundedMemory
+        result.pendingDownload
           ? {
-              color: 'yellow',
-              title: String(t('Backup exported with warnings')),
+              color: warningCount > 0 ? 'yellow' : 'green',
+              title: String(t('Backup ready to download')),
               body: warningBody,
             }
-          : { color: 'green', title: String(t('Backup exported successfully')) }
+          : warningCount > 0 || !result.boundedMemory
+            ? {
+                color: 'yellow',
+                title: String(t('Backup exported with warnings')),
+                body: warningBody,
+              }
+            : { color: 'green', title: String(t('Backup exported successfully')) }
       )
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -587,6 +637,19 @@ const ImportExportDataSection = () => {
               <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
                 {exportNotice.body}
               </Text>
+            )}
+            {pendingDownload && pendingDownloadUrl && (
+              <Flex gap="sm" mt="sm">
+                {canSharePendingDownload && <Button onClick={onSharePendingDownload}>{t('Save')}</Button>}
+                <Button
+                  component="a"
+                  variant={canSharePendingDownload ? 'light' : 'filled'}
+                  href={pendingDownloadUrl}
+                  download={pendingDownload.filename}
+                >
+                  {t('Download')}
+                </Button>
+              </Flex>
             )}
           </Alert>
         )}
