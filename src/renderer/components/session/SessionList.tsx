@@ -27,6 +27,7 @@ import { type CSSProperties, type MutableRefObject, useCallback, useMemo, useSta
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import platform from '@/platform'
 import { useSessionList } from '@/stores/chatStore'
 import { reorderSessions } from '@/stores/sessionActions'
 import SessionItem from './SessionItem'
@@ -168,7 +169,16 @@ export default function SessionList(props: Props) {
             </Flex>
           )}
           <Virtuoso
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              ...(platform.type === 'web'
+                ? {
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                  }
+                : {}),
+            }}
             data={displayItems}
             computeItemKey={(_index, item) => item.id}
             scrollerRef={(ref) => {
