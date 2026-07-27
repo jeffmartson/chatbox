@@ -71,3 +71,41 @@ describe('SettingsSchema shortcut compatibility', () => {
     expect(parsed.shortcuts.newPictureChat).toBe('')
   })
 })
+
+describe('SettingsSchema VibeDrop publication history', () => {
+  test('parses session publication metadata without a schema migration', () => {
+    const parsed = SettingsSchema.parse({
+      ...defaultSettings(),
+      vibedropSessionPublications: {
+        'session-1': [
+          {
+            slug: 'site-1',
+            url: 'https://site-1.vibedrop.site',
+            visibility: 'public',
+            uniqueId: 'artifact-1',
+            updatedAt: 1,
+          },
+        ],
+      },
+    })
+
+    expect(parsed.vibedropSessionPublications?.['session-1']?.[0]).toEqual({
+      slug: 'site-1',
+      url: 'https://site-1.vibedrop.site',
+      visibility: 'public',
+      uniqueId: 'artifact-1',
+      updatedAt: 1,
+    })
+  })
+
+  test('ignores malformed publication history from older or external settings', () => {
+    const parsed = SettingsSchema.parse({
+      ...defaultSettings(),
+      vibedropSessionPublications: {
+        'session-1': [{ slug: 'site-1' }],
+      },
+    })
+
+    expect(parsed.vibedropSessionPublications).toBeUndefined()
+  })
+})

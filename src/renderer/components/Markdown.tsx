@@ -92,6 +92,7 @@ function rehypeWrapStreamingSegments(options: StreamingTextSegment[]) {
 function Markdown(props: {
   children: string
   uniqueId?: string
+  sessionId?: string
   enableLaTeXRendering?: boolean
   enableMermaidRendering?: boolean
   hiddenCodeCopyButton?: boolean
@@ -104,6 +105,7 @@ function Markdown(props: {
   const {
     children,
     uniqueId,
+    sessionId,
     enableLaTeXRendering = true,
     enableMermaidRendering = true,
     hiddenCodeCopyButton,
@@ -149,6 +151,7 @@ function Markdown(props: {
                 <CodeRenderer
                   {...props}
                   uniqueId={uniqueId ? `${uniqueId}-code-${codeIndex}` : undefined}
+                  sessionId={sessionId}
                   hiddenCodeCopyButton={hiddenCodeCopyButton}
                   enableMermaidRendering={enableMermaidRendering}
                   generating={generating && generatingCodeIndex === codeIndex}
@@ -172,6 +175,7 @@ function Markdown(props: {
           }),
           [
             uniqueId,
+            sessionId,
             hiddenCodeCopyButton,
             enableMermaidRendering,
             generating,
@@ -248,6 +252,7 @@ export const CodeRenderer = memo(
     children: string
     className?: string
     uniqueId?: string
+    sessionId?: string
     hiddenCodeCopyButton?: boolean
     generating?: boolean
     enableMermaidRendering?: boolean
@@ -278,6 +283,7 @@ export const CodeRenderer = memo(
       <>
         <BlockCode
           uniqueId={props.uniqueId}
+          sessionId={props.sessionId}
           hiddenCodeCopyButton={hiddenCodeCopyButton}
           language={language}
           generating={generating}
@@ -404,6 +410,7 @@ type BlockCodeProps = {
   language: string
   children: string
   uniqueId?: string
+  sessionId?: string
   hiddenCodeCopyButton?: boolean
   generating?: boolean
   forceColorScheme?: 'light' | 'dark'
@@ -501,6 +508,7 @@ const BlockCode = memo(
   ({
     children,
     uniqueId,
+    sessionId,
     hiddenCodeCopyButton,
     language,
     generating,
@@ -538,9 +546,10 @@ const BlockCode = memo(
         NiceModal.show('artifact-preview', {
           htmlCode: String(children),
           uniqueId,
+          sessionId,
         }).catch(() => null)
       },
-      [children, uniqueId]
+      [children, uniqueId, sessionId]
     )
 
     const onClickDeploy = useCallback(
@@ -552,9 +561,9 @@ const BlockCode = memo(
         }
         // 应投放侧要求改触发点为分享按钮。但注意现在语义上是 mismatch 的
         onPreviewWebpage?.()
-        NiceModal.show('vibedrop-publish', { html: String(children), uniqueId }).catch(() => null)
+        NiceModal.show('vibedrop-publish', { html: String(children), uniqueId, sessionId }).catch(() => null)
       },
-      [canDeploy, children, uniqueId, onPreviewWebpage]
+      [canDeploy, children, uniqueId, sessionId, onPreviewWebpage]
     )
 
     const needCollapse = useMemo(

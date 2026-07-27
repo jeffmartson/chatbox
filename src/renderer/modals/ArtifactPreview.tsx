@@ -24,6 +24,7 @@ export interface ArtifactPreviewProps {
   previewUrl?: string
   sandboxPath?: string
   uniqueId?: string
+  sessionId?: string
 }
 
 function decodeBase64Utf8(base64: string): string {
@@ -48,7 +49,8 @@ async function readSandboxHtml(sandboxPath: string): Promise<string> {
   })
 }
 
-const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl, sandboxPath, uniqueId }: ArtifactPreviewProps) => {
+const ArtifactPreview = NiceModal.create((props: ArtifactPreviewProps) => {
+  const { htmlCode, previewUrl, sandboxPath, uniqueId, sessionId } = props
   const modal = useModal()
   const { t } = useTranslation()
   const [reloadSign, setReloadSign] = useState(0)
@@ -76,13 +78,13 @@ const ArtifactPreview = NiceModal.create(({ htmlCode, previewUrl, sandboxPath, u
     setDeploying(true)
     try {
       const publishHtml = htmlCode.trim() ? htmlCode : await readSandboxHtml(sandboxPath || '')
-      NiceModal.show('vibedrop-publish', { html: publishHtml, uniqueId }).catch(() => null)
+      NiceModal.show('vibedrop-publish', { html: publishHtml, uniqueId, sessionId }).catch(() => null)
     } catch (error) {
       toastActions.add((error as Error)?.message || t('Publish failed'))
     } finally {
       setDeploying(false)
     }
-  }, [canPublish, htmlCode, sandboxPath, uniqueId, t])
+  }, [canPublish, htmlCode, sandboxPath, uniqueId, sessionId, t])
   const isSmallScreen = useIsSmallScreen()
   const showFullscreen = isSmallScreen || isFullscreen
   const showLabeledActions = !isSmallScreen

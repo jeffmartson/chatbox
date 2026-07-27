@@ -63,7 +63,15 @@ export function MessageArtifact(props: {
     return generateHtml([...contextMessages.map((m) => getMessageText(m)), messageContent])
   }, [contextMessages, messageContent])
 
-  return <ArtifactWithButtons htmlCode={htmlCode} preview={preview} setPreview={setPreview} />
+  return (
+    <ArtifactWithButtons
+      htmlCode={htmlCode}
+      preview={preview}
+      setPreview={setPreview}
+      sessionId={sessionId}
+      uniqueId={`${messageId}-artifact`}
+    />
+  )
 }
 
 export function ArtifactWithButtons(props: {
@@ -71,8 +79,10 @@ export function ArtifactWithButtons(props: {
   previewUrl?: string
   preview: boolean
   setPreview: (preview: boolean) => void
+  sessionId?: string
+  uniqueId?: string
 }) {
-  const { htmlCode, previewUrl, preview, setPreview } = props
+  const { htmlCode, previewUrl, preview, setPreview, sessionId, uniqueId } = props
   const { t } = useTranslation()
   const [reloadSign, setReloadSign] = useState(0)
   const isSmallScreen = useIsSmallScreen()
@@ -91,6 +101,8 @@ export function ArtifactWithButtons(props: {
     await NiceModal.show('artifact-preview', {
       htmlCode,
       previewUrl,
+      sessionId,
+      uniqueId,
     })
   }
   if (!preview) {

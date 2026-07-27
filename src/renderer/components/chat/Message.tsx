@@ -568,6 +568,7 @@ const _Message: FC<Props> = (props) => {
       enableMarkdownRendering ? (
         <Markdown
           uniqueId={`${msg.id}-step-${index}`}
+          sessionId={sessionId}
           enableLaTeXRendering={enableLaTeXRendering}
           enableMermaidRendering={enableMermaidRendering}
           generating={msg.generating}
@@ -587,6 +588,7 @@ const _Message: FC<Props> = (props) => {
       msg.id,
       onCodeCopy,
       onPreviewWebpage,
+      sessionId,
     ]
   )
 
@@ -773,6 +775,7 @@ const _Message: FC<Props> = (props) => {
                     {enableMarkdownRendering && !isCollapsed ? (
                       <Markdown
                         uniqueId={`${msg.id}-${index}`}
+                        sessionId={sessionId}
                         enableLaTeXRendering={enableLaTeXRendering}
                         enableMermaidRendering={enableMermaidRendering}
                         generating={msg.generating}
@@ -938,7 +941,9 @@ const _Message: FC<Props> = (props) => {
               )}
             </div>
           )}
-          {!msg.generating && <DownloadArtifactsUI parts={downloadArtifactParts} />}
+          {!msg.generating && (
+            <DownloadArtifactsUI parts={downloadArtifactParts} sessionId={sessionId} messageId={msg.id} />
+          )}
           {preparingToolCallStatuses?.map((status) => (
             <PreparingToolCallStatus key={`preparing-tool-call-${status.toolName ?? 'tool-call'}`} status={status} />
           ))}

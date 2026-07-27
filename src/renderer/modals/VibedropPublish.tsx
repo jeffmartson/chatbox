@@ -1,8 +1,9 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { ActionIcon, Button, CopyButton, Flex, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconCheck, IconCopy, IconExternalLink, IconWorldUpload } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { AdaptiveSelect } from '@/components/AdaptiveSelect'
 import { AdaptiveModal } from '@/components/common/AdaptiveModal'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
@@ -11,8 +12,10 @@ import { issueVibedropKey } from '@/packages/remote'
 import {
   clearCachedVibedropKey,
   getCachedVibedropKey,
+  getSessionVibedropPublications,
   getStoredSlug,
   publishToVibedrop,
+  recordSessionVibedropPublication,
   setCachedVibedropKey,
   setStoredSlug,
   VIBEDROP_MANAGE_URL,
@@ -28,9 +31,11 @@ export interface VibedropPublishProps {
   html: string
   // Stable code-block id; used to reuse the published slug on re-publish.
   uniqueId?: string
+  sessionId?: string
 }
 
 type Stage = 'login_required' | 'form' | 'publishing' | 'email_required' | 'success' | 'error'
+type PublishMode = 'new' | 'update'
 
 const ManageSitesHint = () => (
   <Text size="xs" c="dimmed">
@@ -50,14 +55,38 @@ const ManageSitesHint = () => (
   </Text>
 )
 
-const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishProps) => {
+const VibedropPublish = NiceModal.create(({ html, uniqueId, sessionId }: VibedropPublishProps) => {
   const isSmallScreen = useIsSmallScreen()
   const modal = useModal()
   const { t } = useTranslation()
 
   const isLoggedIn = useAuthInfoStore((state) => Boolean(state.accessToken && state.refreshToken))
+  const publicationTargets = useMemo(() => {
+    const storedSlug = getStoredSlug(uniqueId)
+    const publications = getSessionVibedropPublications(sessionId)
+    if (!storedSlug || publications.some((publication) => publication.slug === storedSlug)) {
+      return publications
+    }
+    return [
+      {
+        slug: storedSlug,
+        url: '',
+        visibility: 'unlisted' as const,
+        uniqueId,
+        updatedAt: 0,
+      },
+      ...publications,
+    ]
+  }, [sessionId, uniqueId])
+  const storedSlug = getStoredSlug(uniqueId)
+  const initialTargetSlug = storedSlug || publicationTargets[0]?.slug || ''
+  const initialTarget = publicationTargets.find((publication) => publication.slug === initialTargetSlug)
   const [stage, setStage] = useState<Stage>(isLoggedIn ? 'form' : 'login_required')
-  const [visibility, setVisibility] = useState<VibedropVisibility>('unlisted')
+  const [publishMode, setPublishMode] = useState<PublishMode>(storedSlug ? 'update' : 'new')
+  const [selectedSlug, setSelectedSlug] = useState(initialTargetSlug)
+  const [visibility, setVisibility] = useState<VibedropVisibility>(
+    storedSlug ? initialTarget?.visibility || 'unlisted' : 'unlisted'
+  )
   const [url, setUrl] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -69,6 +98,9 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
       }
       if (message === 'VibeDrop authorization failed') {
         return t('VibeDrop authorization failed')
+      }
+      if (error instanceof VibedropSlugNotOwnedError) {
+        return t('This page can no longer be updated. Publish it as a new page instead.')
       }
       if (message?.startsWith('Failed to publish to VibeDrop (status ')) {
         return t('Failed to publish to VibeDrop. Please try again later.')
@@ -83,6 +115,13 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
     modal.hide()
   }
 
+  const onExitTransitionEnd = () => {
+    modal.resolveHide()
+    if (!modal.keepMounted) {
+      modal.remove()
+    }
+  }
+
   const goLogin = () => {
     navigateToSettings('/provider/chatbox-ai')
     onClose()
@@ -93,6 +132,28 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
       setStage('form')
     }
   }, [isLoggedIn, stage])
+
+  const changePublishMode = (value: string) => {
+    const nextMode = value as PublishMode
+    setPublishMode(nextMode)
+    if (nextMode === 'new') {
+      setVisibility('unlisted')
+      return
+    }
+    const target = publicationTargets.find((publication) => publication.slug === selectedSlug)
+    if (target) {
+      setVisibility(target.visibility)
+    }
+  }
+
+  const changePublicationTarget = (value: string | null) => {
+    const slug = value || ''
+    setSelectedSlug(slug)
+    const target = publicationTargets.find((publication) => publication.slug === slug)
+    if (target) {
+      setVisibility(target.visibility)
+    }
+  }
 
   // Obtain a publish key: cached first, otherwise issue one via chatbox-backend.
   const obtainKey = useCallback(async (forceReissue = false): Promise<string> => {
@@ -107,7 +168,7 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
 
   const publishWithRetry = useCallback(async (): Promise<VibedropSite> => {
     let vdKey = await obtainKey()
-    const slug = getStoredSlug(uniqueId)
+    const slug = publishMode === 'update' ? selectedSlug || null : null
     try {
       return await publishToVibedrop({ html, vdKey, visibility, slug })
     } catch (e) {
@@ -117,19 +178,16 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
         vdKey = await obtainKey(true)
         return await publishToVibedrop({ html, vdKey, visibility, slug })
       }
-      if (e instanceof VibedropSlugNotOwnedError) {
-        // Stored slug no longer owned — publish as a fresh site.
-        return await publishToVibedrop({ html, vdKey, visibility, slug: null })
-      }
       throw e
     }
-  }, [html, uniqueId, visibility, obtainKey])
+  }, [html, publishMode, selectedSlug, visibility, obtainKey])
 
   const publish = useCallback(async () => {
     setStage('publishing')
     try {
       const site = await publishWithRetry()
       setStoredSlug(uniqueId, site.slug)
+      recordSessionVibedropPublication(sessionId, uniqueId, site)
       setUrl(site.url)
       setStage('success')
     } catch (e) {
@@ -137,13 +195,23 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
         setStage('email_required')
         return
       }
+      if (e instanceof VibedropSlugNotOwnedError) {
+        setPublishMode('new')
+        setVisibility('unlisted')
+      }
       setErrorMessage(getPublishErrorMessage(e))
       setStage('error')
     }
-  }, [uniqueId, publishWithRetry, getPublishErrorMessage])
+  }, [sessionId, uniqueId, publishWithRetry, getPublishErrorMessage])
 
   return (
-    <AdaptiveModal opened={modal.visible} onClose={onClose} centered title={t('Publish to VibeDrop')}>
+    <AdaptiveModal
+      opened={modal.visible}
+      onClose={onClose}
+      onExitTransitionEnd={onExitTransitionEnd}
+      centered
+      title={t('Publish to VibeDrop')}
+    >
       <Stack>
         {stage === 'login_required' && (
           <>
@@ -166,6 +234,37 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
             <Text size="sm" c="dimmed">
               {t('Your HTML page will be published to VibeDrop. Choose who can access it.')}
             </Text>
+            {publicationTargets.length > 0 && (
+              <Stack gap="xs">
+                <SegmentedControl
+                  fullWidth
+                  value={publishMode}
+                  onChange={changePublishMode}
+                  disabled={stage === 'publishing'}
+                  data={[
+                    { label: t('New page'), value: 'new' },
+                    { label: t('Update page'), value: 'update' },
+                  ]}
+                />
+                {publishMode === 'update' && (
+                  <>
+                    <AdaptiveSelect
+                      label={t('Page to update')}
+                      value={selectedSlug}
+                      onChange={changePublicationTarget}
+                      disabled={stage === 'publishing'}
+                      data={publicationTargets.map((publication) => ({
+                        label: publication.url || publication.slug,
+                        value: publication.slug,
+                      }))}
+                    />
+                    <Text size="xs" c="dimmed">
+                      {t('The selected page keeps the same URL and its content will be replaced.')}
+                    </Text>
+                  </>
+                )}
+              </Stack>
+            )}
             <SegmentedControl
               fullWidth
               value={visibility}
@@ -189,6 +288,7 @@ const VibedropPublish = NiceModal.create(({ html, uniqueId }: VibedropPublishPro
               <Button
                 onClick={publish}
                 loading={stage === 'publishing'}
+                disabled={publishMode === 'update' && !selectedSlug}
                 leftSection={<ScalableIcon icon={IconWorldUpload} size={16} />}
                 c="white"
               >

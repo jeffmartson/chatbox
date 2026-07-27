@@ -690,7 +690,11 @@ function decodeBase64Utf8(base64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
-const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
+const CreateDownloadUI: FC<{ part: MessageToolCallPart } & ToolCallActionContext> = ({
+  part,
+  sessionId,
+  messageId,
+}) => {
   const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -746,6 +750,8 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
             htmlCode: '',
             previewUrl: preview.url,
             sandboxPath: filePath,
+            sessionId,
+            uniqueId: messageId ? `${messageId}-tool-${part.toolCallId}` : undefined,
           })
           return
         }
@@ -763,6 +769,8 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
       })
       await NiceModal.show('artifact-preview', {
         htmlCode,
+        sessionId,
+        uniqueId: messageId ? `${messageId}-tool-${part.toolCallId}` : undefined,
       })
     } catch (err) {
       console.error('Failed to preview HTML artifact:', err)
@@ -770,7 +778,7 @@ const CreateDownloadUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
     } finally {
       setPreviewing(false)
     }
-  }, [filePath, t])
+  }, [filePath, messageId, part.toolCallId, sessionId, t])
 
   if (isLoading) {
     return (
@@ -865,7 +873,11 @@ function isDownloadArtifact(part: MessageToolCallPart): boolean {
   return result?.downloadable === true
 }
 
-export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] }> = ({ parts }) => {
+export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] } & ToolCallActionContext> = ({
+  parts,
+  sessionId,
+  messageId,
+}) => {
   const { t } = useTranslation()
   const artifacts = parts.filter(isDownloadArtifact)
 
@@ -887,7 +899,7 @@ export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] }> = ({ part
       </Group>
       <Stack gap={6}>
         {artifacts.map((part) => (
-          <CreateDownloadUI key={part.toolCallId} part={part} />
+          <CreateDownloadUI key={part.toolCallId} part={part} sessionId={sessionId} messageId={messageId} />
         ))}
       </Stack>
     </Stack>
@@ -1013,7 +1025,7 @@ export const ToolCallPartUI: FC<{ part: MessageToolCallPart } & ToolCallActionCo
     return <ParseLinkUI part={part} />
   }
   if (part.toolName === 'create_download') {
-    return <CreateDownloadUI part={part} />
+    return <CreateDownloadUI part={part} sessionId={sessionId} messageId={messageId} />
   }
   if (part.toolName === 'user_exec') {
     return <UserExecUI part={part} />

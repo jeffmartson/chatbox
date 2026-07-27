@@ -29,11 +29,16 @@ export interface VibedropSite {
   visibility: VibedropVisibility
 }
 
+export interface VibedropPublication extends VibedropSite {
+  uniqueId?: string
+  updatedAt: number
+}
+
 /** The Chatbox account has no email — publishing requires one (VibeDrop is email-identified). */
 export class VibedropEmailRequiredError extends Error {}
 /** VibeDrop rejected the key (revoked/invalid) — caller should clear cache and re-issue. */
 export class VibedropAuthError extends Error {}
-/** An update targeted a slug the current key no longer owns — caller should retry as a new site. */
+/** An update targeted a slug the current key no longer owns. */
 export class VibedropSlugNotOwnedError extends Error {}
 
 interface InlinePublishResponse {
@@ -155,4 +160,31 @@ export function setStoredSlug(uniqueId: string | undefined, slug: string): void 
   settingsStore.setState((state) => ({
     vibedropSlugs: { ...(state.vibedropSlugs || {}), [uniqueId]: slug },
   }))
+}
+
+export function getSessionVibedropPublications(sessionId: string | undefined): VibedropPublication[] {
+  if (!sessionId || sessionId === 'new') return []
+  return settingsStore.getState().vibedropSessionPublications?.[sessionId] || []
+}
+
+export function recordSessionVibedropPublication(
+  sessionId: string | undefined,
+  uniqueId: string | undefined,
+  site: VibedropSite
+): void {
+  if (!sessionId || sessionId === 'new') return
+  settingsStore.setState((state) => {
+    const current = state.vibedropSessionPublications?.[sessionId] || []
+    const publication: VibedropPublication = {
+      ...site,
+      uniqueId,
+      updatedAt: Date.now(),
+    }
+    return {
+      vibedropSessionPublications: {
+        ...(state.vibedropSessionPublications || {}),
+        [sessionId]: [publication, ...current.filter((item) => item.slug !== site.slug)].slice(0, 20),
+      },
+    }
+  })
 }

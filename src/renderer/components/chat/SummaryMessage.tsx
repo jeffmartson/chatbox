@@ -67,6 +67,7 @@ const SummaryMessage: FC<SummaryMessageProps> = ({ msg, className, isLatestSumma
           {enableMarkdownRendering ? (
             <Markdown
               uniqueId={`summary-${msg.id}`}
+              sessionId={sessionId}
               enableLaTeXRendering={enableLaTeXRendering}
               enableMermaidRendering={enableMermaidRendering}
             >
