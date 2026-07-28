@@ -6,7 +6,7 @@ const changelog = `
 4. Redesigned the model picker with search and per-model thinking depth
 5. Added a conversation minimap for navigating long chats
 6. Refreshed onboarding with ready-to-use examples
-7. Added chat archiving, conversation duplication, and creation time in the sidebar
+7. Added chat archiving and creation time in the sidebar
 8. Added PDF support on mobile
 9. Improved streaming responses, automatic scrolling, and reasoning status display
 10. Updated built-in DeepSeek models and improved compatibility with MCP servers
