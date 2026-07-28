@@ -20,21 +20,34 @@ export type AgentModeTrackingContext = {
 
 export type AgentModeApprovalTarget = 'user_exec' | 'file_write' | 'file_edit'
 
+function buildAgentModeBaseTrackingOptions(context: AgentModeTrackingContext) {
+  return {
+    pageName: JK_PAGE_NAMES.CHAT_PAGE,
+    platform: platform.type === 'web' ? ('web' as const) : ('app' as const),
+    props: {
+      agent_info: {
+        mode: context.mode,
+        session_id: context.sessionId,
+      },
+    },
+  }
+}
+
 function buildAgentModeTrackingOptions(
   context: AgentModeTrackingContext,
   content: string,
   agentInfo: Record<string, unknown> = {}
 ) {
+  const baseOptions = buildAgentModeBaseTrackingOptions(context)
   return {
-    pageName: JK_PAGE_NAMES.CHAT_PAGE,
+    ...baseOptions,
     content,
     contentType: context.model,
-    platform: platform.type === 'web' ? ('web' as const) : ('app' as const),
     props: {
+      ...baseOptions.props,
       agent_info: {
         ...agentInfo,
-        mode: context.mode,
-        session_id: context.sessionId,
+        ...baseOptions.props.agent_info,
       },
       content_add_info: {
         content: context.provider ?? null,
@@ -71,6 +84,31 @@ export function trackWebSearchClick(context: AgentModeTrackingContext, enabled: 
     JK_EVENTS.WEB_SEARCH_CLICK,
     buildAgentModeTrackingOptions(context, enabled ? 'on' : 'off', { content: webSearchProvider })
   )
+}
+
+export function trackAgentModeFreePointsCard(context: AgentModeTrackingContext) {
+  const baseOptions = buildAgentModeBaseTrackingOptions(context)
+  trackJkAutoEvent(JK_EVENTS.AGENT_MODE_FREE_POINTS_CARD, {
+    ...baseOptions,
+    props: {
+      ...baseOptions.props,
+      content_add_info: {
+        content: context.provider ?? null,
+      },
+      ...(context.model ? { content_info: { type: context.model } } : {}),
+    },
+  })
+}
+
+export function trackAgentModeFreePointsCardClick(context: AgentModeTrackingContext) {
+  trackJkClickEvent(
+    JK_EVENTS.AGENT_MODE_FREE_POINTS_CARD_CLICK,
+    buildAgentModeTrackingOptions(context, 'free_points_claim')
+  )
+}
+
+export function trackAgentModeFreePointsClaimSuccess(context: AgentModeTrackingContext) {
+  trackJkAutoEvent(JK_EVENTS.AGENT_MODE_FREE_POINTS_CLAIM_SUCCESS, buildAgentModeBaseTrackingOptions(context))
 }
 
 export function toBooleanString(value: boolean): BooleanString {

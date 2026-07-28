@@ -674,6 +674,7 @@ const _Message: FC<Props> = (props) => {
   const errorTipsElement = (
     <MessageErrTips
       msg={msg}
+      sessionId={sessionId}
       onRetry={msg.role === 'assistant' ? handleErrorTipRetry : undefined}
       isBubbleLayout={isBubbleLayout}
     />
