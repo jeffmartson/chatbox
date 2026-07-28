@@ -581,7 +581,10 @@ describe('fork actions', () => {
     expect(copiedFork).toBeDefined()
     expect(copiedFork?.lists[1].messages[0].id).not.toBe(threadAlternative.id)
     expect(updateSessionWithMessages).toHaveBeenCalledWith(session.id, { threads: [] })
-    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-thread' })
+    expect(routerNavigateMock).toHaveBeenCalledWith({
+      to: '/session/$sessionId',
+      params: { sessionId: 'new-session-thread' },
+    })
   })
 
   test('moveCurrentThreadToConversations preserves current thread forks', async () => {
@@ -642,7 +645,10 @@ describe('fork actions', () => {
         threadName: 'History',
       })
     )
-    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-current' })
+    expect(routerNavigateMock).toHaveBeenCalledWith({
+      to: '/session/$sessionId',
+      params: { sessionId: 'new-session-current' },
+    })
   })
 
   test('copyAndSwitchSession preserves current and historical thread forks', async () => {
@@ -735,6 +741,9 @@ describe('fork actions', () => {
     expect(newSession.settings?.agentMode).toEqual({ value: 'on', locked: true, lockReason: 'message_sent' })
     expect(setSessionAgentModeMock).not.toHaveBeenCalled()
     expect(lockSessionAgentModeMock).not.toHaveBeenCalled()
-    expect(routerNavigateMock).toHaveBeenCalledWith({ to: '/session/new-session-copy' })
+    expect(routerNavigateMock).toHaveBeenCalledWith({
+      to: '/session/$sessionId',
+      params: { sessionId: 'new-session-copy' },
+    })
   })
 })

@@ -112,6 +112,7 @@ function _errorI18nKeys(t: (key: string) => string) {
   t(
     'The current search provider does not support reading webpages. Please <OpenExtensionSettingButton>choose a different search provider</OpenExtensionSettingButton> that supports this capability.'
   )
+  t('Your points are used up. Claim free reward quota to continue.')
   // END GENERATED ERROR I18N KEYS
 
   // HTTP status code errors (MessageErrTips.tsx)
