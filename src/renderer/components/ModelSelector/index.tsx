@@ -48,11 +48,7 @@ export const ModelSelector = forwardRef<HTMLDivElement, ModelSelectorProps>(
 
     const filteredProviders = useMemo(() => {
       const filtered = providers.map((provider) => {
-        const models = filterModelsForSelector(
-          provider.models,
-          modelFilter,
-          provider.id
-        )?.filter(
+        const models = filterModelsForSelector(provider.models, modelFilter, provider.id)?.filter(
           (model) =>
             provider.id.toLowerCase().includes(search.toLowerCase()) ||
             provider.name.toLowerCase().includes(search.toLowerCase()) ||
