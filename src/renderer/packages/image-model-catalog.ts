@@ -1,4 +1,5 @@
 import { isUsingOAuth, mergeSharedOAuthProviderSettings } from '@shared/oauth'
+import type { PlatformType } from '@shared/platform'
 import { ModelProviderEnum, ModelProviderType, type ProviderModelInfo, type Settings } from '@shared/types'
 import { getLogger } from '@/lib/utils'
 import { getModelManifest, type RemoteModelInfo } from '@/packages/remote'
@@ -62,6 +63,14 @@ export async function loadProviderImageModels(
 function isBuiltinProviderConfigured(provider: ModelProviderEnum, settings: Settings): boolean {
   const providerSettings = mergeSharedOAuthProviderSettings(provider, settings.providers)
   return !!providerSettings.apiKey || isUsingOAuth(providerSettings, platform.type)
+}
+
+export function isOpenAIImageGenerationAuthSupported(
+  providers: Settings['providers'],
+  platformType: PlatformType = platform.type
+): boolean {
+  const providerSettings = mergeSharedOAuthProviderSettings(ModelProviderEnum.OpenAI, providers)
+  return !isUsingOAuth(providerSettings, platformType)
 }
 
 function manualImageModels(settings: Settings, provider: string): ImageModelOption[] {
@@ -132,7 +141,10 @@ export async function getAvailableImageModels(
     }
   }
 
-  if (isBuiltinProviderConfigured(ModelProviderEnum.OpenAI, settings)) {
+  if (
+    isBuiltinProviderConfigured(ModelProviderEnum.OpenAI, settings) &&
+    isOpenAIImageGenerationAuthSupported(settings.providers)
+  ) {
     const remoteModels = await loadRemoteModels(ModelProviderEnum.OpenAI, settings)
     catalog.push(
       ...catalogEntries(

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import {
   type ImageModelOption,
+  isOpenAIImageGenerationAuthSupported,
   loadProviderImageModels,
   manualImageModelToOption,
   mergeImageModels,
@@ -100,7 +101,7 @@ export function useImageModelGroups(): ImageModelGroup[] {
       }
     }
 
-    if (openAIProvider) {
+    if (openAIProvider && isOpenAIImageGenerationAuthSupported(providerSettingsMap)) {
       const manualModels = (providerSettingsMap?.[openAIProvider.id]?.models || [])
         .filter((model) => model.type === 'image')
         .map(manualImageModelToOption)

@@ -63,6 +63,7 @@ import { GeneratedImagesGallery } from './-components/GeneratedImagesGallery'
 import { HistoryPanel } from './-components/HistoryPanel'
 import { ImageGenerationErrorTips } from './-components/ImageGenerationErrorTips'
 import { MobileHistoryDrawer, MobileModelDrawer, MobileRatioDrawer } from './-components/MobileDrawers'
+import { resolveImageModelSelection } from './-components/model-selection'
 import { PromptDisplay } from './-components/PromptDisplay'
 import { ReferenceImagesPreview } from './-components/ReferenceImagesPreview'
 import { LoadingShimmer } from './-components/Shimmer'
@@ -284,18 +285,18 @@ function ImageCreatorPage() {
   }, [])
 
   useEffect(() => {
-    if (imageModelGroups.length === 0) return
-    const selectedGroup = imageModelGroups.find((group) => group.providerId === selectedProvider)
-    const selectedOption = selectedGroup?.models.find((model) => model.modelId === selectedModel)
-    if (selectedOption) return
+    const nextSelection = resolveImageModelSelection(imageModelGroups, selectedProvider, selectedModel)
+    if (!nextSelection) {
+      setSelectedProvider('')
+      setSelectedModel('')
+      setSelectedRatio('auto')
+      return
+    }
+    if (nextSelection.provider === selectedProvider && nextSelection.model === selectedModel) return
 
-    const firstGroup = imageModelGroups.find((group) => group.models.length > 0)
-    const firstModel = firstGroup?.models[0]
-    if (!firstGroup || !firstModel) return
-
-    setSelectedProvider(firstGroup.providerId)
-    setSelectedModel(firstModel.modelId)
-    const ratioOptionsForFirstModel = getRatioOptionsForModel(firstModel.modelId)
+    setSelectedProvider(nextSelection.provider)
+    setSelectedModel(nextSelection.model)
+    const ratioOptionsForFirstModel = getRatioOptionsForModel(nextSelection.model)
     setSelectedRatio((prev) => (ratioOptionsForFirstModel.includes(prev) ? prev : 'auto'))
   }, [imageModelGroups, selectedProvider, selectedModel])
 

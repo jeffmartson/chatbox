@@ -111,4 +111,35 @@ describe('image model catalog', () => {
       { provider: ModelProviderEnum.OpenAI, modelId: 'manual-only', nickname: 'Manual Only' },
     ])
   })
+
+  it('omits OpenAI image models when OAuth is active', async () => {
+    const settings = createSettings()
+    settings.providers = {
+      [ModelProviderEnum.OpenAI]: {
+        apiKey: 'openai-key',
+        activeAuthMode: 'oauth',
+        oauth: { accessToken: 'oauth-token' },
+        models: [{ modelId: 'gpt-image-2', type: 'image', nickname: 'GPT Image 2' }],
+      },
+    }
+
+    await expect(getAvailableImageModels(settings)).resolves.toEqual([])
+    expect(getModelManifestMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps OpenAI image models when OAuth credentials are stored but API key mode is active', async () => {
+    const settings = createSettings()
+    settings.providers = {
+      [ModelProviderEnum.OpenAI]: {
+        apiKey: 'openai-key',
+        activeAuthMode: 'apikey',
+        oauth: { accessToken: 'oauth-token' },
+      },
+    }
+    getModelManifestMock.mockResolvedValue(manifest([{ modelId: 'gpt-image-2', modelName: 'GPT Image 2' }]))
+
+    await expect(getAvailableImageModels(settings)).resolves.toEqual([
+      { provider: ModelProviderEnum.OpenAI, modelId: 'gpt-image-2', nickname: 'GPT Image 2' },
+    ])
+  })
 })
