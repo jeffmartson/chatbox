@@ -89,7 +89,6 @@ import Loading from '../icons/Loading'
 import {
   DownloadArtifactsUI,
   ReasoningContentUI,
-  type StepTimelinePart,
   StepTimelineUI,
   ToolCallPartUI,
 } from '../message-parts/ToolCallPartUI'
@@ -97,6 +96,7 @@ import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
 import { isMessageReminderPresentation, resolveMessageErrorPresentation } from './message-error-presentation'
+import { createMessageTimelineLayout } from './message-timeline'
 import { PictureGallery } from './PictureGallery'
 
 // Reset an assistant message back to a clean generating state, reusing the same
@@ -470,44 +470,12 @@ const _Message: FC<Props> = (props) => {
     [contentParts]
   )
 
-  // Index of the last reasoning/tool-call part. Text before it is "intermediate"
-  // narration (part of the process); text after it is the final answer.
-  const lastStepIndex = useMemo(() => {
-    let last = -1
-    for (let i = 0; i < contentParts.length; i++) {
-      const p = contentParts[i]
-      if (p.type === 'reasoning' || p.type === 'tool-call') last = i
-    }
-    return last
-  }, [contentParts])
-
-  // Group consecutive reasoning + tool-call + intermediate-text parts into a
-  // single "step group" so they render on one connected, collapsible timeline.
-  // All tool calls (including web_search) share the same timeline-step style;
-  // the final answer text stays outside.
-  const groupedContentParts = useMemo(() => {
-    const groups: Array<{ type: 'step_group'; parts: StepTimelinePart[] } | (typeof contentParts)[number]> = []
-    const pushToStepGroup = (item: StepTimelinePart) => {
-      const last = groups[groups.length - 1]
-      if (last && 'parts' in last && last.type === 'step_group') {
-        last.parts.push(item)
-      } else {
-        groups.push({ type: 'step_group', parts: [item] })
-      }
-    }
-    for (let i = 0; i < contentParts.length; i++) {
-      const item = contentParts[i]
-      if (item.type === 'tool-call' || item.type === 'reasoning') {
-        pushToStepGroup(item)
-      } else if (item.type === 'text' && i < lastStepIndex) {
-        // Intermediate narration between steps — thread it into the timeline.
-        pushToStepGroup(item)
-      } else {
-        groups.push(item)
-      }
-    }
-    return groups
-  }, [contentParts, lastStepIndex])
+  // Normalize provider-specific non-streaming reasoning order before deciding
+  // which text belongs to the process timeline and which text is the final answer.
+  const { orderedContentParts, lastStepIndex, groupedContentParts } = useMemo(
+    () => createMessageTimelineLayout(contentParts, msg.isStreamingMode),
+    [contentParts, msg.isStreamingMode]
+  )
 
   // Total time the assistant spent "working" on this message (thinking + tools).
   // Prefer the wall-clock generation time, but never report less than the sum of
@@ -550,16 +518,16 @@ const _Message: FC<Props> = (props) => {
   // whole answer region rather than only the last part.
   const displayGroups = useMemo<typeof groupedContentParts>(() => {
     if (!(showWorkSummary && processCollapsed)) return groupedContentParts
-    const answerParts = contentParts.slice(lastStepIndex + 1)
+    const answerParts = orderedContentParts.slice(lastStepIndex + 1)
     if (answerParts.length > 0) return answerParts
     // The message ended on a process step — fall back to showing that last step.
-    const lastPart = contentParts[contentParts.length - 1]
+    const lastPart = orderedContentParts[orderedContentParts.length - 1]
     if (!lastPart) return []
     if (lastPart.type === 'tool-call' || lastPart.type === 'reasoning') {
       return [{ type: 'step_group' as const, parts: [lastPart] }]
     }
     return [lastPart]
-  }, [showWorkSummary, processCollapsed, groupedContentParts, contentParts, lastStepIndex])
+  }, [showWorkSummary, processCollapsed, groupedContentParts, orderedContentParts, lastStepIndex])
 
   // Renders an intermediate text block inside the step timeline, reusing the same
   // markdown settings as the main answer text.

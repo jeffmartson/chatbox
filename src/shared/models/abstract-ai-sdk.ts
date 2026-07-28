@@ -35,6 +35,7 @@ import type { ModelDependencies } from '../types/adapters'
 import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
 import { isExpectedGenerationError } from './error-classification'
 import { ApiError, ChatboxAIAPIError } from './errors'
+import { wrapOpenAICompatibleNonStreamingModel } from './openai-compatible-non-streaming'
 import { stopWhenPersistentToolCallPause } from './persistent-tool-call-pause'
 import { repairToolCallJson } from './tool-call-json-repair'
 import type {
@@ -174,6 +175,19 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
 
   protected abstract getChatModel(options: CallChatCompletionOptions): LanguageModelV3
 
+  private prepareChatModel(model: LanguageModelV3): LanguageModelV3 {
+    if (this.options.stream !== false) return model
+
+    if (this.apiStyle === 'openai') {
+      return wrapOpenAICompatibleNonStreamingModel(model)
+    }
+
+    return wrapLanguageModel({
+      model,
+      middleware: simulateStreamingMiddleware(),
+    })
+  }
+
   protected getImageModel(): ImageModel | null {
     return null
   }
@@ -259,15 +273,8 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     messages: ModelMessage[],
     options: ChatStreamOptions
   ): AsyncGenerator<ModelStreamPart<T>> {
-    let baseModel = this.getChatModel(options)
+    const baseModel = this.prepareChatModel(this.getChatModel(options))
     const callSettings = this.resolveCallSettings(options)
-
-    if (this.options.stream === false) {
-      baseModel = wrapLanguageModel({
-        model: baseModel,
-        middleware: simulateStreamingMiddleware(),
-      })
-    }
 
     const statusQueue = new StatusQueue()
 
@@ -815,15 +822,8 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     coreMessages: ModelMessage[],
     options: CallChatCompletionOptions<T>
   ): Promise<StreamTextResult> {
-    let baseModel = this.getChatModel(options)
+    const baseModel = this.prepareChatModel(this.getChatModel(options))
     const callSettings = this.resolveCallSettings(options)
-
-    if (this.options.stream === false) {
-      baseModel = wrapLanguageModel({
-        model: baseModel,
-        middleware: simulateStreamingMiddleware(),
-      })
-    }
 
     const retryableStatusAttempt = (context: RetryContext<LanguageModelV3>) => {
       if (isErrorAttempt(context.current)) {
