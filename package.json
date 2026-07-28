@@ -1,6 +1,6 @@
 {
-  "name": "xyz.chatboxapp.app",
-  "productName": "xyz.chatboxapp.app",
+  "name": "xyz.chatboxapp.ce",
+  "productName": "xyz.chatboxapp.ce",
   "version": "0.0.1",
   "engines": {
     "node": ">=22.13.0 <23.0.0",
@@ -136,10 +136,8 @@
     "@mui/icons-material": "^5.11.11",
     "@mui/material": "^5.11.11",
     "@openrouter/ai-sdk-provider": "^2.0.0",
-    "@playwright/test": "^1.58.2",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.10",
     "@radix-ui/react-dialog": "^1.0.5",
-    "@ruguoapp/jk-analytics": "^1.4.21",
     "@sentry/react": "^10.12.0",
     "@sentry/vite-plugin": "^4.6.1",
     "@sentry/webpack-plugin": "^4.3.0",
@@ -250,7 +248,6 @@
     "p-timeout": "^6.1.4",
     "pdfjs-dist": "^6.0.227",
     "photoswipe": "^5.4.4",
-    "playwright": "^1.58.2",
     "postcss": "^8.5.3",
     "postcss-loader": "^7.3.3",
     "postcss-preset-mantine": "^1.17.0",
