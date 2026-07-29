@@ -184,7 +184,7 @@ describe('AgentModePanel submenu hover behavior', () => {
     expect(screen.getAllByText('MCP')).toHaveLength(1)
   })
 
-  test('resets the submenu when the pointer leaves the whole panel', () => {
+  test('keeps the submenu open while the pointer crosses the gap into it', () => {
     renderPanel()
 
     const skillsRow = screen.getByRole('button', { name: 'Skills' })
@@ -194,6 +194,27 @@ describe('AgentModePanel submenu hover behavior', () => {
     const panel = screen.getByRole('button', { name: 'Skills' }).closest('.relative')
     expect(panel).not.toBeNull()
     fireEvent.mouseLeave(panel as Element)
+
+    act(() => vi.advanceTimersByTime(200))
+    expect(screen.getAllByText('Skills')).toHaveLength(2)
+
+    const subPanel = (panel as Element).querySelector('.absolute')
+    expect(subPanel).not.toBeNull()
+    fireEvent.mouseEnter(subPanel as Element)
+
+    act(() => vi.advanceTimersByTime(300))
+    expect(screen.getAllByText('Skills')).toHaveLength(2)
+  })
+
+  test('closes the submenu after the pointer stays outside the whole panel', () => {
+    renderPanel()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Skills' }))
+    const panel = screen.getByRole('button', { name: 'Skills' }).closest('.relative')
+    expect(panel).not.toBeNull()
+    fireEvent.mouseLeave(panel as Element)
+
+    act(() => vi.advanceTimersByTime(300))
 
     expect(screen.getAllByText('Skills')).toHaveLength(1)
   })

@@ -865,7 +865,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     <div
       className="relative"
       ref={panelRef}
-      onMouseLeave={resetSubPanel}
+      onMouseLeave={handleSubPanelLeave}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && page === 'main') {
           e.preventDefault()
