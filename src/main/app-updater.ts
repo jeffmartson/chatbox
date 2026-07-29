@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
+import { getQuitAndInstallArguments } from './installer-command'
 import { getSettings } from './store-node'
 import { getLogger } from './util'
 
@@ -77,7 +78,7 @@ export class AppUpdater {
 
     ipcMain.removeHandler('install-update')
     ipcMain.handle('install-update', () => {
-      autoUpdater.quitAndInstall()
+      autoUpdater.quitAndInstall(...getQuitAndInstallArguments(process.platform))
     })
 
     const settings = getSettings()

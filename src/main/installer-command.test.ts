@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isQuitForInstallRequested, QUIT_FOR_INSTALL_ARGUMENT } from './installer-command'
+import { getQuitAndInstallArguments, isQuitForInstallRequested, QUIT_FOR_INSTALL_ARGUMENT } from './installer-command'
 
 describe('isQuitForInstallRequested', () => {
   it('recognizes the installer quit argument', () => {
@@ -10,4 +10,17 @@ describe('isQuitForInstallRequested', () => {
     expect(isQuitForInstallRequested(['Chatbox.exe'])).toBe(false)
     expect(isQuitForInstallRequested(['Chatbox.exe', 'chatbox://settings'])).toBe(false)
   })
+})
+
+describe('getQuitAndInstallArguments', () => {
+  it('enables silent installation and relaunch on Windows', () => {
+    expect(getQuitAndInstallArguments('win32')).toEqual([true, true])
+  })
+
+  it.each(['darwin', 'linux'] satisfies NodeJS.Platform[])(
+    'preserves the default updater behavior on %s',
+    (platform) => {
+      expect(getQuitAndInstallArguments(platform)).toEqual([])
+    }
+  )
 })
