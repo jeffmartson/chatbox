@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { MantineProvider } from '@mantine/core'
+import type { AgentModeValue } from '@shared/types'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -29,8 +30,10 @@ vi.mock('@tanstack/react-router', () => ({
   useLocation: () => ({ pathname: '/', search: {} }),
 }))
 
+let agentModeValue: AgentModeValue = 'on'
+
 vi.mock('@/stores/session/agent-mode', () => ({
-  useSessionAgentMode: () => ({ value: 'on', locked: false, lockReason: null }),
+  useSessionAgentMode: () => ({ value: agentModeValue, locked: false, lockReason: null }),
 }))
 
 vi.mock('@/platform', () => ({ default: { type: 'desktop' } }))
@@ -39,12 +42,13 @@ vi.mock('./AgentModePanel', () => ({ default: () => null }))
 
 import AgentModeButton from './AgentModeButton'
 
-function renderButton(modelSupportsAgentMode: boolean) {
+function renderButton({ modelSupportsAgentMode = true, compact = false } = {}) {
   return render(
     <MantineProvider>
       <AgentModeButton
         sessionId="session-1"
         modelSupportsAgentMode={modelSupportsAgentMode}
+        compact={compact}
         webBrowsingMode={false}
         onWebBrowsingChange={vi.fn()}
         onKnowledgeBaseSelect={vi.fn()}
@@ -57,10 +61,11 @@ function renderButton(modelSupportsAgentMode: boolean) {
 describe('AgentModeButton', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    agentModeValue = 'on'
   })
 
   test('is disabled and explains why when the selected model does not support agent tools', async () => {
-    renderButton(false)
+    renderButton({ modelSupportsAgentMode: false })
 
     const button = screen.getByRole('button', { name: 'Chat Mode' })
     expect(button).toHaveProperty('disabled', true)
@@ -75,13 +80,13 @@ describe('AgentModeButton', () => {
   })
 
   test('remains enabled for a model that supports agent tools', () => {
-    renderButton(true)
+    renderButton()
 
     expect(screen.getByRole('button', { name: 'Work Mode' })).toHaveProperty('disabled', false)
   })
 
   test('shows the Web Search migration tip until the user dismisses it', () => {
-    const view = renderButton(true)
+    const view = renderButton()
 
     expect(screen.getByText('Web Search has moved')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
@@ -90,7 +95,33 @@ describe('AgentModeButton', () => {
     expect(window.localStorage.getItem('chatbox.web-search-moved-tip-dismissed.v1')).toBe('true')
 
     view.unmount()
-    renderButton(true)
+    renderButton()
     expect(screen.queryByText('Web Search has moved')).toBeNull()
+  })
+
+  test('keeps the mode text in regular mode', () => {
+    renderButton()
+
+    expect(screen.getByRole('button', { name: 'Work Mode' }).textContent).toBe('Work Mode')
+  })
+
+  test.each([
+    ['on', 'on', 'Work Mode'],
+    ['off', 'off', 'Chat Mode'],
+  ] as const)('shows a status icon instead of the mode text for %s', (value, expectedMode, label) => {
+    agentModeValue = value
+    const view = renderButton({ compact: true })
+
+    const button = screen.getByRole('button', { name: label })
+    expect(button.textContent).toBe('')
+    expect(view.container.querySelector(`[data-agent-mode="${expectedMode}"]`)).toBeTruthy()
+    expect(view.container.querySelector(`[data-agent-mode-status="${expectedMode}"]`)).toBeTruthy()
+  })
+
+  test('falls back to the chat mode status icon when the model is unsupported', () => {
+    const view = renderButton({ modelSupportsAgentMode: false, compact: true })
+
+    expect(screen.getByRole('button', { name: 'Chat Mode' })).toHaveProperty('disabled', true)
+    expect(view.container.querySelector('[data-agent-mode-status="off"]')).toBeTruthy()
   })
 })

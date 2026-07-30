@@ -1687,6 +1687,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     providerId={model?.provider}
                     modelId={model?.modelId}
                     iconSize={toolbarIconSize}
+                    compact={isSmallScreen}
                     modelSupportsAgentMode={model ? modelSupportsAgentMode : true}
                     webBrowsingMode={webBrowsingMode}
                     onWebBrowsingChange={(v) => {

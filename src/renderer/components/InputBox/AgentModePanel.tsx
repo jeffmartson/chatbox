@@ -38,6 +38,7 @@ import { useMcpSettings, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { ScalableIcon } from '../common/ScalableIcon'
 import MCPStatus from '../mcp/MCPStatus'
+import AgentModeStatusIcon from './AgentModeStatusIcon'
 import { getAgentModeUIState } from './agentModeState'
 
 type PanelPage = 'main' | 'web-search' | 'code-execution' | 'skills' | 'mcp' | 'knowledge-base' | 'working-directory'
@@ -409,6 +410,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
           color={isActive ? 'chatbox-brand' : undefined}
           fullWidth
           disabled={isDisabled}
+          leftSection={<AgentModeStatusIcon mode={value} size={14} />}
+          // Long locales (fr/pt/ru) wrap onto a second line instead of being clipped mid-word
+          styles={{ root: { height: 'auto', minHeight: 26 }, label: { whiteSpace: 'normal', paddingBlock: 4 } }}
           onClick={() => handleModeChange(value)}
         >
           {label}
@@ -874,7 +878,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       }}
     >
       {/* Main panel - always visible */}
-      <Stack gap={0} py="xs" className="w-[228px]">
+      {/* Width follows the mode labels (localized text can be much wider than English) within a clamp.
+          The clamp also tracks the viewport: the window can be resized down to 280px (see window_state.ts). */}
+      <Stack gap={0} py="xs" className="w-max min-w-[min(240px,calc(100vw-24px))] max-w-[min(340px,calc(100vw-24px))]">
         {/* Header: mode switcher */}
         <Stack gap="xs" px="sm" py="xs" onMouseEnter={handleNonExtensionHover}>
           <Text fw={600} size="sm" c="chatbox-primary">
@@ -884,7 +890,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             <ModeButton value="off" label={t('Chat Mode')} />
             <ModeButton value="on" label={t('Work Mode')} />
           </Flex>
-          <Text size="xs" c="chatbox-secondary" className="leading-snug">
+          <Text size="xs" c="chatbox-secondary" className="leading-snug max-w-[244px]">
             {modeDescription}
           </Text>
           {isChatModeSelected && (
@@ -898,7 +904,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 <Text size="xs" fw={500} c="chatbox-primary">
                   {t('Smart Switching')}
                 </Text>
-                <Text size="xs" c="chatbox-secondary" className="leading-snug">
+                <Text size="xs" c="chatbox-secondary" className="leading-snug max-w-[196px]">
                   {smartSwitchingDescription}
                 </Text>
               </Stack>

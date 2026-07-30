@@ -145,6 +145,19 @@ beforeEach(() => {
   mocks.knowledgeBases.splice(0)
 })
 
+describe('AgentModePanel mode buttons', () => {
+  test('label the chat and work mode buttons with the same status icons as the composer button', () => {
+    const view = renderPanel()
+
+    const chatMode = screen.getByRole('button', { name: 'Chat Mode' })
+    const workMode = screen.getByRole('button', { name: 'Work Mode' })
+
+    expect(chatMode.querySelector('[data-agent-mode-status="off"]')).toBeTruthy()
+    expect(workMode.querySelector('[data-agent-mode-status="on"]')).toBeTruthy()
+    expect(view.container.querySelectorAll('[data-agent-mode-status]')).toHaveLength(2)
+  })
+})
+
 describe('AgentModePanel submenu hover behavior', () => {
   beforeEach(() => {
     vi.useFakeTimers()

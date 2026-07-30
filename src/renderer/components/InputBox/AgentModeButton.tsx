@@ -6,6 +6,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'reac
 import { useTranslation } from 'react-i18next'
 import { useSessionAgentMode } from '@/stores/session/agent-mode'
 import AgentModePanel from './AgentModePanel'
+import AgentModeStatusIcon from './AgentModeStatusIcon'
 import { getAgentModeUIState } from './agentModeState'
 
 interface AgentModeButtonProps {
@@ -13,6 +14,8 @@ interface AgentModeButtonProps {
   providerId?: string
   modelId?: string
   iconSize?: number
+  /** Small screens render the mode as an icon status badge instead of a text label. */
+  compact?: boolean
   modelSupportsAgentMode?: boolean
   webBrowsingMode: boolean
   onWebBrowsingChange: (enabled: boolean) => void
@@ -44,6 +47,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   providerId,
   modelId,
   iconSize = 18,
+  compact = false,
   modelSupportsAgentMode = true,
   webBrowsingMode,
   onWebBrowsingChange,
@@ -149,6 +153,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
             >
               <UnstyledButton
                 disabled={disabled}
+                aria-label={modeLabel}
                 onMouseEnter={disabled || showWebSearchMovedTip ? undefined : handleMouseEnter}
                 onMouseLeave={disabled || showWebSearchMovedTip ? undefined : handleMouseLeave}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${disabled ? '' : 'hover:bg-[var(--chatbox-background-tertiary)]'}`}
@@ -158,8 +163,14 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
                   pointerEvents: disabled ? 'none' : undefined,
                 }}
               >
-                <IconRobot size={iconSize} strokeWidth={1.8} />
-                <span className="text-xs font-medium whitespace-nowrap">{modeLabel}</span>
+                {compact ? (
+                  <CompactAgentModeIcon mode={agentModeUIState.displayValue} size={iconSize} />
+                ) : (
+                  <>
+                    <IconRobot size={iconSize} strokeWidth={1.8} />
+                    <span className="text-xs font-medium whitespace-nowrap">{modeLabel}</span>
+                  </>
+                )}
               </UnstyledButton>
             </span>
           </Tooltip>
@@ -202,6 +213,22 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
         )}
       </Popover.Dropdown>
     </Popover>
+  )
+}
+
+function CompactAgentModeIcon({ mode, size }: { mode: AgentModeValue; size: number }) {
+  // Slightly larger than the reasoning badge (0.5x): the briefcase outline needs the extra pixel to stay readable.
+  const statusSize = Math.max(10, Math.round(size * 0.55))
+
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }} data-agent-mode={mode}>
+      <IconRobot size={size} strokeWidth={1.8} />
+      <AgentModeStatusIcon
+        mode={mode}
+        size={statusSize}
+        className="absolute -bottom-0.5 -right-0.5 bg-[var(--chatbox-background-secondary)]"
+      />
+    </span>
   )
 }
 
