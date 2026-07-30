@@ -12,7 +12,12 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
-import { getDefaultInterfaceColors, type InterfaceThemeColors } from '@shared/theme-colors'
+import {
+  getDefaultInterfaceColors,
+  INTERFACE_COLOR_PRESETS,
+  type InterfaceColors,
+  type InterfaceThemeColors,
+} from '@shared/theme-colors'
 import { type Language, Theme } from '@shared/types'
 import { formatFileSize } from '@shared/utils'
 import { getBackupFilename } from '@shared/utils/backup'
@@ -53,17 +58,27 @@ export function RouteComponent() {
   const realTheme = useUIStore((state) => state.realTheme)
   const currentInterfaceColors = (settings.interfaceColors ?? getDefaultInterfaceColors())[realTheme]
 
-  const setInterfaceColor = (key: keyof InterfaceThemeColors, value: string) => {
+  const updateCurrentInterfaceColors = (updater: (colors: InterfaceThemeColors) => InterfaceThemeColors) => {
     setSettings((draft) => {
       draft.interfaceColors ??= getDefaultInterfaceColors()
-      draft.interfaceColors[realTheme][key] = value
+      draft.interfaceColors[realTheme] = updater(draft.interfaceColors[realTheme])
     })
   }
 
+  const setInterfaceColor = (key: keyof InterfaceThemeColors, value: string) => {
+    updateCurrentInterfaceColors((colors) => ({ ...colors, [key]: value }))
+  }
+
   const resetInterfaceColors = () => {
+    updateCurrentInterfaceColors(() => getDefaultInterfaceColors()[realTheme])
+  }
+
+  const applyInterfaceColorPreset = (colors: InterfaceColors) => {
     setSettings((draft) => {
-      draft.interfaceColors ??= getDefaultInterfaceColors()
-      draft.interfaceColors[realTheme] = getDefaultInterfaceColors()[realTheme]
+      draft.interfaceColors = {
+        light: { ...colors.light },
+        dark: { ...colors.dark },
+      }
     })
   }
 
@@ -132,6 +147,21 @@ export function RouteComponent() {
               {realTheme === 'dark' ? t('Dark Mode') : t('Light Mode')}
             </Text>
           </Flex>
+          <Stack gap="xxs">
+            <Text size="sm">{t('Color Presets')}</Text>
+            <Flex gap="xs" wrap="wrap">
+              {INTERFACE_COLOR_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  variant="default"
+                  size="compact-sm"
+                  onClick={() => applyInterfaceColorPreset(preset.colors)}
+                >
+                  {t(preset.label)}
+                </Button>
+              ))}
+            </Flex>
+          </Stack>
           <InterfaceColorInput
             label={t('Primary Background')}
             value={currentInterfaceColors.backgroundPrimary}
