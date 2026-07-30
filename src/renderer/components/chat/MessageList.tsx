@@ -212,6 +212,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const [smoothFollowOutput] = useState(() =>
     createSmoothFollowOutputController({
       scrollToBottom: (behavior) => virtuoso.current?.scrollTo({ top: Infinity, behavior }),
+      stopScrolling: (scrollTop) => virtuoso.current?.scrollTo({ top: scrollTop, behavior: 'auto' }),
       // Mobile WebViews can fall behind when a smooth scroll is retargeted on every streaming height change.
       getScrollBehavior: platform.type === 'mobile' ? () => 'auto' : undefined,
     })
@@ -362,6 +363,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
       const maxScrollTop = e.currentTarget.scrollHeight - e.currentTarget.clientHeight
       if (smoothFollowOutput.handleScroll(scrollTop, maxScrollTop)) {
         setAtBottom(false)
+      } else if (smoothFollowOutput.isFollowing()) {
+        setAtBottom(true)
       }
       if (e.currentTarget.scrollHeight - (scrollTop + e.currentTarget.clientHeight) >= 0) {
         handleScrollTopThrottled(scrollTop)
@@ -541,9 +544,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
             }}
             atTopStateChange={setAtTop}
             atBottomStateChange={(nextAtBottom) => {
-              if (nextAtBottom) {
-                smoothFollowOutput.resume()
-              }
+              smoothFollowOutput.handleAtBottomChange(nextAtBottom)
               setAtBottom(nextAtBottom || smoothFollowOutput.isFollowing())
             }}
             totalListHeightChanged={smoothFollowOutput.handleHeightChange}
