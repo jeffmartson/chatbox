@@ -3,9 +3,9 @@
  */
 
 import { MantineProvider } from '@mantine/core'
-import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@/test-utils'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

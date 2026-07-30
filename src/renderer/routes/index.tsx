@@ -458,7 +458,7 @@ function Index() {
                   />
                   <ActionIcon
                     size={32}
-                    radius={16}
+                    radius="lg"
                     c="chatbox-tertiary"
                     bg="#F1F3F5"
                     onClick={() => setSession((old) => ({ ...old, copilotId: undefined }))}
@@ -673,7 +673,7 @@ const CopilotItem = ({
       bg={selected ? 'var(--chatbox-background-brand-secondary)' : 'transparent'}
       className={clsx(
         'max-w-[75vw] sm:max-w-[50vw] cursor-pointer shrink-0 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.04)]',
-        isSmallScreen ? 'rounded-full' : 'rounded-md'
+        isSmallScreen ? 'rounded-full' : 'rounded-lg'
       )}
       onClick={onClick}
     >
@@ -683,7 +683,7 @@ const CopilotItem = ({
             src={avatar?.type === 'storage-key' ? '' : avatar?.url || picUrl}
             alt={name}
             size={isSmallScreen ? 20 : 24}
-            radius="xl"
+            radius="lg"
             className="flex-shrink-0 border border-solid border-chatbox-border-primary"
           >
             {avatar?.type === 'storage-key' ? (

@@ -1,10 +1,11 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { Tooltip, Typography } from '@mui/material'
+import { Typography } from '@mui/material'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import type { SessionAttachmentIndexingStage } from '@shared/types'
 import { AlertCircle, CheckCircle, Eye, Link2, Loader2, RotateCw, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import {
   isSessionAttachmentRagAuthError,
   isSessionAttachmentRagIndexingError,
@@ -73,7 +74,7 @@ export function ImageMiniCard(props: { storageKey: string; onDelete: () => void 
     <div
       key={storageKey}
       className="w-[100px] h-[100px] p-1 m-1 inline-flex items-center justify-center
-                                bg-white shadow-sm rounded-md border-solid border-gray-400/20
+                                bg-white shadow-sm rounded-lg border-solid border-gray-400/20
                                 hover:shadow-lg hover:cursor-pointer hover:scale-105 transition-all duration-200
                                 group/image-mini-card"
     >
@@ -148,13 +149,13 @@ export function FileMiniCard(props: {
   return (
     <div
       className="w-[132px] h-[108px] px-2.5 pt-2 pb-3 m-1 inline-flex items-center justify-center
-                                bg-white shadow-sm rounded-md border-solid border-gray-400/20
+                                bg-white shadow-sm rounded-lg border-solid border-gray-400/20
                                 hover:shadow-lg hover:cursor-pointer hover:scale-105 transition-all duration-200
                                 group/file-mini-card relative"
       onClick={handleClick}
     >
       <Tooltip
-        title={
+        label={
           status === 'error' && translatedError
             ? translatedError
             : onPreviewClick
@@ -420,16 +421,16 @@ export function MessageAttachment(props: {
           : label
 
   return (
-    <Tooltip title={tooltipTitle}>
+    <Tooltip label={tooltipTitle}>
       <div
         className={`flex items-center gap-2 px-2 py-1.5 min-w-0 overflow-hidden
             relative
-            rounded-md
+            rounded-lg
             bg-chatbox-background-secondary
             ${isClickable ? 'cursor-pointer hover:bg-chatbox-background-secondary-hover transition-colors' : ''}`}
         onClick={handleClick}
       >
-        <div className="flex-none w-7 h-7 rounded-md bg-chatbox-background-primary flex items-center justify-center">
+        <div className="flex-none w-7 h-7 rounded-lg bg-chatbox-background-primary flex items-center justify-center">
           {filename && <FileIcon filename={filename} className="w-4 h-4" />}
           {url && !filename && <Link2 className="w-4 h-4 text-chatbox-secondary" strokeWidth={1.5} />}
         </div>

@@ -1,5 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Flex, Loader, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Flex, Loader, Text } from '@mantine/core'
 import { Link } from '@mui/material'
 import { aiProviderNameHash } from '@shared/models'
 import { ChatboxAIAPIError } from '@shared/models/errors'
@@ -17,6 +17,7 @@ import {
 import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useCopied } from '@/hooks/useCopied'
 import { navigateToSettings } from '@/modals/Settings'
 import { AgentModeRewardResumeError, claimAgentModeRewardAndResume } from '@/packages/agent-mode-reward'
@@ -501,7 +502,7 @@ export default function MessageErrTips(props: {
           <br />
           {isTruncated ? (
             <div
-              className="text-sm p-2 rounded-md bg-red-50 dark:bg-red-900/20 cursor-pointer overflow-hidden"
+              className="text-sm p-2 rounded-lg bg-red-50 dark:bg-red-900/20 cursor-pointer overflow-hidden"
               onClick={() => setExpanded(!expanded)}
             >
               <Flex align="flex-start" gap="xs" className="min-w-0">
@@ -530,7 +531,7 @@ export default function MessageErrTips(props: {
               />
             </div>
           ) : (
-            <div className="text-sm p-2 rounded-md bg-red-50 dark:bg-red-900/20 overflow-hidden">
+            <div className="text-sm p-2 rounded-lg bg-red-50 dark:bg-red-900/20 overflow-hidden">
               <div className="whitespace-pre-wrap break-all">{displayedErrorMessage}</div>
               <ErrorActionButtons
                 showTranslateButton={showTranslateButton}

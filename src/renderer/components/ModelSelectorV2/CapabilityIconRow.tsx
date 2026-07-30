@@ -46,7 +46,7 @@ export function CapabilityIconRow({
           align="center"
           gap={4}
           className={clsx(
-            'rounded-md font-semibold',
+            'rounded-lg font-semibold',
             CAPABILITY_STYLES[item.id],
             compact ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm'
           )}

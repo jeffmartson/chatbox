@@ -1,6 +1,7 @@
-import { ActionIcon, Flex, Image, Skeleton, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Flex, Image, Skeleton, UnstyledButton } from '@mantine/core'
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useBlob } from '@/hooks/useBlob'
 import { blobToDataUrl, isDirectImageSource, MAX_REFERENCE_IMAGES } from './constants'
 
@@ -29,7 +30,7 @@ export function ReferenceImagesPreview({ images, onRemove, onAddClick }: Referen
           <Tooltip label={t('Add Reference Image')}>
             <UnstyledButton
               onClick={onAddClick}
-              className="w-[64px] h-[64px] rounded-md border border-dashed border-[var(--chatbox-border-primary)] hover:border-[var(--chatbox-tint-tertiary)] flex items-center justify-center transition-colors"
+              className="w-[64px] h-[64px] rounded-lg border border-dashed border-[var(--chatbox-border-primary)] hover:border-[var(--chatbox-tint-tertiary)] flex items-center justify-center transition-colors"
             >
               <IconPlus size={18} className="text-[var(--chatbox-tint-tertiary)]" />
             </UnstyledButton>
@@ -53,17 +54,17 @@ function ReferenceImageItem({ storageKey, onRemove }: { storageKey: string; onRe
           h={64}
           w={64}
           fit="cover"
-          radius="md"
+          radius="lg"
           className="border border-[var(--chatbox-border-primary)]"
         />
       ) : (
-        <Skeleton h={64} w={64} radius="md" />
+        <Skeleton h={64} w={64} radius="lg" />
       )}
       <ActionIcon
         size="xs"
         variant="filled"
         color="dark"
-        radius="xl"
+        radius="lg"
         className="absolute -top-2 -right-2 shadow-md opacity-90"
         onClick={() => onRemove(storageKey)}
       >

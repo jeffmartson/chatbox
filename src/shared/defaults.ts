@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
+import { getDefaultInterfaceColors } from './theme-colors'
 import { type Config, ModelProviderEnum, type SessionSettings, type Settings, Theme } from './types'
 import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES } from './types/skills'
 
@@ -80,6 +81,7 @@ export function settings(): Settings {
     defaultAssistantAvatarKey: '',
     backgroundImageKey: '',
     theme: Theme.System,
+    interfaceColors: getDefaultInterfaceColors(),
     language: 'en',
     fontSize: 14,
     spellCheck: true,

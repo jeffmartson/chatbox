@@ -14,7 +14,6 @@ import {
   ScrollArea,
   Stack,
   Text,
-  Tooltip,
 } from '@mantine/core'
 import {
   KNOWLEDGE_BASE_MAX_FILE_SIZE,
@@ -45,6 +44,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useKnowledgeBaseFiles, useKnowledgeBaseFilesActions, useKnowledgeBaseFilesCount } from '@/hooks/knowledge-base'
 import { useChunksPreview } from '@/hooks/useChunksPreview'
 import { toastError } from '@/packages/toast'
@@ -624,7 +624,7 @@ const KnowledgeBaseDocuments: React.FC<KnowledgeBaseDocumentsProps> = ({ knowled
         const isRemoteParser = parserType === 'mineru' || parserType === 'chatbox-ai'
         return (
           <Flex gap={4} align="center">
-            <Tooltip label={errorLabel} multiline w={300} withArrow position="top" transitionProps={{ duration: 200 }}>
+            <Tooltip label={errorLabel} multiline w={300} withArrow position="top">
               <Pill size="xs" c={isRemoteParser ? 'orange' : 'gray'} className="cursor-help">
                 {getParserLabel()}
               </Pill>
@@ -701,7 +701,7 @@ const KnowledgeBaseDocuments: React.FC<KnowledgeBaseDocumentsProps> = ({ knowled
 
       {/* Documents Section */}
       <Box>
-        <Paper withBorder radius="sm" p={0}>
+        <Paper withBorder radius="lg" p={0}>
           {/* Documents Header */}
           <Group
             align="center"
@@ -710,7 +710,6 @@ const KnowledgeBaseDocuments: React.FC<KnowledgeBaseDocumentsProps> = ({ knowled
             py="2px"
             style={{
               cursor: 'pointer',
-              backgroundColor: 'var(--chatbox-background-secondary)',
               borderBottom: '1px solid var(--chatbox-border-secondary-hover)',
             }}
             onClick={() => setIsExpanded(!isExpanded)}
@@ -767,7 +766,7 @@ const KnowledgeBaseDocuments: React.FC<KnowledgeBaseDocumentsProps> = ({ knowled
                 <Paper
                   withBorder
                   p="lg"
-                  radius="md"
+                  radius="lg"
                   style={{
                     border: isDragOver
                       ? '2px dashed var(--chatbox-border-brand)'
@@ -967,7 +966,7 @@ const KnowledgeBaseDocuments: React.FC<KnowledgeBaseDocumentsProps> = ({ knowled
                                       size="xs"
                                       mt={2}
                                       color={doc.status === 'processing' ? 'blue' : 'orange'}
-                                      radius="sm"
+                                      radius="lg"
                                     />
                                   </Box>
                                 )}

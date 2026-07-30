@@ -1,4 +1,5 @@
 import { createTheme, type ThemeOptions } from '@mui/material/styles'
+import { getDefaultInterfaceColors } from '@shared/theme-colors'
 import { useLayoutEffect, useMemo } from 'react'
 import { settingsStore, useLanguage, useSettingsStore } from '@/stores/settingsStore'
 import { uiStore, useUIStore } from '@/stores/uiStore'
@@ -24,6 +25,7 @@ export const switchTheme = async (theme: Theme) => {
 
 export default function useAppTheme() {
   const theme = useSettingsStore((state) => state.theme)
+  const interfaceColors = useSettingsStore((state) => state.interfaceColors ?? getDefaultInterfaceColors())
   const realTheme = useUIStore((state) => state.realTheme)
   const language = useLanguage()
 
@@ -48,6 +50,14 @@ export default function useAppTheme() {
       document.documentElement.classList.remove('dark')
     }
   }, [realTheme])
+
+  useLayoutEffect(() => {
+    const colors = interfaceColors[realTheme]
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty('--chatbox-background-primary', colors.backgroundPrimary)
+    rootStyle.setProperty('--chatbox-background-secondary', colors.backgroundSecondary)
+    rootStyle.setProperty('--chatbox-background-tertiary', colors.backgroundTertiary)
+  }, [interfaceColors, realTheme])
 
   const themeObj = useMemo(() => createTheme(getThemeDesign(realTheme, language)), [realTheme, language])
   return themeObj

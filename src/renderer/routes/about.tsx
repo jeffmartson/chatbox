@@ -177,7 +177,7 @@ function MobileUpdateHint({ language, needCheckUpdate }: { language: string; nee
         size="xs"
         variant="light"
         color="chatbox-brand"
-        radius="xl"
+        radius="lg"
         className="flex-shrink-0"
         onClick={() => platform.openLink(buildChatboxUrl(`/redirect_app/check_update/${language}`))}
       >
@@ -190,7 +190,7 @@ function MobileUpdateHint({ language, needCheckUpdate }: { language: string; nee
     <Button
       size="xs"
       variant="default"
-      radius="xl"
+      radius="lg"
       className="flex-shrink-0"
       onClick={() => platform.openLink(buildChatboxUrl(`/redirect_app/check_update/${language}`))}
     >
@@ -233,7 +233,7 @@ function DesktopUpdateSection() {
   switch (status) {
     case 'checking':
       return (
-        <Button size="xs" variant="default" radius="xl" className="flex-shrink-0" loading>
+        <Button size="xs" variant="default" radius="lg" className="flex-shrink-0" loading>
           {t('Checking...')}
         </Button>
       )
@@ -257,7 +257,7 @@ function DesktopUpdateSection() {
           size="xs"
           variant="filled"
           color="chatbox-brand"
-          radius="xl"
+          radius="lg"
           className="flex-shrink-0"
           leftSection={<ScalableIcon icon={IconRefresh} size={14} />}
           onClick={handleInstall}
@@ -274,7 +274,7 @@ function DesktopUpdateSection() {
             <Text size="xs" c="chatbox-error">
               {t('Update failed')}
             </Text>
-            <Button size="xs" variant="default" radius="xl" onClick={handleCheck}>
+            <Button size="xs" variant="default" radius="lg" onClick={handleCheck}>
               {t('Retry')}
             </Button>
           </Flex>
@@ -297,7 +297,7 @@ function DesktopUpdateSection() {
 
     default:
       return (
-        <Button size="xs" variant="default" radius="xl" className="flex-shrink-0" onClick={handleCheck}>
+        <Button size="xs" variant="default" radius="lg" className="flex-shrink-0" onClick={handleCheck}>
           {t('Check Update')}
         </Button>
       )

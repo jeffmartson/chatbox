@@ -1,12 +1,13 @@
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Flex, Text } from '@mantine/core'
 import type { SessionMetaRecord } from '@shared/types'
 import { IconArchive, IconArrowsMoveVertical, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
 import dayjs from 'dayjs'
 import { type MouseEvent, memo, type PointerEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { navigateToSettings } from '@/modals/Settings'
 import platform from '@/platform'
@@ -221,7 +222,7 @@ function SessionItem(props: Props) {
     <Flex
       align="center"
       className={clsx(
-        'cursor-pointer rounded-sm group/session-item',
+        'cursor-pointer rounded-lg group/session-item',
         'select-none',
         props.isReordering && 'cursor-default',
         isSmallScreen
@@ -237,7 +238,7 @@ function SessionItem(props: Props) {
       mx="xs"
       pl="xs"
       pr={props.isReordering ? 44 : 'xs'}
-      py={10}
+      py={8}
       gap={10}
       onClick={onClick}
       onContextMenu={handleContextMenu}

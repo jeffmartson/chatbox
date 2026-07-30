@@ -20,7 +20,7 @@ export function EmptyState({ onPromptSelect }: EmptyStateProps) {
   return (
     <Flex direction="column" align="center" justify="center" className="min-h-[60vh]">
       {/* Simple Icon */}
-      <div className="w-20 h-20 rounded-2xl bg-[var(--chatbox-background-secondary)] flex items-center justify-center mb-6">
+      <div className="w-20 h-20 rounded-lg bg-[var(--chatbox-background-secondary)] flex items-center justify-center mb-6">
         <IconPhoto size={40} className="text-[var(--chatbox-tint-tertiary)]" stroke={1.5} />
       </div>
 

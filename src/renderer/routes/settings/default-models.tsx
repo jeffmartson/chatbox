@@ -289,7 +289,7 @@ const ModelSelectContent = forwardRef<
       align="center"
       c="chatbox-tertiary"
       w={320}
-      className="border-solid border border-chatbox-border-primary rounded-sm cursor-pointer bg-transparent"
+      className="border-solid border border-chatbox-border-primary rounded-lg cursor-pointer bg-transparent"
       onClick={onClick}
     >
       <Text span flex={1} className=" text-left">

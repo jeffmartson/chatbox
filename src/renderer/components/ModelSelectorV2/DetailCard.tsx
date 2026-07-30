@@ -1,8 +1,9 @@
-import { Badge, Button, Flex, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { Badge, Button, Flex, Stack, Text, UnstyledButton } from '@mantine/core'
 import { IconDatabase, IconSparkles } from '@tabler/icons-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import platform from '@/platform'
 import { formatNumber } from '@/utils/format'
 import { ScalableIcon } from '../common/ScalableIcon'
@@ -123,7 +124,6 @@ function TieredPricingTag({
       withArrow
       multiline
       w={340}
-      events={{ hover: true, focus: true, touch: false }}
       openDelay={120}
       position="right"
       offset={8}
@@ -230,7 +230,7 @@ function PricingBlock({
         </Stack>
       )}
       {mobile && hasTieredPricing && mobileTieredOpen && (
-        <div className="rounded-md border border-solid border-chatbox-border-primary bg-chatbox-background-primary px-3 py-2">
+        <div className="rounded-lg border border-solid border-chatbox-border-primary bg-chatbox-background-primary px-3 py-2">
           <TieredPricingDetails tiers={pricing.tieredPricing} t={t} isCN={isCN} />
         </div>
       )}

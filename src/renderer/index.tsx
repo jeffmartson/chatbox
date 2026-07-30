@@ -28,6 +28,8 @@ import './setup/load_polyfill'
 // GA4 初始化
 import './setup/ga_init'
 
+// Show native scrollbars only while scrolling
+import './setup/scrollbar_visibility'
 // 引入保护代码
 import './setup/protect'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -111,7 +113,7 @@ function InitPage() {
         <div
           role="button"
           tabIndex={0}
-          className="px-4 py-0 rounded-md cursor-pointer select-none text-sm text-blue-600"
+          className="px-4 py-0 rounded-lg cursor-pointer select-none text-sm text-blue-600"
           onClick={() => setShowLoadingLog(!showLoadingLog)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {

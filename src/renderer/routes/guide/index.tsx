@@ -334,7 +334,7 @@ function GuidePage() {
         <Box px="sm" pb="md" pt="sm" className="flex-shrink-0">
           <Stack gap="xs" maw="56rem" mx="auto">
             <Stack
-              className="bg-chatbox-background-secondary rounded-md p-3"
+              className="bg-chatbox-background-secondary rounded-lg p-3"
               style={{ border: '1px solid var(--chatbox-border-primary)' }}
               gap="xs"
             >
@@ -367,7 +367,7 @@ function GuidePage() {
                   size={32}
                   variant="filled"
                   color={isLoading ? 'dark' : 'chatbox-brand'}
-                  radius="xl"
+                  radius="lg"
                   onClick={isLoading ? stopGeneration : handleSend}
                   className={`shrink-0 mb-1 ${(!inputValue.trim() || !canSendMessage) && !isLoading ? 'disabled:!opacity-100 !text-white' : ''}`}
                   style={

@@ -58,7 +58,7 @@ export function CopilotItem({ copilot, type = 'local', highlightTerm = '' }: Cop
         relative
         p-xs
         gap-xs
-        rounded-md
+        rounded-lg
         border border-solid border-chatbox-border-primary
         bg-chatbox-background-primary
         cursor-pointer
@@ -71,7 +71,7 @@ export function CopilotItem({ copilot, type = 'local', highlightTerm = '' }: Cop
               src={avatar?.type === 'storage-key' ? '' : avatar?.url || picUrl}
               alt={name}
               size={36}
-              radius="md"
+              radius="lg"
               className="flex-shrink-0 border border-solid border-chatbox-border-primary"
             >
               {avatar?.type === 'storage-key' ? (
@@ -89,7 +89,7 @@ export function CopilotItem({ copilot, type = 'local', highlightTerm = '' }: Cop
               h={36}
               align="center"
               justify="center"
-              className="flex-shrink-0 rounded-md bg-chatbox-background-brand-secondary"
+              className="flex-shrink-0 rounded-lg bg-chatbox-background-brand-secondary"
             >
               <ScalableIcon icon={IconMessageCircle2Filled} size={20} className="text-chatbox-tint-brand" />
             </Stack>

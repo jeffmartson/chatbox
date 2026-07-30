@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { SystemProviders } from '@shared/defaults'
 import { type OAuthProviderInfo, toOAuthProviderId, toOAuthSettingsProviderId } from '@shared/oauth'
@@ -54,6 +53,7 @@ import { AdaptiveModal } from '@/components/common/AdaptiveModal'
 import PopoverConfirm from '@/components/common/PopoverConfirm'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { ModelList } from '@/components/ModelList'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useOAuth } from '@/hooks/useOAuth'
 import { useOAuthProviders } from '@/hooks/useOAuthProviders'
 import { enrichModelsFromRegistry, forceRefreshRegistry, useModelRegistryVersion } from '@/packages/model-registry'

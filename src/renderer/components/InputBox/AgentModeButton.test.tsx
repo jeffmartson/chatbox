@@ -2,8 +2,9 @@
 
 import { MantineProvider } from '@mantine/core'
 import type { AgentModeValue } from '@shared/types'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { render, screen } from '@/test-utils'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

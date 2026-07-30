@@ -214,7 +214,7 @@ export default function SessionList(props: Props) {
               )
             }}
           />
-          <DragOverlay>
+          <DragOverlay dropAnimation={null}>
             {activeDragSession ? (
               <div className="pointer-events-none">
                 <SessionItem
@@ -252,7 +252,7 @@ function SortableItem(props: {
     <div
       ref={setNodeRef}
       style={style}
-      className="relative"
+      className="relative pb-1"
       {...(!disabled && !showDragHandle ? attributes : {})}
       {...(!disabled && !showDragHandle ? listeners : {})}
     >

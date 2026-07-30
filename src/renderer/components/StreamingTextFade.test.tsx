@@ -2,11 +2,11 @@
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { cleanup, render } from '@testing-library/react'
 import type { Element, Root } from 'hast'
 import { StrictMode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render } from '@/test-utils'
 import StreamingTextFade from './StreamingTextFade'
 import { type StreamingTextSegment, wrapStreamingSegmentsInHast } from './streaming-text-fade'
 

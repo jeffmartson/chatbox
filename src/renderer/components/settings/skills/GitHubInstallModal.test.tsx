@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { MantineProvider } from '@mantine/core'
-import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
+import { fireEvent, render, screen } from '@/test-utils'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

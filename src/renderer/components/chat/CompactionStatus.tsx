@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Button, Collapse, Flex, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Button, Collapse, Flex, Text } from '@mantine/core'
 import {
   IconAlertCircle,
   IconCheck,
@@ -11,6 +11,7 @@ import {
 import { useAtomValue } from 'jotai'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useCopied } from '@/hooks/useCopied'
 import { runCompactionWithUIState } from '@/packages/context-management'
 import { compactionUIStateMapAtom, setCompactionUIState } from '@/stores/atoms'

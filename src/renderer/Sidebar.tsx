@@ -1,6 +1,6 @@
 import { registerPlugin } from '@capacitor/core'
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Box, Button, Flex, Image, NavLink, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Button, Flex, Image, NavLink, Stack, Text } from '@mantine/core'
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
 import {
   IconArchive,
@@ -19,6 +19,7 @@ import { useNavigate } from '@tanstack/react-router'
 import clsx from 'clsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import Divider from './components/common/Divider'
 import { ScalableIcon } from './components/common/ScalableIcon'
 import ThemeSwitchButton from './components/dev/ThemeSwitchButton'
@@ -150,6 +151,7 @@ export default function Sidebar() {
         '& .MuiDrawer-paper': {
           backgroundColor: isSmallScreen ? undefined : 'transparent',
           backgroundImage: 'none',
+          border: 0,
           boxSizing: 'border-box',
           width: isSmallScreen ? '75vw' : sidebarWidth,
           maxWidth: '75vw',
@@ -169,14 +171,7 @@ export default function Sidebar() {
         className="relative"
       >
         {needRoomForMacWindowControls && <Box className="title-bar flex-[0_0_44px]" />}
-        <Flex
-          align="center"
-          justify="space-between"
-          gap="xs"
-          px="md"
-          py="sm"
-          className="border-0 border-b border-solid border-chatbox-border-primary"
-        >
+        <Flex align="center" justify="space-between" gap="xs" px="md" py="sm" className="border-0">
           <Flex align="center" gap="sm" style={{ minWidth: 0, flex: 1 }}>
             <Flex
               align="center"
@@ -242,11 +237,23 @@ export default function Sidebar() {
         <Stack gap={0} px="xs" pb="xs">
           <Divider />
           <Stack gap="xs" pt="xs" mb="xs">
-            <Button variant="light" fullWidth data-testid="new-chat-button" onClick={handleCreateNewSession}>
+            <Button
+              variant="light"
+              fullWidth
+              radius="lg"
+              data-testid="new-chat-button"
+              onClick={handleCreateNewSession}
+            >
               <ScalableIcon icon={IconCirclePlus} className="mr-2" />
               {t('New Chat')}
             </Button>
-            <Button variant="light" fullWidth data-testid="new-image-button" onClick={handleCreateNewPictureSession}>
+            <Button
+              variant="light"
+              fullWidth
+              radius="lg"
+              data-testid="new-image-button"
+              onClick={handleCreateNewPictureSession}
+            >
               <ScalableIcon icon={IconPhotoPlus} className="mr-2" />
               {t('Create Image')}
             </Button>
@@ -256,7 +263,7 @@ export default function Sidebar() {
             <Flex gap="md" align="center">
               <NavLink
                 c="chatbox-secondary"
-                className="rounded"
+                className="rounded-lg"
                 label={t('My Copilots')}
                 leftSection={<ScalableIcon icon={IconMessageChatbot} size={20} />}
                 onClick={() => {
@@ -300,7 +307,7 @@ export default function Sidebar() {
             <>
               <NavLink
                 c="chatbox-secondary"
-                className="rounded"
+                className="rounded-lg"
                 label={t('My Copilots')}
                 leftSection={<ScalableIcon icon={IconMessageChatbot} size={20} />}
                 onClick={() => {
@@ -316,7 +323,7 @@ export default function Sidebar() {
               />
               <NavLink
                 c="chatbox-secondary"
-                className="rounded"
+                className="rounded-lg"
                 label={t('Settings')}
                 leftSection={<ScalableIcon icon={IconSettingsFilled} size={20} />}
                 onClick={() => navigateToSettings()}
@@ -326,7 +333,7 @@ export default function Sidebar() {
               {!versionHook.isExceeded && (
                 <NavLink
                   c="chatbox-secondary"
-                  className="rounded"
+                  className="rounded-lg"
                   label={t('Help')}
                   leftSection={<ScalableIcon icon={IconHelpCircle} size={20} />}
                   onClick={() => navigate({ to: '/guide' })}
@@ -337,7 +344,7 @@ export default function Sidebar() {
               {FORCE_ENABLE_DEV_PAGES && (
                 <NavLink
                   c="chatbox-secondary"
-                  className="rounded"
+                  className="rounded-lg"
                   label="Dev Tools"
                   leftSection={<ScalableIcon icon={IconCode} size={20} />}
                   onClick={() => navigate({ to: '/dev' })}
@@ -387,7 +394,7 @@ function SidebarUpdateBannerInner() {
         gap="xs"
         px="sm"
         py={6}
-        className="rounded-md cursor-pointer bg-chatbox-background-brand-secondary"
+        className="rounded-lg cursor-pointer bg-chatbox-background-brand-secondary"
         onClick={installUpdate}
       >
         <ScalableIcon icon={IconDownload} size={16} className="text-chatbox-brand flex-shrink-0" />
@@ -423,7 +430,7 @@ function AboutNavLink({
   return (
     <NavLink
       c="chatbox-tertiary"
-      className="rounded"
+      className="rounded-lg"
       label={
         <Flex align="center" gap={6}>
           <span>{`${t('About')} ${/\d/.test(versionHook.version) ? `(${versionHook.version})` : ''}`}</span>

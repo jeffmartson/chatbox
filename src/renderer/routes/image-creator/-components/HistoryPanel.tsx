@@ -1,8 +1,9 @@
-import { ActionIcon, Box, Button, Flex, Skeleton, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Button, Flex, Skeleton, Stack, Text } from '@mantine/core'
 import type { ImageGeneration } from '@shared/types'
 import { IconChevronRight, IconClock, IconPlus } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { HistoryItem } from './HistoryItem'
 
 interface HistoryListFooterContext {

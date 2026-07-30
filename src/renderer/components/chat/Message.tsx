@@ -1,15 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
-import {
-  ActionIcon,
-  type ActionIconProps,
-  Button,
-  Flex,
-  Loader,
-  Modal,
-  Stack,
-  Text,
-  Tooltip as Tooltip1,
-} from '@mantine/core'
+import { ActionIcon, type ActionIconProps, Button, Flex, Loader, Modal, Stack, Text } from '@mantine/core'
 import { Box, Grid, useTheme } from '@mui/material'
 import { findMessageLocation } from '@shared/session/message-forks'
 import type {
@@ -23,7 +13,6 @@ import type {
 import { getMessageText } from '@shared/utils/message'
 import {
   IconArrowDown,
-  IconBug,
   IconChevronDown,
   IconClockHour3,
   IconCode,
@@ -59,6 +48,7 @@ import { trackJkClickEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import Markdown from '@/components/Markdown'
 import StreamingTextFade from '@/components/StreamingTextFade'
+import { AppTooltip as Tooltip1 } from '@/components/ui/tooltip'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { formatElapsedTime } from '@/hooks/useThinkingTimer'
 import { cn } from '@/lib/utils'
@@ -81,7 +71,6 @@ import {
 } from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import ActionMenu, { type ActionMenuItemProps } from '../ActionMenu'
-import { isContainRenderableCode, MessageArtifact } from '../Artifact'
 import { AssistantAvatar, SystemAvatar, UserAvatar } from '../common/Avatar'
 import { ScalableIcon } from '../common/ScalableIcon'
 import Loading from '../icons/Loading'
@@ -95,6 +84,7 @@ import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
 import { isMessageReminderPresentation, resolveMessageErrorPresentation } from './message-error-presentation'
+import { getMessageRoleClass } from './message-role-class'
 import { createMessageTimelineLayout } from './message-timeline'
 import { PictureGallery } from './PictureGallery'
 
@@ -175,22 +165,17 @@ const _Message: FC<Props> = (props) => {
   const userAvatarKey = useSettingsStore((state) => state.userAvatarKey)
   const showMessageTimestamp = useSettingsStore((state) => state.showMessageTimestamp)
   const showModelName = useSettingsStore((state) => state.showModelName)
-  const showTokenCount = useSettingsStore((state) => state.showTokenCount)
   const showWordCount = useSettingsStore((state) => state.showWordCount)
   const showTokenUsed = useSettingsStore((state) => state.showTokenUsed)
   const showFirstTokenLatency = useSettingsStore((state) => state.showFirstTokenLatency)
   const enableMarkdownRendering = useSettingsStore((state) => state.enableMarkdownRendering)
   const enableLaTeXRendering = useSettingsStore((state) => state.enableLaTeXRendering)
   const enableMermaidRendering = useSettingsStore((state) => state.enableMermaidRendering)
-  const autoPreviewArtifacts = useSettingsStore((state) => state.autoPreviewArtifacts)
-  const autoCollapseCodeBlock = useSettingsStore((state) => state.autoCollapseCodeBlock)
   const showAvatar = useSettingsStore((state) => state.showAvatar)
   const messageLayout = useSettingsStore((state) => state.messageLayout)
 
   const isBubbleLayout = messageLayout === 'bubble'
 
-  const [previewArtifact, setPreviewArtifact] = useState(autoPreviewArtifacts)
-  const [shouldThrowError, setShouldThrowError] = useState(false)
   const [retryChoiceOpened, setRetryChoiceOpened] = useState(false)
 
   const contentLength = useMemo(() => {
@@ -364,18 +349,9 @@ const _Message: FC<Props> = (props) => {
     await NiceModal.show('message-edit', { sessionId, msg: msg })
   }, [msg, sessionId])
 
-  // for testing: manual trigger error
-  const onTriggerError = useCallback(() => {
-    setShouldThrowError(true)
-  }, [])
-
   const onViewMessageJson = useCallback(async () => {
     await NiceModal.show('json-viewer', { title: t('Message Raw JSON'), data: msg })
   }, [msg, t])
-
-  if (shouldThrowError) {
-    throw new Error('Manual error triggered from Message component for testing ErrorBoundary')
-  }
 
   // Units like "tokens", "words", "tkn", "s" are intentionally kept as hardcoded English
   // because they are technical/universal abbreviations that remain readable across all locales.
@@ -399,9 +375,6 @@ const _Message: FC<Props> = (props) => {
           tooltip: t('First token latency') as string,
         })
     }
-    // if (showTokenCount && !msg.generating) {
-    //   if (msg.tokenCount) tips.push({ label: `${msg.tokenCount} tkn`, tooltip: t('Token count') as string })
-    // }
   } else if (props.sessionType === 'picture') {
     if (showModelName && props.msg.role === 'assistant') {
       tips.push({ label: props.msg.model || 'unknown', tooltip: t('Model') as string })
@@ -425,14 +398,6 @@ const _Message: FC<Props> = (props) => {
     }
     tips.push({ label: messageTimestamp })
   }
-
-  // 是否需要渲染 Aritfact 组件
-  const needArtifact = useMemo(() => {
-    if (msg.role !== 'assistant') {
-      return false
-    }
-    return isContainRenderableCode(getMessageText(msg))
-  }, [msg.contentParts, msg.role, msg])
 
   const trackWithSessionName = useCallback(
     async (event: string) => {
@@ -626,14 +591,8 @@ const _Message: FC<Props> = (props) => {
             },
           ]
         : []),
-      // 开发环境添加测试错误按钮
       ...(process.env.NODE_ENV === 'development'
         ? [
-            // {
-            //   text: 'Trigger Error (Test)',
-            //   icon: IconBug,
-            //   onClick: onTriggerError,
-            // },
             {
               text: t('View Message JSON'),
               icon: IconCode,
@@ -669,6 +628,11 @@ const _Message: FC<Props> = (props) => {
 
   const isUserBubble = isBubbleLayout && msg.role === 'user'
   const isErrorReminder = msg.error ? isMessageReminderPresentation(resolveMessageErrorPresentation(msg)) : false
+  const isClassicLayout = !isBubbleLayout
+  const isClassicMessage = isClassicLayout && (msg.role === 'assistant' || msg.role === 'user')
+  const isRightAlignedMessage = isUserBubble || (isClassicLayout && msg.role === 'user')
+  const messageRoleClass = getMessageRoleClass(msg.role)
+  const shouldShowAvatar = showAvatar ?? true
   const statusElements = <MessageStatuses statuses={leadingStatuses} />
   const errorTipsElement = (
     <MessageErrTips
@@ -683,10 +647,14 @@ const _Message: FC<Props> = (props) => {
     <>
       <div
         className={cn(
-          isBubbleLayout ? 'inline-block max-w-full' : msg.role === 'assistant' ? 'w-full' : 'inline-block',
+          isBubbleLayout
+            ? 'inline-block max-w-full min-w-0'
+            : msg.role === 'assistant'
+              ? 'w-full min-w-0'
+              : 'inline-block max-w-full min-w-0',
           isBubbleLayout
             ? cn(
-                'px-4 py-1 rounded-2xl',
+                'px-4 py-1 rounded-lg',
                 msg.role === 'user'
                   ? 'bg-[var(--mantine-color-chatbox-brand-filled)] text-white'
                   : msg.role === 'assistant'
@@ -792,7 +760,7 @@ const _Message: FC<Props> = (props) => {
                         className="min-w-0 flex-1"
                         wrap={{ base: 'wrap', sm: 'nowrap' }}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-chatbox-background-brand-secondary text-chatbox-tint-brand">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chatbox-background-brand-secondary text-chatbox-tint-brand">
                           <ScalableIcon icon={IconRobot} size={18} />
                         </div>
                         <Stack gap={2} className="min-w-0 flex-1">
@@ -839,7 +807,7 @@ const _Message: FC<Props> = (props) => {
                       />
                       {item.ocrResult && (
                         <div
-                          className="my-2 p-2 rounded-md cursor-pointer transition-colors"
+                          className="my-2 p-2 rounded-lg cursor-pointer transition-colors"
                           onClick={async (e) => {
                             e.stopPropagation()
                             await NiceModal.show('content-viewer', {
@@ -943,7 +911,7 @@ const _Message: FC<Props> = (props) => {
           <div
             className={cn(
               'inline-flex items-center gap-1.5 py-3',
-              isBubbleLayout ? 'px-1 rounded-2xl bg-chatbox-background-secondary' : 'px-4'
+              isBubbleLayout ? 'px-1 rounded-lg bg-chatbox-background-secondary' : 'px-4'
             )}
           >
             <Loading />
@@ -988,7 +956,7 @@ const _Message: FC<Props> = (props) => {
         gap={0}
         className={
           isSmallScreen
-            ? 'p-xxs bg-chatbox-background-primary rounded-md border-[0.5px] border-solid border-chatbox-border-primary shadow-sm'
+            ? 'p-xxs bg-chatbox-background-primary rounded-lg border-[0.5px] border-solid border-chatbox-border-primary shadow-sm'
             : ''
         }
       >
@@ -1024,14 +992,14 @@ const _Message: FC<Props> = (props) => {
       gap={2}
       mt={isBubbleLayout ? 4 : 2}
       className={cn(isBubbleLayout ? 'px-1' : '')}
-      align={isUserBubble ? 'flex-end' : 'flex-start'}
+      align={isRightAlignedMessage ? 'flex-end' : 'flex-start'}
     >
       {tipsElements && (
         <Flex
           align="center"
           gap={4}
           wrap="wrap"
-          justify={isUserBubble ? 'flex-end' : 'flex-start'}
+          justify={isRightAlignedMessage ? 'flex-end' : 'flex-start'}
           className="overflow-hidden"
         >
           {tipsElements}
@@ -1053,10 +1021,11 @@ const _Message: FC<Props> = (props) => {
         className={cn(
           'group/message',
           'msg-block',
+          'bubble-msg',
           'bubble-user-msg',
           'px-2 py-1.5',
           msg.generating ? 'rendering' : 'render-done',
-          'user-msg',
+          messageRoleClass,
           className,
           'w-full'
         )}
@@ -1068,18 +1037,70 @@ const _Message: FC<Props> = (props) => {
           },
         }}
       >
-        <Flex justify="flex-end" gap="xs" className="w-full">
-          <Flex direction="column" align="flex-end" className={cn('max-w-[85%]', isSmallScreen && 'max-w-[95%]')}>
+        <Flex justify="flex-end" gap="xs" className="w-full min-w-0">
+          <Flex
+            direction="column"
+            align="flex-end"
+            className={cn(
+              'min-w-0',
+              isSmallScreen ? (shouldShowAvatar ? 'max-w-[calc(100%-3rem)]' : 'max-w-[95%]') : 'max-w-[85%]'
+            )}
+          >
             {messageContent}
             {(msg.files || msg.links) && <MessageAttachmentGrid files={msg.files} links={msg.links} align="end" />}
             {meta}
             {actionButtons}
           </Flex>
-          {(showAvatar ?? true) && (
+          {shouldShowAvatar && (
             <Box className="mt-1 shrink-0">
               <UserAvatar avatarKey={userAvatarKey} onClick={() => navigateToSettings('/chat')} />
             </Box>
           )}
+        </Flex>
+      </Box>
+    )
+  }
+
+  if (isClassicMessage) {
+    return (
+      <Box
+        ref={ref}
+        id={props.id}
+        key={msg.id}
+        className={cn(
+          'group/message',
+          'msg-block',
+          'px-2 py-1.5',
+          msg.generating ? 'rendering' : 'render-done',
+          messageRoleClass,
+          className,
+          'w-full'
+        )}
+        sx={{
+          paddingBottom: '0.1rem',
+          paddingX: '1rem',
+          [theme.breakpoints.down('sm')]: {
+            paddingX: '0.3rem',
+          },
+        }}
+      >
+        <Flex justify={isRightAlignedMessage ? 'flex-end' : 'flex-start'} className="w-full min-w-0">
+          <Flex
+            direction="column"
+            align={isRightAlignedMessage ? 'flex-end' : 'flex-start'}
+            className={cn('min-w-0 max-w-[100%]', isSmallScreen && 'max-w-[95%]')}
+          >
+            {messageContent}
+            {(msg.files || msg.links) && (
+              <MessageAttachmentGrid
+                files={msg.files}
+                links={msg.links}
+                align={isRightAlignedMessage ? 'end' : 'start'}
+              />
+            )}
+            {meta}
+            {actionButtons}
+          </Flex>
         </Flex>
       </Box>
     )
@@ -1093,9 +1114,10 @@ const _Message: FC<Props> = (props) => {
       className={cn(
         'group/message',
         'msg-block',
+        isBubbleLayout ? 'bubble-msg' : '',
         'px-2 py-1.5',
         msg.generating ? 'rendering' : 'render-done',
-        { user: 'user-msg', system: 'system-msg', assistant: 'assistant-msg', tool: 'tool-msg' }[msg.role || 'user'],
+        messageRoleClass,
         className,
         'w-full'
       )}

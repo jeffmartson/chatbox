@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getDefaultInterfaceColors } from '../theme-colors'
 import { ModelProviderEnum, ModelProviderType } from './provider'
 import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES, SkillSettingsSchema } from './skills'
 
@@ -379,6 +380,21 @@ export enum Theme {
   System,
 }
 
+const HexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i)
+
+const InterfaceThemeColorsSchema = z.object({
+  backgroundPrimary: HexColorSchema,
+  backgroundSecondary: HexColorSchema,
+  backgroundTertiary: HexColorSchema,
+})
+
+const InterfaceColorsSchema = z
+  .object({
+    light: InterfaceThemeColorsSchema,
+    dark: InterfaceThemeColorsSchema,
+  })
+  .catch(getDefaultInterfaceColors())
+
 const DefaultModelSelectionSchema = z
   .object({
     provider: z.string(),
@@ -467,6 +483,7 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
   messageLayout: z.enum(['left', 'bubble']).optional().catch(undefined),
 
   theme: z.nativeEnum(Theme),
+  interfaceColors: InterfaceColorsSchema,
   language: z.enum([
     'en',
     'zh-Hans',

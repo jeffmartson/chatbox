@@ -12,6 +12,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
+import { getDefaultInterfaceColors, type InterfaceThemeColors } from '@shared/theme-colors'
 import { type Language, Theme } from '@shared/types'
 import { formatFileSize } from '@shared/utils'
 import { getBackupFilename } from '@shared/utils/backup'
@@ -21,6 +22,7 @@ import dayjs from 'dayjs'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AdaptiveSelect } from '@/components/AdaptiveSelect'
+import { InterfaceColorInput } from '@/components/common/InterfaceColorInput'
 import LazySlider from '@/components/common/LazySlider'
 import { languageNameMap, languages } from '@/i18n/locales'
 import {
@@ -39,6 +41,7 @@ import storage from '@/storage'
 import { getMetaStorage, recoverSessionList } from '@/stores/chatStore'
 import { migrateOnData } from '@/stores/migration'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useUIStore } from '@/stores/uiStore'
 
 export const Route = createFileRoute('/settings/general')({
   component: RouteComponent,
@@ -47,6 +50,22 @@ export const Route = createFileRoute('/settings/general')({
 export function RouteComponent() {
   const { t } = useTranslation()
   const { setSettings, ...settings } = useSettingsStore((state) => state)
+  const realTheme = useUIStore((state) => state.realTheme)
+  const currentInterfaceColors = (settings.interfaceColors ?? getDefaultInterfaceColors())[realTheme]
+
+  const setInterfaceColor = (key: keyof InterfaceThemeColors, value: string) => {
+    setSettings((draft) => {
+      draft.interfaceColors ??= getDefaultInterfaceColors()
+      draft.interfaceColors[realTheme][key] = value
+    })
+  }
+
+  const resetInterfaceColors = () => {
+    setSettings((draft) => {
+      draft.interfaceColors ??= getDefaultInterfaceColors()
+      draft.interfaceColors[realTheme] = getDefaultInterfaceColors()[realTheme]
+    })
+  }
 
   return (
     <Stack p="md" gap="xl">
@@ -105,6 +124,33 @@ export function RouteComponent() {
             }
           }}
         />
+
+        <Stack gap="xs" maw={320}>
+          <Flex align="center" justify="space-between">
+            <Text>{t('Interface Colors')}</Text>
+            <Text size="xs" c="chatbox-tertiary">
+              {realTheme === 'dark' ? t('Dark Mode') : t('Light Mode')}
+            </Text>
+          </Flex>
+          <InterfaceColorInput
+            label={t('Primary Background')}
+            value={currentInterfaceColors.backgroundPrimary}
+            onCommit={(value) => setInterfaceColor('backgroundPrimary', value)}
+          />
+          <InterfaceColorInput
+            label={t('Secondary Background')}
+            value={currentInterfaceColors.backgroundSecondary}
+            onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
+          />
+          <InterfaceColorInput
+            label={t('Tertiary Background')}
+            value={currentInterfaceColors.backgroundTertiary}
+            onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
+          />
+          <Button variant="subtle" size="compact-sm" onClick={resetInterfaceColors}>
+            {t('Reset Colors')}
+          </Button>
+        </Stack>
 
         {/* Font Size */}
         <Stack>

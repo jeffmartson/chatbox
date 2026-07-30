@@ -1,6 +1,7 @@
-import { ActionIcon, Tooltip } from '@mantine/core'
+import { ActionIcon } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
 import { forwardRef } from 'react'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { desktopActionIconProps, mobileActionIconProps } from './actionIconStyles'
 
 interface ImageUploadButtonProps {

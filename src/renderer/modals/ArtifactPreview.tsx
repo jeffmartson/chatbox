@@ -1,5 +1,5 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import { ActionIcon, Button, Flex, Loader, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, Flex, Loader, Stack, Text } from '@mantine/core'
 import {
   IconArrowsMaximize,
   IconArrowsMinimize,
@@ -15,6 +15,7 @@ import { Artifact } from '@/components/Artifact'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { Modal } from '@/components/layout/Overlay'
 import { inlineSandboxHtmlAssets } from '@/components/message-parts/html-artifact-assets'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import platform from '@/platform'
 import * as toastActions from '@/stores/toastActions'

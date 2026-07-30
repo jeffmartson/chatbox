@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, Divider, Flex, Group, Loader, Stack, Switch, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Button, Divider, Flex, Group, Loader, Stack, Switch, Text } from '@mantine/core'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import {
   IconCheck,
@@ -23,6 +23,7 @@ import {
   trackSmartSwitchingClick,
   trackWebSearchClick,
 } from '@/analytics/agent-mode'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useKnowledgeBases } from '@/hooks/knowledge-base'
 import { useMCPServerStatus, useToggleMCPServer } from '@/hooks/mcp'
 import { navigateToSettings } from '@/modals/Settings'
@@ -898,7 +899,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               justify="space-between"
               align="center"
               gap="sm"
-              className="rounded-md bg-chatbox-background-secondary px-2 py-1.5"
+              className="rounded-lg bg-chatbox-background-secondary px-2 py-1.5"
             >
               <Stack gap={0} className="min-w-0">
                 <Text size="xs" fw={500} c="chatbox-primary">

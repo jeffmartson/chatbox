@@ -1,22 +1,10 @@
-import {
-  Anchor,
-  Badge,
-  Button,
-  Group,
-  Kbd,
-  Paper,
-  Radio,
-  Stack,
-  Text,
-  Textarea,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
+import { Anchor, Badge, Button, Group, Kbd, Paper, Radio, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import pTimeout from 'p-timeout'
 import { type FC, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@/components/layout/Overlay'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { MCPServer } from '@/packages/mcp/controller'
 import type { MCPServerConfig } from '@/packages/mcp/types'
 import { trackEvent } from '@/utils/track'

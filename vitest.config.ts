@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
@@ -8,6 +9,14 @@ export default defineConfig(({ mode }) => {
   const isModelProviderRun = process.env.RUN_MODEL_PROVIDER_TESTS === '1'
 
   return {
+    plugins: [
+      TanStackRouterVite({
+        target: 'react',
+        autoCodeSplitting: true,
+        routesDirectory: './src/renderer/routes',
+        generatedRouteTree: './src/renderer/routeTree.gen.ts',
+      }),
+    ],
     test: {
       globals: true,
       environment: 'node',

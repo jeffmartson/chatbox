@@ -2,8 +2,8 @@
 
 import NiceModal from '@ebay/nice-modal-react'
 import { MantineProvider } from '@mantine/core'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor } from '@/test-utils'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

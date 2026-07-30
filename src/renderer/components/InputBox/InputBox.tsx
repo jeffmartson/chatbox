@@ -1,5 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Box, Button, Flex, Loader, Menu, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Box, Button, Flex, Loader, Menu, Stack, Text, Textarea, UnstyledButton } from '@mantine/core'
 import { useViewportSize } from '@mantine/hooks'
 import {
   getFileAcceptConfig,
@@ -38,6 +38,7 @@ import { useTranslation } from 'react-i18next'
 import { v4 as uuidv4 } from 'uuid'
 import { createModelDependencies } from '@/adapters'
 import { JK_PAGE_NAMES } from '@/analytics/jk-events'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import useInputBoxHistory from '@/hooks/useInputBoxHistory'
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase'
 import { useProviders } from '@/hooks/useProviders'
@@ -67,7 +68,6 @@ import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useSessionAgentMode } from '@/stores/session/agent-mode'
 import { settingsStore, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
-import { delay } from '@/utils'
 import { trackEvent } from '@/utils/track'
 import {
   type KnowledgeBase,
@@ -725,20 +725,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       [currentSessionId, isNewSession]
     )
 
-    const [showSelectModelErrorTip, setShowSelectModelErrorTip] = useState(false)
-    useEffect(() => {
-      if (showSelectModelErrorTip) {
-        const clickEventListener = () => {
-          setShowSelectModelErrorTip(false)
-          document.removeEventListener('click', clickEventListener)
-        }
-        document.addEventListener('click', clickEventListener)
-        return () => {
-          document.removeEventListener('click', clickEventListener)
-        }
-      }
-    }, [showSelectModelErrorTip])
-
     const [showRollbackThreadButton, setShowRollbackThreadButton] = useState(false)
     useEffect(() => {
       if (showRollbackThreadButton) {
@@ -775,7 +761,6 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     getNextHistoryInputRef.current = getNextHistoryInput
     const insertFilesRef = useRef<(files: File[]) => void>(() => {})
 
-    const closeSelectModelErrorTipCb = useRef<NodeJS.Timeout>()
     const handleSubmit = async (needGenerating = true, options: SubmitOptions = {}) => {
       if (
         disableSubmit ||
@@ -789,15 +774,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         return
       }
 
-      // 未选择模型时 显示error tip
       if (!model) {
-        // 如果不延时执行，会导致error tip 立即消失
-        await delay(100)
-        if (closeSelectModelErrorTipCb.current) {
-          clearTimeout(closeSelectModelErrorTipCb.current)
-        }
-        setShowSelectModelErrorTip(true)
-        closeSelectModelErrorTipCb.current = setTimeout(() => setShowSelectModelErrorTip(false), 5000)
         return
       }
 
@@ -1320,7 +1297,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       return (
         <Box pt={0} pb={isSmallScreen ? 'md' : 'sm'} px="sm" id={dom.InputBoxID}>
           <Stack
-            className={cn('rounded-2xl bg-chatbox-background-secondary', widthFull ? 'w-full' : 'max-w-4xl mx-auto')}
+            className={cn(
+              'rounded-lg bg-chatbox-background-secondary shadow-[0_8px_48px_-8px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_48px_-8px_rgba(0,0,0,0.5)]',
+              widthFull ? 'w-full' : 'max-w-4xl mx-auto'
+            )}
             gap="xs"
             p="md"
             align="center"
@@ -1343,14 +1323,14 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
           {currentSessionId && <CompactionStatus sessionId={currentSessionId} />}
           <Stack
             className={cn(
-              'relative rounded-md bg-chatbox-background-secondary justify-between px-3 py-2',
+              'relative rounded-lg bg-chatbox-background-secondary justify-between px-3 py-2 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.3)]',
               !isSmallScreen && 'min-h-[92px]'
             )}
-            style={{ border: '1px solid var(--chatbox-border-primary)' }}
+            style={{ border: '0.5px solid var(--chatbox-border-primary)' }}
             gap="xs"
           >
             {skillCommandQuery !== null && matchingInputSkills.length > 0 && !isAwaitingToolApproval && (
-              <Box className="absolute left-3 right-12 bottom-[52px] z-20 max-h-52 overflow-y-auto rounded-md border border-solid border-chatbox-border-primary bg-chatbox-background-primary py-1 shadow-lg">
+              <Box className="absolute left-3 right-12 bottom-[52px] z-20 max-h-52 overflow-y-auto rounded-lg border border-solid border-chatbox-border-primary bg-chatbox-background-primary py-1 shadow-lg">
                 {matchingInputSkills.map((skill, index) => (
                   <UnstyledButton
                     key={skill.name}
@@ -1416,7 +1396,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 size={32}
                 variant="filled"
                 color={generating ? 'dark' : 'chatbox-brand'}
-                radius="xl"
+                radius="lg"
                 onClick={generating ? onStopGenerating : () => handleSubmit()}
                 className={cn(
                   'shrink-0 mb-1',
@@ -1464,7 +1444,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     aria-live="polite"
                     align="center"
                     gap={8}
-                    className="w-full rounded-md px-2.5 py-2 mb-1"
+                    className="w-full rounded-lg px-2.5 py-2 mb-1"
                     style={{
                       border: '1px solid var(--chatbox-border-primary)',
                       borderLeft: '3px solid var(--chatbox-tint-warning)',
@@ -1495,7 +1475,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                     aria-live="polite"
                     align="center"
                     gap={8}
-                    className="w-full rounded-md px-2.5 py-2 mb-1"
+                    className="w-full rounded-lg px-2.5 py-2 mb-1"
                     style={{
                       border: '1px solid var(--chatbox-border-primary)',
                       borderLeft: '3px solid var(--chatbox-tint-warning)',
@@ -1819,54 +1799,40 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
                 {/* Model Selector */}
                 <Box className="min-w-0 flex-1 justify-end max-w-[200px]">
-                  <Tooltip
-                    label={
-                      <Flex align="center" c="white" gap="xxs" min-w-0>
-                        <ScalableIcon icon={IconAlertCircle} size={12} className="text-inherit" />
-                        <Text span size="xxs" c="white">
-                          {t('Please select a model')}
-                        </Text>
-                      </Flex>
-                    }
-                    color="dark"
-                    opened={showSelectModelErrorTip}
-                    withArrow
+                  <ModelSelectorV2
+                    onSelect={onSelectModel}
+                    selectedProviderId={model?.provider}
+                    selectedModelId={model?.modelId}
+                    modelDisabledCheck={modelDisabledCheck}
+                    pageName={JK_PAGE_NAMES.CHAT_PAGE}
+                    position="top-end"
+                    transitionProps={{
+                      transition: 'fade-up',
+                      duration: 200,
+                    }}
                   >
-                    <ModelSelectorV2
-                      onSelect={onSelectModel}
-                      selectedProviderId={model?.provider}
-                      selectedModelId={model?.modelId}
-                      modelDisabledCheck={modelDisabledCheck}
-                      pageName={JK_PAGE_NAMES.CHAT_PAGE}
-                      position="top-end"
-                      transitionProps={{
-                        transition: 'fade-up',
-                        duration: 200,
-                      }}
+                    <UnstyledButton
+                      className={cn(
+                        'flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors',
+                        !model && 'animate-pulse bg-blue-500/20'
+                      )}
                     >
-                      <UnstyledButton
+                      {!!model && <ProviderImageIcon size={18} provider={model.provider} />}
+                      <Text
+                        size="sm"
                         className={cn(
-                          'flex min-w-0 max-w-full items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors',
-                          !model && 'animate-pulse bg-blue-500/20'
+                          'min-w-0 flex-1 truncate text-[var(--chatbox-tint-secondary)]',
+                          isSmallScreen ? 'max-w-[100px]' : 'max-w-[160px]'
                         )}
                       >
-                        {!!model && <ProviderImageIcon size={18} provider={model.provider} />}
-                        <Text
-                          size="sm"
-                          className={cn(
-                            'min-w-0 flex-1 truncate text-[var(--chatbox-tint-secondary)]',
-                            isSmallScreen ? 'max-w-[100px]' : 'max-w-[160px]'
-                          )}
-                        >
-                          {modelSelectorDisplayText}
-                        </Text>
-                        <IconChevronRight
-                          size={14}
-                          className="text-[var(--chatbox-tint-tertiary)] rotate-90 flex-shrink-0"
-                        />
-                      </UnstyledButton>
-                    </ModelSelectorV2>
-                  </Tooltip>
+                        {modelSelectorDisplayText}
+                      </Text>
+                      <IconChevronRight
+                        size={14}
+                        className="text-[var(--chatbox-tint-tertiary)] rotate-90 flex-shrink-0"
+                      />
+                    </UnstyledButton>
+                  </ModelSelectorV2>
                 </Box>
               </Flex>
             </Flex>

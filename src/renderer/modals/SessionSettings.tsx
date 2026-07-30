@@ -1,18 +1,5 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import {
-  ActionIcon,
-  Box,
-  Button,
-  FileButton,
-  Flex,
-  Input,
-  Slider,
-  Stack,
-  Switch,
-  Text,
-  Textarea,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Box, Button, FileButton, Flex, Input, Slider, Stack, Switch, Text, Textarea } from '@mantine/core'
 import { chatSessionSettings, pictureSessionSettings } from '@shared/defaults'
 import {
   createMessage,
@@ -43,6 +30,7 @@ import SliderWithInput from '@/components/common/SliderWithInput'
 import { handleImageInputAndSave, ImageInStorage } from '@/components/Image'
 import ImageStyleSelect from '@/components/ImageStyleSelect'
 import { resolveReasoningModelInfo } from '@/components/InputBox/useReasoningControlState'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { trackingEvent } from '@/packages/event'
@@ -202,7 +190,7 @@ const SessionSettingsModal = NiceModal.create(
                       <ActionIcon
                         color="chatbox-error"
                         size={24}
-                        radius="xl"
+                        radius="lg"
                         bottom={0}
                         right={0}
                         className="absolute"
@@ -255,7 +243,7 @@ const SessionSettingsModal = NiceModal.create(
                 </Button>
               </Flex>
 
-              <Box p="sm" className="border border-solid border-chatbox-border-primary rounded-md">
+              <Box p="sm" className="border border-solid border-chatbox-border-primary rounded-lg">
                 {isChatSession(session) && (
                   <ChatConfig
                     settings={editingData.settings}
@@ -286,7 +274,7 @@ const SessionSettingsModal = NiceModal.create(
                 align="center"
                 gap="sm"
                 wrap="wrap"
-                className="p-sm border border-solid border-chatbox-border-primary rounded-md"
+                className="p-sm border border-solid border-chatbox-border-primary rounded-lg"
               >
                 <Flex align="center" gap="xxs">
                   <Text>{t('Background Image')}</Text>
@@ -338,7 +326,7 @@ const SessionSettingsModal = NiceModal.create(
                     <ActionIcon
                       color="chatbox-error"
                       size={20}
-                      radius={10}
+                      radius="lg"
                       bottom={3}
                       right={3}
                       className="absolute"
@@ -446,7 +434,6 @@ function ReasoningControlConfig({
           maw={320}
           className="!whitespace-normal"
           zIndex={3000}
-          events={{ hover: true, focus: true, touch: true }}
         >
           <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
         </Tooltip>
@@ -494,7 +481,6 @@ export function ChatConfig({
             maw={320}
             className="!whitespace-normal"
             zIndex={3000}
-            events={{ hover: true, focus: true, touch: true }}
           >
             <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
           </Tooltip>
@@ -516,7 +502,6 @@ export function ChatConfig({
             maw={320}
             className="!whitespace-normal"
             zIndex={3000}
-            events={{ hover: true, focus: true, touch: true }}
           >
             <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
           </Tooltip>
@@ -538,7 +523,6 @@ export function ChatConfig({
             maw={320}
             className="!whitespace-normal"
             zIndex={3000}
-            events={{ hover: true, focus: true, touch: true }}
           >
             <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
           </Tooltip>

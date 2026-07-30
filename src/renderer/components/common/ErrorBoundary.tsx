@@ -86,7 +86,7 @@ function DefaultErrorFallback({ error, retry }: DefaultErrorFallbackProps) {
         <div className="space-y-3">
           <button
             onClick={retry}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors"
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Try Again
           </button>
@@ -96,21 +96,21 @@ function DefaultErrorFallback({ error, retry }: DefaultErrorFallbackProps) {
               retry()
               router.navigate({ to: '/', replace: true })
             }}
-            className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
+            className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Reload App
           </button>
 
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="w-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-4 py-2 rounded-md transition-colors text-sm"
+            className="w-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-4 py-2 rounded-lg transition-colors text-sm"
           >
             {showDetails ? 'Hide Error' : 'Show Error'}
           </button>
         </div>
 
         {showDetails && (
-          <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-md text-left">
+          <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-left">
             <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
               {error && (
                 <div>

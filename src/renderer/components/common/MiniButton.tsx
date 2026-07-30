@@ -1,6 +1,6 @@
 import type React from 'react'
 import { forwardRef } from 'react'
-import { Tooltip } from '@mantine/core'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 interface MiniButtonProps {

@@ -1,4 +1,4 @@
-import { ActionIcon, Flex, Image, Paper, Skeleton, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Flex, Image, Paper, Skeleton, Text } from '@mantine/core'
 import { IconDownload, IconMaximize, IconMessageReport, IconPhoto, IconPhotoOff } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import type PhotoSwipe from 'photoswipe'
@@ -6,6 +6,7 @@ import type { UIElementData } from 'photoswipe'
 import { memo, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gallery, Item as GalleryItem } from 'react-photoswipe-gallery'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useFetchBlob } from '@/hooks/useBlob'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import platform from '@/platform'
@@ -267,7 +268,7 @@ function GeneratedImageGalleryItem({
                 color="red"
                 variant="white"
                 size="sm"
-                radius="xl"
+                radius="lg"
                 onClick={handleReport}
                 className="absolute right-3 bottom-3 z-[1] !bg-white/70 !text-red-500 shadow-sm opacity-65 transition-opacity hover:opacity-100 pointer-events-auto"
               >
@@ -289,7 +290,7 @@ function GeneratedImageGalleryItem({
               <ActionIcon
                 variant="white"
                 size="lg"
-                radius="xl"
+                radius="lg"
                 onClick={open}
                 className="shadow-lg hover:scale-105 transition-transform pointer-events-auto"
               >
@@ -301,7 +302,7 @@ function GeneratedImageGalleryItem({
               <ActionIcon
                 variant="white"
                 size="lg"
-                radius="xl"
+                radius="lg"
                 onClick={handleUseRef}
                 className="shadow-lg hover:scale-105 transition-transform pointer-events-auto"
               >
@@ -313,7 +314,7 @@ function GeneratedImageGalleryItem({
               <ActionIcon
                 variant="white"
                 size="lg"
-                radius="xl"
+                radius="lg"
                 onClick={handleDownload}
                 className="shadow-lg hover:scale-105 transition-transform pointer-events-auto"
               >

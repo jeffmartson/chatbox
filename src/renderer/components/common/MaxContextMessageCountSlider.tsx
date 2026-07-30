@@ -1,7 +1,8 @@
-import { Flex, Slider, Stack, type StackProps, Text, TextInput, type TextProps, Tooltip } from '@mantine/core'
+import { Flex, Slider, Stack, type StackProps, Text, TextInput, type TextProps } from '@mantine/core'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { type ChangeEvent, type KeyboardEvent, useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { ScalableIcon } from '../common/ScalableIcon'
 
 export function toBeRemoved_getContextMessageCount(
@@ -97,7 +98,6 @@ export default function MaxContextMessageCountSlider({ value, onChange, classNam
           maw={320}
           className="!whitespace-normal"
           zIndex={3000}
-          events={{ hover: true, focus: true, touch: true }}
         >
           <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
         </Tooltip>

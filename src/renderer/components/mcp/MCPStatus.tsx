@@ -1,7 +1,7 @@
+import type { FC } from 'react'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { MCPServerStatus } from '@/packages/mcp/types'
-import { Tooltip } from '@mantine/core'
-import type { FC } from 'react'
 
 const MCPStatus: FC<{ status: MCPServerStatus | null }> = ({ status }) => {
   if (status?.error) {

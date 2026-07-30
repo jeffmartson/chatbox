@@ -1,17 +1,4 @@
-import {
-  ActionIcon,
-  Badge,
-  Box,
-  Button,
-  Flex,
-  Loader,
-  Paper,
-  SimpleGrid,
-  Switch,
-  Text,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Badge, Box, Button, Flex, Loader, Paper, SimpleGrid, Switch, Text, TextInput } from '@mantine/core'
 import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES, type SkillInfo } from '@shared/types/skills'
 import {
   IconBrandGithub,
@@ -29,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import ActionMenu, { type ActionMenuItemProps } from '@/components/ActionMenu'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useSkillTranslation } from '@/hooks/useSkillTranslation'
 import { notifySkillsChanged, skillsController } from '@/packages/skills/controller'
 import { toastError } from '@/packages/toast'
@@ -48,7 +36,7 @@ const SkillCard: FC<{
   return (
     <Paper
       shadow="xs"
-      radius="md"
+      radius="lg"
       withBorder
       p="sm"
       className="transition-all duration-150 hover:shadow-md"
@@ -92,14 +80,7 @@ const SkillCard: FC<{
         </Flex>
       </Flex>
 
-      <Tooltip
-        label={skill.description}
-        multiline
-        withArrow
-        w={420}
-        openDelay={400}
-        events={{ hover: true, focus: true, touch: true }}
-      >
+      <Tooltip label={skill.description} multiline withArrow w={420} openDelay={400}>
         <Text size="xs" mt={8} c="chatbox-tertiary" lineClamp={2} className="cursor-help leading-relaxed">
           {skill.description}
         </Text>
@@ -108,11 +89,11 @@ const SkillCard: FC<{
       {(skill.source?.repo || (skill.source?.type && skill.source.type !== 'local')) && (
         <Flex mt={8} gap={6} wrap="wrap">
           {skill.source?.repo ? (
-            <Badge size="xs" variant="light" color="gray" radius="sm">
+            <Badge size="xs" variant="light" color="gray" radius="lg">
               {skill.source.repo}
             </Badge>
           ) : skill.source?.type && skill.source.type !== 'local' ? (
-            <Badge size="xs" variant="light" color="gray" radius="sm">
+            <Badge size="xs" variant="light" color="gray" radius="lg">
               {skill.source.type}
             </Badge>
           ) : null}
@@ -140,7 +121,7 @@ const SectionHeader: FC<{
         </Text>
       )}
       {count != null && (
-        <Badge size="xs" variant="light" color="gray" radius="sm">
+        <Badge size="xs" variant="light" color="gray" radius="lg">
           {count}
         </Badge>
       )}
@@ -157,7 +138,7 @@ const EmptyState: FC<{ onAddClick: () => void; onOpenFolder: () => void }> = ({ 
   const { t } = useTranslation()
 
   return (
-    <Paper radius="md" p="xl" className="border border-dashed border-chatbox-border-primary">
+    <Paper radius="lg" p="xl" className="border border-dashed border-chatbox-border-primary">
       <Flex direction="column" align="center" gap={12} py="md">
         <Box className="rounded-full p-3 bg-chatbox-background-gray-secondary">
           <ScalableIcon icon={IconWand} size={24} className="text-chatbox-tint-tertiary" />
@@ -453,7 +434,7 @@ export const SkillsSection: FC = () => {
       </Flex>
 
       {showGithubInput && (
-        <Paper radius="md" withBorder p="sm" mb="lg" className="bg-chatbox-background-gray-secondary/30">
+        <Paper radius="lg" withBorder p="sm" mb="lg" className="bg-chatbox-background-gray-secondary/30">
           <Flex align="center" gap={8} mb={8}>
             <ScalableIcon icon={IconBrandGithub} size={16} className="text-chatbox-tint-tertiary" />
             <Text size="xs" fw={500}>

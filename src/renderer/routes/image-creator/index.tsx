@@ -159,7 +159,7 @@ function InputToolbar({
                 <IconChevronRight size={14} className="text-[var(--chatbox-tint-tertiary)] rotate-90" />
               </UnstyledButton>
             </Menu.Target>
-            <Menu.Dropdown className="!rounded-2xl" style={{ minWidth: 100 }}>
+            <Menu.Dropdown className="!rounded-lg" style={{ minWidth: 100 }}>
               {ratioOptions.map((ratio) => (
                 <Menu.Item key={ratio} onClick={() => onRatioSelect(ratio)} className="!rounded-lg">
                   <Text size="sm" fw={500} ta="center">
@@ -545,7 +545,7 @@ function ImageCreatorPage() {
   ) : (
     <UnstyledButton
       onClick={() => setShowHistory(!showHistory)}
-      className={`controls flex items-center gap-1.5 px-3 py-1.5 rounded-sm ${showHistory ? 'bg-[var(--chatbox-background-tertiary)]' : 'bg-[var(--chatbox-background-secondary)]'}`}
+      className={`controls flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${showHistory ? 'bg-[var(--chatbox-background-tertiary)]' : 'bg-[var(--chatbox-background-secondary)]'}`}
     >
       <IconHistory size={18} className="text-[var(--chatbox-tint-secondary)]" />
       <Text size="sm" className="text-[var(--chatbox-tint-secondary)]">
@@ -629,7 +629,7 @@ function ImageCreatorPage() {
               />
 
               <Box
-                className="rounded-md bg-[var(--chatbox-background-secondary)] px-3 py-2"
+                className="rounded-lg bg-[var(--chatbox-background-secondary)] px-3 py-2"
                 style={{ border: '1px solid var(--chatbox-border-primary)' }}
               >
                 <Stack gap="xs">
@@ -669,7 +669,7 @@ function ImageCreatorPage() {
                       size={32}
                       variant="filled"
                       color={isCurrentlyGenerating ? 'dark' : 'chatbox-brand'}
-                      radius="xl"
+                      radius="lg"
                       onClick={isCurrentlyGenerating ? cancelGeneration : handleSubmit}
                       disabled={(!prompt.trim() || !selectedModel) && !isCurrentlyGenerating}
                       className={`shrink-0 mb-1 ${(!prompt.trim() || !selectedModel) && !isCurrentlyGenerating ? 'disabled:!opacity-100 !text-white' : ''}`}

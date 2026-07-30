@@ -1,4 +1,4 @@
-import { Box, Button, FileButton, Flex, Slider, Stack, Switch, Text, Textarea, Title, Tooltip } from '@mantine/core'
+import { Box, Button, FileButton, Flex, Slider, Stack, Switch, Text, Textarea, Title } from '@mantine/core'
 import { chatSessionSettings, getDefaultPrompt } from '@shared/defaults'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
@@ -11,6 +11,7 @@ import { MessageLayoutSelector } from '@/components/common/MessageLayoutPreview'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import SliderWithInput from '@/components/common/SliderWithInput'
 import { handleImageInputAndSave, ImageInStorage } from '@/components/Image'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import storage from '@/storage'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -178,7 +179,6 @@ export function RouteComponent() {
               maw={320}
               className="!whitespace-normal"
               zIndex={3000}
-              events={{ hover: true, focus: true, touch: true }}
             >
               <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
             </Tooltip>
@@ -199,7 +199,6 @@ export function RouteComponent() {
               maw={320}
               className="!whitespace-normal"
               zIndex={3000}
-              events={{ hover: true, focus: true, touch: true }}
             >
               <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
             </Tooltip>
@@ -491,7 +490,6 @@ function ContextManagementSection() {
               maw={320}
               className="!whitespace-normal"
               zIndex={3000}
-              events={{ hover: true, focus: true, touch: true }}
             >
               <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
             </Tooltip>
@@ -522,7 +520,6 @@ function ContextManagementSection() {
             maw={320}
             className="!whitespace-normal"
             zIndex={3000}
-            events={{ hover: true, focus: true, touch: true }}
           >
             <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
           </Tooltip>

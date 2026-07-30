@@ -23,7 +23,7 @@ import * as latex from '../packages/latex'
 import { isRenderableCodeLanguage } from './Artifact'
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Flex, Loader, Stack, Text, Tooltip, useComputedColorScheme } from '@mantine/core'
+import { ActionIcon, Flex, Loader, Stack, Text, useComputedColorScheme } from '@mantine/core'
 import {
   IconBrandCpp,
   IconBrandCSharp,
@@ -58,6 +58,7 @@ import {
 } from '@tabler/icons-react'
 import clsx from 'clsx'
 import { visit } from 'unist-util-visit'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useCopied } from '@/hooks/useCopied'
 import { highlight, highlightSync, type ShikiTheme } from '../packages/shiki'
 import { ScalableIcon } from './common/ScalableIcon'
@@ -95,6 +96,7 @@ function Markdown(props: {
   sessionId?: string
   enableLaTeXRendering?: boolean
   enableMermaidRendering?: boolean
+  hiddenCodeActions?: boolean
   hiddenCodeCopyButton?: boolean
   className?: string
   generating?: boolean
@@ -108,6 +110,7 @@ function Markdown(props: {
     sessionId,
     enableLaTeXRendering = true,
     enableMermaidRendering = true,
+    hiddenCodeActions,
     hiddenCodeCopyButton,
     className,
     generating,
@@ -152,6 +155,7 @@ function Markdown(props: {
                   {...props}
                   uniqueId={uniqueId ? `${uniqueId}-code-${codeIndex}` : undefined}
                   sessionId={sessionId}
+                  hiddenCodeActions={hiddenCodeActions}
                   hiddenCodeCopyButton={hiddenCodeCopyButton}
                   enableMermaidRendering={enableMermaidRendering}
                   generating={generating && generatingCodeIndex === codeIndex}
@@ -176,6 +180,7 @@ function Markdown(props: {
           [
             uniqueId,
             sessionId,
+            hiddenCodeActions,
             hiddenCodeCopyButton,
             enableMermaidRendering,
             generating,
@@ -253,6 +258,7 @@ export const CodeRenderer = memo(
     className?: string
     uniqueId?: string
     sessionId?: string
+    hiddenCodeActions?: boolean
     hiddenCodeCopyButton?: boolean
     generating?: boolean
     enableMermaidRendering?: boolean
@@ -264,6 +270,7 @@ export const CodeRenderer = memo(
     const {
       children,
       className,
+      hiddenCodeActions,
       hiddenCodeCopyButton,
       generating,
       enableMermaidRendering,
@@ -284,6 +291,7 @@ export const CodeRenderer = memo(
         <BlockCode
           uniqueId={props.uniqueId}
           sessionId={props.sessionId}
+          hiddenCodeActions={hiddenCodeActions}
           hiddenCodeCopyButton={hiddenCodeCopyButton}
           language={language}
           generating={generating}
@@ -307,12 +315,7 @@ export const CodeRenderer = memo(
 const InlineCode = memo((props: { children: string; className?: string }) => {
   const { children, className } = props
   return (
-    <code
-      className={clsx(
-        'bg-chatbox-background-secondary border border-solid border-chatbox-border-secondary rounded-sm px-1 py-0.5 mx-1',
-        className
-      )}
-    >
+    <code className={clsx('bg-chatbox-background-secondary text-[0.85em] rounded-sm px-1 py-0.5 mx-0.5', className)}>
       {children}
     </code>
   )
@@ -411,6 +414,7 @@ type BlockCodeProps = {
   children: string
   uniqueId?: string
   sessionId?: string
+  hiddenCodeActions?: boolean
   hiddenCodeCopyButton?: boolean
   generating?: boolean
   forceColorScheme?: 'light' | 'dark'
@@ -478,7 +482,7 @@ const ShikiCodeBlock = memo(({ code, language, theme }: { code: string; language
   const html = useShikiHtml(code, language, theme)
   const lineNumberStyle = useMemo(() => {
     const lines = code.split('\n').length
-    const lineNumberWidth = `${Math.max(1, lines).toString().length}em`
+    const lineNumberWidth = `${Math.max(1, lines).toString().length - 0.5}em`
     return {
       '--shiki-line-number-width': lineNumberWidth,
     } as CSSProperties
@@ -486,7 +490,7 @@ const ShikiCodeBlock = memo(({ code, language, theme }: { code: string; language
 
   if (!html) {
     return (
-      <div className="shiki-code-wrapper shiki-code-fallback" style={lineNumberStyle}>
+      <div className="shiki-code-wrapper shiki-code-fallback max-w-full min-w-0 text-xs" style={lineNumberStyle}>
         <pre>
           <code>{code}</code>
         </pre>
@@ -496,7 +500,7 @@ const ShikiCodeBlock = memo(({ code, language, theme }: { code: string; language
 
   return (
     <div
-      className="shiki-code-wrapper"
+      className="shiki-code-wrapper max-w-full min-w-0 text-xs"
       style={lineNumberStyle}
       // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki generates safe HTML from code tokenization
       dangerouslySetInnerHTML={{ __html: html }}
@@ -509,6 +513,7 @@ const BlockCode = memo(
     children,
     uniqueId,
     sessionId,
+    hiddenCodeActions,
     hiddenCodeCopyButton,
     language,
     generating,
@@ -578,11 +583,14 @@ const BlockCode = memo(
     }
 
     return (
-      <Stack gap={0}>
+      <Stack
+        gap={0}
+        className="code-block-container w-full max-w-full min-w-0 bg-chatbox-background-secondary rounded-md overflow-hidden"
+      >
         <Flex
           justify="space-between"
           className={clsx(
-            'p-xs bg-chatbox-background-secondary rounded-t-md border border-solid border-[var(--chatbox-border-primary)] select-none',
+            'code-block-header px-xs pl-sm pt-xs pb-0 bg-chatbox-background-secondary select-none',
             !needCollapse || !collapsed ? 'sticky top-0 z-10' : ''
           )}
         >
@@ -590,62 +598,64 @@ const BlockCode = memo(
             {generating ? (
               <Loader size={10} />
             ) : (
-              <ScalableIcon size={16} icon={icon} color="var(--chatbox-tint-tertiary)" />
+              <ScalableIcon size={14} icon={icon} color="var(--chatbox-tint-tertiary)" />
             )}
-            <Text span c="chatbox-tertiary" fw="600" className="font-mono">
+            <Text span c="chatbox-tertiary" fw="500" className="font-mono text-xs">
               {languageName}
             </Text>
           </Flex>
 
-          <Flex gap="xs" align="center">
-            {!hiddenCodeCopyButton && (
-              <Tooltip label={t('copy')} withArrow openDelay={1000}>
-                <ActionIcon
-                  variant="transparent"
-                  color={copied ? 'chatbox-success' : 'chatbox-tertiary'}
-                  size={20}
-                  onClick={onClickCopy}
-                >
-                  {copied ? <IconCheck /> : <IconCopy />}
-                </ActionIcon>
-              </Tooltip>
-            )}
+          {!hiddenCodeActions && (
+            <Flex gap="xs" align="center">
+              {!hiddenCodeCopyButton && (
+                <Tooltip label={t('copy')} withArrow openDelay={1000}>
+                  <ActionIcon
+                    variant="transparent"
+                    color={copied ? 'chatbox-success' : 'chatbox-tertiary'}
+                    size={18}
+                    onClick={onClickCopy}
+                  >
+                    {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
 
-            {isRenderableCode && (
-              <Tooltip label={t('Preview')} withArrow openDelay={1000}>
-                <ActionIcon variant="transparent" color="chatbox-tertiary" size={20} onClick={onClickArtifact}>
-                  <IconPlayerPlayFilled />
-                </ActionIcon>
-              </Tooltip>
-            )}
+              {isRenderableCode && (
+                <Tooltip label={t('Preview')} withArrow openDelay={1000}>
+                  <ActionIcon variant="transparent" color="chatbox-tertiary" size={18} onClick={onClickArtifact}>
+                    <IconPlayerPlayFilled size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
 
-            {canDeploy && (
-              <Tooltip label={t('Publish Webpage')} withArrow openDelay={1000}>
-                <ActionIcon variant="transparent" color="chatbox-tertiary" size={20} onClick={onClickDeploy}>
-                  <IconWorldUpload />
-                </ActionIcon>
-              </Tooltip>
-            )}
+              {canDeploy && (
+                <Tooltip label={t('Publish Webpage')} withArrow openDelay={1000}>
+                  <ActionIcon variant="transparent" color="chatbox-tertiary" size={18} onClick={onClickDeploy}>
+                    <IconWorldUpload size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
 
-            {needCollapse && (
-              <Tooltip label={collapsed ? t('Expand') : t('Collapse')} withArrow openDelay={1000}>
-                <ActionIcon
-                  variant="transparent"
-                  color="chatbox-tertiary"
-                  size={20}
-                  onClick={onClickCollapse}
-                  className={clsx('transition-transform ease-linear', !collapsed ? 'rotate-90' : '')}
-                >
-                  <IconChevronRight />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </Flex>
+              {needCollapse && (
+                <Tooltip label={collapsed ? t('Expand') : t('Collapse')} withArrow openDelay={1000}>
+                  <ActionIcon
+                    variant="transparent"
+                    color="chatbox-tertiary"
+                    size={18}
+                    onClick={onClickCollapse}
+                    className={clsx('transition-transform ease-linear', !collapsed ? 'rotate-90' : '')}
+                  >
+                    <IconChevronRight size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </Flex>
+          )}
         </Flex>
 
         <Stack
           className={clsx(
-            'border border-t-0 border-solid border-[var(--chatbox-border-primary)] rounded-b-md',
+            'max-w-full min-w-0',
             needCollapse && collapsed && generating ? 'h-[10rem] overflow-hidden justify-end' : '',
             needCollapse && collapsed && !generating ? 'h-[10rem] overflow-auto' : ''
           )}

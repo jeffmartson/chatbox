@@ -51,7 +51,7 @@
 
   --chatbox-background-primary: #ffffff;
   --chatbox-background-primary-hover: #f8f9fa;
-  --chatbox-background-secondary: #f1f3f5;
+  --chatbox-background-secondary: #f3f3f3;
   --chatbox-background-secondary-hover: #e9ecef;
   --chatbox-background-tertiary: #dee2e6;
   --chatbox-background-tertiary-hover: #ced4da;
@@ -84,6 +84,27 @@
 
   --chatbox-background-mask-overlay: rgb(59, 59, 59, 0.64);
   --chatbox-background-mask-lighten: rgb(255, 255, 255, 0.76);
+
+  /* shadcn semantic colors */
+  --background: var(--chatbox-background-primary);
+  --foreground: var(--chatbox-tint-primary);
+  --card: var(--chatbox-background-primary);
+  --card-foreground: var(--chatbox-tint-primary);
+  --popover: var(--chatbox-background-primary);
+  --popover-foreground: var(--chatbox-tint-primary);
+  --primary: var(--chatbox-tint-primary);
+  --primary-foreground: var(--chatbox-background-primary);
+  --secondary: var(--chatbox-background-secondary);
+  --secondary-foreground: var(--chatbox-tint-primary);
+  --muted: var(--chatbox-background-secondary);
+  --muted-foreground: var(--chatbox-tint-tertiary);
+  --accent: var(--chatbox-background-secondary);
+  --accent-foreground: var(--chatbox-tint-primary);
+  --destructive: var(--chatbox-tint-error);
+  --destructive-foreground: var(--chatbox-tint-white);
+  --border: var(--chatbox-border-primary);
+  --input: var(--chatbox-border-primary);
+  --ring: var(--chatbox-tint-brand);
 }
 
 :root[data-mantine-color-scheme="dark"] {

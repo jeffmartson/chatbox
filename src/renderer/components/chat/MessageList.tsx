@@ -521,7 +521,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
                     <div
                       className="flex flex-col pt-5"
                       style={
-                        messageViewportHeight > 0 && isNewMessage
+                        messageViewportHeight > 0 && isNewMessage && isLastItem
                           ? { minHeight: `${messageViewportHeight}px` }
                           : undefined
                       } // key
@@ -631,7 +631,7 @@ function ForkNav(props: { sessionId: string; msgId: string; forks: NonNullable<S
       <ActionIcon
         variant="subtle"
         size={20}
-        radius="xl"
+        radius="lg"
         color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
         onClick={() => void switchFork(sessionId, msgId, 'prev')}
       >
@@ -663,7 +663,7 @@ function ForkNav(props: { sessionId: string; msgId: string; forks: NonNullable<S
       <ActionIcon
         variant="subtle"
         size={20}
-        radius="xl"
+        radius="lg"
         color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
         onClick={() => switchFork(sessionId, msgId, 'next')}
       >

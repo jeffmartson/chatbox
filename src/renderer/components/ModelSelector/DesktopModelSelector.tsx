@@ -212,7 +212,7 @@ export const DesktopModelSelector = forwardRef<HTMLDivElement, DesktopModelSelec
           )}
         </Combobox.Target>
 
-        <Combobox.Dropdown className="!p-0 overflow-hidden rounded-md">
+        <Combobox.Dropdown className="!p-0 overflow-hidden rounded-lg">
           {searchPosition === 'top' && (
             <div className="sticky top-0 z-10" style={{ borderBottom: '1px solid var(--chatbox-border-primary)' }}>
               <SearchBox

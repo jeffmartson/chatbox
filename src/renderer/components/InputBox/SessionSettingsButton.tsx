@@ -1,6 +1,7 @@
-import { ActionIcon, Tooltip } from '@mantine/core'
+import { ActionIcon } from '@mantine/core'
 import { IconAdjustmentsHorizontal } from '@tabler/icons-react'
 import { forwardRef } from 'react'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { desktopActionIconProps, mobileActionIconProps } from './actionIconStyles'
 

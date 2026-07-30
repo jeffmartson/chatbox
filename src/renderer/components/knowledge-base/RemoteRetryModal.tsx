@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Group, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { Alert, Button, Flex, Group, ScrollArea, Stack, Text } from '@mantine/core'
 import {
   KNOWLEDGE_BASE_MAX_PARSED_CONTENT_SIZE_LABEL,
   KNOWLEDGE_BASE_PARSED_CONTENT_TOO_LARGE_ERROR,
@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Modal } from '@/components/layout/Overlay'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { toastError } from '@/packages/toast'
 import platform from '@/platform'
 
@@ -142,7 +143,7 @@ export function RemoteRetryModal({ opened, onClose, failedFiles, onSuccess }: Re
                   justify="space-between"
                   align="center"
                   p="xs"
-                  className="rounded"
+                  className="rounded-lg"
                   bg="var(--mantine-color-gray-0)"
                 >
                   <Flex gap="sm" align="center" style={{ flex: 1, minWidth: 0 }}>

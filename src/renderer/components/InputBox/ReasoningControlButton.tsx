@@ -1,4 +1,4 @@
-import { Menu, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { Menu, Text, UnstyledButton } from '@mantine/core'
 import type { ProviderModelInfo, ProviderOptions } from '@shared/types'
 import {
   getReasoningControlCapabilities,
@@ -11,6 +11,7 @@ import {
 import { IconBrain, IconCircleOff, IconSparkles } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 
 interface ReasoningControlButtonProps {
   provider?: string

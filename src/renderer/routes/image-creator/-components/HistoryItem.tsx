@@ -107,7 +107,7 @@ export function HistoryItem({ record, isActive, isMobile, modelDisplayName, onCl
             position="left"
             withArrow
             shadow="md"
-            radius="md"
+            radius="lg"
           >
             <Popover.Target>
               <ActionIcon

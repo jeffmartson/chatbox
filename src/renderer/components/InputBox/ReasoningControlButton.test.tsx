@@ -2,8 +2,8 @@
 
 import { MantineProvider } from '@mantine/core'
 import { ModelProviderEnum, type ProviderModelInfo, type ProviderOptions } from '@shared/types'
-import { render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
+import { render, screen } from '@/test-utils'
 import ReasoningControlButton from './ReasoningControlButton'
 
 Object.defineProperty(window, 'matchMedia', {

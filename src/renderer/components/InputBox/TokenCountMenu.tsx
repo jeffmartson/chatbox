@@ -1,8 +1,9 @@
-import { Flex, Loader, Menu, Switch, Text, Tooltip } from '@mantine/core'
+import { Flex, Loader, Menu, Switch, Text } from '@mantine/core'
 import { formatNumber } from '@shared/utils'
 import { IconFileZip } from '@tabler/icons-react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { ScalableIcon } from '../common/ScalableIcon'
 

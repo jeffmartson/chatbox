@@ -139,7 +139,7 @@ const ContextualActionMenu: FC<ActionMenuProps> = ({
       offset={offset}
       withinPortal={withinPortal}
       shadow="md"
-      radius="sm"
+      radius="lg"
     >
       <Popover.Target>{children}</Popover.Target>
       <Popover.Dropdown
@@ -169,7 +169,7 @@ const ContextualActionMenu: FC<ActionMenuProps> = ({
                 type="button"
                 onClick={handleItemClick(item.onClick)}
                 disabled={item.disabled}
-                className="flex w-full items-center gap-2 rounded-xs border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
+                className="flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
               >
                 {item.icon && <ScalableIcon icon={item.icon} size={15} />}
                 <Text
@@ -233,7 +233,7 @@ const ContextualDoubleCheckMenuItem: FC<{
     <button
       type="button"
       disabled={confirming || item.disabled}
-      className="flex w-full items-center gap-2 rounded-xs border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
+      className="flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
       onClick={async (event) => {
         event.stopPropagation()
         if (!showConfirm) {

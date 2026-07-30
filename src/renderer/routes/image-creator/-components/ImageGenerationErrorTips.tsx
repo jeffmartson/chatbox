@@ -1,9 +1,10 @@
-import { ActionIcon, Button, Flex, Paper, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, Flex, Paper, Text } from '@mantine/core'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import type { ImageGeneration } from '@shared/types'
 import { IconCheck, IconCopy, IconRefresh, IconSettings, IconX } from '@tabler/icons-react'
 import { Trans, useTranslation } from 'react-i18next'
 import LinkTargetBlank from '@/components/common/Link'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { useCopied } from '@/hooks/useCopied'
 import { navigateToSettings } from '@/modals/Settings'
 import { trackingEvent } from '@/packages/event'
@@ -147,7 +148,7 @@ export function ImageGenerationErrorTips({ record, onRetry, isRetrying }: ImageG
               color="gray"
               leftSection={<IconSettings size={16} />}
               onClick={() => navigateToSettings()}
-              radius="md"
+              radius="lg"
             >
               {t('Settings')}
             </Button>
@@ -159,7 +160,7 @@ export function ImageGenerationErrorTips({ record, onRetry, isRetrying }: ImageG
             onClick={onRetry}
             disabled={isRetrying}
             loading={isRetrying}
-            radius="md"
+            radius="lg"
           >
             {t('Retry')}
           </Button>

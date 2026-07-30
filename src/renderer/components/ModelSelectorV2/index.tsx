@@ -374,7 +374,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
                 { label: t('Favorite'), value: 'favorite' },
               ]}
               fullWidth
-              radius="sm"
+              radius="lg"
               size="sm"
               styles={{
                 root: {

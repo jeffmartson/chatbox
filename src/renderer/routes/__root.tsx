@@ -22,7 +22,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
   useMantineColorScheme,
 } from '@mantine/core'
 import { Box, Grid } from '@mui/material'
@@ -35,6 +34,7 @@ import { useSetAtom } from 'jotai'
 import { useEffect, useMemo, useRef } from 'react'
 import { trackJkViewEvent } from '@/analytics/jk'
 import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
+import { AppProviders } from '@/components/AppProviders'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import Toasts from '@/components/common/Toasts'
 import DesktopDownloadReminder from '@/components/layout/DesktopDownloadReminder'
@@ -310,9 +310,16 @@ function Root() {
       <Grid container className="h-full relative z-[1]">
         <Sidebar />
         <Box
-          className="h-full w-full"
+          className="h-full w-full box-border"
           sx={{
             flexGrow: 1,
+            transition: (theme) =>
+              theme.transitions.create('padding', {
+                easing: showSidebar ? theme.transitions.easing.easeOut : theme.transitions.easing.sharp,
+                duration: showSidebar
+                  ? theme.transitions.duration.enteringScreen
+                  : theme.transitions.duration.leavingScreen,
+              }),
             ...(showSidebar
               ? language === 'ar'
                 ? { paddingRight: { sm: `${sidebarWidth}px` } }
@@ -320,9 +327,31 @@ function Root() {
               : {}),
           }}
         >
-          <ErrorBoundary name="main">
-            <Outlet />
-          </ErrorBoundary>
+          <Box
+            className="h-full box-border"
+            sx={{
+              padding: { xs: 0, sm: showSidebar ? '10px 10px 10px 0' : '5px' },
+              transition: (theme) =>
+                theme.transitions.create('padding', {
+                  easing: showSidebar ? theme.transitions.easing.easeOut : theme.transitions.easing.sharp,
+                  duration: showSidebar
+                    ? theme.transitions.duration.enteringScreen
+                    : theme.transitions.duration.leavingScreen,
+                }),
+            }}
+          >
+            <Box
+              className="h-full overflow-hidden bg-chatbox-background-primary border-[0.5px] border-solid border-chatbox-border-primary"
+              sx={{
+                borderRadius: { xs: 0, sm: '16px' },
+                boxShadow: { xs: 'none', sm: '0 0 22px rgba(0, 0, 0, 0.11)' },
+              }}
+            >
+              <ErrorBoundary name="main">
+                <Outlet />
+              </ErrorBoundary>
+            </Box>
+          </Box>
         </Box>
       </Grid>
       {/* 对话设置 */}
@@ -362,6 +391,7 @@ const creteMantineTheme = (scale = 1) =>
   createTheme({
     /** Put your mantine theme override here */
     scale,
+    defaultRadius: 'lg',
     primaryColor: 'chatbox-brand',
     colors: {
       'chatbox-brand': colorsTuple(Array.from({ length: 10 }, () => 'var(--chatbox-tint-brand)')),
@@ -565,6 +595,7 @@ const creteMantineTheme = (scale = 1) =>
           },
           overlay: {
             '--overlay-bg': 'var(--chatbox-background-mask-overlay)',
+            '--overlay-filter': 'blur(4px)',
           },
         }),
       }),
@@ -604,11 +635,6 @@ const creteMantineTheme = (scale = 1) =>
           },
         }),
       }),
-      Tooltip: Tooltip.extend({
-        defaultProps: {
-          zIndex: 3000,
-        },
-      }),
       Popover: Popover.extend({
         defaultProps: {
           zIndex: 3000,
@@ -642,14 +668,16 @@ export const Route = createRootRoute({
         theme={mantineTheme}
         defaultColorScheme={_theme === Theme.Dark ? 'dark' : _theme === Theme.Light ? 'light' : 'auto'}
       >
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <NiceModal.Provider>
-            <ErrorBoundary>
-              <Root />
-            </ErrorBoundary>
-          </NiceModal.Provider>
-        </ThemeProvider>
+        <AppProviders>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <NiceModal.Provider>
+              <ErrorBoundary>
+                <Root />
+              </ErrorBoundary>
+            </NiceModal.Provider>
+          </ThemeProvider>
+        </AppProviders>
       </MantineProvider>
     )
   },

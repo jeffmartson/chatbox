@@ -173,7 +173,7 @@ function QuotaCard({ icon, ...rest }: QuotaCardProps) {
 
   return (
     <div
-      className="h-full rounded-md p-lg"
+      className="h-full rounded-lg p-lg"
       style={{
         backgroundColor:
           'color-mix(in srgb, var(--chatbox-background-secondary) 68%, var(--chatbox-background-primary))',
@@ -203,7 +203,7 @@ interface InfoPanelProps {
 function InfoPanel({ title, value, valueColor }: InfoPanelProps) {
   return (
     <div
-      className="rounded-md p-lg"
+      className="rounded-lg p-lg"
       style={{
         backgroundColor:
           'color-mix(in srgb, var(--chatbox-background-secondary) 68%, var(--chatbox-background-primary))',

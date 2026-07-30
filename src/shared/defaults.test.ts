@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { chatSessionSettings, getDefaultPrompt, newConfigs, pictureSessionSettings, settings } from './defaults'
-import { ModelProviderEnum, type SessionSettings, type Settings, Theme } from './types'
+import { DEFAULT_INTERFACE_COLORS } from './theme-colors'
+import { ModelProviderEnum, type SessionSettings, type Settings, SettingsSchema, Theme } from './types'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -12,6 +13,7 @@ describe('defaults', () => {
     expect(result.language).toBe('en')
     expect(result.fontSize).toBe(14)
     expect(result.spellCheck).toBe(true)
+    expect(result.interfaceColors).toEqual(DEFAULT_INTERFACE_COLORS)
     expect(result.showWordCount).toBe(false)
     expect(result.showTokenCount).toBe(false)
     expect(result.showTokenUsed).toBe(true)
@@ -20,6 +22,12 @@ describe('defaults', () => {
 
   it('settings() returns allowReportingAndTracking as true', () => {
     expect(settings().allowReportingAndTracking).toBe(true)
+  })
+
+  it('uses default interface colors for legacy settings', () => {
+    const legacySettings = { ...settings(), interfaceColors: undefined }
+
+    expect(SettingsSchema.parse(legacySettings).interfaceColors).toEqual(DEFAULT_INTERFACE_COLORS)
   })
 
   it('settings() returns enableMarkdownRendering as true', () => {

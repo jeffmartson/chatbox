@@ -466,7 +466,7 @@ const SkillsSpotlight: FC<{
       const conflicting = getConflictingSkill(entry)
       if (conflicting) {
         return (
-          <Badge size="xs" variant="light" color="orange" radius="sm">
+          <Badge size="xs" variant="light" color="orange" radius="lg">
             <Flex align="center" gap={4}>
               <ScalableIcon icon={IconReplace} size={10} />
               {t('Replace {{source}}', { source: conflicting.source?.repo ?? '?' })}

@@ -1,11 +1,12 @@
-import { ActionIcon, Button, Flex, Group, Loader, Stack, Text, Title, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, Flex, Group, Loader, Stack, Text, Title } from '@mantine/core'
+import type { SessionMetaRecord } from '@shared/types'
 import { IconArchiveOff, IconTrash } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
-import type { SessionMetaRecord } from '@shared/types'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AssistantAvatar } from '@/components/common/Avatar'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { confirmSessionDeletion, deleteSession, restoreSession, useArchivedSessionList } from '@/stores/chatStore'
 
 export const Route = createFileRoute('/settings/archive')({

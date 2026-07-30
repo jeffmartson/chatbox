@@ -141,7 +141,7 @@ const CopilotSettingsModal = NiceModal.create(
       >
         <Stack
           gap="md"
-          className="max-h-[70vh] overflow-y-auto border border-solid border-chatbox-border-primary rounded-md p-sm"
+          className="max-h-[70vh] overflow-y-auto border border-solid border-chatbox-border-primary rounded-lg p-sm"
         >
           {/* Title */}
           <TextInput
@@ -173,7 +173,7 @@ const CopilotSettingsModal = NiceModal.create(
                     src={formData.avatar?.type === 'url' ? formData.avatar.url : formData.picUrl || ''}
                     alt={formData.name}
                     size={48}
-                    radius="xl"
+                    radius="lg"
                     className="flex-shrink-0 border border-solid border-chatbox-border-primary"
                   >
                     {formData.avatar?.type === 'storage-key' ? (
@@ -191,7 +191,7 @@ const CopilotSettingsModal = NiceModal.create(
                     h={48}
                     align="center"
                     justify="center"
-                    className="rounded-md bg-chatbox-background-brand-secondary"
+                    className="rounded-lg bg-chatbox-background-brand-secondary"
                   >
                     <ScalableIcon icon={IconMessageCircle2Filled} size={28} className="text-chatbox-tint-brand" />
                   </Stack>
@@ -226,7 +226,7 @@ const CopilotSettingsModal = NiceModal.create(
                   <Avatar
                     src={formData.backgroundImage?.type === 'url' ? formData.backgroundImage.url : ''}
                     size={48}
-                    radius="md"
+                    radius="lg"
                     className="flex-shrink-0 border border-solid border-chatbox-border-primary"
                   >
                     {formData.backgroundImage?.type === 'storage-key' && (
@@ -242,7 +242,7 @@ const CopilotSettingsModal = NiceModal.create(
                     h={48}
                     align="center"
                     justify="center"
-                    className="rounded-md bg-chatbox-background-secondary border border-dashed border-chatbox-border-primary"
+                    className="rounded-lg bg-chatbox-background-secondary border border-dashed border-chatbox-border-primary"
                   >
                     <ScalableIcon icon={IconPhoto} size={20} className="text-chatbox-tint-tertiary" />
                   </Stack>

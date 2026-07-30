@@ -24,7 +24,7 @@ export function ChatboxWelcomeCard(props: { mode: HomeWelcomeCardMode; pageName:
 
   return (
     <Paper
-      radius="md"
+      radius="lg"
       withBorder
       py="md"
       px="sm"

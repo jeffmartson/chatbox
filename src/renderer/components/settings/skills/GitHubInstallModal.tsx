@@ -162,7 +162,7 @@ export const GitHubInstallModal: FC<GitHubInstallModalProps> = ({
           const statusError = installStatuses[skill.path]?.error
 
           return (
-            <Paper key={skill.path} withBorder radius="md" p="sm">
+            <Paper key={skill.path} withBorder radius="lg" p="sm">
               <Flex align="flex-start" justify="space-between" gap="sm">
                 <Checkbox
                   style={{ flex: '1 1 0', minWidth: 0 }}

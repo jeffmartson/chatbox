@@ -1,9 +1,10 @@
-import { Badge, Combobox, Flex, Text, Tooltip } from '@mantine/core'
+import { Badge, Combobox, Flex, Text } from '@mantine/core'
 import type { ProviderModelInfo } from '@shared/types'
 import { IconBulb, IconEye, IconStar, IconStarFilled, IconTool } from '@tabler/icons-react'
 import clsx from 'clsx'
 import type { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { ModelIcon } from '../icons/ModelIcon'
 
@@ -13,7 +14,7 @@ export const SELECTED_BG_CLASS = '!bg-chatbox-background-brand-secondary'
 const WithDisabledTooltip = ({ reason, children }: { reason?: string; children: ReactElement }) => {
   if (!reason) return children
   return (
-    <Tooltip label={reason} position="right" withArrow events={{ hover: true, focus: true, touch: true }}>
+    <Tooltip label={reason} position="right" withArrow>
       {children}
     </Tooltip>
   )
@@ -99,21 +100,21 @@ export const ModelItem = ({
       )}
 
       {model.capabilities?.includes('reasoning') && (
-        <Tooltip label={t('Reasoning')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Reasoning')}>
           <Text span c="chatbox-warning" className="flex items-center ml-xxs" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconBulb} size={14} />
           </Text>
         </Tooltip>
       )}
       {model.capabilities?.includes('vision') && (
-        <Tooltip label={t('Vision')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Vision')}>
           <Text span c="chatbox-brand" className="flex items-center ml-xxs" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconEye} size={14} />
           </Text>
         </Tooltip>
       )}
       {model.capabilities?.includes('tool_use') && (
-        <Tooltip label={t('Tool Use')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Tool Use')}>
           <Text span c="chatbox-success" className="flex items-center ml-xxs" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconTool} size={14} />
           </Text>
@@ -181,7 +182,7 @@ export const ModelItemInDrawer = ({
       py="xs"
       c={isRecommended ? 'chatbox-brand' : 'chatbox-secondary'}
       className={clsx(
-        'outline-none rounded-md border-0',
+        'outline-none rounded-lg border-0',
         isDisabled && 'opacity-50 cursor-not-allowed',
         isSelected
           ? SELECTED_BG_CLASS
@@ -213,21 +214,21 @@ export const ModelItemInDrawer = ({
       )}
 
       {model.capabilities?.includes('reasoning') && (
-        <Tooltip label={t('Reasoning')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Reasoning')}>
           <Text span c="chatbox-warning" className="flex items-center" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconBulb} size={14} />
           </Text>
         </Tooltip>
       )}
       {model.capabilities?.includes('vision') && (
-        <Tooltip label={t('Vision')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Vision')}>
           <Text span c="chatbox-brand" className="flex items-center" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconEye} size={14} />
           </Text>
         </Tooltip>
       )}
       {model.capabilities?.includes('tool_use') && (
-        <Tooltip label={t('Tool Use')} events={{ hover: true, focus: true, touch: true }}>
+        <Tooltip label={t('Tool Use')}>
           <Text span c="chatbox-success" className="flex items-center" style={{ opacity: 0.7 }}>
             <ScalableIcon icon={IconTool} size={14} />
           </Text>

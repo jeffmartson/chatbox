@@ -186,7 +186,7 @@ export const MobileModelSelector = forwardRef<HTMLDivElement, MobileModelSelecto
                         px="sm"
                         py="xs"
                         className={clsx(
-                          'rounded-md outline-none',
+                          'rounded-lg outline-none',
                           !selectedProviderId && !selectedModelId
                             ? SELECTED_BG_CLASS
                             : 'bg-transparent active:bg-chatbox-background-brand-secondary-hover'

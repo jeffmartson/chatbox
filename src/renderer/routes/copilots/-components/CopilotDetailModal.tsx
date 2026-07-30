@@ -128,7 +128,7 @@ export function CopilotDetailModal({ opened, onClose, type, copilot, onUse }: Co
                 src={avatar?.type === 'storage-key' ? '' : avatar?.url || picUrl}
                 alt={name}
                 size={48}
-                radius="xl"
+                radius="lg"
                 className="flex-shrink-0 border border-solid border-chatbox-border-primary"
               >
                 {avatar?.type === 'storage-key' ? (
@@ -198,7 +198,7 @@ export function CopilotDetailModal({ opened, onClose, type, copilot, onUse }: Co
               <Text size="sm" c="chatbox-secondary">
                 {t('Prompt Content')}
               </Text>
-              <ScrollArea.Autosize mah="40vh" className="rounded-sm border border-solid border-chatbox-border-primary ">
+              <ScrollArea.Autosize mah="40vh" className="rounded-lg border border-solid border-chatbox-border-primary ">
                 <Text size="sm" c="chatbox-primary" p="xs" className="whitespace-pre-wrap">
                   {prompt}
                 </Text>
@@ -230,7 +230,7 @@ export function CopilotDetailModal({ opened, onClose, type, copilot, onUse }: Co
                         key={key}
                         source={screenshot}
                         alt={name}
-                        className="h-[120px] w-[120px] rounded-sm border border-solid border-chatbox-border-primary object-cover"
+                        className="h-[120px] w-[120px] rounded-lg border border-solid border-chatbox-border-primary object-cover"
                       />
                     )
                   })}

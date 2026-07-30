@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
-import { render } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
+import { render } from '@/test-utils'
 import { getSidebarModalSx } from './sidebar-drawer'
 
 describe('sidebar drawer modal', () => {

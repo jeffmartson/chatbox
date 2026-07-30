@@ -13,7 +13,7 @@ const ServerCard: FC<{
   accessible: boolean
 }> = (props) => {
   return (
-    <Paper shadow="xs" radius="md" withBorder p="sm">
+    <Paper shadow="xs" radius="lg" withBorder p="sm">
       <Flex justify="space-between" align="center">
         <Text size="sm" fw={600}>
           {props.config.name}

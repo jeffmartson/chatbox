@@ -15,12 +15,12 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { IconDatabase, IconEye, IconFile, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdaptiveModal } from '@/components/common/AdaptiveModal'
+import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
 import storage from '@/storage'
 
 export const Route = createFileRoute('/dev/storage')({

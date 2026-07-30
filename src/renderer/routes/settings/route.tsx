@@ -182,7 +182,7 @@ export function SettingsRoot() {
                 c={item.key === key ? 'chatbox-brand' : 'chatbox-secondary'}
                 bg={item.key === key ? 'var(--chatbox-background-brand-secondary)' : 'transparent'}
                 className={clsx(
-                  ' cursor-pointer select-none rounded-md',
+                  ' cursor-pointer select-none rounded-lg',
                   item.key === key ? '' : 'hover:!bg-chatbox-background-gray-secondary'
                 )}
               >
@@ -219,7 +219,7 @@ export function SettingsRoot() {
                 py="sm"
                 align="center"
                 c={'chatbox-secondary'}
-                className={clsx(' cursor-pointer select-none rounded-md')}
+                className={clsx(' cursor-pointer select-none rounded-lg')}
               >
                 <Box component="span" flex="0 0 auto" w={20} h={20} mr="xs">
                   <ScalableIcon icon={IconInfoCircle} size={20} />

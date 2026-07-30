@@ -381,9 +381,9 @@ function MediaAndGenerationFixture() {
     <SettingsSurface title="Image controls" description="Actual image display and image generation controls.">
       <Stack gap="md">
         <Group align="center">
-          <Img src={storyImage} className="rounded-md w-40 h-28 object-cover" />
-          <ImageInStorage storageKey="story-image-key" className="rounded-md w-40 h-28 object-cover" />
-          <ImageInStorage storageKey="missing-story-image-key" className="rounded-md w-40 h-28" />
+          <Img src={storyImage} className="rounded-lg w-40 h-28 object-cover" />
+          <ImageInStorage storageKey="story-image-key" className="rounded-lg w-40 h-28 object-cover" />
+          <ImageInStorage storageKey="missing-story-image-key" className="rounded-lg w-40 h-28" />
         </Group>
         <ImageCountSlider value={count} onChange={setCount} />
         <Group align="end">
@@ -402,7 +402,7 @@ function MediaAndGenerationFixture() {
             opened
             onSelect={() => undefined}
           >
-            <span className="inline-flex rounded-md bg-chatbox-background-brand-secondary px-3 py-2 text-sm font-medium text-chatbox-tint-brand">
+            <span className="inline-flex rounded-lg bg-chatbox-background-brand-secondary px-3 py-2 text-sm font-medium text-chatbox-tint-brand">
               Select image model
             </span>
           </ImageModelSelect>
@@ -538,7 +538,7 @@ function CommandAndDialogFixture() {
         title="Command and dialog primitives"
         description="Actual command palette and Radix dialog primitives used by app overlays."
       />
-      <Command className="border border-solid border-chatbox-border-primary rounded-md max-w-md">
+      <Command className="border border-solid border-chatbox-border-primary rounded-lg max-w-md">
         <CommandInput placeholder="Search commands..." />
         <CommandList>
           <CommandEmpty>No command found.</CommandEmpty>

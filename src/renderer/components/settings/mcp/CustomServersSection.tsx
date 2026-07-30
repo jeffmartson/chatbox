@@ -25,7 +25,7 @@ const ServerCard: FC<{
   const { t } = useTranslation()
   const { config, triggerEdit, onEnabledChange } = props
   return (
-    <Paper shadow="xs" radius="md" withBorder p="sm">
+    <Paper shadow="xs" radius="lg" withBorder p="sm">
       <Flex justify="space-between" align="center">
         <Text size="sm" fw={600}>
           {config.name}
@@ -146,7 +146,7 @@ const CustomServersSection: FC<Props> = (props) => {
         <Paper
           tabIndex={-1}
           shadow="xs"
-          radius="md"
+          radius="lg"
           withBorder
           bd="1px dashed var(--chatbox-border-primary)"
           p="sm"

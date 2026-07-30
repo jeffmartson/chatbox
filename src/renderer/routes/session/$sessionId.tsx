@@ -13,6 +13,7 @@ import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
 import Header from '@/components/layout/Header'
 import Page from '@/components/layout/Page'
 import ThreadHistoryDrawer from '@/components/session/ThreadHistoryDrawer'
+import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { useProviders } from '@/hooks/useProviders'
 import useVersion from '@/hooks/useVersion'
 import { defaultSessionsForCN, defaultSessionsForEN } from '@/packages/initial_data'
@@ -50,6 +51,7 @@ function RouteComponent() {
   const isLoggedIn = useAuthInfoStore((s) => Boolean(s.accessToken && s.refreshToken))
   const { isExceeded, isExceededResolved } = useVersion()
   const widthFull = useUIStore((s) => s.widthFull)
+  const isSmallScreen = useIsSmallScreen()
   const setLastUsedChatModel = useStore(lastUsedModelStore, (state) => state.setChatModel)
   const setLastUsedPictureModel = useStore(lastUsedModelStore, (state) => state.setPictureModel)
   const welcomeCardMode = useMemo(
@@ -222,11 +224,16 @@ function RouteComponent() {
   }, [currentSessionWithDefaultModel?.settings?.provider, currentSessionWithDefaultModel?.settings?.modelId])
 
   return currentSession ? (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${!isSmallScreen ? 'relative' : ''}`}>
       <Header session={currentSession} />
 
       {/* MessageList 设置 key，确保每个 session 对应新的 MessageList 实例 */}
-      <MessageList ref={messageListRef} key={`message-list${currentSessionId}`} currentSession={currentSession} />
+      <MessageList
+        ref={messageListRef}
+        key={`message-list${currentSessionId}`}
+        currentSession={currentSession}
+        className={!isSmallScreen ? 'pt-[2px]' : undefined}
+      />
 
       <Box className="relative">
         {shouldShowTemplateWelcomeCard && (

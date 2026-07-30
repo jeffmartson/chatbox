@@ -85,11 +85,14 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
         <Button
           h={28}
           px="xs"
-          radius="sm"
+          radius="lg"
           variant="outline"
           color="chatbox-tertiary"
           leftSection={<ScalableIcon icon={IconSearch} size={16} strokeWidth={1.8} />}
           className="border-chatbox-border-primary"
+          classNames={{
+            label: 'px-1',
+          }}
           onClick={() => setOpenSearchDialog(true)}
         >
           {t('Search')}...
@@ -100,37 +103,26 @@ export default function Toolbar({ sessionId }: { sessionId: string }) {
         </ActionIcon>
       )}
 
-      {isLargeScreen && (
-        <ActionIcon variant="subtle" size={28} color="chatbox-secondary" onClick={() => setWidthFull(!widthFull)}>
-          {widthFull ? <LayoutExpand strokeWidth={1.8} /> : <LayoutShrink strokeWidth={1.8} />}
-        </ActionIcon>
-      )}
-
-      <ActionIcon variant="subtle" size={28} color="chatbox-secondary" onClick={() => setThreadHistoryDrawerOpen(true)}>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="lucide lucide-table-of-contents-icon lucide-table-of-contents"
-        >
-          <path d="M16 5H3" />
-          <path d="M16 12H3" />
-          <path d="M16 19H3" />
-          <path d="M21 5h.01" />
-          <path d="M21 12h.01" />
-          <path d="M21 19h.01" />
-        </svg>
-      </ActionIcon>
-
       <ActionMenu
         position="bottom-end"
         items={[
+          ...(isLargeScreen
+            ? [
+                {
+                  text: widthFull ? t('Standard Width') : t('Full Width'),
+                  icon: widthFull ? LayoutExpand : LayoutShrink,
+                  onClick: () => setWidthFull(!widthFull),
+                },
+              ]
+            : []),
+          {
+            text: t('Thread History'),
+            icon: IconHistory,
+            onClick: () => setThreadHistoryDrawerOpen(true),
+          },
+          {
+            divider: true,
+          },
           {
             text: t('Duplicate Conversation'),
             icon: IconCopy,

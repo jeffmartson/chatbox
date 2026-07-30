@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react'
 import type React from 'react'
 import { describe, expect, test, vi } from 'vitest'
+import { render } from '@/test-utils'
 
 globalThis.ResizeObserver = class ResizeObserver {
   observe() {}
