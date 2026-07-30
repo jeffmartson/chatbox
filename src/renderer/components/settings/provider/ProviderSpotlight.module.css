@@ -1,3 +1,4 @@
+/* Desktop Spotlight only. Mobile uses a Vaul drawer with a single overflow scroller. */
 .actionsList {
   min-height: 0;
   scrollbar-gutter: stable;
@@ -10,7 +11,6 @@
 
 .actionsList [data-scrollbars] {
   min-height: 0;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 
 .actionsList [data-scrollbars] > div {
