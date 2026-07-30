@@ -1,6 +1,7 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Box, Button, Flex, Loader, Menu, Stack, Text, Textarea, UnstyledButton } from '@mantine/core'
 import { useViewportSize } from '@mantine/hooks'
+import { TestId } from '@shared/automation/testids'
 import {
   getFileAcceptConfig,
   getFileAcceptString,
@@ -1383,6 +1384,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
               {/* Send Button */}
               <ActionIcon
+                data-testid={generating ? TestId.chat.stop : TestId.chat.send}
                 disabled={
                   (disableSubmit ||
                     isPreprocessing ||
@@ -1615,8 +1617,13 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
             {/* Toolbar Row */}
             <Flex align="center" gap={0} className="shrink-0 w-full" justify="space-between">
               {/* Hidden file inputs */}
-              <ImageUploadInput ref={pictureInputRef} onChange={onFileInputChange} />
+              <ImageUploadInput
+                ref={pictureInputRef}
+                onChange={onFileInputChange}
+                testId={TestId.chat.attachmentImageInput}
+              />
               <input
+                data-testid={TestId.chat.attachmentFileInput}
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
@@ -1634,6 +1641,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 {platform.type !== 'desktop' && (
                   <Tooltip label={t('Web Search')} position="top" withArrow disabled={isSmallScreen}>
                     <UnstyledButton
+                      data-testid={TestId.chat.webSearchToggle}
                       onClick={() => {
                         setWebBrowsingMode(!webBrowsingMode)
                         dom.focusMessageInput()
@@ -1820,6 +1828,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                       {!!model && <ProviderImageIcon size={18} provider={model.provider} />}
                       <Text
                         size="sm"
+                        data-testid={TestId.model.selectorTrigger}
                         className={cn(
                           'min-w-0 flex-1 truncate text-[var(--chatbox-tint-secondary)]',
                           isSmallScreen ? 'max-w-[100px]' : 'max-w-[160px]'
@@ -1906,15 +1915,26 @@ const AttachmentMenu: React.FC<{
       }}
     >
       <Menu.Target>
-        <UnstyledButton className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors">
+        <UnstyledButton
+          data-testid={TestId.chat.attachmentMenuTrigger}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--chatbox-background-tertiary)] transition-colors"
+        >
           <IconCirclePlus size={toolbarIconSize} strokeWidth={1.8} className="text-[var(--chatbox-tint-secondary)]" />
         </UnstyledButton>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item leftSection={<IconPhoto size={16} />} onClick={onImageUploadClick}>
+        <Menu.Item
+          data-testid={TestId.chat.attachmentSelectImage}
+          leftSection={<IconPhoto size={16} />}
+          onClick={onImageUploadClick}
+        >
           {t('Attach Image')}
         </Menu.Item>
-        <Menu.Item leftSection={<IconFolder size={16} />} onClick={onFileUploadClick}>
+        <Menu.Item
+          data-testid={TestId.chat.attachmentSelectFile}
+          leftSection={<IconFolder size={16} />}
+          onClick={onFileUploadClick}
+        >
           {t('Select File')}
         </Menu.Item>
       </Menu.Dropdown>

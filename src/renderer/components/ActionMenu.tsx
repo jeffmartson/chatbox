@@ -11,6 +11,9 @@ export type ActionMenuItemProps =
   | {
       divider?: false
       text: string
+      testId?: string
+      confirmTestId?: string
+      confirmPanelTestId?: string
       icon?: React.ElementType<IconProps>
       color?: MenuItemProps['color']
       disabled?: boolean
@@ -40,6 +43,7 @@ export type ActionMenuProps = {
   children: ReactElement
   items: ActionMenuItemProps[]
   title?: string
+  contentTestId?: string
   type?: 'desktop' | 'mobile' | 'contextual' | 'auto'
   trigger?: 'click' | 'manual'
 } & Omit<MenuProps, 'trigger'>
@@ -62,6 +66,7 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
   children,
   items,
   title,
+  contentTestId,
   trigger: _trigger,
   position = 'bottom-start',
   ...menuProps
@@ -72,7 +77,7 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
     <Menu position={position} {...menuProps}>
       <Menu.Target>{children}</Menu.Target>
 
-      <Menu.Dropdown miw={150} onClick={(e) => e.stopPropagation()}>
+      <Menu.Dropdown data-testid={contentTestId} miw={150} onClick={(e) => e.stopPropagation()}>
         {items.map((item, index) =>
           item.divider ? (
             <Divider key={`divider-${item.divider}-${index}`} className="my-xxs" />
@@ -86,6 +91,8 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
               doubleCheckIcon={item.doubleCheck === true ? undefined : item.doubleCheck.icon}
               doubleCheckColor={item.doubleCheck === true ? undefined : item.doubleCheck.color}
               disabled={item.disabled}
+              testId={item.testId}
+              confirmTestId={item.confirmTestId}
               onClick={item.onClick}
             />
           ) : (
@@ -94,6 +101,7 @@ const DesktopActionMenu: FC<ActionMenuProps> = ({
               leftSection={item.icon ? <ScalableIcon icon={item.icon} size={14} /> : undefined}
               color={item.color || 'chatbox-primary'}
               disabled={item.disabled}
+              data-testid={item.testId}
               style={{
                 color: theme.variantColorResolver({ color: item.color || 'chatbox-primary', theme, variant: 'light' })
                   .color,
@@ -113,6 +121,7 @@ const ContextualActionMenu: FC<ActionMenuProps> = ({
   children,
   items,
   title,
+  contentTestId,
   opened,
   onChange,
   position = 'right-start',
@@ -143,6 +152,7 @@ const ContextualActionMenu: FC<ActionMenuProps> = ({
     >
       <Popover.Target>{children}</Popover.Target>
       <Popover.Dropdown
+        data-testid={contentTestId}
         miw={156}
         p={4}
         className="border border-solid border-chatbox-border-primary bg-chatbox-background-primary"
@@ -167,6 +177,7 @@ const ContextualActionMenu: FC<ActionMenuProps> = ({
               <button
                 key={`${item.text}${index}`}
                 type="button"
+                data-testid={item.testId}
                 onClick={handleItemClick(item.onClick)}
                 disabled={item.disabled}
                 className="flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
@@ -232,6 +243,7 @@ const ContextualDoubleCheckMenuItem: FC<{
   return (
     <button
       type="button"
+      data-testid={showConfirm ? (item.confirmTestId ?? item.testId) : item.testId}
       disabled={confirming || item.disabled}
       className="flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2 text-left disabled:opacity-50"
       onClick={async (event) => {
@@ -268,7 +280,15 @@ const ContextualDoubleCheckMenuItem: FC<{
   )
 }
 
-const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title, opened, onChange, trigger = 'click' }) => {
+const MobileActionMenu: FC<ActionMenuProps> = ({
+  children,
+  items,
+  title,
+  contentTestId,
+  opened,
+  onChange,
+  trigger = 'click',
+}) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = opened ?? uncontrolledOpen
   const setOpen = (nextOpen: boolean) => {
@@ -292,7 +312,10 @@ const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title, opened,
       {trigger === 'manual' ? children : <Drawer.Trigger asChild>{children}</Drawer.Trigger>}
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-chatbox-background-mask-overlay" />
-        <Drawer.Content className="flex flex-col h-fit fixed bottom-0 left-0 right-0 outline-none">
+        <Drawer.Content
+          data-testid={contentTestId}
+          className="flex flex-col h-fit fixed bottom-0 left-0 right-0 outline-none"
+        >
           <div className="bg-chatbox-background-primary rounded-t-lg">
             <Drawer.Handle />
             {title && (
@@ -313,6 +336,7 @@ const MobileActionMenu: FC<ActionMenuProps> = ({ children, items, title, opened,
                 ) : (
                   <button
                     key={`${item.text}${index}`}
+                    data-testid={item.testId}
                     onClick={handleItemClick(item.onClick)}
                     disabled={item.disabled}
                     className="border-0 bg-transparent p-2.5"
@@ -350,7 +374,7 @@ const MobileDoubleCheckMenuItem: FC<{
   return (
     <Drawer.NestedRoot noBodyStyles open={confirmOpen} onOpenChange={setConfirmOpen}>
       <Drawer.Trigger asChild>
-        <button className="border-0 bg-transparent p-2.5" disabled={item.disabled}>
+        <button className="border-0 bg-transparent p-2.5" disabled={item.disabled} data-testid={item.testId}>
           <Text
             span
             lineClamp={1}
@@ -363,12 +387,16 @@ const MobileDoubleCheckMenuItem: FC<{
       </Drawer.Trigger>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-chatbox-background-mask-overlay" />
-        <Drawer.Content className="flex flex-col h-fit fixed bottom-0 left-0 right-0 outline-none">
+        <Drawer.Content
+          data-testid={item.confirmPanelTestId}
+          className="flex flex-col h-fit fixed bottom-0 left-0 right-0 outline-none"
+        >
           <div className="bg-chatbox-background-primary rounded-t-lg">
             <Drawer.Handle />
             <Stack className="px-2" gap={0}>
               <Drawer.Close asChild>
                 <button
+                  data-testid={item.confirmTestId ?? item.testId}
                   disabled={confirming || item.disabled}
                   onClick={async (e) => {
                     if (confirmingRef.current) return
@@ -418,6 +446,8 @@ const DoubleCheckMenuItem = ({
   doubleCheckText,
   doubleCheckIcon,
   doubleCheckColor,
+  testId,
+  confirmTestId,
   ...menuItemProps
 }: {
   timeout?: number
@@ -427,6 +457,8 @@ const DoubleCheckMenuItem = ({
   doubleCheckText?: string
   doubleCheckIcon?: React.ElementType<IconProps>
   doubleCheckColor?: MenuItemProps['color']
+  testId?: string
+  confirmTestId?: string
 } & MenuItemProps) => {
   const { t } = useTranslation()
   const [showConfirm, setShowConfirm] = useState(false)
@@ -450,6 +482,7 @@ const DoubleCheckMenuItem = ({
       leftSection={icon ? <ScalableIcon icon={icon} size={14} /> : undefined}
       onClick={() => setShowConfirm(true)}
       {...menuItemProps}
+      data-testid={testId}
       style={{
         color: menuItemProps.color
           ? theme.variantColorResolver({ color: menuItemProps.color, theme, variant: 'light' }).color
@@ -460,6 +493,7 @@ const DoubleCheckMenuItem = ({
     </Menu.Item>
   ) : (
     <Menu.Item
+      data-testid={confirmTestId ?? testId}
       leftSection={<ScalableIcon icon={doubleCheckIcon || IconCheck} size={14} />}
       disabled={confirming}
       onClick={async (event) => {

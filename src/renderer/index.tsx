@@ -30,6 +30,9 @@ import './setup/ga_init'
 
 // Show native scrollbars only while scrolling
 import './setup/scrollbar_visibility'
+
+// Publish the automation contract version during renderer startup.
+import './setup/automation_contract'
 // 引入保护代码
 import './setup/protect'
 import { QueryClientProvider } from '@tanstack/react-query'

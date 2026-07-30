@@ -1,6 +1,7 @@
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Flex, Text } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type { SessionMetaRecord } from '@shared/types'
 import { IconArchive, IconArrowsMoveVertical, IconPinned, IconPinnedFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
@@ -220,6 +221,8 @@ function SessionItem(props: Props) {
 
   const content = (
     <Flex
+      data-testid={TestId.sidebar.sessionItem}
+      data-session-id={session.id}
       align="center"
       className={clsx(
         'cursor-pointer rounded-lg group/session-item',
@@ -257,7 +260,13 @@ function SessionItem(props: Props) {
         c={selected ? 'chatbox-brand' : 'chatbox-primary'}
       />
 
-      <Text span flex={1} lineClamp={1} c={selected ? 'chatbox-brand' : 'chatbox-primary'}>
+      <Text
+        data-testid={TestId.sidebar.sessionTitle}
+        span
+        flex={1}
+        lineClamp={1}
+        c={selected ? 'chatbox-brand' : 'chatbox-primary'}
+      >
         {session.name}
       </Text>
 
@@ -274,6 +283,7 @@ function SessionItem(props: Props) {
       <Flex gap={2} className={clsx(isSmallScreen ? 'hidden' : 'group-hover/session-item:flex hidden')}>
         <Tooltip label={pinActionLabel} openDelay={1000} withArrow disabled={actionTooltipDismissed}>
           <ActionIcon
+            data-testid={TestId.sidebar.sessionPin}
             aria-label={pinActionLabel}
             variant="transparent"
             size={20}
@@ -295,6 +305,7 @@ function SessionItem(props: Props) {
 
         <Tooltip label={archiveActionLabel} openDelay={1000} withArrow disabled={actionTooltipDismissed}>
           <ActionIcon
+            data-testid={TestId.sidebar.sessionArchive}
             aria-label={archiveActionLabel}
             variant="transparent"
             size={20}

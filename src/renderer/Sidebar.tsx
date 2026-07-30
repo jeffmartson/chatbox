@@ -2,6 +2,7 @@ import { registerPlugin } from '@capacitor/core'
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, Box, Button, Flex, Image, NavLink, Stack, Text } from '@mantine/core'
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
+import { TestId } from '@shared/automation/testids'
 import {
   IconArchive,
   IconCirclePlus,
@@ -164,6 +165,7 @@ export default function Sidebar() {
       disableSwipeToOpen={CHATBOX_BUILD_PLATFORM !== 'ios'} // 只在iOS设备上启用SwipeToOpen
     >
       <Stack
+        data-testid={TestId.sidebar.root}
         h="100%"
         gap={0}
         pt="var(--mobile-safe-area-inset-top, 0px)"
@@ -241,7 +243,7 @@ export default function Sidebar() {
               variant="light"
               fullWidth
               radius="lg"
-              data-testid="new-chat-button"
+              data-testid={TestId.sidebar.newChat}
               onClick={handleCreateNewSession}
             >
               <ScalableIcon icon={IconCirclePlus} className="mr-2" />
@@ -251,7 +253,7 @@ export default function Sidebar() {
               variant="light"
               fullWidth
               radius="lg"
-              data-testid="new-image-button"
+              data-testid={TestId.sidebar.newImage}
               onClick={handleCreateNewPictureSession}
             >
               <ScalableIcon icon={IconPhotoPlus} className="mr-2" />
@@ -290,6 +292,7 @@ export default function Sidebar() {
                 </ActionIcon>
               )}
               <ActionIcon
+                data-testid={TestId.sidebar.settingsTrigger}
                 variant="transparent"
                 color="chatbox-secondary"
                 size={24}
@@ -322,6 +325,7 @@ export default function Sidebar() {
                 p="xs"
               />
               <NavLink
+                data-testid={TestId.sidebar.settingsTrigger}
                 c="chatbox-secondary"
                 className="rounded-lg"
                 label={t('Settings')}

@@ -1,4 +1,5 @@
 import { Textarea } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type React from 'react'
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
 import { useMessageInput } from '@/hooks/useMessageInput'
@@ -96,7 +97,7 @@ export const MessageInputField = memo(
           onChange={onChange}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          data-testid="message-input"
+          data-testid={TestId.chat.messageInput}
         />
       )
     }

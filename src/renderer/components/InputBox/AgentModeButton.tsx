@@ -1,4 +1,5 @@
 import { ActionIcon, Popover, Text, Tooltip, UnstyledButton } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import { IconRobot, IconX } from '@tabler/icons-react'
 import { useLocation } from '@tanstack/react-router'
@@ -152,6 +153,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
               tabIndex={disabled ? 0 : undefined}
             >
               <UnstyledButton
+                data-testid={TestId.agent.modeTrigger}
                 disabled={disabled}
                 aria-label={modeLabel}
                 onMouseEnter={disabled || showWebSearchMovedTip ? undefined : handleMouseEnter}

@@ -1,6 +1,7 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { ActionIcon, type ActionIconProps, Button, Flex, Loader, Modal, Stack, Text } from '@mantine/core'
 import { Box, Grid, useTheme } from '@mui/material'
+import { TestId } from '@shared/automation/testids'
 import { findMessageLocation } from '@shared/session/message-forks'
 import type {
   Message,
@@ -549,22 +550,26 @@ const _Message: FC<Props> = (props) => {
               msg.role === 'assistant' && {
                 text: t('Reply Again'),
                 icon: IconReload,
+                testId: TestId.message.actionMenuRetry,
                 onClick: handleRefresh,
               },
             msg.role !== 'assistant' && {
               text: t('Reply Again Below'),
               icon: IconArrowDown,
+              testId: TestId.message.actionMenuRetryBelow,
               onClick: onGenerateMore,
             },
             !msg.model?.startsWith('Chatbox-AI') &&
               !(msg.role === 'assistant' && props.sessionType === 'picture') && {
                 text: t('Edit'),
                 icon: IconPencil,
+                testId: TestId.message.actionMenuEdit,
                 onClick: onEditClick,
               },
             !(props.sessionType === 'picture' && msg.role === 'assistant') && {
               text: t('copy'),
               icon: IconCopy,
+              testId: TestId.message.actionMenuCopy,
               onClick: onCopyMsg,
             },
             !msg.generating &&
@@ -579,6 +584,7 @@ const _Message: FC<Props> = (props) => {
       {
         text: t('Quote'),
         icon: IconQuoteFilled,
+        testId: TestId.message.actionQuote,
         onClick: quoteMsg,
       },
       { divider: true },
@@ -604,6 +610,9 @@ const _Message: FC<Props> = (props) => {
         doubleCheck: true,
         text: t('delete'),
         icon: IconTrash,
+        testId: TestId.message.actionDelete,
+        confirmTestId: TestId.message.actionDeleteConfirm,
+        confirmPanelTestId: TestId.message.deleteConfirmation,
         onClick: onDelMsg,
       },
     ],
@@ -646,6 +655,7 @@ const _Message: FC<Props> = (props) => {
   const messageContent = (
     <>
       <div
+        data-testid={TestId.message.content}
         className={cn(
           isBubbleLayout
             ? 'inline-block max-w-full min-w-0'
@@ -953,6 +963,7 @@ const _Message: FC<Props> = (props) => {
       align="center"
     >
       <Flex
+        data-testid={TestId.message.actionBar}
         gap={0}
         className={
           isSmallScreen
@@ -961,26 +972,47 @@ const _Message: FC<Props> = (props) => {
         }
       >
         {!msg.generating && msg.role === 'assistant' && (
-          <MessageActionIcon icon={IconReload} tooltip={t('Reply Again')} onClick={handleMessageRetry} />
+          <MessageActionIcon
+            testId={TestId.message.actionBarRetry}
+            icon={IconReload}
+            tooltip={t('Reply Again')}
+            onClick={handleMessageRetry}
+          />
         )}
         {msg.role !== 'assistant' && (
-          <MessageActionIcon icon={IconArrowDown} tooltip={t('Reply Again Below')} onClick={onGenerateMore} />
+          <MessageActionIcon
+            testId={TestId.message.actionBarRetryBelow}
+            icon={IconArrowDown}
+            tooltip={t('Reply Again Below')}
+            onClick={onGenerateMore}
+          />
         )}
         {!msg.model?.startsWith('Chatbox-AI') && !(msg.role === 'assistant' && props.sessionType === 'picture') && (
-          <MessageActionIcon icon={IconPencil} tooltip={t('Edit')} onClick={onEditClick} />
+          <MessageActionIcon
+            testId={TestId.message.actionBarEdit}
+            icon={IconPencil}
+            tooltip={t('Edit')}
+            onClick={onEditClick}
+          />
         )}
         {!(props.sessionType === 'picture' && msg.role === 'assistant') && (
-          <MessageActionIcon icon={IconCopy} tooltip={t('Copy')} onClick={onCopyMsg} />
+          <MessageActionIcon
+            testId={TestId.message.actionBarCopy}
+            icon={IconCopy}
+            tooltip={t('Copy')}
+            onClick={onCopyMsg}
+          />
         )}
         {!msg.generating && props.sessionType === 'picture' && msg.role === 'assistant' && (
           <MessageActionIcon icon={IconPhotoPlus} tooltip={t('Generate More Images Below')} onClick={onGenerateMore} />
         )}
         <ActionMenu
           items={actionMenuItems}
+          contentTestId={TestId.message.actionMenu}
           opened={actionMenuOpened}
           onChange={(opened) => setActionMenuOpened(opened)}
         >
-          <MessageActionIcon icon={IconDotsVertical} tooltip={t('More')} />
+          <MessageActionIcon testId={TestId.message.actionMore} icon={IconDotsVertical} tooltip={t('More')} />
         </ActionMenu>
       </Flex>
     </Flex>
@@ -1015,6 +1047,8 @@ const _Message: FC<Props> = (props) => {
   if (isBubbleLayout && msg.role === 'user') {
     return (
       <Box
+        data-testid={TestId.message.item}
+        data-message-role={msg.role}
         ref={ref}
         id={props.id}
         key={msg.id}
@@ -1108,6 +1142,8 @@ const _Message: FC<Props> = (props) => {
 
   return (
     <Box
+      data-testid={TestId.message.item}
+      data-message-role={msg.role}
       ref={ref}
       id={props.id}
       key={msg.id}
@@ -1179,10 +1215,11 @@ export const MessageActionIcon = forwardRef<
   HTMLButtonElement,
   ActionIconProps & {
     tooltip?: string | null
+    testId?: string
     onClick?: MouseEventHandler<HTMLButtonElement>
     icon: React.ElementType<IconProps>
   }
->(({ tooltip, icon, ...props }, ref) => {
+>(({ tooltip, icon, testId, ...props }, ref) => {
   const isSmallScreen = useIsSmallScreen()
   const actionIcon = (
     <ActionIcon
@@ -1196,6 +1233,7 @@ export const MessageActionIcon = forwardRef<
       bd={0}
       color="chatbox-secondary"
       aria-label={tooltip ?? undefined}
+      data-testid={testId}
       {...props}
     >
       <ScalableIcon icon={icon} size={isSmallScreen ? 20 : 16} />

@@ -1,4 +1,5 @@
 import { Menu, Text, UnstyledButton } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type { ProviderModelInfo, ProviderOptions } from '@shared/types'
 import {
   getReasoningControlCapabilities,
@@ -55,6 +56,7 @@ export default function ReasoningControlButton({
       <Tooltip label={getDisabledReasonLabel(capabilities.disabledReason, t)} position="top" withArrow>
         <span>
           <UnstyledButton
+            data-testid={TestId.reasoning.trigger}
             className="flex items-center gap-1 px-2 py-1 rounded-lg cursor-not-allowed opacity-60"
             style={{ color: 'var(--chatbox-tint-tertiary)' }}
             disabled
@@ -82,6 +84,7 @@ export default function ReasoningControlButton({
       <Menu.Target>
         <Tooltip label={t('Thinking: {{level}}', { level: levelLabel })} position="top" withArrow>
           <UnstyledButton
+            data-testid={TestId.reasoning.trigger}
             className={
               'flex items-center gap-1 px-2 py-1 rounded-lg ' +
               'hover:bg-[var(--chatbox-background-tertiary)] transition-colors'
@@ -102,10 +105,11 @@ export default function ReasoningControlButton({
           </UnstyledButton>
         </Tooltip>
       </Menu.Target>
-      <Menu.Dropdown>
+      <Menu.Dropdown data-testid={TestId.reasoning.menu}>
         <Menu.Label fw={600}>{t('Thinking Effort')}</Menu.Label>
         {options.map((item) => (
           <Menu.Item
+            data-testid={TestId.reasoning.level(item.level)}
             key={item.level}
             leftSection={<ReasoningLevelStatusIcon level={item.level} size={14} />}
             onClick={() => onChange(item.level)}

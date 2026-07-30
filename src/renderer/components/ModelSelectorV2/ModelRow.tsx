@@ -1,4 +1,5 @@
 import { ActionIcon, Flex, Text } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type { ProviderModelInfo } from '@shared/types'
 import { IconBulb, IconEye, IconInfoCircle, IconLock, IconStar, IconStarFilled } from '@tabler/icons-react'
 import clsx from 'clsx'
@@ -66,6 +67,10 @@ export function ModelRow({
   }
   return (
     <div
+      data-testid={TestId.model.option}
+      data-provider-id={detail.providerId}
+      data-model-id={detail.modelId}
+      data-selected={selected ? 'true' : 'false'}
       role="button"
       tabIndex={0}
       aria-current={selected ? 'true' : undefined}
@@ -90,7 +95,14 @@ export function ModelRow({
         size={mobile ? 20 : 18}
         className="flex-shrink-0"
       />
-      <Text span size="sm" fw={500} lh={1.15} className="min-w-0 flex-shrink truncate">
+      <Text
+        data-testid={TestId.model.optionName}
+        span
+        size="sm"
+        fw={500}
+        lh={1.15}
+        className="min-w-0 flex-shrink truncate"
+      >
         {detail.name}
       </Text>
       <Flex align="center" gap={mobile ? 6 : 4} className="min-w-0 flex-shrink-0">

@@ -1,4 +1,5 @@
 import { Combobox, Flex, SegmentedControl, Stack, Text, TextInput, useCombobox } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import { ModelProviderEnum } from '@shared/types'
 import { IconSearch } from '@tabler/icons-react'
 import clsx from 'clsx'
@@ -286,6 +287,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
       >
         <ScalableIcon icon={IconSearch} size={16} className="text-chatbox-tint-tertiary" />
         <TextInput
+          data-testid={TestId.model.searchInput}
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
           placeholder={t('Search models') as string}
@@ -357,6 +359,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
 
     const content = (
       <Stack
+        data-testid={TestId.model.selectorPanel}
         gap={0}
         className={clsx(
           'overflow-hidden',
@@ -396,6 +399,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
           <Flex align="center" gap="xs" px="md" py={6} className="bg-transparent">
             <ScalableIcon icon={IconSearch} size={16} className="text-chatbox-tint-tertiary" />
             <TextInput
+              data-testid={TestId.model.searchInput}
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}
               placeholder={t('Search models') as string}

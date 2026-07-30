@@ -7,10 +7,11 @@ interface ImageUploadInputProps {
   multiple?: boolean
   className?: string
   style?: React.CSSProperties
+  testId?: string
 }
 
 export const ImageUploadInput = forwardRef<HTMLInputElement, ImageUploadInputProps>(
-  ({ onChange, accept = 'image/png, image/jpeg', multiple = true, className = 'hidden', style }, ref) => {
+  ({ onChange, accept = 'image/png, image/jpeg', multiple = true, className = 'hidden', style, testId }, ref) => {
     return (
       <input
         ref={ref}
@@ -20,6 +21,7 @@ export const ImageUploadInput = forwardRef<HTMLInputElement, ImageUploadInputPro
         onChange={onChange}
         className={className}
         style={style || { display: 'none' }}
+        data-testid={testId}
       />
     )
   }

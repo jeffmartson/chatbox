@@ -1,4 +1,5 @@
 import { ActionIcon, Badge, Button, Divider, Flex, Group, Loader, Stack, Switch, Text } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import {
   IconCheck,
@@ -406,6 +407,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     return (
       <Tooltip label={tooltipLabel} disabled={!isDisabled} withArrow>
         <Button
+          data-testid={value === 'off' ? TestId.agent.modeChat : TestId.agent.modeWork}
           size="xs"
           variant={isActive ? 'filled' : 'default'}
           color={isActive ? 'chatbox-brand' : undefined}
@@ -868,6 +870,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   // ==================== RENDER ====================
   return (
     <div
+      data-testid={TestId.agent.modePanel}
       className="relative"
       ref={panelRef}
       onMouseLeave={handleSubPanelLeave}

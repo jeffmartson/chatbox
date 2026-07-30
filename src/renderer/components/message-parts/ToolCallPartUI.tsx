@@ -13,6 +13,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
 import type {
@@ -1075,17 +1076,18 @@ const ToolCallRunningDots: FC = () => (
 )
 
 const ImageGenerationApprovalCard: FC<{
+  toolCallId: string
   details: ImageGenerationApprovalDetails
   disabled: boolean
   onApprove: () => void
   onDeny: () => void
-}> = ({ details, disabled, onApprove, onDeny }) => {
+}> = ({ toolCallId, details, disabled, onApprove, onDeny }) => {
   const { t, i18n } = useTranslation()
   const usesChatboxQuota = details.billing === 'chatbox_quota'
   const computePointsRemainingRatio = details.computePointsRemainingRatio ?? details.computePointsRemaining
 
   return (
-    <Stack gap="sm">
+    <Stack data-testid={TestId.toolCall.approvalCard} data-tool-call-id={toolCallId} gap="sm">
       <Group gap="xs" wrap="nowrap">
         <Box className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-chatbox-background-brand-secondary">
           <IconPhoto size={18} color="var(--chatbox-tint-brand)" />
@@ -1173,10 +1175,23 @@ const ImageGenerationApprovalCard: FC<{
       </Alert>
 
       <Group gap="xs">
-        <Button size="compact-sm" color="chatbox-brand" disabled={disabled} onClick={onApprove}>
+        <Button
+          data-testid={TestId.toolCall.approve}
+          size="compact-sm"
+          color="chatbox-brand"
+          disabled={disabled}
+          onClick={onApprove}
+        >
           {t('Approve and generate')}
         </Button>
-        <Button size="compact-sm" variant="light" color="gray" disabled={disabled} onClick={onDeny}>
+        <Button
+          data-testid={TestId.toolCall.deny}
+          size="compact-sm"
+          variant="light"
+          color="gray"
+          disabled={disabled}
+          onClick={onDeny}
+        >
           {t('Cancel')}
         </Button>
       </Group>
@@ -1198,6 +1213,7 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
   ) {
     return (
       <ImageGenerationApprovalCard
+        toolCallId={part.toolCallId}
         details={pauseReason.details}
         disabled={!sessionId || !messageId}
         onApprove={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
@@ -1231,12 +1247,13 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
           ? pauseReason.preview
           : stringifyToolPayload(part.args)
   return (
-    <Stack gap="xs">
+    <Stack data-testid={TestId.toolCall.approvalCard} data-tool-call-id={part.toolCallId} gap="xs">
       <Text size="xs" c="chatbox-secondary">
         {title}
       </Text>
       <Group gap="xs">
         <Button
+          data-testid={isApproval ? TestId.toolCall.approve : TestId.toolCall.continue}
           size="compact-xs"
           color="chatbox-brand"
           disabled={!sessionId || !messageId}
@@ -1245,6 +1262,7 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
           {isApproval ? t('Approve') : t('Continue')}
         </Button>
         <Button
+          data-testid={TestId.toolCall.deny}
           size="compact-xs"
           variant="light"
           color="chatbox-error"
