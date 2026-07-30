@@ -1,6 +1,6 @@
 import { BaseError } from '@shared/models/errors'
 import { getModel } from '@shared/providers'
-import type { ImageGeneration, ImageGenerationModel } from '@shared/types'
+import type { ImageGeneration, ImageGenerationModel, ImageGenerationSource } from '@shared/types'
 import { ModelProviderEnum } from '@shared/types'
 import { createModelDependencies } from '@/adapters'
 import { getLogger } from '@/lib/utils'
@@ -89,6 +89,7 @@ export interface GenerateImageParams {
   imageGenerateNum?: number
   aspectRatio?: string
   parentIds?: string[]
+  source?: ImageGenerationSource
 }
 
 export function isGenerating(): boolean {
@@ -138,6 +139,7 @@ export async function startImageGeneration(
     imageGenerateNum: params.imageGenerateNum,
     parentIds: params.parentIds,
     aspectRatio: params.aspectRatio,
+    source: params.source,
   })
 
   try {
@@ -435,7 +437,7 @@ export function clearCurrentRecord(): void {
   imageGenerationStore.getState().setCurrentRecordId(null)
 }
 
-export async function resumeGeneration(recordId: string): Promise<void> {
+export async function resumeGeneration(recordId: string): Promise<ImageGeneration | null> {
   const store = imageGenerationStore.getState()
 
   if (store.currentGeneratingId !== null) {
@@ -492,10 +494,11 @@ export async function resumeGeneration(recordId: string): Promise<void> {
     if (updatedRecord) {
       queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, updatedRecord.id], updatedRecord)
     }
+    return updatedRecord
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'AbortError') {
       log.debug('Resume generation aborted:', recordId)
-      return
+      return null
     }
 
     log.error('Resume generation failed:', err)
@@ -504,6 +507,7 @@ export async function resumeGeneration(recordId: string): Promise<void> {
     if (failedRecord) {
       queryClient.setQueryData([IMAGE_GEN_QUERY_KEY, failedRecord.id], failedRecord)
     }
+    return failedRecord
   } finally {
     currentAbortController = null
     imageGenerationStore.getState().setCurrentGeneratingId(null)

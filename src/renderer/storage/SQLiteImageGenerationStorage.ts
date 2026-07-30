@@ -51,7 +51,8 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
         error_code TEXT,
         error_item_uuid TEXT,
         task_id TEXT,
-        aspect_ratio TEXT
+        aspect_ratio TEXT,
+        source TEXT
       )
     `)
 
@@ -60,6 +61,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
     await this.addColumnIfNotExists('aspect_ratio', 'TEXT')
     await this.addColumnIfNotExists('error_item_uuid', 'TEXT')
     await this.addColumnIfNotExists('generated_image_thumbnails', 'TEXT')
+    await this.addColumnIfNotExists('source', 'TEXT')
 
     await this.database.execute(`
       CREATE INDEX IF NOT EXISTS idx_image_generation_created_at
@@ -96,6 +98,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
       error_item_uuid: record.errorItemUuid || null,
       task_id: record.taskId || null,
       aspect_ratio: record.aspectRatio || null,
+      source: record.source ? JSON.stringify(record.source) : null,
     }
   }
 
@@ -122,6 +125,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
       errorItemUuid: row.error_item_uuid as string | undefined,
       taskId: (row.task_id as string) || undefined,
       aspectRatio: row.aspect_ratio as string | undefined,
+      source: row.source ? JSON.parse(row.source as string) : undefined,
     }
   }
 
@@ -131,8 +135,8 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
 
     await this.database.run(
       `INSERT INTO image_generation
-       (id, prompt, reference_images, generated_images, generated_image_thumbnails, created_at, model_provider, model_id, dalle_style, image_generate_num, status, parent_id, error, error_code, error_item_uuid, task_id, aspect_ratio)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, prompt, reference_images, generated_images, generated_image_thumbnails, created_at, model_provider, model_id, dalle_style, image_generate_num, status, parent_id, error, error_code, error_item_uuid, task_id, aspect_ratio, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.prompt,
@@ -151,6 +155,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
         row.error_item_uuid,
         row.task_id,
         row.aspect_ratio,
+        row.source,
       ]
     )
   }
@@ -168,7 +173,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
        prompt = ?, reference_images = ?, generated_images = ?, generated_image_thumbnails = ?, created_at = ?,
        model_provider = ?, model_id = ?, dalle_style = ?, image_generate_num = ?,
        status = ?, parent_id = ?, error = ?, error_code = ?, error_item_uuid = ?,
-       task_id = ?, aspect_ratio = ?
+       task_id = ?, aspect_ratio = ?, source = ?
        WHERE id = ?`,
       [
         row.prompt,
@@ -187,6 +192,7 @@ export class SQLiteImageGenerationStorage implements ImageGenerationStorage {
         row.error_item_uuid,
         row.task_id,
         row.aspect_ratio,
+        row.source,
         id,
       ]
     )

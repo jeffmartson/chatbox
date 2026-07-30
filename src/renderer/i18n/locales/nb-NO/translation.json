@@ -1237,5 +1237,10 @@
   "Your points are used up": "Poengene dine er brukt opp",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "Kvoten for inneværende periode er brukt opp. Oppgrader planen for å fortsette.",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Dagens gratispoeng er brukt opp. De tilbakestilles daglig; oppgrader planen for å fortsette nå.",
-  "Upgrade plan": "Oppgrader planen"
+  "Upgrade plan": "Oppgrader planen",
+  "Another image is being generated. Please wait.": "Et annet bilde genereres nå. Vent litt.",
+  "Image generation interrupted": "Bildegenereringen ble avbrutt",
+  "The original task cannot be resumed. Please send a new image generation request.": "Den opprinnelige oppgaven kan ikke gjenopptas. Send en ny forespørsel om bildegenerering.",
+  "This chat is no longer available.": "Denne samtalen er ikke lenger tilgjengelig.",
+  "Unable to resume image generation.": "Kunne ikke gjenoppta bildegenereringen."
 }

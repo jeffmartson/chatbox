@@ -259,7 +259,14 @@ describe('Chatbox CLI image commands', () => {
     await command('generate').execute(context(['--prompt', 'red fox'], { approved: true, approvalDetails }))
 
     expect(startImageGenerationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ model: { provider: 'chatbox-ai', modelId: 'reviewed-model' } }),
+      expect.objectContaining({
+        model: { provider: 'chatbox-ai', modelId: 'reviewed-model' },
+        source: {
+          type: 'chatbox_cli',
+          sessionId: 'session-1',
+          toolCallId: 'tool-1',
+        },
+      }),
       expect.objectContaining({ onRecordCreated: expect.any(Function) })
     )
   })
@@ -282,6 +289,7 @@ describe('Chatbox CLI image commands', () => {
       model: { provider: 'chatbox-ai', modelId: 'manifest-image' },
       imageGenerateNum: 1,
       status: 'generating',
+      taskId: 'task-persisted',
     }
     startImageGenerationMock.mockImplementationOnce(
       async (_params: unknown, options: { onRecordCreated?: (record: ImageGeneration) => Promise<void> }) => {
@@ -342,6 +350,7 @@ describe('Chatbox CLI image commands', () => {
       referenceImages: [],
       generatedImages: [],
       model: { provider: 'chatbox-ai', modelId: 'manifest-image' },
+      taskId: 'task-1',
     })
 
     await expect(command('status').execute(context(['record-1']))).resolves.toMatchObject({
@@ -351,7 +360,30 @@ describe('Chatbox CLI image commands', () => {
         mode: 'manual_resume',
         managedBy: 'chatbox',
         modelShouldPoll: false,
-        location: 'Image Creator',
+        location: 'original chat or Image Creator',
+      },
+    })
+  })
+
+  it('requires a newly approved retry when an interrupted record has no resumable task id', async () => {
+    getImageGenerationByIdMock.mockResolvedValue({
+      id: 'record-direct',
+      status: 'generating',
+      createdAt: 1_000,
+      prompt: 'red fox',
+      referenceImages: [],
+      generatedImages: [],
+      model: { provider: 'openai', modelId: 'gpt-image-1' },
+    })
+
+    await expect(command('status').execute(context(['record-direct']))).resolves.toMatchObject({
+      id: 'record-direct',
+      status: 'generating',
+      wait: {
+        mode: 'manual_retry',
+        managedBy: 'chatbox',
+        modelShouldPoll: false,
+        requiresNewApproval: true,
       },
     })
   })

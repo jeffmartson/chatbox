@@ -13,6 +13,15 @@ export const ImageGenerationModelSchema = z.object({
 })
 export type ImageGenerationModel = z.infer<typeof ImageGenerationModelSchema>
 
+export const ImageGenerationSourceSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('chatbox_cli'),
+    sessionId: z.string(),
+    toolCallId: z.string(),
+  }),
+])
+export type ImageGenerationSource = z.infer<typeof ImageGenerationSourceSchema>
+
 // Image generation record schema
 export const ImageGenerationSchema = z.object({
   id: z.string(),
@@ -33,6 +42,7 @@ export const ImageGenerationSchema = z.object({
   errorItemUuid: z.string().optional(),
   taskId: z.string().optional(), // Backend task ID for polling
   aspectRatio: z.string().optional(), // Store aspect ratio for record
+  source: ImageGenerationSourceSchema.optional(), // Originating workflow for reconnecting completion callbacks
 })
 export type ImageGeneration = z.infer<typeof ImageGenerationSchema>
 

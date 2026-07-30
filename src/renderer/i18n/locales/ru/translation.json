@@ -1237,5 +1237,10 @@
   "Your points are used up": "Ваши баллы закончились",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "Квота на текущий период исчерпана. Обновите план, чтобы продолжить.",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Бесплатные баллы на сегодня закончились. Они сбрасываются ежедневно; обновите план, чтобы продолжить сейчас.",
-  "Upgrade plan": "Обновить план"
+  "Upgrade plan": "Обновить план",
+  "Another image is being generated. Please wait.": "Сейчас создаётся другое изображение. Подождите.",
+  "Image generation interrupted": "Создание изображения прервано",
+  "The original task cannot be resumed. Please send a new image generation request.": "Исходную задачу нельзя возобновить. Отправьте новый запрос на создание изображения.",
+  "This chat is no longer available.": "Этот чат больше недоступен.",
+  "Unable to resume image generation.": "Не удалось возобновить создание изображения."
 }

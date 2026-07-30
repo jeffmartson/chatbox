@@ -10,6 +10,7 @@ import {
   Paper,
   Stack,
   Text,
+  Tooltip,
   UnstyledButton,
 } from '@mantine/core'
 import { ChatboxAIAPIError } from '@shared/models/errors'
@@ -56,18 +57,23 @@ import { ImageGenerationResultGallery } from '@/components/chat/ImageGenerationR
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hooks/useThinkingTimer'
+import { getLogger } from '@/lib/utils'
 import { getAcceptedImageBackgroundTaskResult } from '@/packages/chatbox-cli/background-task-result'
 import { formatComputePointsRemainingRatio } from '@/packages/chatbox-cli/compute-points'
+import { resumeImageGenerationWithFollowUp } from '@/packages/chatbox-cli/image-task-follow-up'
 import { getToolName } from '@/packages/tools'
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
 import { useCurrentGeneratingId, useImageGenerationRecord } from '@/stores/imageGenerationStore'
 import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
+import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
 import { getLocalFileName, localFilePathToUrl } from './local-file-url'
 
 // ─── Tool Error Result ──────────────────────────────────────────────
+
+const log = getLogger('tool-call-part-ui')
 
 const TOOL_ERROR_PREVIEW_LENGTH = 1_200
 const TOOL_PAYLOAD_PREVIEW_LENGTH = 8_000
@@ -1384,21 +1390,54 @@ const TimelineToolCallStep: FC<
 > = ({ part, isFirst, isLast, sessionId, messageId, showPausedActionDetails = true }) => {
   const { t } = useTranslation()
   const acceptedImageTask = getAcceptedImageBackgroundTaskResult(part.result)
-  const { data: imageRecord } = useImageGenerationRecord(acceptedImageTask?.recordId ?? null)
+  const { data: imageRecord, isFetched: isImageRecordFetched } = useImageGenerationRecord(
+    acceptedImageTask?.recordId ?? null
+  )
   const currentGeneratingId = useCurrentGeneratingId()
   const imageStatus = imageRecord?.status ?? acceptedImageTask?.status
   const isBackgroundWaiting = imageStatus === 'pending' || imageStatus === 'generating'
   const isBackgroundActive =
     Boolean(acceptedImageTask) && isBackgroundWaiting && currentGeneratingId === acceptedImageTask?.recordId
   const isBackgroundInterrupted = Boolean(acceptedImageTask) && isBackgroundWaiting && !isBackgroundActive
+  const canResumeBackground = isBackgroundInterrupted && Boolean(imageRecord?.taskId)
+  const isImageRecordLoading = Boolean(acceptedImageTask) && !isImageRecordFetched
+  const isImageRecordMissing = Boolean(acceptedImageTask) && isImageRecordFetched && imageRecord == null
+  const isBackgroundUnrecoverable =
+    isBackgroundInterrupted && (isImageRecordMissing || (imageRecord != null && !imageRecord.taskId))
+  const [isResumingBackground, setIsResumingBackground] = useState(false)
   const backgroundElapsed = useThinkingTimer(imageRecord?.createdAt ?? acceptedImageTask?.startedAt, isBackgroundActive)
   const isPaused = part.state === 'paused'
-  const isLoading = part.state === 'call' || isBackgroundActive
+  const isLoading = part.state === 'call' || isBackgroundActive || isImageRecordLoading || isResumingBackground
   const isBashNotAvailable = isBashNotAvailableResult(part)
-  const isError = part.state === 'error' || isBashNotAvailable || imageStatus === 'error'
+  const isError = part.state === 'error' || isBashNotAvailable || imageStatus === 'error' || isBackgroundUnrecoverable
   const isDone = part.state === 'result' && !isBashNotAvailable && !isBackgroundWaiting && imageStatus !== 'error'
   const [expanded, setExpanded] = useAutoExpandOnSignal(isPaused || isBashNotAvailable)
   const Icon = getToolIcon(part.toolName)
+  const handleResumeBackground = useCallback(async () => {
+    if (!acceptedImageTask || !sessionId || !canResumeBackground || isResumingBackground) return
+    setIsResumingBackground(true)
+    try {
+      await resumeImageGenerationWithFollowUp(acceptedImageTask.recordId, {
+        sessionId,
+        toolCallId: part.toolCallId,
+      })
+    } catch (error) {
+      // `resumeGeneration` rejects with untranslated developer strings ("Record not found", "No task ID
+      // found for this record"), so show a localized message here and keep the raw cause in the log.
+      log.error('Failed to resume CLI image generation:', error)
+      toastActions.add(t('Unable to resume image generation.'))
+    } finally {
+      setIsResumingBackground(false)
+    }
+  }, [acceptedImageTask, canResumeBackground, isResumingBackground, part.toolCallId, sessionId, t])
+
+  // Another record occupying the generator is the only reason a resumable task cannot be resumed right now.
+  const isBlockedByOtherGeneration = currentGeneratingId !== null && currentGeneratingId !== acceptedImageTask?.recordId
+  const resumeDisabledReason = !sessionId
+    ? t('This chat is no longer available.')
+    : isBlockedByOtherGeneration
+      ? t('Another image is being generated. Please wait.')
+      : undefined
 
   // Per-step elapsed time: prefer the persisted duration, fall back to a live
   // timer while the call is still running. Hidden below the 2s threshold.
@@ -1415,7 +1454,7 @@ const TimelineToolCallStep: FC<
   const showTime = stepDuration >= MIN_STEP_DURATION_MS
 
   const stateColor =
-    isPaused || isBackgroundInterrupted
+    isPaused || canResumeBackground
       ? 'var(--chatbox-tint-warning)'
       : isLoading
         ? 'var(--chatbox-tint-brand)'
@@ -1423,7 +1462,7 @@ const TimelineToolCallStep: FC<
           ? 'var(--chatbox-tint-error)'
           : 'var(--chatbox-tint-success)'
   const dotBg =
-    isPaused || isBackgroundInterrupted
+    isPaused || canResumeBackground
       ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
       : isLoading
         ? 'var(--chatbox-background-brand-secondary)'
@@ -1446,17 +1485,19 @@ const TimelineToolCallStep: FC<
       : undefined
 
   const summary = acceptedImageTask
-    ? isBackgroundActive
+    ? isBackgroundActive || isImageRecordLoading
       ? acceptedImageTask.wait.pollIntervalMs
         ? `${t('Generating image')} · ${t('Checking every {{time}}', {
             time: formatElapsedTime(acceptedImageTask.wait.pollIntervalMs),
           })}`
         : t('Generating image')
-      : isBackgroundInterrupted
+      : canResumeBackground
         ? t('Waiting to resume image generation')
-        : imageStatus === 'error'
-          ? t('Image generation failed')
-          : t('Image generated')
+        : isBackgroundUnrecoverable
+          ? t('Image generation interrupted')
+          : imageStatus === 'error'
+            ? t('Image generation failed')
+            : t('Image generated')
     : isPaused
       ? t('Paused')
       : isLoading
@@ -1516,6 +1557,28 @@ const TimelineToolCallStep: FC<
           )}
         </Group>
       </UnstyledButton>
+      {canResumeBackground && (
+        <Tooltip label={resumeDisabledReason} disabled={!resumeDisabledReason} withArrow>
+          {/* A disabled Mantine Button drops pointer events, so the tooltip needs a wrapper to hover. */}
+          <Box mt={2} w="fit-content">
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              leftSection={<IconPlayerPlay size={12} />}
+              loading={isResumingBackground}
+              disabled={Boolean(resumeDisabledReason)}
+              onClick={() => void handleResumeBackground()}
+            >
+              {t('Resume Generation')}
+            </Button>
+          </Box>
+        </Tooltip>
+      )}
+      {isBackgroundUnrecoverable && (
+        <Text size="xs" c="chatbox-tertiary" mt={2}>
+          {t('The original task cannot be resumed. Please send a new image generation request.')}
+        </Text>
+      )}
       <ImageGenerationResultGallery images={imageRecord?.generatedImages ?? []} />
       <Collapse in={expanded && hasDetail}>
         <Box

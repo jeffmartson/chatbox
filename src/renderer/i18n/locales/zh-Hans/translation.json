@@ -1237,5 +1237,10 @@
   "Your points are used up": "点数已用完",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "当前额度周期的点数已用完。升级套餐后即可继续使用。",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "您已达到免费套餐每日点数上限。请升级套餐获得更多点数额度，或等待每日凌晨点数重置",
-  "Upgrade plan": "升级套餐"
+  "Upgrade plan": "升级套餐",
+  "Another image is being generated. Please wait.": "正在生成另一张图片，请稍候。",
+  "Image generation interrupted": "图片生成已中断",
+  "The original task cannot be resumed. Please send a new image generation request.": "原任务无法恢复，请重新发送生图请求。",
+  "This chat is no longer available.": "该对话已不存在。",
+  "Unable to resume image generation.": "无法恢复图片生成。"
 }

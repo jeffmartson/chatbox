@@ -1237,5 +1237,10 @@
   "Your points are used up": "Vos points sont épuisés",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "Votre quota pour la période en cours est épuisé. Mettez votre plan à niveau pour continuer.",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Vos points gratuits du jour sont épuisés. Ils sont réinitialisés chaque jour ; mettez votre plan à niveau pour continuer maintenant.",
-  "Upgrade plan": "Mettre le plan à niveau"
+  "Upgrade plan": "Mettre le plan à niveau",
+  "Another image is being generated. Please wait.": "Une autre image est en cours de génération. Veuillez patienter.",
+  "Image generation interrupted": "Génération de l’image interrompue",
+  "The original task cannot be resumed. Please send a new image generation request.": "La tâche d’origine ne peut pas être reprise. Veuillez envoyer une nouvelle demande de génération d’image.",
+  "This chat is no longer available.": "Cette conversation n’est plus disponible.",
+  "Unable to resume image generation.": "Impossible de reprendre la génération de l’image."
 }

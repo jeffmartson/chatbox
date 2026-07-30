@@ -1237,5 +1237,10 @@
   "Your points are used up": "Your points are used up",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "Your quota for the current period is used up. Upgrade your plan to continue.",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.",
-  "Upgrade plan": "Upgrade plan"
+  "Upgrade plan": "Upgrade plan",
+  "Another image is being generated. Please wait.": "Another image is being generated. Please wait.",
+  "Image generation interrupted": "Image generation interrupted",
+  "The original task cannot be resumed. Please send a new image generation request.": "The original task cannot be resumed. Please send a new image generation request.",
+  "This chat is no longer available.": "This chat is no longer available.",
+  "Unable to resume image generation.": "Unable to resume image generation."
 }

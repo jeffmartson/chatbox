@@ -1237,5 +1237,10 @@
   "Your points are used up": "ポイントを使い切りました",
   "Your quota for the current period is used up. Upgrade your plan to continue.": "現在の期間のポイントを使い切りました。続行するにはプランをアップグレードしてください。",
   "Today's free points are used up. Free points reset daily; upgrade your plan to continue now.": "本日の無料ポイントを使い切りました。無料ポイントは毎日リセットされます。今すぐ続行するにはプランをアップグレードしてください。",
-  "Upgrade plan": "プランをアップグレード"
+  "Upgrade plan": "プランをアップグレード",
+  "Another image is being generated. Please wait.": "別の画像を生成中です。しばらくお待ちください。",
+  "Image generation interrupted": "画像生成が中断されました",
+  "The original task cannot be resumed. Please send a new image generation request.": "元のタスクは再開できません。新しい画像生成リクエストを送信してください。",
+  "This chat is no longer available.": "このチャットは利用できなくなりました。",
+  "Unable to resume image generation.": "画像生成を再開できませんでした。"
 }

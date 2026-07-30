@@ -6,8 +6,8 @@ import storage from '@/storage'
 import { startImageGeneration } from '@/stores/imageGenerationActions'
 import { imageGenerationStore } from '@/stores/imageGenerationStore'
 import { settingsStore } from '@/stores/settingsStore'
-import { queueBackgroundTaskNotification } from './background-follow-up'
 import { getComputePointsRemainingRatio } from './compute-points'
+import { queueImageTaskCompletion, queueImageTaskCompletionError } from './image-task-follow-up'
 import { ChatboxCliUsageError, integerFlag, stringFlag } from './parser'
 import type { ChatboxCliCommandContext, ChatboxCliCommandDefinition } from './types'
 
@@ -82,10 +82,10 @@ function compactRecord(record: ImageGeneration): Record<string, unknown> {
                 modelShouldPoll: false,
               }
             : {
-                mode: 'manual_resume',
+                mode: record.taskId ? 'manual_resume' : 'manual_retry',
                 managedBy: 'chatbox',
                 modelShouldPoll: false,
-                location: 'Image Creator',
+                ...(record.taskId ? { location: 'original chat or Image Creator' } : { requiresNewApproval: true }),
               },
         }
       : {}),
@@ -120,7 +120,9 @@ function restoredExecutionResult(record: ImageGeneration): Record<string, unknow
     recordId: record.id,
     ...compactRecord(record),
     message: waitingForCompletion
-      ? 'This image request was already submitted. Do not submit it again or poll it; open Image Creator to resume or inspect it.'
+      ? record.taskId
+        ? 'This image request was already submitted. Do not submit it again or poll it; resume it from the original chat or Image Creator.'
+        : 'This image generation was interrupted without a resumable task id. Do not submit it again without new user approval.'
       : 'This tool call is already linked to the returned image record and was not submitted again.',
   }
 }
@@ -295,6 +297,11 @@ async function generateImage(context: ChatboxCliCommandContext): Promise<Record<
         imageGenerateNum: count,
         aspectRatio,
         dalleStyle,
+        source: {
+          type: 'chatbox_cli',
+          sessionId,
+          toolCallId,
+        },
       },
       {
         onRecordCreated: async (record) => {
@@ -310,35 +317,10 @@ async function generateImage(context: ChatboxCliCommandContext): Promise<Record<
 
     void handle.completion
       .then((record) => {
-        if (!record || (record.status !== 'done' && record.status !== 'error')) return
-        const finishedAt = Date.now()
-        queueBackgroundTaskNotification(sessionId, toolCallId, {
-          id: `image-generation:${record.id}:${record.status}`,
-          type: 'image_generation',
-          status: record.status === 'done' ? 'completed' : 'failed',
-          recordId: record.id,
-          startedAt: handle.startedAt,
-          finishedAt,
-          elapsedMs: Math.max(0, finishedAt - handle.startedAt),
-          summary:
-            record.status === 'done'
-              ? `${record.generatedImages.length} image(s) generated. Use "chatbox image status ${record.id}" to inspect the result references.`
-              : `Image generation failed: ${record.error?.slice(0, 500) ?? 'Unknown error'}`,
-        })
+        if (record) queueImageTaskCompletion(record, { sessionId, toolCallId }, handle.startedAt)
       })
       .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error)
-        const finishedAt = Date.now()
-        queueBackgroundTaskNotification(sessionId, toolCallId, {
-          id: `image-generation:${handle.recordId}:completion-error`,
-          type: 'image_generation',
-          status: 'failed',
-          recordId: handle.recordId,
-          startedAt: handle.startedAt,
-          finishedAt,
-          elapsedMs: Math.max(0, finishedAt - handle.startedAt),
-          summary: `Unable to read image generation result: ${message.slice(0, 500)}`,
-        })
+        queueImageTaskCompletionError(handle.recordId, handle.startedAt, { sessionId, toolCallId }, error)
       })
 
     return {

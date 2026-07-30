@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const submitImageGenerationMock = vi.fn()
 const pollTaskUntilCompleteMock = vi.fn()
+const pollImageTaskMock = vi.fn()
 const createRecordMock = vi.fn()
 const updateRecordMock = vi.fn()
+const getImageGenerationByIdMock = vi.fn()
 const setQueryDataMock = vi.fn()
 const invalidateQueriesMock = vi.fn()
 const getImageMock = vi.fn()
@@ -23,7 +25,7 @@ vi.mock('@/packages/remote', () => ({
   IMAGE_GENERATION_POLL_INTERVAL_MS: 2000,
   submitImageGeneration: submitImageGenerationMock,
   pollTaskUntilComplete: pollTaskUntilCompleteMock,
-  pollImageTask: vi.fn(),
+  pollImageTask: pollImageTaskMock,
 }))
 
 vi.mock('./imageGenerationStore', () => ({
@@ -71,7 +73,11 @@ vi.mock('@/lib/utils', () => ({
 }))
 
 vi.mock('@/platform', () => ({
-  default: {},
+  default: {
+    getImageGenerationStorage: () => ({
+      getById: getImageGenerationByIdMock,
+    }),
+  },
 }))
 
 vi.mock('@/storage', () => ({
@@ -102,6 +108,22 @@ describe('imageGenerationActions reference image payload', () => {
       ],
     })
     getImageMock.mockResolvedValue('data:image/png;base64,AAAA')
+    getImageGenerationByIdMock.mockResolvedValue({
+      id: 'record-1',
+      prompt: 'make an image',
+      referenceImages: [],
+      generatedImages: [],
+      createdAt: 1_000,
+      model: { provider: 'chatbox-ai', modelId: 'gpt-image-1' },
+      imageGenerateNum: 1,
+      status: 'generating',
+      taskId: 'task-1',
+      source: {
+        type: 'chatbox_cli',
+        sessionId: 'session-1',
+        toolCallId: 'tool-1',
+      },
+    })
   })
 
   it('sends reference images as image_url entries for both URLs and stored images', async () => {
@@ -182,6 +204,48 @@ describe('imageGenerationActions reference image payload', () => {
     releasePersistence?.()
     await handlePromise
     await vi.waitFor(() => expect(submitImageGenerationMock).toHaveBeenCalledOnce())
+  })
+
+  it('returns the terminal record when resuming an existing backend task', async () => {
+    pollImageTaskMock.mockResolvedValueOnce({
+      is_finished: true,
+      items: [
+        {
+          status: 'completed',
+          image_url: 'https://example.com/resumed.png',
+          thumbnail_url: 'https://example.com/resumed-thumbnail.png',
+        },
+      ],
+    })
+    updateRecordMock.mockResolvedValueOnce({
+      id: 'record-1',
+      prompt: 'make an image',
+      referenceImages: [],
+      generatedImages: ['https://example.com/resumed.png'],
+      generatedImageThumbnails: ['https://example.com/resumed-thumbnail.png'],
+      createdAt: 1_000,
+      model: { provider: 'chatbox-ai', modelId: 'gpt-image-1' },
+      imageGenerateNum: 1,
+      status: 'done',
+      taskId: 'task-1',
+      source: {
+        type: 'chatbox_cli',
+        sessionId: 'session-1',
+        toolCallId: 'tool-1',
+      },
+    })
+
+    const { resumeGeneration } = await import('./imageGenerationActions')
+
+    await expect(resumeGeneration('record-1')).resolves.toMatchObject({
+      id: 'record-1',
+      status: 'done',
+      source: {
+        type: 'chatbox_cli',
+        sessionId: 'session-1',
+        toolCallId: 'tool-1',
+      },
+    })
   })
 
   it('stores structured error codes from Chatbox AI image generation failures', async () => {

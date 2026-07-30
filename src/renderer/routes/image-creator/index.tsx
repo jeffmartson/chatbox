@@ -35,10 +35,11 @@ import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import useVersion from '@/hooks/useVersion'
 import { getLogger } from '@/lib/utils'
+import { resumeImageGenerationWithFollowUp } from '@/packages/chatbox-cli/image-task-follow-up'
 import storage from '@/storage'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
 import { useAuthInfoStore } from '@/stores/authInfoStore'
-import { cancelGeneration, createAndGenerate, resumeGeneration, retryGeneration } from '@/stores/imageGenerationActions'
+import { cancelGeneration, createAndGenerate, retryGeneration } from '@/stores/imageGenerationActions'
 import {
   deleteRecord,
   IMAGE_GEN_LIST_QUERY_KEY,
@@ -587,7 +588,7 @@ function ImageCreatorPage() {
 
                   {currentRecord.status === 'generating' && currentRecord.taskId && !isCurrentlyGenerating && (
                     <Flex justify="center" w="100%">
-                      <Button variant="light" onClick={() => void resumeGeneration(currentRecord.id)}>
+                      <Button variant="light" onClick={() => void resumeImageGenerationWithFollowUp(currentRecord.id)}>
                         {t('Resume Generation')}
                       </Button>
                     </Flex>
