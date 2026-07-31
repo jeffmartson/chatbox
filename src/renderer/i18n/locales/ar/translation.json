@@ -1258,5 +1258,19 @@
   "1 follow-up message": "رسالة متابعة واحدة",
   "{{count}} follow-up messages": "{{count}} من رسائل المتابعة",
   "Showing {{shown}} of {{total}} other replies": "يتم عرض {{shown}} من أصل {{total}} من الردود الأخرى",
-  "Switch to this branch": "التبديل إلى هذا الفرع"
+  "Switch to this branch": "التبديل إلى هذا الفرع",
+  "Auto-scroll new messages to top": "التمرير التلقائي للرسائل الجديدة إلى الأعلى",
+  "Brand Color": "لون العلامة التجارية",
+  "Claude Classic": "Claude كلاسيكي",
+  "Color Presets": "إعدادات الألوان المسبقة",
+  "Custom Preset {{number}}": "إعداد مسبق مخصص {{number}}",
+  "Full Width": "العرض الكامل",
+  "Mist Blue": "أزرق ضبابي",
+  "Primary Background": "الخلفية الأساسية",
+  "Reset Colors": "إعادة تعيين الألوان",
+  "Save Current Colors": "حفظ الألوان الحالية",
+  "Secondary Background": "الخلفية الثانوية",
+  "Standard Width": "العرض القياسي",
+  "Tertiary Background": "الخلفية الثالثة",
+  "unknown source": "مصدر غير معروف"
 }

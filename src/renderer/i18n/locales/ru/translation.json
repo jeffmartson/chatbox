@@ -1258,5 +1258,19 @@
   "1 follow-up message": "1 последующее сообщение",
   "{{count}} follow-up messages": "Последующих сообщений: {{count}}",
   "Showing {{shown}} of {{total}} other replies": "Показано {{shown}} из {{total}} других ответов",
-  "Switch to this branch": "Перейти на эту ветку"
+  "Switch to this branch": "Перейти на эту ветку",
+  "Auto-scroll new messages to top": "Автоматически прокручивать новые сообщения вверх",
+  "Brand Color": "Фирменный цвет",
+  "Claude Classic": "Claude Classic",
+  "Color Presets": "Предустановки цветов",
+  "Custom Preset {{number}}": "Пользовательская предустановка {{number}}",
+  "Full Width": "На всю ширину",
+  "Mist Blue": "Mist Blue",
+  "Primary Background": "Основной фон",
+  "Reset Colors": "Сбросить цвета",
+  "Save Current Colors": "Сохранить текущие цвета",
+  "Secondary Background": "Вторичный фон",
+  "Standard Width": "Стандартная ширина",
+  "Tertiary Background": "Третичный фон",
+  "unknown source": "неизвестный источник"
 }

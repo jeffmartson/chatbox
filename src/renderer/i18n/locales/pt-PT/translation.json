@@ -1258,5 +1258,19 @@
   "1 follow-up message": "1 mensagem de seguimento",
   "{{count}} follow-up messages": "{{count}} mensagens de seguimento",
   "Showing {{shown}} of {{total}} other replies": "A mostrar {{shown}} de {{total}} outras respostas",
-  "Switch to this branch": "Mudar para este ramo"
+  "Switch to this branch": "Mudar para este ramo",
+  "Auto-scroll new messages to top": "Deslocar automaticamente novas mensagens para o topo",
+  "Brand Color": "Cor da Marca",
+  "Claude Classic": "Claude Clássico",
+  "Color Presets": "Predefinições de Cor",
+  "Custom Preset {{number}}": "Predefinição Personalizada {{number}}",
+  "Full Width": "Largura total",
+  "Mist Blue": "Azul Névoa",
+  "Primary Background": "Fundo Primário",
+  "Reset Colors": "Repor Cores",
+  "Save Current Colors": "Guardar Cores Atuais",
+  "Secondary Background": "Fundo Secundário",
+  "Standard Width": "Largura padrão",
+  "Tertiary Background": "Fundo Terciário",
+  "unknown source": "fonte desconhecida"
 }

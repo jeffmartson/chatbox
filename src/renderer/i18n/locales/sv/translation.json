@@ -1258,5 +1258,19 @@
   "1 follow-up message": "1 uppföljningsmeddelande",
   "{{count}} follow-up messages": "{{count}} uppföljningsmeddelanden",
   "Showing {{shown}} of {{total}} other replies": "Visar {{shown}} av {{total}} andra svar",
-  "Switch to this branch": "Byt till den här grenen"
+  "Switch to this branch": "Byt till den här grenen",
+  "Auto-scroll new messages to top": "Autoscrolla nya meddelanden till toppen",
+  "Brand Color": "Varumärkesfärg",
+  "Claude Classic": "Claude Klassisk",
+  "Color Presets": "Förinställda färger",
+  "Custom Preset {{number}}": "Anpassad förinställning {{number}}",
+  "Full Width": "Full bredd",
+  "Mist Blue": "Dimblå",
+  "Primary Background": "Primär bakgrund",
+  "Reset Colors": "Återställ färger",
+  "Save Current Colors": "Spara nuvarande färger",
+  "Secondary Background": "Sekundär bakgrund",
+  "Standard Width": "Standardbredd",
+  "Tertiary Background": "Tertiär bakgrund",
+  "unknown source": "Okänd källa"
 }

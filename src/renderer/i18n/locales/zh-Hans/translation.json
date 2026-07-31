@@ -1258,5 +1258,19 @@
   "1 follow-up message": "还有 1 条后续消息",
   "{{count}} follow-up messages": "还有 {{count}} 条后续消息",
   "Showing {{shown}} of {{total}} other replies": "已显示其他回答中的 {{shown}} / {{total}} 条",
-  "Switch to this branch": "切换到该分支"
+  "Switch to this branch": "切换到该分支",
+  "Auto-scroll new messages to top": "新消息自动滚动到顶部",
+  "Brand Color": "品牌颜色",
+  "Claude Classic": "Claude 经典",
+  "Color Presets": "预设颜色",
+  "Custom Preset {{number}}": "自定义预设 {{number}}",
+  "Full Width": "全宽",
+  "Mist Blue": "迷雾蓝",
+  "Primary Background": "主背景",
+  "Reset Colors": "重置颜色",
+  "Save Current Colors": "保存当前颜色",
+  "Secondary Background": "次要背景",
+  "Standard Width": "标准宽度",
+  "Tertiary Background": "第三背景",
+  "unknown source": "未知来源"
 }

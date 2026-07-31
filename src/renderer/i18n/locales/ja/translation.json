@@ -1258,5 +1258,19 @@
   "1 follow-up message": "後続メッセージ 1 件",
   "{{count}} follow-up messages": "後続メッセージ {{count}} 件",
   "Showing {{shown}} of {{total}} other replies": "他の回答 {{total}} 件中 {{shown}} 件を表示",
-  "Switch to this branch": "この分岐に切り替える"
+  "Switch to this branch": "この分岐に切り替える",
+  "Auto-scroll new messages to top": "新しいメッセージを自動的に上部へスクロールする",
+  "Brand Color": "ブランドカラー",
+  "Claude Classic": "Claude クラシック",
+  "Color Presets": "カラープリセット",
+  "Custom Preset {{number}}": "カスタムプリセット {{number}}",
+  "Full Width": "全幅",
+  "Mist Blue": "ミストブルー",
+  "Primary Background": "プライマリ背景",
+  "Reset Colors": "色をリセット",
+  "Save Current Colors": "現在の色を保存",
+  "Secondary Background": "セカンダリ背景",
+  "Standard Width": "標準幅",
+  "Tertiary Background": "ターシャリ背景",
+  "unknown source": "不明なソース"
 }
