@@ -191,21 +191,14 @@ export function RouteComponent() {
             value={currentInterfaceColors.brand}
             onCommit={(value) => setInterfaceColor('brand', value)}
           />
-          <Button variant="subtle" size="compact-sm" onClick={resetInterfaceColors}>
-            {t('Reset Colors')}
-          </Button>
+          <Flex gap="xs">
+            <Button onClick={resetInterfaceColors}>{t('Reset Colors')}</Button>
+            <Button leftSection={<IconDeviceFloppy size={14} />} onClick={saveInterfaceColorPreset}>
+              {t('Save Current Colors')}
+            </Button>
+          </Flex>
           <Stack gap="xxs">
-            <Flex align="center" justify="space-between">
-              <Text size="sm">{t('Color Presets')}</Text>
-              <Button
-                variant="subtle"
-                size="compact-sm"
-                leftSection={<IconDeviceFloppy size={14} />}
-                onClick={saveInterfaceColorPreset}
-              >
-                {t('Save Current Colors')}
-              </Button>
-            </Flex>
+            <Text size="sm">{t('Color Presets')}</Text>
             <Flex gap="xs" wrap="wrap">
               {colorPresets.map((preset) => (
                 <Flex key={preset.id} gap={2} align="center">
