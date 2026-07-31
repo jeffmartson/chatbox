@@ -118,62 +118,59 @@ export function RouteComponent() {
       <Title order={5}>{t('General Settings')}</Title>
 
       {/* Display Settings */}
-      <Stack gap="md">
+      <Stack gap="lg" maw={720}>
         <Title order={5}>{t('Display Settings')}</Title>
 
-        {/* language */}
-        <AdaptiveSelect
-          maw={320}
-          comboboxProps={{ withinPortal: true }}
-          value={settings.language}
-          data={languages.map((language) => ({
-            value: language,
-            label: languageNameMap[language],
-            // style: language === 'ar' ? { fontFamily: 'Cairo, Arial, sans-serif' } : {},
-          }))}
-          label={t('Language')}
-          styles={{
-            label: {
-              fontWeight: 400,
-            },
-          }}
-          onChange={(val) => {
-            if (val) {
-              setSettings({
-                language: val as Language,
-              })
-            }
-          }}
-        />
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <AdaptiveSelect
+            comboboxProps={{ withinPortal: true }}
+            value={settings.language}
+            data={languages.map((language) => ({
+              value: language,
+              label: languageNameMap[language],
+              // style: language === 'ar' ? { fontFamily: 'Cairo, Arial, sans-serif' } : {},
+            }))}
+            label={t('Language')}
+            styles={{
+              label: {
+                fontWeight: 400,
+              },
+            }}
+            onChange={(val) => {
+              if (val) {
+                setSettings({
+                  language: val as Language,
+                })
+              }
+            }}
+          />
+          <AdaptiveSelect
+            comboboxProps={{ withinPortal: true, withArrow: true }}
+            label={t('Theme')}
+            styles={{
+              label: {
+                fontWeight: 400,
+              },
+            }}
+            data={[
+              { value: `${Theme.System}`, label: t('Follow System') },
+              { value: `${Theme.Light}`, label: t('Light Mode') },
+              { value: `${Theme.Dark}`, label: t('Dark Mode') },
+            ]}
+            value={`${settings.theme}`}
+            onChange={(val) => {
+              if (val) {
+                setSettings({
+                  theme: parseInt(val),
+                })
+              }
+            }}
+          />
+        </SimpleGrid>
 
-        {/* theme */}
-        <AdaptiveSelect
-          maw={320}
-          comboboxProps={{ withinPortal: true, withArrow: true }}
-          label={t('Theme')}
-          styles={{
-            label: {
-              fontWeight: 400,
-            },
-          }}
-          data={[
-            { value: `${Theme.System}`, label: t('Follow System') },
-            { value: `${Theme.Light}`, label: t('Light Mode') },
-            { value: `${Theme.Dark}`, label: t('Dark Mode') },
-          ]}
-          value={`${settings.theme}`}
-          onChange={(val) => {
-            if (val) {
-              setSettings({
-                theme: parseInt(val),
-              })
-            }
-          }}
-        />
-
-        <Stack gap="xs" maw={320}>
-          <SimpleGrid cols={2} spacing="xs">
-            <Stack gap="xs">
+        <Stack gap="md">
+          <SimpleGrid cols={2} spacing="md">
+            <Stack gap="md">
               <InterfaceColorInput
                 label={t('Primary Background')}
                 value={currentInterfaceColors.backgroundPrimary}
@@ -185,7 +182,7 @@ export function RouteComponent() {
                 onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
               />
             </Stack>
-            <Stack gap="xs">
+            <Stack gap="md">
               <InterfaceColorInput
                 label={t('Tertiary Background')}
                 value={currentInterfaceColors.backgroundTertiary}
@@ -247,7 +244,7 @@ export function RouteComponent() {
             step={1}
             min={10}
             max={22}
-            maw={320}
+            maw={720}
             marks={[
               {
                 value: 14,
