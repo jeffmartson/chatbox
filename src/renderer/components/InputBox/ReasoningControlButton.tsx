@@ -82,28 +82,30 @@ export default function ReasoningControlButton({
       transitionProps={{ transition: 'pop', duration: 200 }}
     >
       <Menu.Target>
-        <Tooltip label={t('Thinking: {{level}}', { level: levelLabel })} position="top" withArrow>
-          <UnstyledButton
-            data-testid={TestId.reasoning.trigger}
-            className={
-              'flex items-center gap-1 px-2 py-1 rounded-lg ' +
-              'hover:bg-[var(--chatbox-background-tertiary)] transition-colors'
-            }
-            style={{ color: LEVEL_COLORS[level] }}
-            aria-label={t('Thinking: {{level}}', { level: levelLabel })}
-          >
-            {compact ? (
-              <CompactReasoningLevelIcon level={level} size={iconSize} />
-            ) : (
-              <>
-                <IconBrain size={iconSize} strokeWidth={1.8} />
-                <Text span size="xs" fw={500} className="whitespace-nowrap" c="inherit">
-                  {levelLabel}
-                </Text>
-              </>
-            )}
-          </UnstyledButton>
-        </Tooltip>
+        <span className="inline-flex">
+          <Tooltip label={t('Thinking: {{level}}', { level: levelLabel })} position="top" withArrow>
+            <UnstyledButton
+              data-testid={TestId.reasoning.trigger}
+              className={
+                'flex items-center gap-1 px-2 py-1 rounded-lg ' +
+                'hover:bg-[var(--chatbox-background-tertiary)] transition-colors'
+              }
+              style={{ color: LEVEL_COLORS[level] }}
+              aria-label={t('Thinking: {{level}}', { level: levelLabel })}
+            >
+              {compact ? (
+                <CompactReasoningLevelIcon level={level} size={iconSize} />
+              ) : (
+                <>
+                  <IconBrain size={iconSize} strokeWidth={1.8} />
+                  <Text span size="xs" fw={500} className="whitespace-nowrap" c="inherit">
+                    {levelLabel}
+                  </Text>
+                </>
+              )}
+            </UnstyledButton>
+          </Tooltip>
+        </span>
       </Menu.Target>
       <Menu.Dropdown data-testid={TestId.reasoning.menu}>
         <Menu.Label fw={600}>{t('Thinking Effort')}</Menu.Label>

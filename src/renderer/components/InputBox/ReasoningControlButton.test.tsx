@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { MantineProvider } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import { ModelProviderEnum, type ProviderModelInfo, type ProviderOptions } from '@shared/types'
 import { describe, expect, test, vi } from 'vitest'
-import { render, screen } from '@/test-utils'
+import { fireEvent, render, screen, waitFor } from '@/test-utils'
 import ReasoningControlButton from './ReasoningControlButton'
 
 Object.defineProperty(window, 'matchMedia', {
@@ -72,5 +73,14 @@ describe('ReasoningControlButton', () => {
     renderButton(false)
 
     expect(screen.getByRole('button', { name: 'Thinking: High' }).textContent).toBe('High')
+  })
+
+  test('opens the effort menu when the trigger is clicked', async () => {
+    renderButton(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thinking: High' }))
+
+    await waitFor(() => expect(screen.getByTestId(TestId.reasoning.menu)).toBeTruthy())
+    expect(screen.getByTestId(TestId.reasoning.level('default'))).toBeTruthy()
   })
 })
