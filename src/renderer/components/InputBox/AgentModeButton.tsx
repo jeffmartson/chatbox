@@ -1,6 +1,6 @@
-import { Popover, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Popover, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
-import { IconRobot } from '@tabler/icons-react'
+import { IconRobot, IconX } from '@tabler/icons-react'
 import { useLocation } from '@tanstack/react-router'
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -29,6 +29,15 @@ const MODE_COLORS: Record<AgentModeValue, string> = {
 
 const OPEN_DELAY = 100
 const CLOSE_DELAY = 250
+const WEB_SEARCH_MOVED_TIP_DISMISSED_KEY = 'chatbox.web-search-moved-tip-dismissed.v1'
+
+function isWebSearchMovedTipDismissed() {
+  try {
+    return window.localStorage.getItem(WEB_SEARCH_MOVED_TIP_DISMISSED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 const AgentModeButton: FC<AgentModeButtonProps> = ({
   sessionId,
@@ -45,6 +54,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   const { t } = useTranslation()
   const location = useLocation()
   const [opened, setOpened] = useState(false)
+  const [showWebSearchMovedTip, setShowWebSearchMovedTip] = useState(() => !isWebSearchMovedTipDismissed())
   const openTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const entry = useSessionAgentMode(sessionId)
@@ -87,6 +97,16 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
     setOpened(false)
   }, [])
 
+  const handleDismissWebSearchMovedTip = useCallback(() => {
+    setShowWebSearchMovedTip(false)
+    setOpened(false)
+    try {
+      window.localStorage.setItem(WEB_SEARCH_MOVED_TIP_DISMISSED_KEY, 'true')
+    } catch {
+      // Keep the tip dismissed for this render even if persistent storage is unavailable.
+    }
+  }, [])
+
   useEffect(() => {
     return () => {
       clearTimeout(openTimerRef.current)
@@ -104,43 +124,82 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
     <Popover
       position="top-start"
       withArrow
+      arrowOffset={showWebSearchMovedTip ? 18 : 5}
       shadow="md"
-      opened={opened && !settingsOpened && !disabled}
+      opened={(showWebSearchMovedTip || opened) && !settingsOpened && !disabled}
       onChange={setOpened}
       keepMounted
       transitionProps={{ transition: 'pop', duration: 200 }}
     >
       <Popover.Target>
-        <UnstyledButton
-          disabled={disabled}
-          title={disabled ? t('This model does not support Agent Mode') : undefined}
-          onMouseEnter={disabled ? undefined : handleMouseEnter}
-          onMouseLeave={disabled ? undefined : handleMouseLeave}
-          className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${disabled ? '' : 'hover:bg-[var(--chatbox-background-tertiary)]'}`}
-          style={{ color, opacity: disabled ? 0.5 : undefined }}
-        >
-          <IconRobot size={iconSize} strokeWidth={1.8} />
-          <span className="text-xs font-medium whitespace-nowrap">{modeLabel}</span>
-        </UnstyledButton>
+        <span className="inline-flex">
+          <Tooltip
+            label={t(
+              'This model is older and has limited capabilities, so it does not support more advanced features.'
+            )}
+            disabled={!disabled}
+            position="top-start"
+            withArrow
+            openDelay={0}
+          >
+            <span
+              className="inline-flex"
+              style={{ cursor: disabled ? 'not-allowed' : undefined }}
+              tabIndex={disabled ? 0 : undefined}
+            >
+              <UnstyledButton
+                disabled={disabled}
+                onMouseEnter={disabled || showWebSearchMovedTip ? undefined : handleMouseEnter}
+                onMouseLeave={disabled || showWebSearchMovedTip ? undefined : handleMouseLeave}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${disabled ? '' : 'hover:bg-[var(--chatbox-background-tertiary)]'}`}
+                style={{
+                  color,
+                  opacity: disabled ? 0.5 : undefined,
+                  pointerEvents: disabled ? 'none' : undefined,
+                }}
+              >
+                <IconRobot size={iconSize} strokeWidth={1.8} />
+                <span className="text-xs font-medium whitespace-nowrap">{modeLabel}</span>
+              </UnstyledButton>
+            </span>
+          </Tooltip>
+        </span>
       </Popover.Target>
       <Popover.Dropdown
-        p={0}
+        p={showWebSearchMovedTip ? 'sm' : 0}
+        w={showWebSearchMovedTip ? 280 : undefined}
         style={{ overflow: 'visible' }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseEnter={showWebSearchMovedTip ? undefined : handleMouseEnter}
+        onMouseLeave={showWebSearchMovedTip ? undefined : handleMouseLeave}
       >
-        <AgentModePanel
-          sessionId={sessionId}
-          providerId={providerId}
-          modelId={modelId}
-          modelSupportsAgentMode={modelSupportsAgentMode}
-          webBrowsingMode={webBrowsingMode}
-          onWebBrowsingChange={onWebBrowsingChange}
-          currentKnowledgeBaseId={currentKnowledgeBaseId}
-          onKnowledgeBaseSelect={onKnowledgeBaseSelect}
-          onSkillSelect={onSkillSelect}
-          onClose={handleClose}
-        />
+        {showWebSearchMovedTip ? (
+          <div className="flex items-start gap-2" role="status">
+            <div className="min-w-0 flex-1">
+              <Text size="sm" fw={600}>
+                {t('Web Search has moved')}
+              </Text>
+              <Text size="xs" c="dimmed" mt={2}>
+                {t('Web Search is now available in the mode menu.')}
+              </Text>
+            </div>
+            <ActionIcon variant="subtle" size="sm" aria-label={t('Close')} onClick={handleDismissWebSearchMovedTip}>
+              <IconX size={14} />
+            </ActionIcon>
+          </div>
+        ) : (
+          <AgentModePanel
+            sessionId={sessionId}
+            providerId={providerId}
+            modelId={modelId}
+            modelSupportsAgentMode={modelSupportsAgentMode}
+            webBrowsingMode={webBrowsingMode}
+            onWebBrowsingChange={onWebBrowsingChange}
+            currentKnowledgeBaseId={currentKnowledgeBaseId}
+            onKnowledgeBaseSelect={onKnowledgeBaseSelect}
+            onSkillSelect={onSkillSelect}
+            onClose={handleClose}
+          />
+        )}
       </Popover.Dropdown>
     </Popover>
   )

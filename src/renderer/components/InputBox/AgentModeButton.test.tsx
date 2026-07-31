@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { MantineProvider } from '@mantine/core'
-import { render, screen } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -40,7 +40,7 @@ vi.mock('./AgentModePanel', () => ({ default: () => null }))
 import AgentModeButton from './AgentModeButton'
 
 function renderButton(modelSupportsAgentMode: boolean) {
-  render(
+  return render(
     <MantineProvider>
       <AgentModeButton
         sessionId="session-1"
@@ -55,17 +55,42 @@ function renderButton(modelSupportsAgentMode: boolean) {
 }
 
 describe('AgentModeButton', () => {
-  test('is disabled when the selected model does not support agent tools', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  test('is disabled and explains why when the selected model does not support agent tools', async () => {
     renderButton(false)
 
     const button = screen.getByRole('button', { name: 'Chat Mode' })
     expect(button).toHaveProperty('disabled', true)
-    expect(button.getAttribute('title')).toBe('This model does not support Agent Mode')
+
+    fireEvent.mouseEnter(button.parentElement as HTMLElement)
+
+    expect(
+      await screen.findByText(
+        'This model is older and has limited capabilities, so it does not support more advanced features.'
+      )
+    ).toBeTruthy()
   })
 
   test('remains enabled for a model that supports agent tools', () => {
     renderButton(true)
 
     expect(screen.getByRole('button', { name: 'Work Mode' })).toHaveProperty('disabled', false)
+  })
+
+  test('shows the Web Search migration tip until the user dismisses it', () => {
+    const view = renderButton(true)
+
+    expect(screen.getByText('Web Search has moved')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(screen.queryByText('Web Search has moved')).toBeNull()
+    expect(window.localStorage.getItem('chatbox.web-search-moved-tip-dismissed.v1')).toBe('true')
+
+    view.unmount()
+    renderButton(true)
+    expect(screen.queryByText('Web Search has moved')).toBeNull()
   })
 })
