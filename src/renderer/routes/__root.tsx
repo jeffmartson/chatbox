@@ -304,7 +304,11 @@ function Root() {
   }, [needRoomForMacWindowControls])
 
   return (
-    <Box className="box-border App relative" spellCheck={spellCheck} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <Box
+      className="box-border App relative bg-chatbox-background-primary"
+      spellCheck={spellCheck}
+      dir={language === 'ar' ? 'rtl' : 'ltr'}
+    >
       <BackgroundImageOverlay />
       {platform.type === 'desktop' && (getOS() === 'Windows' || getOS() === 'Linux') && <ExitFullscreenButton />}
       <Grid container className="h-full relative z-[1]">

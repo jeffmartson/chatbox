@@ -150,7 +150,7 @@ export default function Sidebar() {
       }}
       sx={{
         '& .MuiDrawer-paper': {
-          backgroundColor: 'var(--chatbox-background-primary)',
+          backgroundColor: 'transparent',
           backgroundImage: 'none',
           border: 0,
           boxSizing: 'border-box',
