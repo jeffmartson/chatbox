@@ -192,7 +192,9 @@ export function RouteComponent() {
             onCommit={(value) => setInterfaceColor('brand', value)}
           />
           <Flex gap="xs">
-            <Button onClick={resetInterfaceColors}>{t('Reset Colors')}</Button>
+            <Button variant="outline" onClick={resetInterfaceColors}>
+              {t('Reset Colors')}
+            </Button>
             <Button leftSection={<IconDeviceFloppy size={14} />} onClick={saveInterfaceColorPreset}>
               {t('Save Current Colors')}
             </Button>
