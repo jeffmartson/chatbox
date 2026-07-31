@@ -80,6 +80,7 @@ export function settings(): Settings {
     userAvatarKey: '',
     defaultAssistantAvatarKey: '',
     backgroundImageKey: '',
+    backgroundImageOpacity: 0.16,
     theme: Theme.System,
     interfaceColors: getDefaultInterfaceColors(),
     interfaceColorPresets: [],

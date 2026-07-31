@@ -71,6 +71,7 @@ import { blobToDataUrl } from './image-creator/-components/constants'
 function BackgroundImageOverlay() {
   const location = useLocation()
   const globalBackgroundImageKey = useSettingsStore((s) => s.backgroundImageKey)
+  const backgroundImageOpacity = useSettingsStore((s) => s.backgroundImageOpacity)
   const showSidebar = useUIStore((s) => s.showSidebar)
   const sidebarWidth = useSidebarWidth()
   const isRootPage = location.pathname === '/'
@@ -106,11 +107,12 @@ function BackgroundImageOverlay() {
   return (
     <div className="absolute z-0 top-0 left-0 w-full h-full">
       <div
-        className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-[0.16]"
+        className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `
           url("${imageUrl.replace(/"/g, '%22')}")
         `,
+          opacity: backgroundImageOpacity,
         }}
       />
       <div className="hidden sm:block absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-chatbox-background-primary from-0 to-transparent to-100%" />
@@ -123,13 +125,25 @@ function BackgroundImageOverlay() {
         />
       )}
 
-      <Flex h={48} className="sm:hidden bg-chatbox-background-primary" />
+      <Flex h={54} className="sm:hidden bg-chatbox-background-primary" />
 
       <Flex className="sm:hidden relative h-36 bg-gradient-to-b from-chatbox-background-primary from-0 to-transparent to-100%" />
 
       <Flex className="sm:hidden absolute bottom-0 left-0 w-full h-36 bg-gradient-to-t from-chatbox-background-primary from-0 to-transparent to-100%" />
     </div>
   )
+}
+
+function useHasBackgroundImage() {
+  const location = useLocation()
+  const globalBackgroundImageKey = useSettingsStore((s) => s.backgroundImageKey)
+  const isRootPage = location.pathname === '/'
+  const isSessionPage = location.pathname.startsWith('/session/') && location.pathname.length > '/session/'.length
+  const sessionId =
+    isSessionPage && location.pathname !== '/session/new' ? location.pathname.slice('/session/'.length) : null
+  const { session } = useSession(sessionId)
+
+  return (isRootPage || isSessionPage) && Boolean(session?.backgroundImage ?? globalBackgroundImageKey)
 }
 
 function Root() {
@@ -139,6 +153,7 @@ function Root() {
   const location = useLocation()
   const spellCheck = useSettingsStore((state) => state.spellCheck)
   const language = useLanguage()
+  const hasBackgroundImage = useHasBackgroundImage()
   const initialized = useRef(false)
 
   const setOpenAboutDialog = useUIStore((s) => s.setOpenAboutDialog)
@@ -345,7 +360,9 @@ function Root() {
             }}
           >
             <Box
-              className="h-full overflow-hidden bg-chatbox-background-primary border-[0.5px] border-solid border-chatbox-border-primary"
+              className={`h-full overflow-hidden border-[0.5px] border-solid border-chatbox-border-primary ${
+                hasBackgroundImage ? 'bg-transparent' : 'bg-chatbox-background-primary'
+              }`}
               sx={{
                 borderRadius: { xs: 0, sm: '16px' },
                 boxShadow: { xs: 'none', sm: '0 0 22px rgba(0, 0, 0, 0.11)' },

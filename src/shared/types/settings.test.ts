@@ -34,6 +34,15 @@ describe('SettingsSchema RAG default models', () => {
   })
 })
 
+describe('SettingsSchema background image opacity', () => {
+  test('uses the original opacity for existing settings', () => {
+    const legacySettings: Record<string, unknown> = { ...defaultSettings() }
+    delete legacySettings.backgroundImageOpacity
+
+    expect(SettingsSchema.parse(legacySettings).backgroundImageOpacity).toBe(0.16)
+  })
+})
+
 describe('SettingsSchema shortcut compatibility', () => {
   test('adds the new thread shortcut when loading settings without the historical key', () => {
     const shortcuts: Record<string, unknown> = { ...defaultSettings().shortcuts }

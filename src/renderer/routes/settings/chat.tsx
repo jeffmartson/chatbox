@@ -248,6 +248,17 @@ export function RouteComponent() {
               )}
             </Flex>
           </Flex>
+          {!!settings.backgroundImageKey && (
+            <Stack gap="xxs">
+              <Text size="sm">{t('Background Image Opacity (%)')}</Text>
+              <SliderWithInput
+                value={Math.round(settings.backgroundImageOpacity * 100)}
+                onChange={(value) => setSettings({ backgroundImageOpacity: (value ?? 16) / 100 })}
+                max={100}
+                step={1}
+              />
+            </Stack>
+          )}
         </Stack>
 
         {/* Stream output */}
