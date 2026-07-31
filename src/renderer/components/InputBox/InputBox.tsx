@@ -1649,9 +1649,9 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               <Flex align="center" gap={0}>
                 <AttachmentMenu onImageUploadClick={onImageUploadClick} onFileUploadClick={onFileUploadClick} t={t} />
 
-                {/* Web Search - hidden only when agent mode is actually active (its own
-                    panel owns web search then); shown for off/auto and on mobile/web. */}
-                {!agentModeUIState.isActive && (
+                {/* Desktop owns Web Search in AgentModePanel for both Chat and Work modes.
+                    Mobile/Web keep this standalone entry because they do not render that panel. */}
+                {platform.type !== 'desktop' && (
                   <Tooltip label={t('Web Search')} position="top" withArrow disabled={isSmallScreen}>
                     <UnstyledButton
                       onClick={() => {

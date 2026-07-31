@@ -63,7 +63,9 @@ vi.mock('@/analytics/agent-mode', () => ({
 
 vi.mock('@/packages/mcp/controller', () => ({
   mcpController: {
-    getAvailableTools: () => ({}),
+    getAvailableTools: () => ({
+      mcp_tool: { execute: async () => ({}) },
+    }),
   },
 }))
 
@@ -257,6 +259,7 @@ describe('buildToolsForSession', () => {
     expect(result.tools.load_skill).toBeUndefined()
     expect(result.tools.chatbox_cli).toBeUndefined()
     expect(result.tools.user_exec).toBeUndefined()
+    expect(result.tools.mcp_tool).toBeUndefined()
     expect(result.instructions).not.toContain('## Skills')
     expect(result.instructions).not.toContain('Chatbox Account CLI')
     expect(result.instructions).not.toContain('## Tool-use Communication')
@@ -264,6 +267,40 @@ describe('buildToolsForSession', () => {
     for (const name of sandboxToolNames) {
       expect(result.tools[name]).toBeUndefined()
     }
+  })
+
+  test('agentMode="off" exposes selected Knowledge Base without Work Mode tools', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      knowledgeBase: { id: 1, name: 'Product Docs' },
+      messages: [],
+      agentMode: 'off',
+    })
+
+    expect(result.tools.kb_search).toBeDefined()
+    expect(result.instructions).toContain('kb toolset')
+    expect(result.tools.mcp_tool).toBeUndefined()
+    expect(result.tools.load_skill).toBeUndefined()
+    expect(result.tools.user_exec).toBeUndefined()
+    expect(result.tools.list_files).toBeUndefined()
+    expect(result.tools.code_execution).toBeUndefined()
+    expect(discoverSkillsMock).not.toHaveBeenCalled()
+  })
+
+  test('agentMode="off" can combine Web Search and Knowledge Base', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: true,
+      knowledgeBase: { id: 1, name: 'Product Docs' },
+      messages: [],
+      agentMode: 'off',
+    })
+
+    expect(result.tools.web_search).toBeDefined()
+    expect(result.tools.kb_search).toBeDefined()
+    expect(result.tools.mcp_tool).toBeUndefined()
+    expect(result.tools.load_skill).toBeUndefined()
   })
 
   test('agentMode="on" — has all tools', async () => {
@@ -283,11 +320,28 @@ describe('buildToolsForSession', () => {
     const result = await buildToolsForSession(model, options)
 
     expect(result.tools.load_skill).toBeDefined()
+    expect(result.tools.mcp_tool).toBeDefined()
+    expect(result.tools.kb_search).toBeUndefined()
     // Sandbox tools NOT present when code_execution is active
     for (const name of sandboxToolNames) {
       expect(result.tools[name]).toBeUndefined()
     }
     expect(result.tools.code_execution).toBeDefined()
+  })
+
+  test('agentMode="on" keeps Knowledge Base alongside Work Mode tools', async () => {
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      webBrowsing: false,
+      knowledgeBase: { id: 1, name: 'Product Docs' },
+      messages: [],
+      agentMode: 'on',
+    })
+
+    expect(result.tools.kb_search).toBeDefined()
+    expect(result.tools.mcp_tool).toBeDefined()
+    expect(result.tools.load_skill).toBeDefined()
+    expect(result.tools.list_files).toBeDefined()
   })
 
   test('normalizes Windows paths and prefers PowerShell without redundant directory changes', async () => {

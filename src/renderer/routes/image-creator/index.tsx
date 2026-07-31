@@ -573,7 +573,7 @@ function ImageCreatorPage() {
                       <GeneratedImagesGallery
                         images={currentRecord.generatedImages}
                         onUseAsReference={(urlOrKey) => handleUseAsReference(urlOrKey, currentRecord.id)}
-                        onReport={isSmallScreen ? () => void handleReportGeneratedImage(currentRecord) : undefined}
+                        onReport={() => void handleReportGeneratedImage(currentRecord)}
                       />
                     </Flex>
                   )}

@@ -226,8 +226,8 @@ export async function buildToolsForSession(
 
   // Agent mode tools require model to support the 'agent' scope.
   // Models with weak function calling (e.g. DeepSeek V3/R1) return false here,
-  // so they won't get any agent-specific tools (MCP, sandbox, skills, KB, code execution).
-  // Web search is independent — it works outside agent mode.
+  // so they won't get agent-specific tools (MCP, sandbox, skills, code execution).
+  // Web search and Knowledge Base are independent — they work outside agent mode.
   const modelSupportsAgentTools = model.isSupportToolUse('agent')
   const includeAgentTools = agentMode === 'on' && modelSupportsAgentTools
 
@@ -238,7 +238,7 @@ export async function buildToolsForSession(
   // When code execution is enabled, file tools are replaced by code_execution + sandbox read_file.
   const needFileToolSet = !codeExecution && hasInlineFileOrLink && model.isSupportToolUse('read-file')
   const needSessionAttachmentRagToolSet = sessionAttachmentIds.length > 0 && model.isSupportToolUse('read-file')
-  const kbSupported = includeAgentTools && knowledgeBase && model.isSupportToolUse('knowledge-base')
+  const kbSupported = Boolean(knowledgeBase) && model.isSupportToolUse('knowledge-base')
   const webSupported = webBrowsing && model.isSupportToolUse('web-browsing')
   const searchProvider = settingActions.getExtensionSettings().webSearch.provider
   const includeParseLinkTool = webSupported && PROVIDERS_WITH_PARSE_LINK.has(searchProvider)

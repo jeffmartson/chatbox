@@ -65,7 +65,6 @@ import { cn } from '@/lib/utils'
 import { navigateToSettings } from '@/modals/Settings'
 import { copyToClipboard } from '@/packages/navigator'
 import { countWord } from '@/packages/word-count'
-import platform from '@/platform'
 import { getSession } from '@/stores/chatStore'
 import { lockSessionAgentMode, setSessionAgentMode } from '@/stores/session/agent-mode'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -618,7 +617,7 @@ const _Message: FC<Props> = (props) => {
         onClick: quoteMsg,
       },
       { divider: true },
-      ...(msg.role === 'assistant' && platform.type === 'mobile'
+      ...(msg.role === 'assistant'
         ? [
             {
               text: t('report'),
@@ -918,10 +917,7 @@ const _Message: FC<Props> = (props) => {
           ))}
         </Box>
         {props.sessionType === 'picture' && contentParts.filter((p) => p.type === 'image').length > 0 && (
-          <PictureGallery
-            pictures={contentParts.filter((p) => p.type === 'image')}
-            onReport={platform.type === 'mobile' ? onReport : undefined}
-          />
+          <PictureGallery pictures={contentParts.filter((p) => p.type === 'image')} onReport={onReport} />
         )}
         {isBubbleLayout && errorTipsElement}
         <Modal

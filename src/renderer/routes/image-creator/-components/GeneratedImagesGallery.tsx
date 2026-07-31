@@ -260,7 +260,7 @@ function GeneratedImageGalleryItem({
             }}
           />
 
-          {onReport && isSmallScreen && (
+          {onReport && (
             <Tooltip label={t('report')} withArrow disabled={isSmallScreen}>
               <ActionIcon
                 aria-label={t('report')}

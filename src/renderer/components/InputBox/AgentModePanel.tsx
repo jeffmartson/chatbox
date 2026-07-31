@@ -15,7 +15,7 @@ import {
 } from '@tabler/icons-react'
 import { Link } from '@tanstack/react-router'
 import { PlusIcon } from 'lucide-react'
-import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   trackAgentModeSelect,
@@ -125,7 +125,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     () => getAgentModeUIState(entry, modelSupportsAgentMode),
     [entry, modelSupportsAgentMode]
   )
-  const capabilitiesDisabled = agentModeUIState.capabilitiesDisabled
+  const workModeCapabilitiesDisabled = agentModeUIState.capabilitiesDisabled
 
   // Web Search state
   const webSearchProvider = useSettingsStore((s) => s.extension.webSearch.provider)
@@ -463,8 +463,10 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       className={`rounded outline-none focus-visible:ring-2 focus-visible:ring-[var(--chatbox-tint-brand)] ${
         active
           ? 'bg-[var(--mantine-color-gray-1)] dark:bg-[var(--mantine-color-dark-5)]'
-          : 'hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
-      } ${disabled ? '' : 'cursor-pointer'}`}
+          : disabled
+            ? ''
+            : 'hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
+      } ${disabled ? 'cursor-default opacity-50' : 'cursor-pointer'}`}
       onMouseEnter={(e) => handleExtensionHover(targetPage, e, subPanelAlign)}
       onMouseLeave={clearSubPanelOpenTimer}
       onFocus={(e) => handleExtensionHover(targetPage, e as unknown as React.MouseEvent, subPanelAlign)}
@@ -538,17 +540,16 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'web-search') {
       return (
         <>
-          <SubPanelHeader title={t('Web Search')} settingsPath="/web-search" disabled={capabilitiesDisabled} />
+          <SubPanelHeader title={t('Web Search')} settingsPath="/web-search" />
           <Divider my={4} />
           {WEB_SEARCH_PROVIDERS.map((provider) => {
             const available = isProviderAvailable(provider.value)
             const isSelected = webSearchProvider === provider.value
-            const isDisabled = capabilitiesDisabled || !available
             return (
               <Tooltip
                 key={provider.value}
                 label={t('Configure in Settings')}
-                disabled={capabilitiesDisabled || available}
+                disabled={available}
                 withArrow
                 position="right"
               >
@@ -558,14 +559,11 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                   px="sm"
                   py={6}
                   className={`rounded ${
-                    !isDisabled
+                    available
                       ? 'cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
                       : 'cursor-default opacity-50'
                   }`}
                   onClick={() => {
-                    if (capabilitiesDisabled) {
-                      return
-                    }
                     if (available) {
                       handleWebSearchProviderChange(provider.value)
                     } else {
@@ -589,7 +587,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'code-execution') {
       return (
         <>
-          <SubPanelHeader title={t('Code Execution')} disabled={capabilitiesDisabled} />
+          <SubPanelHeader title={t('Code Execution')} disabled={workModeCapabilitiesDisabled} />
           <Divider my={4} />
           <Flex
             justify="space-between"
@@ -598,12 +596,12 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             py={6}
             gap="sm"
             className={`rounded ${
-              capabilitiesDisabled
+              workModeCapabilitiesDisabled
                 ? 'cursor-default opacity-50'
                 : 'cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
             }`}
             onClick={() => {
-              if (capabilitiesDisabled) return
+              if (workModeCapabilitiesDisabled) return
               void updateAgentFullAccess(false)
             }}
           >
@@ -624,12 +622,12 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             py={6}
             gap="sm"
             className={`rounded ${
-              capabilitiesDisabled
+              workModeCapabilitiesDisabled
                 ? 'cursor-default opacity-50'
                 : 'cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/30'
             }`}
             onClick={() => {
-              if (capabilitiesDisabled) return
+              if (workModeCapabilitiesDisabled) return
               void updateAgentFullAccess(true)
             }}
           >
@@ -650,7 +648,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'skills') {
       return (
         <>
-          <SubPanelHeader title="Skills" settingsPath="/skills" disabled={capabilitiesDisabled} />
+          <SubPanelHeader title="Skills" settingsPath="/skills" disabled={workModeCapabilitiesDisabled} />
           <Divider my={4} />
           {skillsLoading ? (
             <Flex justify="center" py="md">
@@ -663,14 +661,14 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 px="sm"
                 py={6}
                 className={`rounded ${
-                  capabilitiesDisabled
+                  workModeCapabilitiesDisabled
                     ? 'cursor-default opacity-50'
                     : 'cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
                 }`}
                 gap="xs"
                 align="center"
                 onClick={() => {
-                  if (capabilitiesDisabled) return
+                  if (workModeCapabilitiesDisabled) return
                   onSkillSelect(skill.name)
                   onClose()
                 }}
@@ -693,9 +691,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               <Button
                 size="xs"
                 variant="light"
-                disabled={capabilitiesDisabled}
+                disabled={workModeCapabilitiesDisabled}
                 onClick={() => {
-                  if (capabilitiesDisabled) return
+                  if (workModeCapabilitiesDisabled) return
                   onClose()
                   navigateToSettings('/skills')
                 }}
@@ -712,7 +710,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'mcp') {
       return (
         <>
-          <SubPanelHeader title="MCP" settingsPath="/mcp" disabled={capabilitiesDisabled} />
+          <SubPanelHeader title="MCP" settingsPath="/mcp" disabled={workModeCapabilitiesDisabled} />
           <Divider my={4} />
           {isPremium && (
             <>
@@ -722,7 +720,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                   id={server.id}
                   name={server.name}
                   enabled={mcp.enabledBuiltinServers.includes(server.id)}
-                  disabled={capabilitiesDisabled}
+                  disabled={workModeCapabilitiesDisabled}
                   onEnabledChange={onMCPEnabledChange}
                 />
               ))}
@@ -735,7 +733,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               id={server.id}
               name={server.name}
               enabled={server.enabled}
-              disabled={capabilitiesDisabled}
+              disabled={workModeCapabilitiesDisabled}
               onEnabledChange={onMCPEnabledChange}
             />
           ))}
@@ -744,9 +742,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               <Button
                 size="xs"
                 variant="light"
-                disabled={capabilitiesDisabled}
+                disabled={workModeCapabilitiesDisabled}
                 onClick={() => {
-                  if (capabilitiesDisabled) return
+                  if (workModeCapabilitiesDisabled) return
                   onClose()
                   navigateToSettings('/mcp')
                 }}
@@ -763,7 +761,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'knowledge-base') {
       return (
         <>
-          <SubPanelHeader title={t('Knowledge Base')} settingsPath="/knowledge-base" disabled={capabilitiesDisabled} />
+          <SubPanelHeader title={t('Knowledge Base')} settingsPath="/knowledge-base" />
           <Divider my={4} />
           {knowledgeBases && knowledgeBases.length > 0 ? (
             knowledgeBases.map((kb) => (
@@ -773,13 +771,8 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 align="center"
                 px="sm"
                 py={6}
-                className={`rounded ${
-                  capabilitiesDisabled
-                    ? 'cursor-default opacity-50'
-                    : 'cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
-                }`}
+                className="rounded cursor-pointer hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]"
                 onClick={() => {
-                  if (capabilitiesDisabled) return
                   onKnowledgeBaseSelect(kb.id === currentKnowledgeBaseId ? null : kb)
                   onClose()
                 }}
@@ -795,20 +788,11 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             ))
           ) : (
             <Group justify="center" py="md">
-              <Link
-                to="/settings/knowledge-base"
-                onClick={(e: MouseEvent<HTMLAnchorElement>) => {
-                  if (capabilitiesDisabled) {
-                    e.preventDefault()
-                  }
-                }}
-              >
+              <Link to="/settings/knowledge-base">
                 <Button
                   size="xs"
                   variant="light"
-                  disabled={capabilitiesDisabled}
                   onClick={() => {
-                    if (capabilitiesDisabled) return
                     onClose()
                   }}
                 >
@@ -825,7 +809,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     if (page === 'working-directory') {
       return (
         <>
-          <SubPanelHeader title={t('Working Directory')} disabled={capabilitiesDisabled} />
+          <SubPanelHeader title={t('Working Directory')} disabled={workModeCapabilitiesDisabled} />
           <Divider my={4} />
           <Text size="xs" c="dimmed" px="sm" pb={4}>
             {t('Grant the agent read/write access to local folders without per-action approval.')}
@@ -844,10 +828,10 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 variant="subtle"
                 size={20}
                 color="red"
-                disabled={capabilitiesDisabled}
+                disabled={workModeCapabilitiesDisabled}
                 aria-label={t('Remove')}
                 onClick={() => {
-                  if (capabilitiesDisabled) return
+                  if (workModeCapabilitiesDisabled) return
                   void handleRemoveWorkingDirectory(dir)
                 }}
               >
@@ -859,9 +843,9 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             <Button
               size="xs"
               variant="light"
-              disabled={capabilitiesDisabled}
+              disabled={workModeCapabilitiesDisabled}
               onClick={() => {
-                if (capabilitiesDisabled) return
+                if (workModeCapabilitiesDisabled) return
                 void handleAddWorkingDirectory()
               }}
             >
@@ -928,8 +912,8 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
           )}
         </Stack>
 
-        {/* Capabilities - always visible, disabled when off */}
-        <div style={capabilitiesDisabled ? { opacity: 0.5 } : undefined}>
+        {/* Independent capabilities stay available in Chat Mode; agent capabilities require Work Mode. */}
+        <div>
           {/* Built-in capabilities */}
           <Divider my={4} mx="sm" label={t('Built-in')} labelPosition="left" />
 
@@ -939,21 +923,19 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             subtitle={webBrowsingMode ? webSearchProviderLabel : undefined}
             active={page === 'web-search'}
             page="web-search"
-            disabled={capabilitiesDisabled}
             subPanelAlign="top"
             rightContent={
               <Flex gap="xs" align="center" className="shrink-0">
                 <Switch
                   checked={webBrowsingMode}
                   size="xs"
-                  disabled={capabilitiesDisabled}
                   onChange={(e) => {
                     e.stopPropagation()
                     const enabled = e.currentTarget.checked
                     trackWebSearchClick(
                       {
                         sessionId,
-                        mode: 'work_mode',
+                        mode: agentModeUIState.isActive ? 'work_mode' : 'chat_mode',
                         provider: providerId,
                         model: modelId,
                       },
@@ -973,7 +955,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             label={t('Code Execution')}
             active={page === 'code-execution'}
             page="code-execution"
-            disabled={capabilitiesDisabled}
+            disabled={workModeCapabilitiesDisabled}
             subPanelAlign="top"
             rightContent={
               <Flex gap="xs" align="center" className="shrink-0">
@@ -1000,7 +982,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             badge={enabledSkillNames.length > 0 ? enabledSkillNames.length : undefined}
             active={page === 'skills'}
             page="skills"
-            disabled={capabilitiesDisabled}
+            disabled={workModeCapabilitiesDisabled}
           />
 
           <ExtensionRow
@@ -1009,7 +991,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             badge={enabledMCPCount > 0 ? enabledMCPCount : undefined}
             active={page === 'mcp'}
             page="mcp"
-            disabled={capabilitiesDisabled}
+            disabled={workModeCapabilitiesDisabled}
           />
 
           <ExtensionRow
@@ -1018,7 +1000,6 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
             subtitle={selectedKB?.name}
             active={page === 'knowledge-base'}
             page="knowledge-base"
-            disabled={capabilitiesDisabled}
           />
 
           {supportsWorkingDirectories && (
@@ -1028,7 +1009,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               badge={workingDirectories.length > 0 ? workingDirectories.length : undefined}
               active={page === 'working-directory'}
               page="working-directory"
-              disabled={capabilitiesDisabled}
+              disabled={workModeCapabilitiesDisabled}
             />
           )}
         </div>

@@ -44,8 +44,15 @@ const mocks = vi.hoisted(() => {
     setAgentModeSmartSwitchingDefault: vi.fn(),
     setNewSessionState: vi.fn(),
   }
+  const agentModeEntry = {
+    value: 'on' as 'auto' | 'on' | 'off',
+    locked: false,
+    lockReason: null,
+  }
+  const knowledgeBases: Array<{ id: number; name: string }> = []
+  const trackWebSearchClickMock = vi.fn()
 
-  return { settingsState, uiState }
+  return { agentModeEntry, knowledgeBases, settingsState, trackWebSearchClickMock, uiState }
 })
 
 vi.mock('react-i18next', () => ({
@@ -53,8 +60,15 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
+vi.mock('@/analytics/agent-mode', () => ({
+  trackAgentModeSelect: vi.fn(),
+  trackCodeExecutionClick: vi.fn(),
+  trackSmartSwitchingClick: vi.fn(),
+  trackWebSearchClick: mocks.trackWebSearchClickMock,
+}))
+
 vi.mock('@/hooks/knowledge-base', () => ({
-  useKnowledgeBases: () => ({ data: [] }),
+  useKnowledgeBases: () => ({ data: mocks.knowledgeBases }),
 }))
 
 vi.mock('@/hooks/mcp', () => ({
@@ -78,7 +92,7 @@ vi.mock('@/packages/skills/controller', () => ({
 }))
 
 vi.mock('@/platform', () => ({
-  default: { type: 'desktop' },
+  default: { type: 'desktop', openDirectoryDialog: vi.fn() },
 }))
 
 vi.mock('@/stores/chatStore', () => ({
@@ -93,7 +107,7 @@ vi.mock('@/stores/premiumActions', () => ({
 
 vi.mock('@/stores/session/agent-mode', () => ({
   setSessionAgentMode: vi.fn(),
-  useSessionAgentMode: () => ({ value: 'on', locked: false, lockReason: null }),
+  useSessionAgentMode: () => mocks.agentModeEntry,
 }))
 
 vi.mock('@/stores/settingsStore', () => ({
@@ -117,13 +131,19 @@ const defaultProps: ComponentProps<typeof AgentModePanel> = {
   onClose: vi.fn(),
 }
 
-function renderPanel() {
+function renderPanel(props: Partial<ComponentProps<typeof AgentModePanel>> = {}) {
   return render(
     <MantineProvider>
-      <AgentModePanel {...defaultProps} />
+      <AgentModePanel {...defaultProps} {...props} />
     </MantineProvider>
   )
 }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.agentModeEntry.value = 'on'
+  mocks.knowledgeBases.splice(0)
+})
 
 describe('AgentModePanel submenu hover behavior', () => {
   beforeEach(() => {
@@ -176,5 +196,60 @@ describe('AgentModePanel submenu hover behavior', () => {
     fireEvent.mouseLeave(panel as Element)
 
     expect(screen.getAllByText('Skills')).toHaveLength(1)
+  })
+})
+
+describe('AgentModePanel capability availability', () => {
+  test('keeps Web Search and Knowledge Base enabled in Chat Mode', () => {
+    mocks.agentModeEntry.value = 'off'
+    renderPanel()
+
+    expect(screen.getByRole('button', { name: 'Web Search' }).getAttribute('aria-disabled')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Knowledge Base' }).getAttribute('aria-disabled')).toBe('false')
+    expect(screen.getByRole('button', { name: /^Code Execution/ }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Skills' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'MCP' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Working Directory' }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  test('tracks and updates Web Search from Chat Mode', () => {
+    mocks.agentModeEntry.value = 'off'
+    const onWebBrowsingChange = vi.fn()
+    renderPanel({ onWebBrowsingChange })
+
+    const webSearchRow = screen.getByRole('button', { name: 'Web Search' })
+    const webSearchSwitch = webSearchRow.querySelector('input[type="checkbox"]')
+    expect(webSearchSwitch).not.toBeNull()
+    fireEvent.click(webSearchSwitch as HTMLInputElement)
+
+    expect(onWebBrowsingChange).toHaveBeenCalledWith(true)
+    expect(mocks.trackWebSearchClickMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'chat_mode', sessionId: 'new' }),
+      true,
+      'build-in'
+    )
+  })
+
+  test('allows selecting a Knowledge Base from Chat Mode', () => {
+    mocks.agentModeEntry.value = 'off'
+    mocks.knowledgeBases.push({ id: 1, name: 'Product Docs' })
+    const onKnowledgeBaseSelect = vi.fn()
+    const onClose = vi.fn()
+    renderPanel({ onKnowledgeBaseSelect, onClose })
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Knowledge Base' }))
+    fireEvent.click(screen.getByText('Product Docs'))
+
+    expect(onKnowledgeBaseSelect).toHaveBeenCalledWith({ id: 1, name: 'Product Docs' })
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  test('keeps all capability rows enabled in Work Mode', () => {
+    renderPanel()
+
+    for (const name of ['Web Search', 'Skills', 'MCP', 'Knowledge Base', 'Working Directory']) {
+      expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe('false')
+    }
+    expect(screen.getByRole('button', { name: /^Code Execution/ }).getAttribute('aria-disabled')).toBe('false')
   })
 })
