@@ -13,6 +13,7 @@ import { scheduleGenerateNameAndThreadName, scheduleGenerateThreadName } from '@
 import * as settingActions from '@/stores/settingActions'
 import { useUIStore } from '@/stores/uiStore'
 import Divider from '../common/Divider'
+import { getAutoTitleGenerationAction } from './auto-title'
 import Toolbar from './Toolbar'
 import WindowControls from './WindowControls'
 
@@ -32,15 +33,10 @@ export default function Header(props: { session: Session }) {
       return
     }
 
-    const hasGeneratingMessage = currentSession.messages.some((msg) => msg.generating)
-
-    if (hasGeneratingMessage || currentSession.messages.length < 2) {
-      return
-    }
-
-    if (currentSession.name === 'Untitled') {
+    const action = getAutoTitleGenerationAction(currentSession)
+    if (action === 'session-and-thread') {
       scheduleGenerateNameAndThreadName(currentSession.id)
-    } else if (!currentSession.threadName) {
+    } else if (action === 'thread') {
       scheduleGenerateThreadName(currentSession.id)
     }
   }, [currentSession])

@@ -533,7 +533,13 @@ export async function orchestrateGeneration(
       // already-aborted controller. shouldSuggestAgentMode() swallows the abort
       // and returns normally, so this won't reach the catch block below.
       if (controller.signal.aborted) {
-        targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [] }
+        targetMsg = {
+          ...targetMsg,
+          generating: false,
+          cancel: undefined,
+          status: [],
+          finishReason: 'canceled',
+        }
         await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
         return
       }
@@ -746,6 +752,7 @@ export async function orchestrateGeneration(
         generating: false,
         cancel: undefined,
         status: [],
+        finishReason: 'canceled',
       }
       await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
       return

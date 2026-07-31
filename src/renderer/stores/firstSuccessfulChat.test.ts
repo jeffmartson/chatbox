@@ -16,11 +16,10 @@ import {
   FIRST_SUCCESSFUL_CHAT_KEY,
   getHasCompletedFirstSuccessfulChat,
   hasSuccessfulConversation,
-  hasSuccessfulUserAssistantTurn,
-  isSuccessfulAssistantReply,
   markFirstSuccessfulChatCompleted,
   resetFirstSuccessfulChatForDebug,
 } from './firstSuccessfulChat'
+import { hasSuccessfulUserAssistantTurn, isSuccessfulAssistantReply } from './session/message-success'
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>()
@@ -194,6 +193,10 @@ describe('firstSuccessfulChat', () => {
     expect(isSuccessfulAssistantReply(textMessage('assistant', '', { generating: true }))).toBe(false)
     expect(isSuccessfulAssistantReply(textMessage('assistant', 'failed', { error: 'boom' }))).toBe(false)
     expect(isSuccessfulAssistantReply(textMessage('assistant', 'failed', { errorCode: 500 }))).toBe(false)
+    expect(isSuccessfulAssistantReply(textMessage('assistant', 'partial', { finishReason: 'canceled' }))).toBe(false)
+    expect(isSuccessfulAssistantReply(textMessage('assistant', 'blocked', { finishReason: 'content-filter' }))).toBe(
+      false
+    )
     expect(
       isSuccessfulAssistantReply(
         textMessage('assistant', '', {

@@ -88,6 +88,7 @@ import { isMessageReminderPresentation, resolveMessageErrorPresentation } from '
 import { shouldRightAlignMessage } from './message-layout'
 import { getMessageRoleClass } from './message-role-class'
 import { createMessageTimelineLayout } from './message-timeline'
+import { getMessageTokenDisplay } from './message-token-display'
 import { PictureGallery } from './PictureGallery'
 
 // Reset an assistant message back to a clean generating state, reusing the same
@@ -363,8 +364,13 @@ const _Message: FC<Props> = (props) => {
       tips.push({ label: props.msg.model || 'unknown', tooltip: t('Model') as string })
     }
     if (showTokenUsed && msg.role === 'assistant' && !msg.generating) {
-      const tokens = msg.usage?.totalTokens ? msg.usage.totalTokens : msg.tokensUsed
-      if (tokens) tips.push({ label: `${tokens} tokens`, tooltip: t('Total tokens consumed') as string })
+      const consumedTokens = getMessageTokenDisplay(msg)
+      if (consumedTokens) {
+        tips.push({
+          label: `${consumedTokens} tokens`,
+          tooltip: t('Total tokens consumed') as string,
+        })
+      }
     }
     if (showWordCount && !msg.generating) {
       const wc = msg.wordCount !== undefined ? msg.wordCount : countWord(getMessageText(msg))

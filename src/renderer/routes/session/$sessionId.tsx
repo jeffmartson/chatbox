@@ -208,7 +208,11 @@ function RouteComponent() {
     }
     if (lastGeneratingMessage?.generating) {
       lastGeneratingMessage?.cancel?.()
-      void modifyMessage(currentSession.id, { ...lastGeneratingMessage, generating: false }, true)
+      void modifyMessage(
+        currentSession.id,
+        { ...lastGeneratingMessage, generating: false, finishReason: 'canceled' },
+        true
+      )
     }
     return true
   }, [currentSession, lastGeneratingMessage])

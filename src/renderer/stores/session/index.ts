@@ -14,7 +14,6 @@
  * - Export (1): Export functionality
  */
 
-export { createAttachmentResolver } from './attachment-resolver'
 export {
   createDefaultAgentModeEntry,
   getSessionAgentModeEntry,
@@ -23,6 +22,7 @@ export {
   setSessionAgentMode,
   useSessionAgentMode,
 } from './agent-mode'
+export { createAttachmentResolver } from './attachment-resolver'
 // CRUD operations (8 functions)
 export {
   clear,
@@ -48,6 +48,7 @@ export {
   getSessionWebBrowsing,
   regenerateInNewFork,
 } from './generation'
+export { hasSuccessfulUserAssistantTurn, isSuccessfulAssistantReply } from './message-success'
 // Message operations (5 functions)
 export {
   insertMessage,
