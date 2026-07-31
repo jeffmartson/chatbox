@@ -153,6 +153,10 @@ function _otherI18nKeys(t: (key: string) => string) {
   t('Keyboard Shortcuts')
   t('General Settings')
 
+  // src/shared/theme-colors.ts, rendered dynamically in settings/general.tsx
+  t('Claude Classic')
+  t('Mist Blue')
+
   // src/renderer/components/common/MessageLayoutPreview.tsx
   t('Left-aligned')
   t('Chat bubbles')
