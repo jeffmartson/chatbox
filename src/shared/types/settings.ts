@@ -397,6 +397,12 @@ const InterfaceColorsSchema = z
   })
   .catch(getDefaultInterfaceColors())
 
+const InterfaceColorPresetSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  colors: InterfaceColorsSchema,
+})
+
 const DefaultModelSelectionSchema = z
   .object({
     provider: z.string(),
@@ -486,6 +492,7 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
 
   theme: z.nativeEnum(Theme),
   interfaceColors: InterfaceColorsSchema,
+  interfaceColorPresets: z.array(InterfaceColorPresetSchema).default([]),
   language: z.enum([
     'en',
     'zh-Hans',

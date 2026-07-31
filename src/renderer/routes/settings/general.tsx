@@ -1,5 +1,7 @@
 import {
+  ActionIcon,
   Alert,
+  Badge,
   Button,
   Checkbox,
   Divider,
@@ -15,13 +17,15 @@ import {
 import {
   getDefaultInterfaceColors,
   INTERFACE_COLOR_PRESETS,
+  type InterfaceColorPreset,
   type InterfaceColors,
   type InterfaceThemeColors,
+  withColorOpacity,
 } from '@shared/theme-colors'
 import { type Language, Theme } from '@shared/types'
 import { formatFileSize } from '@shared/utils'
 import { getBackupFilename } from '@shared/utils/backup'
-import { IconInfoCircle } from '@tabler/icons-react'
+import { IconDeviceFloppy, IconInfoCircle, IconTrash } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
 import dayjs from 'dayjs'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -82,6 +86,32 @@ export function RouteComponent() {
     })
   }
 
+  const saveInterfaceColorPreset = () => {
+    setSettings((draft) => {
+      const currentColors = draft.interfaceColors ?? getDefaultInterfaceColors()
+      draft.interfaceColorPresets ??= []
+      draft.interfaceColorPresets.push({
+        id: crypto.randomUUID(),
+        label: t('Custom Preset {{number}}', { number: draft.interfaceColorPresets.length + 1 }),
+        colors: {
+          light: { ...currentColors.light },
+          dark: { ...currentColors.dark },
+        },
+      })
+    })
+  }
+
+  const deleteInterfaceColorPreset = (presetId: string) => {
+    setSettings((draft) => {
+      draft.interfaceColorPresets = (draft.interfaceColorPresets ?? []).filter((preset) => preset.id !== presetId)
+    })
+  }
+
+  const colorPresets = [
+    ...INTERFACE_COLOR_PRESETS.map((preset) => ({ ...preset, isCustom: false })),
+    ...(settings.interfaceColorPresets ?? []).map((preset) => ({ ...preset, isCustom: true })),
+  ] satisfies Array<InterfaceColorPreset & { isCustom: boolean }>
+
   return (
     <Stack p="md" gap="xl">
       <Title order={5}>{t('General Settings')}</Title>
@@ -141,21 +171,6 @@ export function RouteComponent() {
         />
 
         <Stack gap="xs" maw={320}>
-          <Stack gap="xxs">
-            <Text size="sm">{t('Color Presets')}</Text>
-            <Flex gap="xs" wrap="wrap">
-              {INTERFACE_COLOR_PRESETS.map((preset) => (
-                <Button
-                  key={preset.id}
-                  variant="default"
-                  size="compact-sm"
-                  onClick={() => applyInterfaceColorPreset(preset.colors)}
-                >
-                  {t(preset.label)}
-                </Button>
-              ))}
-            </Flex>
-          </Stack>
           <InterfaceColorInput
             label={t('Primary Background')}
             value={currentInterfaceColors.backgroundPrimary}
@@ -179,6 +194,48 @@ export function RouteComponent() {
           <Button variant="subtle" size="compact-sm" onClick={resetInterfaceColors}>
             {t('Reset Colors')}
           </Button>
+          <Stack gap="xxs">
+            <Flex align="center" justify="space-between">
+              <Text size="sm">{t('Color Presets')}</Text>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                leftSection={<IconDeviceFloppy size={14} />}
+                onClick={saveInterfaceColorPreset}
+              >
+                {t('Save Current Colors')}
+              </Button>
+            </Flex>
+            <Flex gap="xs" wrap="wrap">
+              {colorPresets.map((preset) => (
+                <Flex key={preset.id} gap={2} align="center">
+                  <Badge
+                    component="button"
+                    type="button"
+                    variant="filled"
+                    style={{
+                      backgroundColor: withColorOpacity(preset.colors[realTheme].brand, 0.6),
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => applyInterfaceColorPreset(preset.colors)}
+                  >
+                    {t(preset.label)}
+                  </Badge>
+                  {preset.isCustom && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="sm"
+                      aria-label={t('Delete')}
+                      onClick={() => deleteInterfaceColorPreset(preset.id)}
+                    >
+                      <IconTrash size={14} />
+                    </ActionIcon>
+                  )}
+                </Flex>
+              ))}
+            </Flex>
+          </Stack>
         </Stack>
 
         {/* Font Size */}

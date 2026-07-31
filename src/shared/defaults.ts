@@ -82,6 +82,7 @@ export function settings(): Settings {
     backgroundImageKey: '',
     theme: Theme.System,
     interfaceColors: getDefaultInterfaceColors(),
+    interfaceColorPresets: [],
     language: 'en',
     fontSize: 14,
     spellCheck: true,

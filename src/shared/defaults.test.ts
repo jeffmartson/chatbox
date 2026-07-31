@@ -14,6 +14,7 @@ describe('defaults', () => {
     expect(result.fontSize).toBe(14)
     expect(result.spellCheck).toBe(true)
     expect(result.interfaceColors).toEqual(DEFAULT_INTERFACE_COLORS)
+    expect(result.interfaceColorPresets).toEqual([])
     expect(result.showWordCount).toBe(false)
     expect(result.showTokenCount).toBe(false)
     expect(result.showTokenUsed).toBe(true)
@@ -51,6 +52,24 @@ describe('defaults', () => {
       light: { ...legacySettings.interfaceColors.light, brand: DEFAULT_INTERFACE_COLORS.light.brand },
       dark: { ...legacySettings.interfaceColors.dark, brand: DEFAULT_INTERFACE_COLORS.dark.brand },
     })
+  })
+
+  it('uses an empty preset collection for legacy settings', () => {
+    const legacySettings = { ...settings(), interfaceColorPresets: undefined }
+
+    expect(SettingsSchema.parse(legacySettings).interfaceColorPresets).toEqual([])
+  })
+
+  it('preserves saved interface color presets', () => {
+    const customPreset = {
+      id: 'f9a591a3-7f5e-4ae9-b856-f9d8e2fdceda',
+      label: 'Custom Preset 1',
+      colors: DEFAULT_INTERFACE_COLORS,
+    }
+
+    expect(
+      SettingsSchema.parse({ ...settings(), interfaceColorPresets: [customPreset] }).interfaceColorPresets
+    ).toEqual([customPreset])
   })
 
   it('settings() returns enableMarkdownRendering as true', () => {

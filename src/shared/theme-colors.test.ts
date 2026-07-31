@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INTERFACE_COLOR_PRESETS } from './theme-colors'
+import { INTERFACE_COLOR_PRESETS, withColorOpacity } from './theme-colors'
 
 describe('INTERFACE_COLOR_PRESETS', () => {
   it('provides the requested Claude and Mist Blue presets', () => {
@@ -24,5 +24,9 @@ describe('INTERFACE_COLOR_PRESETS', () => {
         brand: expect.stringMatching(/^#[0-9a-f]{6}$/i),
       })
     }
+  })
+
+  it('uses a 60% alpha channel for preset badge backgrounds', () => {
+    expect(withColorOpacity('#d97757', 0.6)).toBe('#d9775799')
   })
 })

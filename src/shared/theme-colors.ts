@@ -9,6 +9,12 @@ export type InterfaceThemeColors = {
 
 export type InterfaceColors = Record<InterfaceTheme, InterfaceThemeColors>
 
+export type InterfaceColorPreset = {
+  id: string
+  label: string
+  colors: InterfaceColors
+}
+
 export const INTERFACE_COLOR_PRESETS = [
   {
     id: 'claude-classic',
@@ -46,7 +52,7 @@ export const INTERFACE_COLOR_PRESETS = [
       },
     },
   },
-] satisfies ReadonlyArray<{ id: string; label: string; colors: InterfaceColors }>
+] satisfies ReadonlyArray<InterfaceColorPreset>
 
 export const DEFAULT_INTERFACE_COLORS: InterfaceColors = {
   light: {
@@ -68,4 +74,9 @@ export function getDefaultInterfaceColors(): InterfaceColors {
     light: { ...DEFAULT_INTERFACE_COLORS.light },
     dark: { ...DEFAULT_INTERFACE_COLORS.dark },
   }
+}
+
+export function withColorOpacity(color: string, opacity: number): string {
+  const alpha = Math.round(Math.min(Math.max(opacity, 0), 1) * 255)
+  return `${color}${alpha.toString(16).padStart(2, '0')}`
 }
