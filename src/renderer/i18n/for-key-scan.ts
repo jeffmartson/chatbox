@@ -152,8 +152,8 @@ function _otherI18nKeys(t: (key: string) => string) {
   t('General Settings')
 
   // src/renderer/components/common/MessageLayoutPreview.tsx
-  t('Classic')
-  t('Bubble')
+  t('Left-aligned')
+  t('Chat bubbles')
 
   // src/renderer/modals/ExportChat.tsx
   t('All threads')

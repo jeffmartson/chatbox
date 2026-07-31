@@ -85,6 +85,7 @@ import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
 import { isMessageReminderPresentation, resolveMessageErrorPresentation } from './message-error-presentation'
+import { shouldRightAlignMessage } from './message-layout'
 import { getMessageRoleClass } from './message-role-class'
 import { createMessageTimelineLayout } from './message-timeline'
 import { PictureGallery } from './PictureGallery'
@@ -639,7 +640,7 @@ const _Message: FC<Props> = (props) => {
   const isErrorReminder = msg.error ? isMessageReminderPresentation(resolveMessageErrorPresentation(msg)) : false
   const isClassicLayout = !isBubbleLayout
   const isClassicMessage = isClassicLayout && (msg.role === 'assistant' || msg.role === 'user')
-  const isRightAlignedMessage = isUserBubble || (isClassicLayout && msg.role === 'user')
+  const isRightAlignedMessage = shouldRightAlignMessage(messageLayout, msg.role)
   const messageRoleClass = getMessageRoleClass(msg.role)
   const shouldShowAvatar = showAvatar ?? true
   const statusElements = <MessageStatuses statuses={leadingStatuses} />
@@ -1118,20 +1119,33 @@ const _Message: FC<Props> = (props) => {
           },
         }}
       >
-        <Flex justify={isRightAlignedMessage ? 'flex-end' : 'flex-start'} className="w-full min-w-0">
+        <Flex gap="xs" align="flex-start" className="w-full min-w-0">
+          {shouldShowAvatar && (
+            <Box className={cn('relative shrink-0', msg.role !== 'assistant' ? 'mt-1' : 'mt-2')}>
+              {msg.role === 'assistant' ? (
+                <AssistantAvatar
+                  avatarKey={assistantAvatarKey}
+                  picUrl={sessionPicUrl}
+                  sessionType={props.sessionType}
+                  onClick={onClickAssistantAvatar}
+                />
+              ) : (
+                <UserAvatar avatarKey={userAvatarKey} onClick={() => navigateToSettings('/chat')} />
+              )}
+              {msg.role === 'assistant' && msg.generating && (
+                <Flex className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                  <Loader size={32} className=" " classNames={{ root: "after:content-[''] after:border-[2px]" }} />
+                </Flex>
+              )}
+            </Box>
+          )}
           <Flex
             direction="column"
-            align={isRightAlignedMessage ? 'flex-end' : 'flex-start'}
-            className={cn('min-w-0 max-w-[100%]', isSmallScreen && 'max-w-[95%]')}
+            align="flex-start"
+            className={cn('min-w-0 flex-1 max-w-full', isSmallScreen && 'max-w-[95%]')}
           >
             {messageContent}
-            {(msg.files || msg.links) && (
-              <MessageAttachmentGrid
-                files={msg.files}
-                links={msg.links}
-                align={isRightAlignedMessage ? 'end' : 'start'}
-              />
-            )}
+            {(msg.files || msg.links) && <MessageAttachmentGrid files={msg.files} links={msg.links} align="start" />}
             {meta}
             {actionButtons}
           </Flex>
