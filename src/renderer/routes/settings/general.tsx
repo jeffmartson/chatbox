@@ -8,6 +8,7 @@ import {
   FileButton,
   Flex,
   Radio,
+  SimpleGrid,
   Stack,
   Switch,
   Text,
@@ -171,26 +172,32 @@ export function RouteComponent() {
         />
 
         <Stack gap="xs" maw={320}>
-          <InterfaceColorInput
-            label={t('Primary Background')}
-            value={currentInterfaceColors.backgroundPrimary}
-            onCommit={(value) => setInterfaceColor('backgroundPrimary', value)}
-          />
-          <InterfaceColorInput
-            label={t('Secondary Background')}
-            value={currentInterfaceColors.backgroundSecondary}
-            onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
-          />
-          <InterfaceColorInput
-            label={t('Tertiary Background')}
-            value={currentInterfaceColors.backgroundTertiary}
-            onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
-          />
-          <InterfaceColorInput
-            label={t('Brand Color')}
-            value={currentInterfaceColors.brand}
-            onCommit={(value) => setInterfaceColor('brand', value)}
-          />
+          <SimpleGrid cols={2} spacing="xs">
+            <Stack gap="xs">
+              <InterfaceColorInput
+                label={t('Primary Background')}
+                value={currentInterfaceColors.backgroundPrimary}
+                onCommit={(value) => setInterfaceColor('backgroundPrimary', value)}
+              />
+              <InterfaceColorInput
+                label={t('Secondary Background')}
+                value={currentInterfaceColors.backgroundSecondary}
+                onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
+              />
+            </Stack>
+            <Stack gap="xs">
+              <InterfaceColorInput
+                label={t('Tertiary Background')}
+                value={currentInterfaceColors.backgroundTertiary}
+                onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
+              />
+              <InterfaceColorInput
+                label={t('Brand Color')}
+                value={currentInterfaceColors.brand}
+                onCommit={(value) => setInterfaceColor('brand', value)}
+              />
+            </Stack>
+          </SimpleGrid>
           <Flex gap="xs">
             <Button variant="outline" onClick={resetInterfaceColors}>
               {t('Reset Colors')}
