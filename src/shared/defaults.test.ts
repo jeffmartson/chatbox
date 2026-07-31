@@ -30,6 +30,29 @@ describe('defaults', () => {
     expect(SettingsSchema.parse(legacySettings).interfaceColors).toEqual(DEFAULT_INTERFACE_COLORS)
   })
 
+  it('preserves legacy interface backgrounds when adding the brand color', () => {
+    const legacySettings = {
+      ...settings(),
+      interfaceColors: {
+        light: {
+          backgroundPrimary: '#123456',
+          backgroundSecondary: '#234567',
+          backgroundTertiary: '#345678',
+        },
+        dark: {
+          backgroundPrimary: '#456789',
+          backgroundSecondary: '#56789a',
+          backgroundTertiary: '#6789ab',
+        },
+      },
+    }
+
+    expect(SettingsSchema.parse(legacySettings).interfaceColors).toEqual({
+      light: { ...legacySettings.interfaceColors.light, brand: DEFAULT_INTERFACE_COLORS.light.brand },
+      dark: { ...legacySettings.interfaceColors.dark, brand: DEFAULT_INTERFACE_COLORS.dark.brand },
+    })
+  })
+
   it('settings() returns enableMarkdownRendering as true', () => {
     expect(settings().enableMarkdownRendering).toBe(true)
   })

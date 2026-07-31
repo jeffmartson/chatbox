@@ -57,15 +57,21 @@ export default function useAppTheme() {
     rootStyle.setProperty('--chatbox-background-primary', colors.backgroundPrimary)
     rootStyle.setProperty('--chatbox-background-secondary', colors.backgroundSecondary)
     rootStyle.setProperty('--chatbox-background-tertiary', colors.backgroundTertiary)
+    rootStyle.setProperty('--chatbox-brand', colors.brand)
   }, [interfaceColors, realTheme])
 
-  const themeObj = useMemo(() => createTheme(getThemeDesign(realTheme, language)), [realTheme, language])
+  const themeObj = useMemo(
+    () => createTheme(getThemeDesign(realTheme, language, interfaceColors[realTheme].brand)),
+    [interfaceColors, language, realTheme]
+  )
   return themeObj
 }
 
-export function getThemeDesign(realTheme: 'light' | 'dark', language: Language): ThemeOptions {
-  const brandColor = realTheme === 'dark' ? '#4dabf7' : '#228be6'
-
+export function getThemeDesign(
+  realTheme: 'light' | 'dark',
+  language: Language,
+  brandColor = getDefaultInterfaceColors()[realTheme].brand
+): ThemeOptions {
   return {
     palette: {
       mode: realTheme,

@@ -141,12 +141,6 @@ export function RouteComponent() {
         />
 
         <Stack gap="xs" maw={320}>
-          <Flex align="center" justify="space-between">
-            <Text>{t('Interface Colors')}</Text>
-            <Text size="xs" c="chatbox-tertiary">
-              {realTheme === 'dark' ? t('Dark Mode') : t('Light Mode')}
-            </Text>
-          </Flex>
           <Stack gap="xxs">
             <Text size="sm">{t('Color Presets')}</Text>
             <Flex gap="xs" wrap="wrap">
@@ -176,6 +170,11 @@ export function RouteComponent() {
             label={t('Tertiary Background')}
             value={currentInterfaceColors.backgroundTertiary}
             onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
+          />
+          <InterfaceColorInput
+            label={t('Brand Color')}
+            value={currentInterfaceColors.brand}
+            onCommit={(value) => setInterfaceColor('brand', value)}
           />
           <Button variant="subtle" size="compact-sm" onClick={resetInterfaceColors}>
             {t('Reset Colors')}

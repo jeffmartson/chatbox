@@ -15,11 +15,13 @@ describe('INTERFACE_COLOR_PRESETS', () => {
         backgroundPrimary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
         backgroundSecondary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
         backgroundTertiary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
+        brand: expect.stringMatching(/^#[0-9a-f]{6}$/i),
       })
       expect(preset.colors.dark).toEqual({
         backgroundPrimary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
         backgroundSecondary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
         backgroundTertiary: expect.stringMatching(/^#[0-9a-f]{6}$/i),
+        brand: expect.stringMatching(/^#[0-9a-f]{6}$/i),
       })
     }
   })

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { getDefaultInterfaceColors } from '../theme-colors'
+import { DEFAULT_INTERFACE_COLORS, getDefaultInterfaceColors } from '../theme-colors'
 import { ModelProviderEnum, ModelProviderType } from './provider'
 import { DEFAULT_ENABLED_BUILTIN_SKILL_NAMES, SkillSettingsSchema } from './skills'
 
@@ -382,16 +382,18 @@ export enum Theme {
 
 const HexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i)
 
-const InterfaceThemeColorsSchema = z.object({
-  backgroundPrimary: HexColorSchema,
-  backgroundSecondary: HexColorSchema,
-  backgroundTertiary: HexColorSchema,
-})
+const createInterfaceThemeColorsSchema = (defaultBrand: string) =>
+  z.object({
+    backgroundPrimary: HexColorSchema,
+    backgroundSecondary: HexColorSchema,
+    backgroundTertiary: HexColorSchema,
+    brand: HexColorSchema.default(defaultBrand),
+  })
 
 const InterfaceColorsSchema = z
   .object({
-    light: InterfaceThemeColorsSchema,
-    dark: InterfaceThemeColorsSchema,
+    light: createInterfaceThemeColorsSchema(DEFAULT_INTERFACE_COLORS.light.brand),
+    dark: createInterfaceThemeColorsSchema(DEFAULT_INTERFACE_COLORS.dark.brand),
   })
   .catch(getDefaultInterfaceColors())
 
