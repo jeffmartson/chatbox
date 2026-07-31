@@ -195,14 +195,14 @@ export function RouteComponent() {
               />
             </Stack>
           </SimpleGrid>
-          <Flex gap="xs">
+          <SimpleGrid cols={2} spacing="md">
             <Button variant="outline" onClick={resetInterfaceColors}>
               {t('Reset Colors')}
             </Button>
             <Button leftSection={<IconDeviceFloppy size={14} />} onClick={saveInterfaceColorPreset}>
               {t('Save Current Colors')}
             </Button>
-          </Flex>
+          </SimpleGrid>
           <Stack gap="xxs">
             <Text size="sm">{t('Color Presets')}</Text>
             <Flex gap="xs" wrap="wrap">
