@@ -35,7 +35,8 @@
   --chatbox-tint-gray: #868e96;
 
   --chatbox-tint-disabled: #adb5bd;
-  --chatbox-tint-brand: #228be6;
+  --chatbox-brand: #228be6;
+  --chatbox-tint-brand: var(--chatbox-brand);
   --chatbox-tint-placeholder: #adb5bd;
   --chatbox-tint-error: #fa5252;
   --chatbox-tint-error-disabled: #ff8787;
@@ -47,7 +48,7 @@
   --chatbox-border-warning: #fab005;
   --chatbox-border-error: #fa5252;
   --chatbox-border-success: #12b886;
-  --chatbox-border-brand: #228be6;
+  --chatbox-border-brand: var(--chatbox-brand);
 
   --chatbox-background-primary: #ffffff;
   --chatbox-background-primary-hover: #f8f9fa;
@@ -57,10 +58,10 @@
   --chatbox-background-tertiary-hover: #ced4da;
   --chatbox-background-disabled: #e9ecef;
 
-  --chatbox-background-brand-primary: #228be6;
-  --chatbox-background-brand-primary-hover: #1c7ed6;
-  --chatbox-background-brand-secondary: rgb(34, 139, 230, 0.08);
-  --chatbox-background-brand-secondary-hover: rgb(34, 139, 230, 0.16);
+  --chatbox-background-brand-primary: var(--chatbox-brand);
+  --chatbox-background-brand-primary-hover: color-mix(in srgb, var(--chatbox-brand), black 12%);
+  --chatbox-background-brand-secondary: color-mix(in srgb, var(--chatbox-brand), transparent 92%);
+  --chatbox-background-brand-secondary-hover: color-mix(in srgb, var(--chatbox-brand), transparent 84%);
 
   --chatbox-background-gray-primary: #868e96;
   --chatbox-background-gray-primary-hover: #495057;
@@ -118,7 +119,8 @@
   --chatbox-tint-gray: #868e96;
 
   --chatbox-tint-disabled: #696969;
-  --chatbox-tint-brand: #4dabf7;
+  --chatbox-brand: #4dabf7;
+  --chatbox-tint-brand: var(--chatbox-brand);
   --chatbox-tint-placeholder: #828282;
   --chatbox-tint-error: #f03e3e;
   --chatbox-tint-error-disabled: rgb(224, 49, 49, 0.5);
@@ -130,7 +132,7 @@
   --chatbox-border-warning: #ffe066;
   --chatbox-border-error: #f03e3e;
   --chatbox-border-success: #63e6be;
-  --chatbox-border-brand: #1971c2;
+  --chatbox-border-brand: var(--chatbox-brand);
 
   --chatbox-background-primary: #242424;
   --chatbox-background-primary-hover: #1f1f1f;
@@ -140,10 +142,10 @@
   --chatbox-background-tertiary-hover: #696969;
   --chatbox-background-disabled: #2e2e2e;
 
-  --chatbox-background-brand-primary: #1971c2;
-  --chatbox-background-brand-primary-hover: #1864ab;
-  --chatbox-background-brand-secondary: rgb(28, 126, 214, 0.2);
-  --chatbox-background-brand-secondary-hover: rgb(34, 139, 230, 0.24);
+  --chatbox-background-brand-primary: var(--chatbox-brand);
+  --chatbox-background-brand-primary-hover: color-mix(in srgb, var(--chatbox-brand), black 12%);
+  --chatbox-background-brand-secondary: color-mix(in srgb, var(--chatbox-brand), transparent 80%);
+  --chatbox-background-brand-secondary-hover: color-mix(in srgb, var(--chatbox-brand), transparent 76%);
 
   --chatbox-background-gray-primary: #343a40;
   --chatbox-background-gray-primary-hover: #212529;

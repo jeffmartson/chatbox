@@ -64,9 +64,14 @@ export default function useAppTheme() {
 }
 
 export function getThemeDesign(realTheme: 'light' | 'dark', language: Language): ThemeOptions {
+  const brandColor = realTheme === 'dark' ? '#4dabf7' : '#228be6'
+
   return {
     palette: {
       mode: realTheme,
+      primary: {
+        main: brandColor,
+      },
       ...(realTheme === 'light'
         ? {}
         : {
