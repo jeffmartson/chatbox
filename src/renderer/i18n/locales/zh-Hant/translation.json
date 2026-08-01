@@ -331,6 +331,7 @@
   "Description": "描述",
   "Details": "詳細資訊",
   "Device Authorization": "裝置授權",
+  "Device storage is full. Free up some space, then try attaching the file again.": "裝置儲存空間已滿。請釋放一些空間，然後重新附加檔案。",
   "Diagnostic Logs": "診斷紀錄",
   "Directory selection is not available on this platform.": "此平台不支援目錄選擇。",
   "Discard Changes": "放棄更改",

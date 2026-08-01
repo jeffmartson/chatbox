@@ -331,6 +331,7 @@
   "Description": "説明",
   "Details": "詳細",
   "Device Authorization": "デバイス認証",
+  "Device storage is full. Free up some space, then try attaching the file again.": "デバイスのストレージがいっぱいです。空き容量を確保してから、もう一度ファイルを添付してください。",
   "Diagnostic Logs": "診断ログ",
   "Directory selection is not available on this platform.": "このプラットフォームではディレクトリの選択は利用できません。",
   "Discard Changes": "変更を破棄",

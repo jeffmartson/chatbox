@@ -331,6 +331,7 @@
   "Description": "Description",
   "Details": "Details",
   "Device Authorization": "Device Authorization",
+  "Device storage is full. Free up some space, then try attaching the file again.": "Device storage is full. Free up some space, then try attaching the file again.",
   "Diagnostic Logs": "Diagnostic Logs",
   "Directory selection is not available on this platform.": "Directory selection is not available on this platform.",
   "Discard Changes": "Discard Changes",

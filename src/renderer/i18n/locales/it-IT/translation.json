@@ -331,6 +331,7 @@
   "Description": "Descrizione",
   "Details": "Dettagli",
   "Device Authorization": "Autorizzazione dispositivo",
+  "Device storage is full. Free up some space, then try attaching the file again.": "Lo spazio di archiviazione del dispositivo è esaurito. Libera spazio, quindi prova ad allegare di nuovo il file.",
   "Diagnostic Logs": "Log di diagnostica",
   "Directory selection is not available on this platform.": "La selezione della directory non è disponibile su questa piattaforma.",
   "Discard Changes": "Elimina modifiche",

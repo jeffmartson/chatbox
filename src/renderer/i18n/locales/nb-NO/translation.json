@@ -331,6 +331,7 @@
   "Description": "Beskrivelse",
   "Details": "Detaljer",
   "Device Authorization": "Enhetsautorisasjon",
+  "Device storage is full. Free up some space, then try attaching the file again.": "Enhetslagringen er full. Frigjør plass, og prøv deretter å legge ved filen på nytt.",
   "Diagnostic Logs": "Diagnostikklogger",
   "Directory selection is not available on this platform.": "Valg av mappe er ikke tilgjengelig på denne plattformen.",
   "Discard Changes": "Forkast endringer",

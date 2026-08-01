@@ -331,6 +331,7 @@
   "Description": "Beschreibung",
   "Details": "Details",
   "Device Authorization": "Geräteautorisierung",
+  "Device storage is full. Free up some space, then try attaching the file again.": "Der Gerätespeicher ist voll. Geben Sie Speicherplatz frei und versuchen Sie dann erneut, die Datei anzuhängen.",
   "Diagnostic Logs": "Diagnoseprotokolle",
   "Directory selection is not available on this platform.": "Die Verzeichnisauswahl ist auf dieser Plattform nicht verfügbar.",
   "Discard Changes": "Änderungen verwerfen",

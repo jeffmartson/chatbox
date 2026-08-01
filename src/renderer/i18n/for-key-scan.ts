@@ -105,6 +105,7 @@ function _errorI18nKeys(t: (key: string) => string) {
   t(
     'This file type requires a document parser. Please go to <OpenDocumentParserSettingButton>Settings</OpenDocumentParserSettingButton> and enable Chatbox AI document parsing.'
   )
+  t('Device storage is full. Free up some space, then try attaching the file again.')
   t(
     'You have selected BoCha as the search provider, but an API key has not been entered yet. Please <OpenExtensionSettingButton>click here to open Settings</OpenExtensionSettingButton> and enter your API key, or choose a different search provider.'
   )
@@ -112,6 +113,7 @@ function _errorI18nKeys(t: (key: string) => string) {
   t(
     'The current search provider does not support reading webpages. Please <OpenExtensionSettingButton>choose a different search provider</OpenExtensionSettingButton> that supports this capability.'
   )
+  t('Failed to parse file. Please try again or use a different file format.')
   t('Your points are used up. Claim free reward quota to continue.')
   // END GENERATED ERROR I18N KEYS
 

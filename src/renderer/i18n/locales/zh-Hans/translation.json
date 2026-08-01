@@ -331,6 +331,7 @@
   "Description": "描述",
   "Details": "详情",
   "Device Authorization": "设备授权",
+  "Device storage is full. Free up some space, then try attaching the file again.": "设备存储空间已满。请清理出一些空间，然后重新添加文件。",
   "Diagnostic Logs": "诊断日志",
   "Directory selection is not available on this platform.": "当前平台不支持选择目录。",
   "Discard Changes": "放弃更改",

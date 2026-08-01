@@ -26,6 +26,7 @@ import storage from '@/storage'
 import { StorageKey, StorageKeyGenerator } from '@/storage/StoreStorage'
 import { authInfoStore } from '@/stores/authInfoStore'
 import { getMetaStorage } from '@/stores/chatStore'
+import { reportError } from '@/utils/sentry'
 import { migrateSession, sortSessions } from '@/utils/session-utils'
 import * as defaults from '../../shared/defaults'
 import { SESSION_ATTACHMENT_RAG_LOG_PREFIX } from '../../shared/session-attachment-rag/logging'
@@ -51,6 +52,8 @@ export {
 } from './sessionAttachmentRagErrors'
 
 const log = getLogger('session-helpers')
+const FILE_STORAGE_QUOTA_EXCEEDED_ERROR = 'file_storage_quota_exceeded'
+const FILE_PREPROCESS_FAILED_ERROR = 'file_preprocess_failed'
 const SESSION_ATTACHMENT_RAG_INLINE_BYTE_THRESHOLD = 256 * 1024
 export const SESSION_ATTACHMENT_RAG_MAX_PARSED_BYTE_LENGTH = 6 * 1024 * 1024
 let sessionRagCapabilityCache:
@@ -64,6 +67,108 @@ type ContentStats = {
   lineCount: number
   byteLength: number
   previewContent: string
+}
+
+type FilePreprocessStage =
+  | 'cache_read'
+  | 'cloud_parse'
+  | 'content_analysis'
+  | 'local_parse'
+  | 'metadata_storage'
+  | 'parse'
+  | 'token_estimation'
+
+class FilePreprocessFailure extends Error {
+  constructor(
+    readonly code: string,
+    readonly stage: FilePreprocessStage,
+    readonly originalError: unknown
+  ) {
+    super(code)
+    this.name = 'FilePreprocessFailure'
+  }
+}
+
+const EXPECTED_FILE_PREPROCESS_ERROR_CODES = new Set([
+  'chatbox_ai_parser_failed',
+  'document_parser_not_configured',
+  'local_parser_failed',
+  'mineru_api_token_required',
+  'parsing_cancelled',
+  'third_party_parser_failed',
+  'third_party_parser_not_supported_in_chat',
+  ...NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES,
+])
+
+function isStorageQuotaError(error: unknown): boolean {
+  const name = error instanceof Error ? error.name : ''
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    name === 'QuotaExceededError' ||
+    /quota.{0,20}exceed|storage.{0,20}full|database or disk is full|not enough.{0,20}(?:space|storage)|no space left|ENOSPC/i.test(
+      message
+    )
+  )
+}
+
+function getSafeFileExtension(fileName: string): string {
+  const match = fileName.match(/\.([a-z0-9]{1,12})$/i)
+  return match?.[1].toLowerCase() ?? 'none'
+}
+
+function getFileSizeBucket(size: number): string {
+  if (size < 100 * 1024) return 'under_100_kb'
+  if (size < 1024 * 1024) return '100_kb_to_1_mb'
+  if (size < 10 * 1024 * 1024) return '1_mb_to_10_mb'
+  if (size < 50 * 1024 * 1024) return '10_mb_to_50_mb'
+  return 'over_50_mb'
+}
+
+function getSafeErrorType(error: unknown): string {
+  const name = error instanceof Error ? error.name : typeof error
+  return /^[a-z][a-z0-9]{0,39}$/i.test(name) ? name : 'unknown'
+}
+
+function createSafeReportedError(error: unknown, errorCode: string): Error {
+  const reportedError = new Error(errorCode)
+  if (error instanceof Error && error.stack) {
+    const stackFrames = error.stack.split('\n').filter((line) => /^\s+at\s/.test(line))
+    if (stackFrames.length > 0) {
+      reportedError.stack = [`Error: ${errorCode}`, ...stackFrames].join('\n')
+    }
+  }
+  return reportedError
+}
+
+function reportFilePreprocessFailure(file: File, failure: FilePreprocessFailure): void {
+  reportError(createSafeReportedError(failure.originalError, failure.code), {
+    domain: 'file-attachment',
+    operation: 'preprocess-file',
+    priority: 'high',
+    tags: {
+      error_type: getSafeErrorType(failure.originalError),
+      file_extension: getSafeFileExtension(file.name),
+      file_size_bucket: getFileSizeBucket(file.size),
+      platform_type: platform.type,
+      preprocess_stage: failure.stage,
+      user_error_code: failure.code,
+    },
+  })
+}
+
+function normalizeFilePreprocessFailure(error: unknown, stage: FilePreprocessStage): FilePreprocessFailure | undefined {
+  if (error instanceof FilePreprocessFailure) {
+    return error
+  }
+  if (isStorageQuotaError(error)) {
+    return new FilePreprocessFailure(FILE_STORAGE_QUOTA_EXCEEDED_ERROR, stage, error)
+  }
+
+  const errorCode = error instanceof Error ? error.message : ''
+  if (EXPECTED_FILE_PREPROCESS_ERROR_CODES.has(errorCode)) {
+    return undefined
+  }
+  return new FilePreprocessFailure(FILE_PREPROCESS_FAILED_ERROR, stage, error)
 }
 
 function getContentStats(content: string): ContentStats {
@@ -272,6 +377,12 @@ async function fallbackToChatboxAIParser(
     return await parseFileWithChatboxAI(file, uniqKey)
   } catch (error) {
     log.error(`Chatbox AI fallback parsing failed for "${file.name}":`, error)
+    // A full client-side storage database is not a cloud-parser problem — persisting the
+    // parsed content fails the same way. Preserve it for the quota-specific user message
+    // and sanitized Sentry report at the outer boundary.
+    if (isStorageQuotaError(error)) {
+      throw new FilePreprocessFailure(FILE_STORAGE_QUOTA_EXCEEDED_ERROR, 'cloud_parse', error)
+    }
     throw new Error('chatbox_ai_parser_failed')
   }
 }
@@ -290,6 +401,12 @@ async function parseFileWithLocalFallback(
   } catch (error) {
     log.error(`Local parsing failed for "${file.name}":`, error)
 
+    // Already classified (e.g. a storage-quota failure from the empty-content cloud
+    // fallback above) — propagate as-is instead of re-classifying or retrying.
+    if (error instanceof FilePreprocessFailure) {
+      throw error
+    }
+
     // Encrypted or oversized PDFs cannot be recovered by the cloud parser either,
     // so surface the specific error directly instead of wasting a fallback upload.
     const errorCode = error instanceof Error ? error.message : ''
@@ -297,11 +414,20 @@ async function parseFileWithLocalFallback(
       throw error
     }
 
+    // Cloud parsing cannot recover from a full client-side storage database.
+    // Preserve the original exception for a sanitized Sentry report at the outer boundary.
+    if (isStorageQuotaError(error)) {
+      throw new FilePreprocessFailure(FILE_STORAGE_QUOTA_EXCEEDED_ERROR, 'local_parse', error)
+    }
+
     if (options.forceChatboxAIFallback || canFallbackToChatboxAI()) {
       return await fallbackToChatboxAIParser(file, uniqKey, 'local_parser_failed')
     }
 
-    throw new Error('local_parser_failed')
+    if (errorCode === 'local_parser_failed') {
+      throw error
+    }
+    throw new FilePreprocessFailure('local_parser_failed', 'local_parse', error)
   }
 }
 
@@ -370,6 +496,7 @@ export async function prepareFileAttachment(
   settings: SessionSettings,
   options?: { agentMode?: boolean }
 ): Promise<AttachmentPreparationResult> {
+  let stage: FilePreprocessStage = 'cache_read'
   try {
     const uniqKey = StorageKeyGenerator.fileUniqKey(file)
 
@@ -388,6 +515,7 @@ export async function prepareFileAttachment(
         | string
         | undefined
 
+      stage = 'content_analysis'
       const stats = getContentStats(existingContent)
       const sessionAttachmentWarningReason = isParsedContentVeryLarge(stats)
         ? SESSION_ATTACHMENT_RAG_LARGE_ATTACHMENT_WARNING
@@ -408,6 +536,7 @@ export async function prepareFileAttachment(
         : false
       const shouldUseSessionAttachmentRag =
         exceedsSessionAttachmentRagThreshold && sessionAttachmentRagAllowed && !sessionAttachmentWarningReason
+      stage = 'token_estimation'
       const { lineCount, byteLength, tokenCountMap } = computePreviewMetadata(existingContent, existingTokenMap, {
         includeFullTokenCounts: !shouldUseSessionAttachmentRag,
         stats,
@@ -416,6 +545,7 @@ export async function prepareFileAttachment(
         `${SESSION_ATTACHMENT_RAG_LOG_PREFIX} Cached preprocess decision: file="${file.name}", bytes=${stats.byteLength}, tokens=${tokenCountMap[TOKEN_CACHE_KEYS.default] ?? 0}, ragFileType=${isSessionAttachmentRagFileType}, exceedsThreshold=${exceedsSessionAttachmentRagThreshold}, ragMode=${shouldUseSessionAttachmentRag ? 'session-retrieval' : 'inline'}, allowed=${sessionAttachmentRagAllowed}`
       )
 
+      stage = 'metadata_storage'
       await storage.setItem(`${uniqKey}_tokenMap`, tokenCountMap)
 
       // Ensure cached non-text files still have the raw binary needed by sandbox code execution.
@@ -467,6 +597,7 @@ export async function prepareFileAttachment(
       }
     }
 
+    stage = 'parse'
     if (isTextFilePath(file.name)) {
       log.debug(`Text file detected, using local parser: ${file.name}`)
       result = await parseFileWithLocalFallback(file, uniqKey)
@@ -512,6 +643,7 @@ export async function prepareFileAttachment(
       }
     }
 
+    stage = 'content_analysis'
     const stats = getContentStats(result.content)
     const sessionAttachmentWarningReason = isParsedContentVeryLarge(stats)
       ? SESSION_ATTACHMENT_RAG_LARGE_ATTACHMENT_WARNING
@@ -532,10 +664,12 @@ export async function prepareFileAttachment(
       : false
     const shouldUseSessionAttachmentRag =
       exceedsSessionAttachmentRagThreshold && sessionAttachmentRagAllowed && !sessionAttachmentWarningReason
+    stage = 'token_estimation'
     const { lineCount, byteLength, tokenCountMap } = computePreviewMetadata(result.content, result.tokenCountMap, {
       includeFullTokenCounts: !shouldUseSessionAttachmentRag,
       stats,
     })
+    stage = 'metadata_storage'
     await storage.setItem(`${result.storageKey}_tokenMap`, tokenCountMap)
     await storage.setItem(`${result.storageKey}_parserType`, result.parserType)
 
@@ -558,11 +692,15 @@ export async function prepareFileAttachment(
     }
   } catch (error) {
     log.error(`${SESSION_ATTACHMENT_RAG_LOG_PREFIX} Failed to preprocess file "${file.name}":`, error)
+    const failure = normalizeFilePreprocessFailure(error, stage)
+    if (failure) {
+      reportFilePreprocessFailure(file, failure)
+    }
     return {
       file,
       content: '',
       storageKey: '',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: failure?.code ?? (error instanceof Error ? error.message : FILE_PREPROCESS_FAILED_ERROR),
     }
   }
 }

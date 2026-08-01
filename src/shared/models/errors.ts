@@ -308,6 +308,12 @@ export class ChatboxAIAPIError extends BaseError {
       i18nKey:
         'This file type requires a document parser. Please go to <OpenDocumentParserSettingButton>Settings</OpenDocumentParserSettingButton> and enable Chatbox AI document parsing.',
     },
+    file_storage_quota_exceeded: {
+      name: 'file_storage_quota_exceeded',
+      // 20036 reserved by searxng_base_url_required (PR #794, unmerged)
+      code: 20042,
+      i18nKey: 'Device storage is full. Free up some space, then try attaching the file again.',
+    },
     bocha_api_key_required: {
       name: 'bocha_api_key_required',
       code: 20035,
@@ -324,6 +330,11 @@ export class ChatboxAIAPIError extends BaseError {
       code: 20038,
       i18nKey:
         'The current search provider does not support reading webpages. Please <OpenExtensionSettingButton>choose a different search provider</OpenExtensionSettingButton> that supports this capability.',
+    },
+    file_preprocess_failed: {
+      name: 'file_preprocess_failed',
+      code: 20041,
+      i18nKey: 'Failed to parse file. Please try again or use a different file format.',
     },
     // Free 用户在工作模式中点数耗尽，但仍可领取一次奖励额度继续当前任务
     free_agent_mode_token_quota_exhausted: {

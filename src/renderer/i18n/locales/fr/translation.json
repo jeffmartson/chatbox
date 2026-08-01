@@ -331,6 +331,7 @@
   "Description": "Description",
   "Details": "Détails",
   "Device Authorization": "Autorisation de l'appareil",
+  "Device storage is full. Free up some space, then try attaching the file again.": "L’espace de stockage de l’appareil est saturé. Libérez de l’espace, puis essayez à nouveau de joindre le fichier.",
   "Diagnostic Logs": "Journaux de diagnostic",
   "Directory selection is not available on this platform.": "La sélection de répertoire n'est pas disponible sur cette plateforme.",
   "Discard Changes": "Annuler les modifications",
