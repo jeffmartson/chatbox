@@ -1,4 +1,4 @@
-import type { CompactionPoint, Message, SessionSettings, Settings } from '@shared/types'
+import type { CompactionPoint, SessionSettings, Settings } from '@shared/types'
 import { createMessage } from '@shared/types'
 import { getTokenizerType } from '@/packages/token-estimation'
 import { setCompactionUIState } from '@/stores/atoms/compactionAtoms'
@@ -6,6 +6,8 @@ import * as chatStore from '@/stores/chatStore'
 import queryClient from '@/stores/queryClient'
 import { settingsStore } from '@/stores/settingsStore'
 import { sumCachedTokensFromMessages } from '../token'
+import { findLastCompactionBoundaryMessage } from './compaction-boundary'
+import { buildCompactionCommitPatch } from './compaction-commit'
 import { checkOverflow } from './compaction-detector'
 import {
   type ContextTokensCacheValue,
@@ -37,6 +39,8 @@ export interface CompactionResult {
   compacted: boolean
   error?: Error
   summaryMessageId?: string
+  /** Another compaction for this session was already streaming; nothing was done. */
+  alreadyRunning?: boolean
 }
 
 export function isAutoCompactionEnabled(sessionSettings?: SessionSettings, globalSettings?: Settings): boolean {
@@ -124,6 +128,13 @@ export async function runCompactionWithUIState(
   sessionId: string,
   options: CompactionOptions = {}
 ): Promise<CompactionResult> {
+  // A duplicate request (e.g. manual Compress confirmed while auto-compaction
+  // streams) must not touch the UI state: resetting it to idle would unlock
+  // fork switching while the owning run is still streaming.
+  if (isCompactionInProgress(sessionId)) {
+    return { success: true, compacted: false, alreadyRunning: true }
+  }
+
   if (!options.force) {
     const shouldCompact = await needsCompaction(sessionId)
     if (!shouldCompact) {
@@ -134,6 +145,11 @@ export async function runCompactionWithUIState(
   setCompactionUIState(sessionId, { status: 'running', error: null, streamingText: '' })
 
   const result = await runCompactionWithStreaming(sessionId)
+
+  if (result.alreadyRunning) {
+    // Lost a race with a concurrent run: leave the UI state to its owner.
+    return result
+  }
 
   if (result.success) {
     setCompactionUIState(sessionId, { status: 'idle', error: null, streamingText: '' })
@@ -150,7 +166,7 @@ export async function runCompactionWithUIState(
 
 async function runCompactionWithStreaming(sessionId: string): Promise<CompactionResult> {
   if (ongoingCompactions.has(sessionId)) {
-    return { success: true, compacted: false }
+    return { success: true, compacted: false, alreadyRunning: true }
   }
 
   ongoingCompactions.add(sessionId)
@@ -192,34 +208,43 @@ async function runCompactionWithStreaming(sessionId: string): Promise<Compaction
     const summaryMessage = createMessage('assistant', summaryResult.summary)
     summaryMessage.isSummary = true
 
-    const lastNonSummaryMessage = [...session.messages].reverse().find((m) => !m.isSummary)
-    if (!lastNonSummaryMessage) {
+    const boundaryMessage = findLastCompactionBoundaryMessage(session.messages)
+    if (!boundaryMessage) {
       return { success: false, compacted: false, error: new Error('No messages to compact') }
     }
 
     const newCompactionPoint: CompactionPoint = {
       summaryMessageId: summaryMessage.id,
-      boundaryMessageId: lastNonSummaryMessage.id,
+      boundaryMessageId: boundaryMessage.id,
       createdAt: Date.now(),
     }
 
+    // Summary generation streamed for a while; the session may have changed
+    // (fork switch, thread archive, message deletion). Committing is decided
+    // against the session state inside the atomic update, not the snapshot.
+    let committed = false
     await chatStore.updateSessionWithMessages(sessionId, (currentSession) => {
       if (!currentSession) {
         throw new Error('Session not found during update')
       }
 
-      const updatedMessages: Message[] = [...currentSession.messages, summaryMessage]
-      const updatedCompactionPoints: CompactionPoint[] = [
-        ...(currentSession.compactionPoints ?? []),
-        newCompactionPoint,
-      ]
-
-      return {
-        ...currentSession,
-        messages: updatedMessages,
-        compactionPoints: updatedCompactionPoints,
+      const patch = buildCompactionCommitPatch(currentSession, summaryMessage, newCompactionPoint)
+      if (!patch) {
+        return currentSession
       }
+
+      committed = true
+      return patch
     })
+
+    if (!committed) {
+      // The boundary message was deleted while the summary streamed. The
+      // summary describes a conversation that no longer exists, so drop it.
+      // Not an error: sending proceeds with the uncompacted context and the
+      // next attempt re-compacts against the current messages.
+      console.warn('[compaction] boundary message disappeared during summary streaming; compaction abandoned')
+      return { success: true, compacted: false }
+    }
 
     return {
       success: true,

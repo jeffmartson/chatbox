@@ -1,14 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import type { Message, Session } from '../types'
 import {
+  buildCreateForkPatch,
   buildCreateInactiveForkPatch,
   buildSwitchForkToPatch,
   findMessageContext,
   findMessageLocation,
+  forkTailStartIndex,
 } from './message-forks'
 
 function message(id: string, role: Message['role']): Message {
   return { id, role, contentParts: [] }
+}
+
+function summaryMessage(id: string): Message {
+  return { ...message(id, 'assistant'), isSummary: true }
 }
 
 describe('buildCreateInactiveForkPatch', () => {
@@ -176,5 +182,114 @@ describe('buildSwitchForkToPatch', () => {
     expect(buildSwitchForkToPatch(session, pivot.id, 0)).toBeNull()
     expect(buildSwitchForkToPatch(session, pivot.id, 2)).toBeNull()
     expect(buildSwitchForkToPatch(session, pivot.id, 0.5)).toBeNull()
+  })
+})
+
+describe('compaction summaries anchored to the fork pivot', () => {
+  // Layout: the pivot is a compaction boundary, so its summary sits right
+  // after it. The summary covers the shared prefix and must stay in it.
+  const pivot = message('user-1', 'user')
+  const summary = summaryMessage('summary-1')
+  const currentReply = message('assistant-current', 'assistant')
+
+  test('forkTailStartIndex skips summaries anchored to the pivot', () => {
+    expect(forkTailStartIndex([pivot, summary, currentReply], 0)).toBe(2)
+    expect(forkTailStartIndex([pivot, currentReply], 0)).toBe(1)
+    expect(forkTailStartIndex([pivot, summary], 0)).toBe(2)
+  })
+
+  test('creating a fork keeps the anchored summary in the shared prefix', () => {
+    const session: Session = {
+      id: 'session-7',
+      name: 'Session',
+      messages: [pivot, summary, currentReply],
+    }
+
+    const patch = buildCreateForkPatch(session, pivot.id)
+
+    expect(patch?.messages).toEqual([pivot, summary])
+    const fork = patch?.messageForksHash?.[pivot.id]
+    expect(fork?.lists[0].messages).toEqual([currentReply])
+    expect(fork?.lists[1].messages).toEqual([])
+  })
+
+  test('switching branches does not move the anchored summary', () => {
+    const alternativeReply = message('assistant-alternative', 'assistant')
+    const session: Session = {
+      id: 'session-8',
+      name: 'Session',
+      messages: [pivot, summary, currentReply],
+      messageForksHash: {
+        [pivot.id]: {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'alternative', messages: [alternativeReply] },
+          ],
+          createdAt: 1,
+        },
+      },
+    }
+
+    const patch = buildSwitchForkToPatch(session, pivot.id, 1)
+
+    expect(patch?.messages).toEqual([pivot, summary, alternativeReply])
+    expect(patch?.messageForksHash?.[pivot.id]).toMatchObject({
+      position: 1,
+      lists: [
+        { id: 'current', messages: [currentReply] },
+        { id: 'alternative', messages: [] },
+      ],
+    })
+  })
+
+  test('an inactive fork on the boundary still counts the summary as shared prefix', () => {
+    const candidate = { ...message('assistant-candidate', 'assistant'), generating: true }
+    const session: Session = {
+      id: 'session-9',
+      name: 'Session',
+      messages: [pivot, summary, currentReply],
+    }
+
+    const patch = buildCreateInactiveForkPatch(session, pivot.id, [candidate])
+
+    expect(patch?.messages).toEqual(session.messages)
+    expect(patch?.messageForksHash?.[pivot.id]?.lists[1].messages).toEqual([candidate])
+  })
+
+  test('a compacted boundary with only its summary is treated as unanswered', () => {
+    // [pivot, summary] and nothing else: there is no active answer to fork
+    // from, matching the bare-user-message rule.
+    const candidate = { ...message('assistant-candidate', 'assistant'), generating: true }
+    const session: Session = {
+      id: 'session-10',
+      name: 'Session',
+      messages: [pivot, summary],
+    }
+
+    expect(buildCreateInactiveForkPatch(session, pivot.id, [candidate])).toBeNull()
+  })
+
+  test('findMessageContext reconstructs branch paths with the summary in the prefix', () => {
+    const alternativeReply = message('assistant-alternative', 'assistant')
+    const session: Session = {
+      id: 'session-11',
+      name: 'Session',
+      messages: [pivot, summary, currentReply],
+      messageForksHash: {
+        [pivot.id]: {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'alternative', messages: [alternativeReply] },
+          ],
+          createdAt: 1,
+        },
+      },
+    }
+
+    const context = findMessageContext(session, alternativeReply.id)
+
+    expect(context?.list.map((m) => m.id)).toEqual([pivot.id, summary.id, alternativeReply.id])
   })
 })

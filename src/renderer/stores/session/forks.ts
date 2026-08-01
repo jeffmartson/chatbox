@@ -6,6 +6,7 @@ import {
   buildSwitchForkPatch,
   buildSwitchForkToPatch,
   findMessageLocation,
+  forkTailStartIndex,
 } from '@shared/session/message-forks'
 import type { Message } from '@shared/types'
 import * as chatStore from '../chatStore'
@@ -63,7 +64,10 @@ export async function createInactiveFork(
         return session
       }
 
-      branchContext = [...location.list.slice(0, location.index + 1), ...branchMessages]
+      // Include compaction summaries anchored to the fork point: they belong
+      // to the shared prefix, so the new candidate generates with the
+      // compacted context instead of the full (or empty) history.
+      branchContext = [...location.list.slice(0, forkTailStartIndex(location.list, location.index)), ...branchMessages]
       return {
         ...session,
         ...patch,

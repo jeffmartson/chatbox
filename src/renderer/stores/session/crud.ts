@@ -3,6 +3,7 @@ import {
   copyMessagesWithMapping,
   copyThreadsWithMapping,
   createMessage,
+  remapCompactionPoints,
   type Session,
   type SessionMeta,
 } from '@shared/types'
@@ -73,33 +74,30 @@ async function copySession(
   // Copy messages and get ID mapping
   const { messages: newMessages, idMapping } = copyMessagesWithMapping(messagesToCopy)
 
+  const sourceThreads = 'threads' in sourceMeta ? sourceMeta.threads : source.threads
+  const { threads: copiedThreads, idMapping: combinedIdMapping } = copyThreadsWithMapping(sourceThreads, idMapping)
+  const sourceMessageForksHash =
+    'messageForksHash' in sourceMeta ? sourceMeta.messageForksHash : source.messageForksHash
+  const { messageForksHash: newMessageForksHash, idMapping: fullIdMapping } = copyMessageForksWithMapping(
+    sourceMessageForksHash,
+    combinedIdMapping
+  )
+
+  // Remap compaction points with the full mapping (active messages, threads
+  // and fork-list messages): a compacted branch may be switched inactive, so
+  // its boundary/summary can live inside a saved fork list — including fork
+  // lists reachable only from archived threads.
+  const newThreads = copiedThreads?.map((thread) => ({
+    ...thread,
+    compactionPoints: remapCompactionPoints(thread.compactionPoints, fullIdMapping, 'copySession'),
+  }))
+
   // Use sourceMeta.compactionPoints if explicitly provided (e.g., from thread),
   // otherwise fall back to source session's compactionPoints
   const sourceCompactionPoints =
     'compactionPoints' in sourceMeta ? sourceMeta.compactionPoints : source.compactionPoints
 
-  // Map compactionPoints IDs
-  const newCompactionPoints = sourceCompactionPoints
-    ?.map((cp) => {
-      const newSummaryId = idMapping.get(cp.summaryMessageId)
-      const newBoundaryId = idMapping.get(cp.boundaryMessageId)
-      if (!newSummaryId || !newBoundaryId) {
-        console.warn('[copySession] Skipping compactionPoint with unmapped IDs', cp)
-        return null
-      }
-      return {
-        ...cp,
-        summaryMessageId: newSummaryId,
-        boundaryMessageId: newBoundaryId,
-      }
-    })
-    .filter((cp): cp is NonNullable<typeof cp> => cp !== null)
-
-  const sourceThreads = 'threads' in sourceMeta ? sourceMeta.threads : source.threads
-  const { threads: newThreads, idMapping: combinedIdMapping } = copyThreadsWithMapping(sourceThreads, idMapping)
-  const sourceMessageForksHash =
-    'messageForksHash' in sourceMeta ? sourceMeta.messageForksHash : source.messageForksHash
-  const newMessageForksHash = copyMessageForksWithMapping(sourceMessageForksHash, combinedIdMapping)
+  const newCompactionPoints = remapCompactionPoints(sourceCompactionPoints, fullIdMapping, 'copySession')
 
   const copiedMessages = [...newMessages]
   if (options?.appendForkMarker) {

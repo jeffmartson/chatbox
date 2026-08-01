@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import type { Message, Session } from '../types/session'
+import type { Message, Session, SessionThread } from '../types/session'
 
 /**
  * Pure message-fork transforms shared by the web renderer and the mobile-native
@@ -18,6 +18,21 @@ import type { Message, Session } from '../types/session'
 
 export type MessageForkEntry = NonNullable<Session['messageForksHash']>[string]
 export type MessageLocation = { list: Message[]; index: number }
+
+/**
+ * Fork tails start after the pivot message and any compaction summaries
+ * anchored to it. A summary is inserted immediately after its boundary
+ * message; when that boundary is a fork pivot, the summary describes the
+ * shared prefix and must stay in it — every branch then reuses the compacted
+ * context instead of tearing the boundary/summary pair apart on switch.
+ */
+export function forkTailStartIndex(messages: Message[], forkMessageIndex: number): number {
+  let index = forkMessageIndex + 1
+  while (index < messages.length && messages[index].isSummary) {
+    index += 1
+  }
+  return index
+}
 
 /**
  * Find the stored location of a message in root, thread, or saved fork messages.
@@ -50,6 +65,26 @@ export function findMessageLocation(session: Session, messageId: string): Messag
  * reachable prefix while traversing the tree.
  */
 export function findMessageContext(session: Session, messageId: string): MessageLocation | null {
+  return searchMessageContext(session, messageId)?.location ?? null
+}
+
+/**
+ * Find the archived thread whose message tree (including fork branches
+ * reachable from it) contains the message. Returns null when the message
+ * belongs to the active conversation or cannot be found.
+ *
+ * Compaction points are stored next to their message list (session-level for
+ * the active path, thread-level for archived threads), so context building
+ * for a message must read the points of the container found here.
+ */
+export function findMessageSourceThread(session: Session, messageId: string): SessionThread | null {
+  return searchMessageContext(session, messageId)?.thread ?? null
+}
+
+function searchMessageContext(
+  session: Session,
+  messageId: string
+): { location: MessageLocation; thread: SessionThread | null } | null {
   const search = (messages: Message[], expandedForkIds: Set<string>): MessageLocation | null => {
     const index = messages.findIndex((message) => message.id === messageId)
     if (index >= 0) {
@@ -68,7 +103,7 @@ export function findMessageContext(session: Session, messageId: string): Message
         if (branch.messages.length === 0) {
           continue
         }
-        const branchContext = [...messages.slice(0, pivotIndex + 1), ...branch.messages]
+        const branchContext = [...messages.slice(0, forkTailStartIndex(messages, pivotIndex)), ...branch.messages]
         const found = search(branchContext, nextExpandedForkIds)
         if (found) {
           return found
@@ -81,12 +116,12 @@ export function findMessageContext(session: Session, messageId: string): Message
 
   const rootResult = search(session.messages, new Set())
   if (rootResult) {
-    return rootResult
+    return { location: rootResult, thread: null }
   }
   for (const thread of session.threads ?? []) {
     const threadResult = search(thread.messages, new Set())
     if (threadResult) {
-      return threadResult
+      return { location: threadResult, thread }
     }
   }
   return null
@@ -175,7 +210,8 @@ function switchForkInMessages(
     return null
   }
 
-  const currentTail = messages.slice(forkMessageIndex + 1)
+  const tailStart = forkTailStartIndex(messages, forkMessageIndex)
+  const currentTail = messages.slice(tailStart)
   const currentPosition = forkEntry.position
   if (
     typeof target === 'number' &&
@@ -197,7 +233,7 @@ function switchForkInMessages(
     if (updatedLists.length <= 1) {
       const remainingMessages = updatedLists[0]?.messages ?? []
       return {
-        messages: messages.slice(0, forkMessageIndex + 1).concat(remainingMessages),
+        messages: messages.slice(0, tailStart).concat(remainingMessages),
         fork: null,
       }
     }
@@ -240,7 +276,7 @@ function switchForkInMessages(
   }
 
   return {
-    messages: messages.slice(0, forkMessageIndex + 1).concat(branchMessages),
+    messages: messages.slice(0, tailStart).concat(branchMessages),
     fork: updatedFork,
   }
 }
@@ -266,7 +302,8 @@ export function buildCreateForkPatch(session: Session, forkMessageId: string): P
         return null
       }
 
-      const backupMessages = messages.slice(forkMessageIndex + 1)
+      const tailStart = forkTailStartIndex(messages, forkMessageIndex)
+      const backupMessages = messages.slice(tailStart)
       if (backupMessages.length === 0) {
         return null
       }
@@ -295,7 +332,7 @@ export function buildCreateForkPatch(session: Session, forkMessageId: string): P
       }
 
       return {
-        messages: messages.slice(0, forkMessageIndex + 1),
+        messages: messages.slice(0, tailStart),
         forkEntry: updatedFork,
       }
     }
@@ -338,9 +375,11 @@ export function buildCreateInactiveForkPatch(
       }
 
       // An inactive alternative only makes sense when an active answer already
-      // follows the fork point. Callers should insert normally for a bare user
-      // message so an empty branch is never exposed in navigation.
-      if (messages.length === forkMessageIndex + 1) {
+      // follows the fork point (compaction summaries anchored to the pivot are
+      // part of the shared prefix, not an answer). Callers should insert
+      // normally for a bare user message so an empty branch is never exposed
+      // in navigation.
+      if (forkTailStartIndex(messages, forkMessageIndex) >= messages.length) {
         return null
       }
 
@@ -372,7 +411,7 @@ export function buildDeleteForkPatch(session: Session, forkMessageId: string): P
         return null
       }
 
-      const trimmedMessages = messages.slice(0, forkMessageIndex + 1)
+      const trimmedMessages = messages.slice(0, forkTailStartIndex(messages, forkMessageIndex))
       const remainingLists = forkEntry.lists.filter((_, index) => index !== forkEntry.position)
 
       if (remainingLists.length === 0) {

@@ -1,9 +1,11 @@
 import { ActionIcon, Box, Button, Flex, Stack, Text, Tooltip } from '@mantine/core'
 import type { Session, SessionType } from '@shared/types'
 import { IconAlignRight, IconChevronLeft, IconChevronRight, IconFold, IconTrash } from '@tabler/icons-react'
+import { useAtomValue } from 'jotai'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import { compactionUIStateMapAtom } from '@/stores/atoms/compactionAtoms'
 import { deleteFork, switchFork, switchForkTo } from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import ActionMenu from '../ActionMenu'
@@ -48,6 +50,15 @@ export default function ForkGroup(props: ForkGroupProps) {
   )
   const { t } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
+
+  // Switching or deleting branches while a compaction summary streams would
+  // move the pending boundary off the active path and waste the summary run
+  // (commit would route it back to the stored branch). Lock the fork controls
+  // for the few seconds the compaction takes, like during generation.
+  const compactionStateMap = useAtomValue(compactionUIStateMapAtom)
+  const compactionRunning = compactionStateMap[sessionId]?.status === 'running'
+  const forkControlsLocked = generationLocked || compactionRunning
+  const lockReason = generationLocked ? t('Wait for the current replies to finish') : t('Wait for compaction to finish')
 
   useEffect(() => {
     if (forks.lists.length > prevLength.current) {
@@ -100,38 +111,38 @@ export default function ForkGroup(props: ForkGroupProps) {
   })
   const visibleBranches = alternativeBranches.filter(({ list }) => expanded || revealedBranchIds.has(list.id))
 
-  const notifyGenerationLocked = useCallback(() => {
-    toastActions.add(t('Wait for the current replies to finish'), 2500)
-  }, [t])
+  const notifyControlsLocked = useCallback(() => {
+    toastActions.add(lockReason, 2500)
+  }, [lockReason])
 
   const handleSwitch = useCallback(
     (direction: 'next' | 'prev') => {
-      if (generationLocked) {
-        notifyGenerationLocked()
+      if (forkControlsLocked) {
+        notifyControlsLocked()
         return
       }
       void switchFork(sessionId, msgId, direction)
     },
-    [generationLocked, msgId, notifyGenerationLocked, sessionId]
+    [forkControlsLocked, msgId, notifyControlsLocked, sessionId]
   )
 
   const handleDelete = useCallback(() => {
-    if (generationLocked) {
-      notifyGenerationLocked()
+    if (forkControlsLocked) {
+      notifyControlsLocked()
       return
     }
     void deleteFork(sessionId, msgId)
-  }, [generationLocked, msgId, notifyGenerationLocked, sessionId])
+  }, [forkControlsLocked, msgId, notifyControlsLocked, sessionId])
 
   const handleSwitchTo = useCallback(
     (position: number) => {
-      if (generationLocked) {
-        notifyGenerationLocked()
+      if (forkControlsLocked) {
+        notifyControlsLocked()
         return
       }
       void switchForkTo(sessionId, msgId, position)
     },
-    [generationLocked, msgId, notifyGenerationLocked, sessionId]
+    [forkControlsLocked, msgId, notifyControlsLocked, sessionId]
   )
 
   const navigation = (
@@ -141,9 +152,9 @@ export default function ForkGroup(props: ForkGroupProps) {
         size={20}
         radius="lg"
         color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
-        aria-label={generationLocked ? t('Wait for the current replies to finish') : t('Previous reply')}
-        aria-disabled={generationLocked}
-        data-disabled={generationLocked || undefined}
+        aria-label={forkControlsLocked ? lockReason : t('Previous reply')}
+        aria-disabled={forkControlsLocked}
+        data-disabled={forkControlsLocked || undefined}
         onClick={() => handleSwitch('prev')}
       >
         <IconChevronLeft />
@@ -176,10 +187,10 @@ export default function ForkGroup(props: ForkGroupProps) {
             divider: true,
           },
           {
-            doubleCheck: !generationLocked,
+            doubleCheck: !forkControlsLocked,
             text: t('delete'),
             icon: IconTrash,
-            disabled: generationLocked && !isSmallScreen,
+            disabled: forkControlsLocked && !isSmallScreen,
             onClick: handleDelete,
           },
         ]}
@@ -193,9 +204,9 @@ export default function ForkGroup(props: ForkGroupProps) {
         size={20}
         radius="lg"
         color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
-        aria-label={generationLocked ? t('Wait for the current replies to finish') : t('Next reply')}
-        aria-disabled={generationLocked}
-        data-disabled={generationLocked || undefined}
+        aria-label={forkControlsLocked ? lockReason : t('Next reply')}
+        aria-disabled={forkControlsLocked}
+        data-disabled={forkControlsLocked || undefined}
         onClick={() => handleSwitch('next')}
       >
         <IconChevronRight />
@@ -206,8 +217,8 @@ export default function ForkGroup(props: ForkGroupProps) {
   return (
     <Stack gap="xs">
       <Flex justify="flex-end" pr="md" mr="md" className="self-end">
-        {generationLocked && !isSmallScreen ? (
-          <Tooltip label={t('Wait for the current replies to finish')} withArrow>
+        {forkControlsLocked && !isSmallScreen ? (
+          <Tooltip label={lockReason} withArrow>
             <Box className="inline-flex">{navigation}</Box>
           </Tooltip>
         ) : (
@@ -220,8 +231,8 @@ export default function ForkGroup(props: ForkGroupProps) {
             variant="subtle"
             color="chatbox-brand"
             size="compact-xs"
-            disabled={generationLocked && !isSmallScreen}
-            aria-disabled={generationLocked}
+            disabled={forkControlsLocked && !isSmallScreen}
+            aria-disabled={forkControlsLocked}
             onClick={() => handleSwitchTo(index)}
           >
             {t('Switch to this branch')}
@@ -248,8 +259,8 @@ export default function ForkGroup(props: ForkGroupProps) {
                       : t('{{count}} follow-up messages', { count: followupCount })}
                   </Text>
                 )}
-                {generationLocked && !isSmallScreen ? (
-                  <Tooltip label={t('Wait for the current replies to finish')} withArrow>
+                {forkControlsLocked && !isSmallScreen ? (
+                  <Tooltip label={lockReason} withArrow>
                     <span>{switchButton}</span>
                   </Tooltip>
                 ) : (

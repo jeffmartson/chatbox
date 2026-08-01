@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "{{n}} 件の回答すべてを停止",
   "Stop generating this reply": "この回答の生成を停止",
   "Wait for the current replies to finish": "現在の回答が完了するまでお待ちください",
+  "Wait for compaction to finish": "圧縮が完了するまでお待ちください",
   "Previous reply": "前の回答",
   "Next reply": "次の回答",
   "Expand view": "展開して表示",

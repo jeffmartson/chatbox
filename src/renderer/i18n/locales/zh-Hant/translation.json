@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "停止全部 {{n}} 則回覆",
   "Stop generating this reply": "停止產生這則回覆",
   "Wait for the current replies to finish": "請等待目前回覆產生完成",
+  "Wait for compaction to finish": "請等待壓縮完成",
   "Previous reply": "上一則回覆",
   "Next reply": "下一則回覆",
   "Expand view": "展開查看",

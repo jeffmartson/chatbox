@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "Stoppa alla {{n}} svaren",
   "Stop generating this reply": "Stoppa det här svaret",
   "Wait for the current replies to finish": "Vänta tills de aktuella svaren är klara",
+  "Wait for compaction to finish": "Vänta tills komprimeringen är klar",
   "Previous reply": "Föregående svar",
   "Next reply": "Nästa svar",
   "Expand view": "Expandera vyn",

@@ -245,6 +245,50 @@ describe('buildContext', () => {
 
       expect(result[0].id).toBe('sys')
     })
+
+    it('should ignore a compaction point whose summary is missing from the path', async () => {
+      const compactionPoints: CompactionPoint[] = [
+        { boundaryMessageId: '2', summaryMessageId: 'missing-summary', createdAt: Date.now() },
+      ]
+
+      const messages: Message[] = [
+        createMessage({ id: '1', role: 'user' }),
+        createMessage({ id: '2', role: 'assistant' }),
+        createMessage({ id: '3', role: 'user' }),
+      ]
+
+      const result = await buildContext(messages, {
+        attachmentResolver: createMockResolver(),
+        compactionPoints,
+      })
+
+      expect(result.map((m) => m.id)).toEqual(['1', '2', '3'])
+    })
+
+    it('should fall back to an older applicable point when the latest is torn apart by a fork switch', async () => {
+      const now = Date.now()
+      const compactionPoints: CompactionPoint[] = [
+        { boundaryMessageId: '2', summaryMessageId: 'old-summary', createdAt: now - 1000 },
+        { boundaryMessageId: '4', summaryMessageId: 'new-summary', createdAt: now },
+      ]
+
+      // new-summary went into a sibling fork branch; this path only holds the older pair.
+      const messages: Message[] = [
+        createMessage({ id: '1', role: 'user' }),
+        createMessage({ id: '2', role: 'assistant' }),
+        createMessage({ id: 'old-summary', role: 'assistant', isSummary: true }),
+        createMessage({ id: '3', role: 'user' }),
+        createMessage({ id: '4', role: 'assistant' }),
+        createMessage({ id: '5', role: 'user' }),
+      ]
+
+      const result = await buildContext(messages, {
+        attachmentResolver: createMockResolver(),
+        compactionPoints,
+      })
+
+      expect(result.map((m) => m.id)).toEqual(['old-summary', '3', '4', '5'])
+    })
   })
 
   describe('tool call cleanup', () => {
@@ -687,12 +731,9 @@ describe('buildContext', () => {
         compactionPoints,
       })
 
-      expect(result.map((m) => m.id)).toContain('sys')
-      expect(result.map((m) => m.id)).toContain('3')
-      expect(result.map((m) => m.id)).toContain('4')
-      expect(result.map((m) => m.id)).not.toContain('1')
-      expect(result.map((m) => m.id)).not.toContain('2')
-      expect(result.map((m) => m.id)).not.toContain('nonexistent-summary')
+      // The point is not applicable without its summary: keep full history
+      // instead of silently dropping everything before the boundary.
+      expect(result.map((m) => m.id)).toEqual(['sys', '1', '2', '3', '4'])
     })
 
     it('should handle system message not at index 0', async () => {

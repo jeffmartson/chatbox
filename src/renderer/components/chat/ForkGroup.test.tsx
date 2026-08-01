@@ -3,7 +3,9 @@
 import { MantineProvider } from '@mantine/core'
 import type { Message, Session } from '@shared/types'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { getDefaultStore } from 'jotai'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { compactionUIStateMapAtom } from '@/stores/atoms/compactionAtoms'
 
 const { deleteForkMock, isSmallScreenMock, switchForkMock, switchForkToMock, toastMock } = vi.hoisted(() => ({
   deleteForkMock: vi.fn(),
@@ -82,6 +84,7 @@ describe('ForkGroup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     isSmallScreenMock.mockReturnValue(false)
+    getDefaultStore().set(compactionUIStateMapAtom, {})
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -209,5 +212,42 @@ describe('ForkGroup', () => {
 
     expect(switchForkToMock).not.toHaveBeenCalled()
     expect(toastMock).toHaveBeenCalledWith('Wait for the current replies to finish', 2500)
+  })
+
+  test('blocks branch switching while compaction is running and explains why', () => {
+    getDefaultStore().set(compactionUIStateMapAtom, {
+      'session-1': { status: 'running', error: null, streamingText: '' },
+    })
+    renderGroup({
+      position: 0,
+      lists: [
+        { id: 'current', messages: [] },
+        { id: 'alternative', messages: [message('alternative-reply')] },
+      ],
+      createdAt: 1,
+    })
+
+    fireEvent.click(screen.getAllByLabelText('Wait for compaction to finish')[0])
+
+    expect(switchForkMock).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith('Wait for compaction to finish', 2500)
+  })
+
+  test('unlocks branch switching for other sessions during compaction', () => {
+    getDefaultStore().set(compactionUIStateMapAtom, {
+      'other-session': { status: 'running', error: null, streamingText: '' },
+    })
+    renderGroup({
+      position: 0,
+      lists: [
+        { id: 'current', messages: [] },
+        { id: 'alternative', messages: [message('alternative-reply')] },
+      ],
+      createdAt: 1,
+    })
+
+    fireEvent.click(screen.getByLabelText('Next reply'))
+
+    expect(switchForkMock).toHaveBeenCalledWith('session-1', 'user-1', 'next')
   })
 })

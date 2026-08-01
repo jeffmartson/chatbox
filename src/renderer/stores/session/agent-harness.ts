@@ -5,6 +5,7 @@ import type { SandboxProvider } from '@shared/sandbox-provider'
 import type {
   AgentModeLockReason,
   AgentModeValue,
+  CompactionPoint,
   Config,
   KnowledgeBase,
   Message,
@@ -60,6 +61,11 @@ export interface PrepareAgentGenerationHarnessOptions {
   agentModeSupported: boolean
   signal: AbortSignal
   providerOptions?: SessionSettings['providerOptions']
+  /**
+   * Points of the conversation being generated (thread-level when the target
+   * message lives in an archived thread). Defaults to session.compactionPoints.
+   */
+  compactionPoints?: CompactionPoint[]
   preserveLastPromptMessageToolCalls?: boolean
   sideEffects?: AgentGenerationSideEffects
   sandboxProviderFactory?: () => SandboxProvider | null
@@ -190,6 +196,7 @@ export async function prepareAgentGenerationHarness(
     agentModeSupported,
     signal,
     providerOptions,
+    compactionPoints = session.compactionPoints,
     preserveLastPromptMessageToolCalls = false,
     sideEffects,
     sandboxProviderFactory = createSandboxProvider,
@@ -235,7 +242,7 @@ export async function prepareAgentGenerationHarness(
   )
   let promptMsgs = await buildContext(messagesForPrompt, {
     attachmentResolver,
-    compactionPoints: session.compactionPoints,
+    compactionPoints,
     modelSupportToolUseForFile: model.isSupportToolUse('read-file'),
     maxContextMessageCount: settings.maxContextMessageCount,
     preserveToolCallMessageIds,

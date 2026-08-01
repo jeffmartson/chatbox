@@ -1,3 +1,4 @@
+import { findLatestApplicableCompactionPoint, isContextEligibleMessage } from '@shared/context'
 import type { CompactionPoint, Message, Session, SessionSettings, SessionThread, Settings } from '@shared/types'
 import { cleanToolCalls } from './tool-cleanup'
 
@@ -19,7 +20,7 @@ export interface BuildContextOptions {
 export function buildContextForAI(options: BuildContextOptions): Message[] {
   const { messages, compactionPoints, keepToolCallRounds = 2 } = options
 
-  const completedMessages = messages.filter((m) => !m.generating && !m.isForkMarker)
+  const completedMessages = messages.filter(isContextEligibleMessage)
 
   if (completedMessages.length === 0) {
     return []
@@ -30,27 +31,26 @@ export function buildContextForAI(options: BuildContextOptions): Message[] {
 }
 
 export function computeContextAfterCompaction(messages: Message[], compactionPoints?: CompactionPoint[]): Message[] {
-  const latestCompactionPoint = findLatestCompactionPoint(compactionPoints)
+  const latestCompactionPoint = findLatestApplicableCompactionPoint(messages, compactionPoints)
 
+  // A summary may only enter context as the stand-in of an applied compaction
+  // point; orphaned summaries (boundary on another branch, point lost) must
+  // not leak into the full-history fallback.
   if (!latestCompactionPoint) {
-    return messages
+    return messages.filter((m) => !m.isSummary)
   }
 
   const boundaryIndex = messages.findIndex((m) => m.id === latestCompactionPoint.boundaryMessageId)
   const summaryMessage = messages.find((m) => m.id === latestCompactionPoint.summaryMessageId)
 
-  if (boundaryIndex === -1) {
-    return messages
+  // findLatestApplicableCompactionPoint guarantees both exist in `messages`.
+  if (boundaryIndex === -1 || !summaryMessage) {
+    return messages.filter((m) => !m.isSummary)
   }
 
   const messagesAfterBoundary = messages.slice(boundaryIndex + 1).filter((m) => !m.isSummary)
 
-  let contextMessages: Message[]
-  if (summaryMessage) {
-    contextMessages = [summaryMessage, ...messagesAfterBoundary]
-  } else {
-    contextMessages = messagesAfterBoundary
-  }
+  let contextMessages: Message[] = [summaryMessage, ...messagesAfterBoundary]
 
   const systemMessage = messages.find((m) => m.role === 'system')
   if (systemMessage && !contextMessages.some((m) => m.id === systemMessage.id)) {
@@ -117,14 +117,4 @@ export function getContextMessageIds(session: Session, maxCount?: number): strin
   }
 
   return ids
-}
-
-function findLatestCompactionPoint(compactionPoints?: CompactionPoint[]): CompactionPoint | undefined {
-  if (!compactionPoints || compactionPoints.length === 0) {
-    return undefined
-  }
-
-  return compactionPoints.reduce((latest, current) => {
-    return current.createdAt > latest.createdAt ? current : latest
-  })
 }

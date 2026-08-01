@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "{{n}}개 답장 모두 중지",
   "Stop generating this reply": "이 답장 생성 중지",
   "Wait for the current replies to finish": "현재 답변이 완료될 때까지 기다려 주세요",
+  "Wait for compaction to finish": "압축이 완료될 때까지 기다려 주세요",
   "Previous reply": "이전 답변",
   "Next reply": "다음 답변",
   "Expand view": "펼쳐 보기",

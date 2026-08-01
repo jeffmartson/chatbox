@@ -120,7 +120,14 @@ async function regenerateInNewForkWithoutSessionLock(
     await _generateWithoutSessionLock(sessionId, msg, { operationType: 'regenerate' })
     return
   }
-  const previousMessageIndex = location.index - 1
+  // Skip anchored compaction summaries: a summary sits immediately after its
+  // boundary and belongs to the shared prefix, so the fork pivot must be the
+  // real conversation message before it (forks keyed on a summary id would
+  // attach navigation to SummaryMessage and break when it is deleted).
+  let previousMessageIndex = location.index - 1
+  while (previousMessageIndex >= 0 && location.list[previousMessageIndex].isSummary) {
+    previousMessageIndex -= 1
+  }
   if (previousMessageIndex < 0) {
     // If target message is the first message, regenerate directly
     await _generateWithoutSessionLock(sessionId, msg, { operationType: 'regenerate' })

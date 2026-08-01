@@ -1,5 +1,7 @@
 import { isTextFilePath } from '../file-extensions'
 import type { CompactionPoint, Message, MessageContentParts } from '../types'
+import { findLatestApplicableCompactionPoint } from './compaction-points'
+import { isContextEligibleMessage } from './message-eligibility'
 import type { AttachmentResolver, ContextBuilderOptions } from './types'
 
 const MAX_INLINE_FILE_LINES = 500
@@ -24,7 +26,7 @@ export async function buildContext(messages: Message[], options: ContextBuilderO
     return []
   }
 
-  const completedMessages = messages.filter((m) => !m.generating && !m.isForkMarker)
+  const completedMessages = messages.filter(isContextEligibleMessage)
 
   if (completedMessages.length === 0) {
     return []
@@ -59,27 +61,35 @@ function applyCompaction(
   keepToolCallRounds: number,
   preserveToolCallMessageIds: string[] | undefined
 ): Message[] {
-  const latestCompactionPoint = findLatestCompactionPoint(compactionPoints)
+  const latestCompactionPoint = findLatestApplicableCompactionPoint(messages, compactionPoints)
 
+  // A summary may only enter context as the stand-in of an applied compaction
+  // point. In fallback paths any summary on the current path is orphaned (its
+  // boundary lives on another branch or its point was lost) and would leak a
+  // summary of other content alongside the full history.
   if (!latestCompactionPoint) {
-    return cleanToolCalls(messages, keepToolCallRounds, preserveToolCallMessageIds)
+    return cleanToolCalls(
+      messages.filter((m) => !m.isSummary),
+      keepToolCallRounds,
+      preserveToolCallMessageIds
+    )
   }
 
   const boundaryIndex = messages.findIndex((m) => m.id === latestCompactionPoint.boundaryMessageId)
   const summaryMessage = messages.find((m) => m.id === latestCompactionPoint.summaryMessageId)
 
-  if (boundaryIndex === -1) {
-    return cleanToolCalls(messages, keepToolCallRounds, preserveToolCallMessageIds)
+  // findLatestApplicableCompactionPoint guarantees both exist in `messages`.
+  if (boundaryIndex === -1 || !summaryMessage) {
+    return cleanToolCalls(
+      messages.filter((m) => !m.isSummary),
+      keepToolCallRounds,
+      preserveToolCallMessageIds
+    )
   }
 
   const messagesAfterBoundary = messages.slice(boundaryIndex + 1).filter((m) => !m.isSummary)
 
-  let contextMessages: Message[]
-  if (summaryMessage) {
-    contextMessages = [summaryMessage, ...messagesAfterBoundary]
-  } else {
-    contextMessages = messagesAfterBoundary
-  }
+  let contextMessages: Message[] = [summaryMessage, ...messagesAfterBoundary]
 
   const systemMessage = messages.find((m) => m.role === 'system')
   if (systemMessage && !contextMessages.some((m) => m.id === systemMessage.id)) {
@@ -87,15 +97,6 @@ function applyCompaction(
   }
 
   return cleanToolCalls(contextMessages, keepToolCallRounds, preserveToolCallMessageIds)
-}
-
-function findLatestCompactionPoint(compactionPoints?: CompactionPoint[]): CompactionPoint | undefined {
-  if (!compactionPoints || compactionPoints.length === 0) {
-    return undefined
-  }
-  return compactionPoints.reduce((latest, current) => {
-    return current.createdAt > latest.createdAt ? current : latest
-  })
 }
 
 function cleanToolCalls(messages: Message[], keepRounds: number, preserveToolCallMessageIds?: string[]): Message[] {

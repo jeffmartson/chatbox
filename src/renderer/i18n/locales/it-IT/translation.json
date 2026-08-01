@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "Interrompi tutte le {{n}} risposte",
   "Stop generating this reply": "Interrompi questa risposta",
   "Wait for the current replies to finish": "Attendi il completamento delle risposte correnti",
+  "Wait for compaction to finish": "Attendi il completamento della compattazione",
   "Previous reply": "Risposta precedente",
   "Next reply": "Risposta successiva",
   "Expand view": "Espandi vista",

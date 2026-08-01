@@ -617,17 +617,25 @@ export async function insertMessage(sessionId: string, message: Message, previou
     }
 
     if (previousId) {
+      // Insert after the previous message, skipping any compaction summaries
+      // anchored to it: a summary sits immediately after its boundary message
+      // and nothing may come between the pair (see buildCompactionCommitPatch).
+      const afterAnchoredSummaries = (messages: Message[], previousIndex: number): number => {
+        let index = previousIndex + 1
+        while (index < messages.length && messages[index].isSummary) {
+          index += 1
+        }
+        return index
+      }
+
       // try to find insert position in message list
       let previousIndex = session.messages.findIndex((m) => m.id === previousId)
 
       if (previousIndex >= 0) {
+        const insertIndex = afterAnchoredSummaries(session.messages, previousIndex)
         return {
           ...session,
-          messages: [
-            ...session.messages.slice(0, previousIndex + 1),
-            message,
-            ...session.messages.slice(previousIndex + 1),
-          ],
+          messages: [...session.messages.slice(0, insertIndex), message, ...session.messages.slice(insertIndex)],
         } satisfies Session
       }
 
@@ -636,17 +644,14 @@ export async function insertMessage(sessionId: string, message: Message, previou
         for (const thread of session.threads) {
           previousIndex = thread.messages.findIndex((m) => m.id === previousId)
           if (previousIndex >= 0) {
+            const insertIndex = afterAnchoredSummaries(thread.messages, previousIndex)
             return {
               ...session,
               threads: session.threads.map((th) => {
                 if (th.id === thread.id) {
                   return {
                     ...thread,
-                    messages: [
-                      ...thread.messages.slice(0, previousIndex + 1),
-                      message,
-                      ...thread.messages.slice(previousIndex + 1),
-                    ],
+                    messages: [...thread.messages.slice(0, insertIndex), message, ...thread.messages.slice(insertIndex)],
                   }
                 }
                 return th

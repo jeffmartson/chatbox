@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { ChatboxAIAPIError, OCRError } from '@shared/models/errors'
-import type { Message, SessionSettings, Settings } from '@shared/types'
+import type { Message, Session, SessionSettings, Settings } from '@shared/types'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const { reportErrorMock, trackEventMock } = vi.hoisted(() => ({
@@ -18,7 +18,7 @@ vi.mock('../chatStore', () => ({
 }))
 
 import { uiStore } from '../uiStore'
-import { handleGenerationError, trackGenerateEvent } from './utils'
+import { getCompactionPointsForTarget, handleGenerationError, trackGenerateEvent } from './utils'
 
 describe('trackGenerateEvent', () => {
   beforeEach(() => {
@@ -112,5 +112,60 @@ describe('trackGenerateEvent', () => {
       aiProvider: 'Chatbox AI',
       causeErrorCode: 20039,
     })
+  })
+})
+
+describe('getCompactionPointsForTarget', () => {
+  const sessionPoint = { summaryMessageId: 'active-summary', boundaryMessageId: 'active-a1', createdAt: 2000 }
+  const threadPoint = { summaryMessageId: 'thread-summary', boundaryMessageId: 'thread-a1', createdAt: 1000 }
+
+  function makeSessionWithThread(): Session {
+    const msg = (id: string, overrides: Partial<Message> = {}): Message => ({
+      id,
+      role: 'assistant',
+      contentParts: [],
+      ...overrides,
+    })
+    return {
+      id: 'session-1',
+      name: 'Test',
+      messages: [msg('active-u1', { role: 'user' }), msg('active-a1'), msg('active-summary', { isSummary: true })],
+      compactionPoints: [sessionPoint],
+      threads: [
+        {
+          id: 'thread-1',
+          name: 'archived',
+          createdAt: 500,
+          messages: [msg('thread-u1', { role: 'user' }), msg('thread-a1'), msg('thread-summary', { isSummary: true })],
+          compactionPoints: [threadPoint],
+        },
+      ],
+      messageForksHash: {
+        'thread-u1': {
+          position: 0,
+          createdAt: 1,
+          lists: [
+            { id: 'list-0', messages: [] },
+            { id: 'list-1', messages: [msg('thread-fork-alt')] },
+          ],
+        },
+      },
+    }
+  }
+
+  test('uses session points for active-conversation messages', () => {
+    expect(getCompactionPointsForTarget(makeSessionWithThread(), 'active-a1')).toEqual([sessionPoint])
+  })
+
+  test('uses the archived thread points when retrying from a thread', () => {
+    expect(getCompactionPointsForTarget(makeSessionWithThread(), 'thread-a1')).toEqual([threadPoint])
+  })
+
+  test('uses the thread points for fork branches reachable from the thread', () => {
+    expect(getCompactionPointsForTarget(makeSessionWithThread(), 'thread-fork-alt')).toEqual([threadPoint])
+  })
+
+  test('falls back to session points for unknown messages', () => {
+    expect(getCompactionPointsForTarget(makeSessionWithThread(), 'missing')).toEqual([sessionPoint])
   })
 })

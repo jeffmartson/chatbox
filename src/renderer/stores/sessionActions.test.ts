@@ -521,6 +521,41 @@ describe('fork actions', () => {
     expect(runGenerateMore).toHaveBeenCalledWith(session.id, pivot.id)
   })
 
+  test('regenerateInNewFork skips an anchored summary when picking the fork pivot', async () => {
+    uuidQueue.push('fork-1', 'fork-2', 'fork-3', 'fork-4')
+    const pivot = makeMessage('pivot', 'user')
+    // Manual compaction during generation anchors the summary right after the
+    // boundary (pivot), before the reply.
+    const anchoredSummary = { ...makeMessage('anchored-summary', 'assistant'), isSummary: true }
+    const target = makeMessage('target', 'assistant')
+    const session: Session = {
+      id: 'session-8b',
+      name: 'Test',
+      messages: [pivot, anchoredSummary, target],
+    }
+
+    getSessionMock.mockResolvedValue(session)
+
+    let updated: Session | undefined
+    updateSessionWithMessages.mockImplementation(async (_, updater) => {
+      const result = updater(session)
+      updated = result as Session
+      return result
+    })
+
+    const runGenerateMore = vi.fn().mockResolvedValue(undefined)
+
+    await sessionActions.regenerateInNewFork(session.id, target, { runGenerateMore })
+
+    // The fork must be keyed on the real conversation message, not the
+    // summary (fork UI attaches to the pivot; summaries are deletable).
+    expect(updated?.messageForksHash?.[pivot.id]).toBeDefined()
+    expect(updated?.messageForksHash?.[anchoredSummary.id]).toBeUndefined()
+    // The anchored summary stays in the shared prefix, not in the fork tail.
+    expect(updated?.messages.map((m) => m.id)).toEqual([pivot.id, anchoredSummary.id])
+    expect(runGenerateMore).toHaveBeenCalledWith(session.id, pivot.id)
+  })
+
   test('moveThreadToConversations preserves thread forks and drops unrelated ones', async () => {
     uuidQueue.push('copied-thread-pivot', 'copied-thread-reply', 'copied-list-0', 'copied-thread-alt', 'copied-list-1')
     const currentPivot = makeMessage('current-pivot', 'user')
@@ -638,13 +673,18 @@ describe('fork actions', () => {
     expect(copiedFork).toBeDefined()
     expect(copiedFork?.lists[1].messages[0].id).not.toBe(alternative.id)
 
-    expect(updateSessionWithMessages).toHaveBeenCalledWith(
-      session.id,
-      expect.objectContaining({
-        messages: [historyPivot, historyReply],
-        threadName: 'History',
-      })
-    )
+    expect(updateSessionWithMessages).toHaveBeenCalledTimes(1)
+    // removeCurrentThread uses a functional updater to read the queue's
+    // current session; apply it to verify the restored thread state.
+    const [updatedSessionId, updater] = updateSessionWithMessages.mock.calls[0] as [
+      string,
+      (s: Session) => Session,
+    ]
+    expect(updatedSessionId).toBe(session.id)
+    expect(typeof updater).toBe('function')
+    const restored = updater(session)
+    expect(restored.messages).toEqual([historyPivot, historyReply])
+    expect(restored.threadName).toBe('History')
     expect(routerNavigateMock).toHaveBeenCalledWith({
       to: '/session/$sessionId',
       params: { sessionId: 'new-session-current' },
@@ -745,5 +785,133 @@ describe('fork actions', () => {
       to: '/session/$sessionId',
       params: { sessionId: 'new-session-copy' },
     })
+  })
+
+  test('copyAndSwitchSession remaps compaction points anchored in inactive fork branches', async () => {
+    uuidQueue.push(
+      'copied-pivot',
+      'copied-active-reply',
+      'copied-list-0',
+      'copied-inactive-boundary',
+      'copied-inactive-summary',
+      'copied-list-1',
+      'copied-fork-marker'
+    )
+    const pivot = makeMessage('pivot', 'user')
+    const activeReply = makeMessage('active-reply', 'assistant')
+    const inactiveBoundary = makeMessage('inactive-boundary', 'assistant')
+    const inactiveSummary = { ...makeMessage('inactive-summary', 'assistant'), isSummary: true }
+    // The compacted branch was switched inactive: its boundary and summary
+    // live in a saved fork list while the point stays at session level.
+    const session: Session = {
+      id: 'session-copy-compacted-fork',
+      name: 'Source Session',
+      messages: [pivot, activeReply],
+      messageForksHash: {
+        [pivot.id]: {
+          position: 0,
+          lists: [
+            { id: 'list-0', messages: [] },
+            { id: 'list-1', messages: [inactiveBoundary, inactiveSummary] },
+          ],
+          createdAt: 1,
+        },
+      },
+      compactionPoints: [
+        { summaryMessageId: inactiveSummary.id, boundaryMessageId: inactiveBoundary.id, createdAt: 100 },
+      ],
+    }
+
+    getSessionMock.mockResolvedValue(session)
+    createSessionMock.mockImplementation(async (newSession: Omit<Session, 'id'>) => ({
+      ...newSession,
+      id: 'new-session-compacted-fork',
+    }))
+
+    await sessionActions.copyAndSwitchSession({ id: session.id, name: session.name })
+
+    const newSession = createSessionMock.mock.calls[0][0] as Omit<Session, 'id'>
+    const copiedPivotId = newSession.messages[0].id
+    const copiedBranch = newSession.messageForksHash?.[copiedPivotId]?.lists[1].messages
+    expect(copiedBranch).toBeDefined()
+    // The point survives the copy, remapped to the copied fork-list messages,
+    // so switching to that branch in the copy still applies the compaction.
+    expect(newSession.compactionPoints).toEqual([
+      {
+        summaryMessageId: copiedBranch?.[1].id,
+        boundaryMessageId: copiedBranch?.[0].id,
+        createdAt: 100,
+      },
+    ])
+  })
+
+  test('copyAndSwitchSession remaps archived-thread points anchored in inactive fork branches', async () => {
+    uuidQueue.push(
+      'copied-active', // active message
+      'copied-thread-pivot', // thread messages
+      'copied-thread-reply',
+      'copied-thread-id',
+      'copied-list-0', // fork lists (reachable from the thread pivot)
+      'copied-fork-boundary',
+      'copied-fork-summary',
+      'copied-list-1',
+      'copied-fork-marker'
+    )
+    const active = makeMessage('active', 'user')
+    const threadPivot = makeMessage('thread-pivot', 'user')
+    const threadReply = makeMessage('thread-reply', 'assistant')
+    const forkBoundary = makeMessage('fork-boundary', 'assistant')
+    const forkSummary = { ...makeMessage('fork-summary', 'assistant'), isSummary: true }
+    // The compacted fork branch is inactive inside an archived thread: its
+    // boundary/summary are only reachable via the fork list, which is copied
+    // after the threads.
+    const session: Session = {
+      id: 'session-copy-thread-fork',
+      name: 'Source Session',
+      messages: [active],
+      threads: [
+        {
+          id: 'thread-1',
+          name: 'History',
+          createdAt: 1,
+          messages: [threadPivot, threadReply],
+          compactionPoints: [
+            { summaryMessageId: forkSummary.id, boundaryMessageId: forkBoundary.id, createdAt: 100 },
+          ],
+        },
+      ],
+      messageForksHash: {
+        [threadPivot.id]: {
+          position: 0,
+          lists: [
+            { id: 'list-0', messages: [] },
+            { id: 'list-1', messages: [forkBoundary, forkSummary] },
+          ],
+          createdAt: 1,
+        },
+      },
+    }
+
+    getSessionMock.mockResolvedValue(session)
+    createSessionMock.mockImplementation(async (newSession: Omit<Session, 'id'>) => ({
+      ...newSession,
+      id: 'new-session-thread-fork',
+    }))
+
+    await sessionActions.copyAndSwitchSession({ id: session.id, name: session.name })
+
+    const newSession = createSessionMock.mock.calls[0][0] as Omit<Session, 'id'>
+    const copiedThreadPivotId = newSession.threads?.[0].messages[0].id
+    const copiedBranch = newSession.messageForksHash?.[copiedThreadPivotId!]?.lists[1].messages
+    expect(copiedBranch).toBeDefined()
+    // The thread's point survives the copy, remapped to the fork-list copies
+    // even though fork lists are copied after the threads.
+    expect(newSession.threads?.[0].compactionPoints).toEqual([
+      {
+        summaryMessageId: copiedBranch?.[1].id,
+        boundaryMessageId: copiedBranch?.[0].id,
+        createdAt: 100,
+      },
+    ])
   })
 })

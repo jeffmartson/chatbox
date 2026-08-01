@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "إيقاف جميع الردود ({{n}})",
   "Stop generating this reply": "إيقاف إنشاء هذا الرد",
   "Wait for the current replies to finish": "انتظر حتى تكتمل الردود الحالية",
+  "Wait for compaction to finish": "انتظر حتى يكتمل الضغط",
   "Previous reply": "الرد السابق",
   "Next reply": "الرد التالي",
   "Expand view": "توسيع العرض",

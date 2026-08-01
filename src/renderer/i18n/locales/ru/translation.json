@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "Остановить все ответы ({{n}})",
   "Stop generating this reply": "Остановить этот ответ",
   "Wait for the current replies to finish": "Дождитесь завершения текущих ответов",
+  "Wait for compaction to finish": "Дождитесь завершения сжатия",
   "Previous reply": "Предыдущий ответ",
   "Next reply": "Следующий ответ",
   "Expand view": "Развернуть просмотр",

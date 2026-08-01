@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "停止全部 {{n}} 条回答",
   "Stop generating this reply": "停止生成这条回答",
   "Wait for the current replies to finish": "请等待当前回答生成完成",
+  "Wait for compaction to finish": "请等待压缩完成",
   "Previous reply": "上一条回答",
   "Next reply": "下一条回答",
   "Expand view": "展开查看",

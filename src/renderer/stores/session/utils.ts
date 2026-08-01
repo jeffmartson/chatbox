@@ -1,8 +1,9 @@
 import { isExpectedGenerationError } from '@shared/models/error-classification'
 import { ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
-import { findMessageContext } from '@shared/session/message-forks'
+import { findMessageContext, findMessageSourceThread } from '@shared/session/message-forks'
 import type {
   AgentModeValue,
+  CompactionPoint,
   Message,
   ModelProvider,
   Session,
@@ -109,6 +110,17 @@ export function findTargetMessageIndex(
 ): { messages: Message[]; index: number } | null {
   const location = findMessageContext(session, targetMsgId)
   return location && location.index > 0 ? { messages: location.list, index: location.index } : null
+}
+
+/**
+ * Compaction points applicable to a target message's conversation: thread
+ * points when the message lives in an archived thread (retry from history),
+ * session points otherwise. Points are stored next to their message list
+ * (see buildCompactionCommitPatch / thread archive flows).
+ */
+export function getCompactionPointsForTarget(session: Session, targetMsgId: string): CompactionPoint[] | undefined {
+  const sourceThread = findMessageSourceThread(session, targetMsgId)
+  return sourceThread ? sourceThread.compactionPoints : session.compactionPoints
 }
 
 /**

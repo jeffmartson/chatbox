@@ -52,6 +52,7 @@ import { createInitialState, processStreamChunk } from './stream-chunk-processor
 import { buildToolsForSession } from './tools-builder'
 import {
   findTargetMessageIndex,
+  getCompactionPointsForTarget,
   getSessionWebBrowsing,
   handleGenerationError,
   initializeTargetMessage,
@@ -602,6 +603,8 @@ export async function orchestrateGeneration(
       agentModeSupported,
       signal: controller.signal,
       providerOptions: settings.providerOptions,
+      // Retrying from an archived thread must use that thread's points.
+      compactionPoints: getCompactionPointsForTarget(session, targetMsg.id),
       preserveLastPromptMessageToolCalls: Boolean(options?.appendToMessage),
       isPro: settingActions.isPro,
       sideEffects: {
@@ -804,7 +807,8 @@ async function buildToolsForPausedToolCall(session: Session, settings: SessionSe
   const messagesForPrompt = await refreshSessionAttachmentStatuses(messagesBeforeTarget)
   const promptMsgs = await buildContext(messagesForPrompt, {
     attachmentResolver,
-    compactionPoints: session.compactionPoints,
+    // Paused tool calls can be resumed from an archived thread too.
+    compactionPoints: getCompactionPointsForTarget(session, targetMsg.id),
     modelSupportToolUseForFile: model.isSupportToolUse('read-file'),
     maxContextMessageCount: settings.maxContextMessageCount,
     sandboxMode: canExecuteCode,

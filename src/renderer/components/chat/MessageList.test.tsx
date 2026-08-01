@@ -106,7 +106,10 @@ vi.mock('@/lib/utils', () => ({
   getLogger: () => ({ debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
 }))
 
-vi.mock('jotai', () => ({
+// Partially mock jotai: ForkGroup imports compactionAtoms, which calls the
+// real `atom()` at module scope; only the hooks need stubbing here.
+vi.mock('jotai', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('jotai')>()),
   useAtomValue: () => 'darwin',
   useSetAtom: () => vi.fn(),
 }))

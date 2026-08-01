@@ -1249,6 +1249,7 @@
   "Stop all {{n}} replies": "Alle {{n}} Antworten stoppen",
   "Stop generating this reply": "Diese Antwort stoppen",
   "Wait for the current replies to finish": "Warte, bis die aktuellen Antworten fertig sind",
+  "Wait for compaction to finish": "Warte, bis die Komprimierung abgeschlossen ist",
   "Previous reply": "Vorherige Antwort",
   "Next reply": "Nächste Antwort",
   "Expand view": "Ansicht erweitern",
