@@ -23,6 +23,7 @@ import {
   IconMessageReport,
   IconPencil,
   IconPhotoPlus,
+  IconPlayerStopFilled,
   type IconProps,
   IconQuoteFilled,
   IconReload,
@@ -58,6 +59,7 @@ import { copyToClipboard } from '@/packages/navigator'
 import { countWord } from '@/packages/word-count'
 import { getSession } from '@/stores/chatStore'
 import { lockSessionAgentMode, setSessionAgentMode } from '@/stores/session/agent-mode'
+import { isCancellableGeneratingAssistantMessage } from '@/stores/session/generation-state'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import '../../static/Block.css'
@@ -84,6 +86,11 @@ import {
 import { MessageAttachmentGrid } from './MessageAttachmentGrid'
 import MessageErrTips from './MessageErrTips'
 import MessageStatuses, { PreparingToolCallStatus } from './MessageLoading'
+import {
+  getMessageActionVisibilityClass,
+  type MessageButtonGroup,
+  shouldShowConcurrentReplyStop,
+} from './message-action-state'
 import { isMessageReminderPresentation, resolveMessageErrorPresentation } from './message-error-presentation'
 import { shouldRightAlignMessage } from './message-layout'
 import { getMessageRoleClass } from './message-role-class'
@@ -114,7 +121,11 @@ interface Props {
   msg: Message
   className?: string
   collapseThreshold?: number // 文本长度阀值, 超过这个长度则会被折叠
-  buttonGroup?: 'auto' | 'always' | 'none' // 按钮组显示策略, auto: 只在 hover 时显示; always: 总是显示; none: 不显示
+  buttonGroup?: MessageButtonGroup // 按钮组显示策略, auto: 只在 hover 时显示; always: 总是显示; none: 不显示
+  generatingReplyCount?: number
+  generationLocked?: boolean
+  readOnly?: boolean
+  allowGeneratingStop?: boolean
   small?: boolean
   assistantAvatarKey?: string
   sessionPicUrl?: string
@@ -157,6 +168,10 @@ const _Message: FC<Props> = (props) => {
     className,
     collapseThreshold,
     buttonGroup = 'auto',
+    generatingReplyCount = 0,
+    generationLocked = false,
+    readOnly = false,
+    allowGeneratingStop = false,
     small,
     assistantAvatarKey,
     sessionPicUrl,
@@ -206,13 +221,26 @@ const _Message: FC<Props> = (props) => {
   }, [msg, setQuote])
 
   const handleStop = useCallback(async () => {
-    await modifyMessage(sessionId, { ...msg, generating: false }, true)
+    msg.cancel?.()
+    if (msg.generating && msg.contentParts.length === 0) {
+      await removeMessage(sessionId, msg.id)
+      return
+    }
+    await modifyMessage(sessionId, { ...msg, generating: false, cancel: undefined }, true)
   }, [sessionId, msg])
 
+  const notifyGenerationLocked = useCallback(() => {
+    toastActions.add(t('Wait for the current replies to finish'), 2500)
+  }, [t])
+
   const handleRefresh = useCallback(async () => {
+    if (generationLocked) {
+      notifyGenerationLocked()
+      return
+    }
     await handleStop()
     await regenerateInNewFork(sessionId, msg)
-  }, [handleStop, sessionId, msg])
+  }, [generationLocked, handleStop, msg, notifyGenerationLocked, sessionId])
 
   // Tracking is best-effort and must never block or break the accept/decline
   // action, so this fetches the session on its own and swallows failures.
@@ -300,17 +328,25 @@ const _Message: FC<Props> = (props) => {
 
   const handleRetryLastStep = useCallback(async () => {
     if (!lastStepForRetry) return
+    if (generationLocked) {
+      notifyGenerationLocked()
+      return
+    }
     setRetryChoiceOpened(false)
     await retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
-  }, [lastStepForRetry, sessionId, msg.id])
+  }, [generationLocked, lastStepForRetry, msg.id, notifyGenerationLocked, sessionId])
 
   const handleErrorTipRetry = useCallback(async () => {
     if (lastStepForRetry) {
+      if (generationLocked) {
+        notifyGenerationLocked()
+        return
+      }
       await retryFromLastToolCallAfterApiError(sessionId, msg.id, lastStepForRetry.toolCallId)
       return
     }
     await handleRefresh()
-  }, [handleRefresh, lastStepForRetry, sessionId, msg.id])
+  }, [generationLocked, handleRefresh, lastStepForRetry, msg.id, notifyGenerationLocked, sessionId])
 
   const handleMessageRetry = useCallback(async () => {
     if (lastStepForRetry) {
@@ -345,12 +381,20 @@ const _Message: FC<Props> = (props) => {
   }, [msg])
 
   const onDelMsg = useCallback(() => {
+    if (generationLocked) {
+      notifyGenerationLocked()
+      return
+    }
     removeMessage(sessionId, msg.id)
-  }, [msg.id, sessionId])
+  }, [generationLocked, msg.id, notifyGenerationLocked, sessionId])
 
   const onEditClick = useCallback(async () => {
+    if (generationLocked) {
+      notifyGenerationLocked()
+      return
+    }
     await NiceModal.show('message-edit', { sessionId, msg: msg })
-  }, [msg, sessionId])
+  }, [generationLocked, msg, notifyGenerationLocked, sessionId])
 
   const onViewMessageJson = useCallback(async () => {
     await NiceModal.show('json-viewer', { title: t('Message Raw JSON'), data: msg })
@@ -559,6 +603,7 @@ const _Message: FC<Props> = (props) => {
                 icon: IconReload,
                 testId: TestId.message.actionMenuRetry,
                 onClick: handleRefresh,
+                disabled: generationLocked && !isSmallScreen,
               },
             msg.role !== 'assistant' && {
               text: t('Reply Again Below'),
@@ -572,6 +617,7 @@ const _Message: FC<Props> = (props) => {
                 icon: IconPencil,
                 testId: TestId.message.actionMenuEdit,
                 onClick: onEditClick,
+                disabled: generationLocked && !isSmallScreen,
               },
             !(props.sessionType === 'picture' && msg.role === 'assistant') && {
               text: t('copy'),
@@ -614,13 +660,14 @@ const _Message: FC<Props> = (props) => {
           ]
         : []),
       {
-        doubleCheck: true,
+        doubleCheck: !generationLocked,
         text: t('delete'),
         icon: IconTrash,
         testId: TestId.message.actionDelete,
         confirmTestId: TestId.message.actionDeleteConfirm,
         confirmPanelTestId: TestId.message.deleteConfirmation,
         onClick: onDelMsg,
+        disabled: generationLocked && !isSmallScreen,
       },
     ],
     [
@@ -638,6 +685,7 @@ const _Message: FC<Props> = (props) => {
       onCopyMsg,
       msg.model,
       props.sessionType,
+      generationLocked,
     ]
   )
   const [actionMenuOpened, setActionMenuOpened] = useState(false)
@@ -654,7 +702,7 @@ const _Message: FC<Props> = (props) => {
     <MessageErrTips
       msg={msg}
       sessionId={sessionId}
-      onRetry={msg.role === 'assistant' ? handleErrorTipRetry : undefined}
+      onRetry={!readOnly && msg.role === 'assistant' ? handleErrorTipRetry : undefined}
       isBubbleLayout={isBubbleLayout}
     />
   )
@@ -958,13 +1006,34 @@ const _Message: FC<Props> = (props) => {
       )
     })
 
-  const actionButtons = buttonGroup !== 'none' && !msg.generating && (
+  const showConcurrentReplyStop = shouldShowConcurrentReplyStop({
+    allowStop: allowGeneratingStop,
+    cancellable: isCancellableGeneratingAssistantMessage(msg),
+    generatingReplyCount,
+    sessionType: props.sessionType,
+  })
+  const generatingActions = showConcurrentReplyStop && (
+    <Flex gap={0} m="4px -4px -4px -4px" align="center" className={isSmallScreen ? 'sticky bottom-4' : ''}>
+      <Flex
+        gap={0}
+        className={
+          isSmallScreen
+            ? 'p-xxs bg-chatbox-background-primary rounded-lg border-[0.5px] border-solid border-chatbox-border-primary shadow-sm'
+            : ''
+        }
+      >
+        <MessageActionIcon icon={IconPlayerStopFilled} tooltip={t('Stop generating this reply')} onClick={handleStop} />
+      </Flex>
+    </Flex>
+  )
+
+  const actionButtons = !readOnly && buttonGroup !== 'none' && !msg.generating && (
     <Flex
       gap={0}
       m="4px -4px -4px -4px"
       className={clsx(
-        'group-hover/message:opacity-100 opacity-0 transition-opacity',
-        actionMenuOpened || buttonGroup === 'always' ? 'opacity-100' : '',
+        'transition-opacity',
+        getMessageActionVisibilityClass(actionMenuOpened || buttonGroup === 'always'),
         isSmallScreen ? 'sticky bottom-4' : ''
       )}
       align="center"
@@ -982,8 +1051,9 @@ const _Message: FC<Props> = (props) => {
           <MessageActionIcon
             testId={TestId.message.actionBarRetry}
             icon={IconReload}
-            tooltip={t('Reply Again')}
+            tooltip={generationLocked ? t('Wait for the current replies to finish') : t('Reply Again')}
             onClick={handleMessageRetry}
+            disabled={generationLocked && !isSmallScreen}
           />
         )}
         {msg.role !== 'assistant' && (
@@ -998,8 +1068,9 @@ const _Message: FC<Props> = (props) => {
           <MessageActionIcon
             testId={TestId.message.actionBarEdit}
             icon={IconPencil}
-            tooltip={t('Edit')}
+            tooltip={generationLocked ? t('Wait for the current replies to finish') : t('Edit')}
             onClick={onEditClick}
+            disabled={generationLocked && !isSmallScreen}
           />
         )}
         {!(props.sessionType === 'picture' && msg.role === 'assistant') && (
@@ -1023,6 +1094,13 @@ const _Message: FC<Props> = (props) => {
         </ActionMenu>
       </Flex>
     </Flex>
+  )
+
+  const messageActions = (
+    <>
+      {actionButtons}
+      {generatingActions}
+    </>
   )
 
   const meta = (
@@ -1153,7 +1231,7 @@ const _Message: FC<Props> = (props) => {
             {messageContent}
             {(msg.files || msg.links) && <MessageAttachmentGrid files={msg.files} links={msg.links} align="start" />}
             {meta}
-            {actionButtons}
+            {messageActions}
           </Flex>
         </Flex>
       </Box>
@@ -1221,7 +1299,7 @@ const _Message: FC<Props> = (props) => {
               <MessageAttachmentGrid files={msg.files} links={msg.links} align={isUserBubble ? 'end' : 'start'} />
             )}
             {meta}
-            {actionButtons}
+            {messageActions}
           </Grid>
         </Grid>
       </Grid>

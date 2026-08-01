@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "圖片生成已中斷",
   "The original task cannot be resumed. Please send a new image generation request.": "原任務無法恢復，請重新傳送圖片生成請求。",
   "This chat is no longer available.": "該對話已不存在。",
-  "Unable to resume image generation.": "無法繼續圖片生成。"
+  "Unable to resume image generation.": "無法繼續圖片生成。",
+  "Stop all {{n}} replies": "停止全部 {{n}} 則回覆",
+  "Stop generating this reply": "停止產生這則回覆",
+  "Wait for the current replies to finish": "請等待目前回覆產生完成",
+  "Previous reply": "上一則回覆",
+  "Next reply": "下一則回覆",
+  "Expand view": "展開查看",
+  "Collapse other branches": "收合其他分支",
+  "Reply {{index}}": "回覆 {{index}}",
+  "1 follow-up message": "還有 1 則後續訊息",
+  "{{count}} follow-up messages": "還有 {{count}} 則後續訊息",
+  "Showing {{shown}} of {{total}} other replies": "已顯示其他回覆中的 {{shown}} / {{total}} 則",
+  "Switch to this branch": "切換到此分支"
 }

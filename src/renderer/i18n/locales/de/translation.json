@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "Bildgenerierung unterbrochen",
   "The original task cannot be resumed. Please send a new image generation request.": "Die ursprüngliche Aufgabe kann nicht fortgesetzt werden. Bitte senden Sie eine neue Anfrage zur Bildgenerierung.",
   "This chat is no longer available.": "Dieser Chat ist nicht mehr verfügbar.",
-  "Unable to resume image generation.": "Bildgenerierung konnte nicht fortgesetzt werden."
+  "Unable to resume image generation.": "Bildgenerierung konnte nicht fortgesetzt werden.",
+  "Stop all {{n}} replies": "Alle {{n}} Antworten stoppen",
+  "Stop generating this reply": "Diese Antwort stoppen",
+  "Wait for the current replies to finish": "Warte, bis die aktuellen Antworten fertig sind",
+  "Previous reply": "Vorherige Antwort",
+  "Next reply": "Nächste Antwort",
+  "Expand view": "Ansicht erweitern",
+  "Collapse other branches": "Andere Zweige einklappen",
+  "Reply {{index}}": "Antwort {{index}}",
+  "1 follow-up message": "1 Folgenachricht",
+  "{{count}} follow-up messages": "{{count}} Folgenachrichten",
+  "Showing {{shown}} of {{total}} other replies": "{{shown}} von {{total}} anderen Antworten werden angezeigt",
+  "Switch to this branch": "Zu diesem Zweig wechseln"
 }

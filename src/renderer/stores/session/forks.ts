@@ -1,10 +1,13 @@
 import {
   buildCreateForkPatch,
+  buildCreateInactiveForkPatch,
   buildDeleteForkPatch,
   buildExpandForkPatch,
   buildSwitchForkPatch,
+  buildSwitchForkToPatch,
   findMessageLocation,
 } from '@shared/session/message-forks'
+import type { Message } from '@shared/types'
 import * as chatStore from '../chatStore'
 
 // The pure fork transforms live in `@shared/session/message-forks` so the
@@ -32,6 +35,47 @@ export async function createNewFork(sessionId: string, forkMessageId: string) {
 }
 
 /**
+ * Create an inactive branch and return the isolated message path that should be
+ * used to generate its first reply. Returns null when the fork point has no
+ * active answer yet.
+ */
+export async function createInactiveFork(
+  sessionId: string,
+  forkMessageId: string,
+  branchMessages: Message[]
+): Promise<Message[] | null> {
+  let branchContext: Message[] | null = null
+
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+
+      const location = findMessageLocation(session, forkMessageId)
+      if (!location) {
+        return session
+      }
+
+      const patch = buildCreateInactiveForkPatch(session, forkMessageId, branchMessages)
+      if (!patch) {
+        return session
+      }
+
+      branchContext = [...location.list.slice(0, location.index + 1), ...branchMessages]
+      return {
+        ...session,
+        ...patch,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
+
+  return branchContext
+}
+
+/**
  * Switch between fork branches
  */
 export async function switchFork(sessionId: string, forkMessageId: string, direction: 'next' | 'prev') {
@@ -40,6 +84,25 @@ export async function switchFork(sessionId: string, forkMessageId: string, direc
       throw new Error('Session not found')
     }
     const patch = buildSwitchForkPatch(session, forkMessageId, direction)
+    if (!patch) {
+      return session
+    }
+    return {
+      ...session,
+      ...patch,
+    } as typeof session
+  })
+}
+
+/**
+ * Switch directly to a saved fork branch by its position.
+ */
+export async function switchForkTo(sessionId: string, forkMessageId: string, position: number) {
+  await chatStore.updateSessionWithMessages(sessionId, (session) => {
+    if (!session) {
+      throw new Error('Session not found')
+    }
+    const patch = buildSwitchForkToPatch(session, forkMessageId, position)
     if (!patch) {
       return session
     }

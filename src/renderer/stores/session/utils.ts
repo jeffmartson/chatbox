@@ -1,5 +1,6 @@
 import { isExpectedGenerationError } from '@shared/models/error-classification'
 import { ApiError, BaseError, NetworkError, OCRError } from '@shared/models/errors'
+import { findMessageContext } from '@shared/session/message-forks'
 import type {
   AgentModeValue,
   Message,
@@ -106,26 +107,8 @@ export function findTargetMessageIndex(
   session: Session,
   targetMsgId: string
 ): { messages: Message[]; index: number } | null {
-  let messages = session.messages
-  let targetMsgIx = messages.findIndex((m) => m.id === targetMsgId)
-
-  if (targetMsgIx <= 0) {
-    if (!session.threads) {
-      return null
-    }
-    for (const t of session.threads) {
-      messages = t.messages
-      targetMsgIx = messages.findIndex((m) => m.id === targetMsgId)
-      if (targetMsgIx > 0) {
-        break
-      }
-    }
-    if (targetMsgIx <= 0) {
-      return null
-    }
-  }
-
-  return { messages, index: targetMsgIx }
+  const location = findMessageContext(session, targetMsgId)
+  return location && location.index > 0 ? { messages: location.list, index: location.index } : null
 }
 
 /**

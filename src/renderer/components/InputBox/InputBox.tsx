@@ -119,6 +119,8 @@ export type InputBoxProps = {
   sessionId?: string
   sessionType?: SessionType
   generating?: boolean
+  /** Number of active replies with a cancellation controller in this runtime. */
+  generatingCount?: number
   model?: {
     provider: string
     modelId: string
@@ -208,6 +210,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       sessionId,
       sessionType = 'chat',
       generating = false,
+      generatingCount = 0,
       model,
       fullWidth = false,
       onSelectModel,
@@ -662,6 +665,14 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       if (!currentSessionId || isNewSession) return false
       return compactionUIStateMap[currentSessionId]?.status === 'running'
     }, [compactionUIStateMap, currentSessionId, isNewSession])
+    const submitBlocked =
+      disableSubmit ||
+      isPreprocessing ||
+      isSubmitting ||
+      isCompactionRunning ||
+      isAwaitingToolApproval ||
+      hasPreprocessErrors ||
+      hasBlockedSessionRagFiles
 
     const autoCompactionEnabled = useMemo(() => {
       if (!currentSession) return globalAutoCompaction ?? true
@@ -1383,54 +1394,31 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               />
 
               {/* Send Button */}
-              <ActionIcon
-                data-testid={generating ? TestId.chat.stop : TestId.chat.send}
-                disabled={
-                  (disableSubmit ||
-                    isPreprocessing ||
-                    isSubmitting ||
-                    isCompactionRunning ||
-                    isAwaitingToolApproval ||
-                    hasPreprocessErrors ||
-                    hasBlockedSessionRagFiles) &&
-                  !generating
-                }
-                size={32}
-                variant="filled"
-                color={generating ? 'dark' : 'chatbox-brand'}
-                radius="lg"
-                onClick={generating ? onStopGenerating : () => handleSubmit()}
-                className={cn(
-                  'shrink-0 mb-1',
-                  !generating &&
-                    (disableSubmit ||
-                      isPreprocessing ||
-                      isSubmitting ||
-                      isCompactionRunning ||
-                      isAwaitingToolApproval ||
-                      hasPreprocessErrors ||
-                      hasBlockedSessionRagFiles) &&
-                    'disabled:!opacity-100 !text-white'
-                )}
-                style={
-                  !generating &&
-                  (disableSubmit ||
-                    isPreprocessing ||
-                    isSubmitting ||
-                    isCompactionRunning ||
-                    isAwaitingToolApproval ||
-                    hasPreprocessErrors ||
-                    hasBlockedSessionRagFiles)
-                    ? { backgroundColor: 'rgba(222, 226, 230, 1)' }
-                    : undefined
-                }
+              <Tooltip
+                // `n` rather than `count`, so i18next does not engage plural resolution for a
+                // label that is only ever shown for more than one reply.
+                label={generatingCount > 1 ? t('Stop all {{n}} replies', { n: generatingCount }) : t('Stop')}
+                disabled={!generating}
+                withArrow
               >
-                {generating ? (
-                  <ScalableIcon icon={IconPlayerStopFilled} size={16} />
-                ) : (
-                  <ScalableIcon icon={IconArrowUp} size={16} />
-                )}
-              </ActionIcon>
+                <ActionIcon
+                  data-testid={generating ? TestId.chat.stop : TestId.chat.send}
+                  disabled={submitBlocked && !generating}
+                  size={32}
+                  variant="filled"
+                  color={generating ? 'dark' : 'chatbox-brand'}
+                  radius="lg"
+                  onClick={generating ? onStopGenerating : () => handleSubmit()}
+                  className={cn('shrink-0 mb-1', !generating && submitBlocked && 'disabled:!opacity-100 !text-white')}
+                  style={!generating && submitBlocked ? { backgroundColor: 'rgba(222, 226, 230, 1)' } : undefined}
+                >
+                  {generating ? (
+                    <ScalableIcon icon={IconPlayerStopFilled} size={16} />
+                  ) : (
+                    <ScalableIcon icon={IconArrowUp} size={16} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
             </Flex>
 
             {(!!pictureKeys.length || !!attachments.length) && (

@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "画像生成が中断されました",
   "The original task cannot be resumed. Please send a new image generation request.": "元のタスクは再開できません。新しい画像生成リクエストを送信してください。",
   "This chat is no longer available.": "このチャットは利用できなくなりました。",
-  "Unable to resume image generation.": "画像生成を再開できませんでした。"
+  "Unable to resume image generation.": "画像生成を再開できませんでした。",
+  "Stop all {{n}} replies": "{{n}} 件の回答すべてを停止",
+  "Stop generating this reply": "この回答の生成を停止",
+  "Wait for the current replies to finish": "現在の回答が完了するまでお待ちください",
+  "Previous reply": "前の回答",
+  "Next reply": "次の回答",
+  "Expand view": "展開して表示",
+  "Collapse other branches": "他の分岐を折りたたむ",
+  "Reply {{index}}": "回答 {{index}}",
+  "1 follow-up message": "後続メッセージ 1 件",
+  "{{count}} follow-up messages": "後続メッセージ {{count}} 件",
+  "Showing {{shown}} of {{total}} other replies": "他の回答 {{total}} 件中 {{shown}} 件を表示",
+  "Switch to this branch": "この分岐に切り替える"
 }

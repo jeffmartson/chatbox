@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "이미지 생성이 중단됨",
   "The original task cannot be resumed. Please send a new image generation request.": "원래 작업을 재개할 수 없습니다. 새 이미지 생성 요청을 보내 주세요.",
   "This chat is no longer available.": "이 대화는 더 이상 사용할 수 없습니다.",
-  "Unable to resume image generation.": "이미지 생성을 재개할 수 없습니다."
+  "Unable to resume image generation.": "이미지 생성을 재개할 수 없습니다.",
+  "Stop all {{n}} replies": "{{n}}개 답장 모두 중지",
+  "Stop generating this reply": "이 답장 생성 중지",
+  "Wait for the current replies to finish": "현재 답변이 완료될 때까지 기다려 주세요",
+  "Previous reply": "이전 답변",
+  "Next reply": "다음 답변",
+  "Expand view": "펼쳐 보기",
+  "Collapse other branches": "다른 분기 접기",
+  "Reply {{index}}": "답변 {{index}}",
+  "1 follow-up message": "후속 메시지 1개",
+  "{{count}} follow-up messages": "후속 메시지 {{count}}개",
+  "Showing {{shown}} of {{total}} other replies": "다른 답변 {{total}}개 중 {{shown}}개 표시",
+  "Switch to this branch": "이 분기로 전환"
 }

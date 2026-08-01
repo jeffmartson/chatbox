@@ -687,9 +687,7 @@ export async function updateMessage(
   updater: Updater<Message>,
   onlyUpdateCache?: boolean
 ) {
-  const updateFn = onlyUpdateCache ? updateSessionCache : updateSessionWithMessages
-
-  await updateFn(sessionId, (session) => {
+  const update = (session: Session | null | undefined): Session => {
     if (!session) {
       throw new Error(`session ${sessionId} not found`)
     }
@@ -735,8 +733,42 @@ export async function updateMessage(
       }
     }
 
+    if (session.messageForksHash) {
+      for (const [forkMessageId, fork] of Object.entries(session.messageForksHash)) {
+        const listIndex = fork.lists.findIndex((list) => list.messages.some((message) => message.id === messageId))
+        if (listIndex < 0) {
+          continue
+        }
+
+        return {
+          ...session,
+          messageForksHash: {
+            ...session.messageForksHash,
+            [forkMessageId]: {
+              ...fork,
+              lists: fork.lists.map((list, index) =>
+                index === listIndex
+                  ? {
+                      ...list,
+                      messages: updateMessages(list.messages),
+                    }
+                  : list
+              ),
+            },
+          },
+        } satisfies Session
+      }
+    }
+
     return session
-  })
+  }
+
+  if (onlyUpdateCache) {
+    await updateSessionCache(sessionId, update)
+    return
+  }
+
+  await updateSessionWithMessages(sessionId, update, { preserveCachedGeneratingMessages: true })
 }
 
 export async function removeMessage(sessionId: string, messageId: string) {
@@ -745,7 +777,13 @@ export async function removeMessage(sessionId: string, messageId: string) {
       throw new Error(`session ${sessionId} not found`)
     }
 
-    const messageToDelete = session.messages.find((m) => m.id === messageId)
+    const messageToDelete =
+      session.messages.find((m) => m.id === messageId) ??
+      session.threads?.flatMap((thread) => thread.messages).find((m) => m.id === messageId) ??
+      Object.values(session.messageForksHash ?? {})
+        .flatMap((fork) => fork.lists)
+        .flatMap((list) => list.messages)
+        .find((m) => m.id === messageId)
     const isSummaryMessage = messageToDelete?.isSummary === true
 
     const newMessages = session.messages.filter((m) => m.id !== messageId)
@@ -763,7 +801,7 @@ export async function removeMessage(sessionId: string, messageId: string) {
 
     // Clean up empty fork branches after message removal and auto-switch if needed
     const { messages: finalMessages, messageForksHash: newMessageForksHash } = cleanupEmptyForkBranches(
-      session.messageForksHash,
+      removeMessageFromSavedForks(session.messageForksHash, messageId),
       newMessages,
       newThreads
     )
@@ -776,6 +814,45 @@ export async function removeMessage(sessionId: string, messageId: string) {
       compactionPoints: newCompactionPoints,
     }
   })
+}
+
+function removeMessageFromSavedForks(
+  messageForksHash: Session['messageForksHash'],
+  messageId: string
+): Session['messageForksHash'] {
+  if (!messageForksHash) {
+    return undefined
+  }
+
+  const nextHash: NonNullable<Session['messageForksHash']> = {}
+  for (const [forkMessageId, fork] of Object.entries(messageForksHash)) {
+    const removedListIndex = fork.lists.findIndex((list) => list.messages.some((message) => message.id === messageId))
+    if (removedListIndex < 0) {
+      nextHash[forkMessageId] = fork
+      continue
+    }
+
+    const removedBranchBecomesEmpty =
+      removedListIndex !== fork.position && fork.lists[removedListIndex].messages.length === 1
+    const updatedLists = fork.lists
+      .map((list) => ({
+        ...list,
+        messages: list.messages.filter((message) => message.id !== messageId),
+      }))
+      .filter((list, index) => index === fork.position || list.messages.length > 0)
+
+    if (updatedLists.length <= 1) {
+      continue
+    }
+
+    nextHash[forkMessageId] = {
+      ...fork,
+      position: removedBranchBecomesEmpty && removedListIndex < fork.position ? fork.position - 1 : fork.position,
+      lists: updatedLists,
+    }
+  }
+
+  return Object.keys(nextHash).length > 0 ? nextHash : undefined
 }
 
 /**

@@ -1,6 +1,6 @@
 import NiceModal from '@ebay/nice-modal-react'
 import { Box, Button } from '@mantine/core'
-import type { Message, ModelProvider } from '@shared/types'
+import type { ModelProvider } from '@shared/types'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,8 +23,17 @@ import { updateSession as updateSessionStore, useSession } from '@/stores/chatSt
 import { applyChatboxLicenseDefaultModelToSession } from '@/stores/defaultChatModel'
 import { lastUsedModelStore } from '@/stores/lastUsedModelStore'
 import * as scrollActions from '@/stores/scrollActions'
-import { modifyMessage, removeCurrentThread, startNewThread, submitNewUserMessage } from '@/stores/sessionActions'
-import { getAllMessageList } from '@/stores/sessionHelpers'
+import {
+  countCancellableGeneratingAssistantMessages,
+  getGenerationControlMessages,
+} from '@/stores/session/generation-state'
+import {
+  modifyMessage,
+  removeCurrentThread,
+  removeMessage,
+  startNewThread,
+  submitNewUserMessage,
+} from '@/stores/sessionActions'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { getHomeWelcomeCardMode } from '@/utils/homeWelcomeCard'
@@ -66,7 +75,10 @@ function RouteComponent() {
     [providers.length, isLoggedIn, hasLicense, hasExpiredLicense, isExceeded, isExceededResolved]
   )
 
-  const currentMessageList = useMemo(() => (currentSession ? getAllMessageList(currentSession) : []), [currentSession])
+  const generationControlMessages = useMemo(
+    () => (currentSession ? getGenerationControlMessages(currentSession) : []),
+    [currentSession]
+  )
   const shouldShowTemplateWelcomeCard = useMemo(
     () => Boolean(currentSession && builtInTemplateSessionIds.has(currentSession.id) && welcomeCardMode !== 'none'),
     [currentSession, welcomeCardMode]
@@ -82,9 +94,13 @@ function RouteComponent() {
       licensePlanName,
     })
   }, [currentSession, hasExpiredLicense, licenseDetail, licenseKey, licensePlanName])
-  const lastGeneratingMessage = useMemo(
-    () => currentMessageList.find((m: Message) => m.generating),
-    [currentMessageList]
+  const generatingMessages = useMemo(
+    () => generationControlMessages.filter((message) => message.generating),
+    [generationControlMessages]
+  )
+  const cancellableGeneratingReplyCount = useMemo(
+    () => countCancellableGeneratingAssistantMessages(generationControlMessages),
+    [generationControlMessages]
   )
 
   const messageListRef = useRef<MessageListRef>(null)
@@ -206,16 +222,22 @@ function RouteComponent() {
     if (!currentSession) {
       return false
     }
-    if (lastGeneratingMessage?.generating) {
-      lastGeneratingMessage?.cancel?.()
-      void modifyMessage(
-        currentSession.id,
-        { ...lastGeneratingMessage, generating: false, finishReason: 'canceled' },
-        true
-      )
+    for (const message of generatingMessages) {
+      message.cancel?.()
     }
+    void Promise.all(
+      generatingMessages.map((message) =>
+        message.contentParts.length === 0
+          ? removeMessage(currentSession.id, message.id)
+          : modifyMessage(
+              currentSession.id,
+              { ...message, generating: false, cancel: undefined, finishReason: 'canceled' },
+              true
+            )
+      )
+    )
     return true
-  }, [currentSession, lastGeneratingMessage])
+  }, [currentSession, generatingMessages])
 
   const model = useMemo(() => {
     if (!currentSessionWithDefaultModel?.settings?.modelId || !currentSessionWithDefaultModel?.settings?.provider) {
@@ -265,7 +287,8 @@ function RouteComponent() {
             onRollbackThread={onRollbackThread}
             onSelectModel={onSelectModel}
             onClickSessionSettings={onClickSessionSettings}
-            generating={!!lastGeneratingMessage}
+            generating={generatingMessages.length > 0}
+            generatingCount={cancellableGeneratingReplyCount}
             onSubmit={onSubmit}
             onStopGenerating={onStopGenerating}
           />

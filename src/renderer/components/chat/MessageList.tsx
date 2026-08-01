@@ -1,14 +1,11 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Button, Flex, Stack, Text, Transition } from '@mantine/core'
+import { Button, Flex, Stack, Transition } from '@mantine/core'
 import { useThrottledCallback } from '@mantine/hooks'
 import type { Session, Message as SessionMessage, SessionThreadBrief } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
 import {
-  IconAlignRight,
   IconArrowBarToUp,
   IconArrowUp,
-  IconChevronLeft,
-  IconChevronRight,
   IconListTree,
   IconMessagePlus,
   IconPencil,
@@ -36,22 +33,20 @@ import { cn } from '@/lib/utils'
 import platform from '@/platform'
 import * as atoms from '@/stores/atoms'
 import {
-  deleteFork,
-  expandFork,
-  moveThreadToConversations,
-  removeMessage,
-  removeThread,
-  switchFork,
-  switchThread,
-} from '@/stores/sessionActions'
+  countCancellableGeneratingAssistantMessages,
+  getGenerationControlMessages,
+} from '@/stores/session/generation-state'
+import { moveThreadToConversations, removeMessage, removeThread, switchThread } from '@/stores/sessionActions'
 import { getAllMessageList, getCurrentThreadHistoryHash } from '@/stores/sessionHelpers'
 import { settingsStore } from '@/stores/settingsStore'
+import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
 import ActionMenu from '../ActionMenu'
 
 import { ErrorBoundary } from '../common/ErrorBoundary'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { BlockCodeCollapsedStateProvider } from '../Markdown'
+import ForkGroup from './ForkGroup'
 import ForkMarkerMessage from './ForkMarkerMessage'
 import Message from './Message'
 import MessageMinimapRail, { type MessageMinimapAnchor } from './MessageMinimapRail'
@@ -118,6 +113,12 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     [currentSession]
   )
   const currentMessageList = useMemo(() => getAllMessageList(currentSession), [currentSession])
+  const generationControlMessages = useMemo(() => getGenerationControlMessages(currentSession), [currentSession])
+  const generatingReplyCount = useMemo(
+    () => countCancellableGeneratingAssistantMessages(generationControlMessages),
+    [generationControlMessages]
+  )
+  const generationLocked = generatingReplyCount > 0
 
   const latestSummaryMessageId = useMemo(() => {
     for (let i = currentMessageList.length - 1; i >= 0; i--) {
@@ -446,7 +447,13 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
                 msg={msg}
                 className={options.isFirstItem ? 'pt-4' : options.isLastItem ? '!pb-4' : ''}
                 isLatestSummary={msg.id === latestSummaryMessageId}
-                onDelete={() => removeMessage(currentSession.id, msg.id)}
+                onDelete={() => {
+                  if (generationLocked) {
+                    toastActions.add(t('Wait for the current replies to finish'), 2500)
+                    return
+                  }
+                  void removeMessage(currentSession.id, msg.id)
+                }}
                 sessionId={currentSession.id}
               />
             ) : (
@@ -458,20 +465,30 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
                 className={options.isFirstItem ? 'pt-4' : options.isLastItem ? '!pb-4' : ''}
                 collapseThreshold={msg.role === 'system' ? 150 : undefined}
                 buttonGroup={options.isLastItem && msg.role === 'assistant' ? 'always' : 'auto'}
+                generatingReplyCount={generatingReplyCount}
+                generationLocked={generationLocked}
                 assistantAvatarKey={currentSession.assistantAvatarKey}
                 sessionPicUrl={currentSession.picUrl}
               />
             )}
           </ErrorBoundary>
+          {/* Saved alternatives stay inside the pivot block, so the active branch in the main list appears last. */}
           {currentSession.messageForksHash?.[msg.id] && currentSession.messageForksHash[msg.id].lists.length > 1 && (
-            <Flex justify="flex-end" pr="md" mr="md" className="self-end">
-              <ForkNav sessionId={currentSession.id} msgId={msg.id} forks={currentSession.messageForksHash[msg.id]} />
-            </Flex>
+            <ForkGroup
+              sessionId={currentSession.id}
+              sessionType={currentSession.type || 'chat'}
+              msgId={msg.id}
+              forks={currentSession.messageForksHash[msg.id]}
+              generatingReplyCount={generatingReplyCount}
+              generationLocked={generationLocked}
+              assistantAvatarKey={currentSession.assistantAvatarKey}
+              sessionPicUrl={currentSession.picUrl}
+            />
           )}
         </Stack>
       )
     },
-    [currentSession, currentThreadHash, latestSummaryMessageId]
+    [currentSession, currentThreadHash, generatingReplyCount, generationLocked, latestSummaryMessageId, t]
   )
 
   useImperativeHandle(ref, () => ({
@@ -610,68 +627,6 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
 })
 
 export default memo(MessageList)
-
-function ForkNav(props: { sessionId: string; msgId: string; forks: NonNullable<Session['messageForksHash']>[string] }) {
-  const { sessionId, msgId, forks } = props
-  const [flash, setFlash] = useState(false)
-  const prevLength = useRef(forks.lists.length)
-  const { t } = useTranslation()
-
-  useEffect(() => {
-    if (forks.lists.length > prevLength.current) {
-      setFlash(true)
-      const timer = setTimeout(() => setFlash(false), 2000)
-      return () => clearTimeout(timer)
-    }
-    prevLength.current = forks.lists.length
-  }, [forks.lists.length])
-
-  return (
-    <Flex gap="xs" align="center">
-      <ActionIcon
-        variant="subtle"
-        size={20}
-        radius="lg"
-        color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
-        onClick={() => void switchFork(sessionId, msgId, 'prev')}
-      >
-        <IconChevronLeft />
-      </ActionIcon>
-      <ActionMenu
-        position="bottom"
-        items={[
-          {
-            text: t('expand'),
-            icon: IconAlignRight,
-            onClick: () => expandFork(sessionId, msgId),
-          },
-          {
-            divider: true,
-          },
-          {
-            doubleCheck: true,
-            text: t('delete'),
-            icon: IconTrash,
-            onClick: () => deleteFork(sessionId, msgId),
-          },
-        ]}
-      >
-        <Text c={flash ? 'chatbox-secondary' : 'chatbox-tertiary'} size="xs" className="cursor-pointer">
-          {forks.position + 1} / {forks.lists.length}
-        </Text>
-      </ActionMenu>
-      <ActionIcon
-        variant="subtle"
-        size={20}
-        radius="lg"
-        color={flash ? 'chatbox-secondary' : 'chatbox-tertiary'}
-        onClick={() => switchFork(sessionId, msgId, 'next')}
-      >
-        <IconChevronRight />
-      </ActionIcon>
-    </Flex>
-  )
-}
 
 type ThreadLabelProps = {
   sessionId: string

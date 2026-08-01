@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "Bildgenereringen avbröts",
   "The original task cannot be resumed. Please send a new image generation request.": "Den ursprungliga uppgiften kan inte återupptas. Skicka en ny begäran om bildgenerering.",
   "This chat is no longer available.": "Den här chatten är inte längre tillgänglig.",
-  "Unable to resume image generation.": "Det gick inte att återuppta bildgenereringen."
+  "Unable to resume image generation.": "Det gick inte att återuppta bildgenereringen.",
+  "Stop all {{n}} replies": "Stoppa alla {{n}} svaren",
+  "Stop generating this reply": "Stoppa det här svaret",
+  "Wait for the current replies to finish": "Vänta tills de aktuella svaren är klara",
+  "Previous reply": "Föregående svar",
+  "Next reply": "Nästa svar",
+  "Expand view": "Expandera vyn",
+  "Collapse other branches": "Fäll ihop andra grenar",
+  "Reply {{index}}": "Svar {{index}}",
+  "1 follow-up message": "1 uppföljningsmeddelande",
+  "{{count}} follow-up messages": "{{count}} uppföljningsmeddelanden",
+  "Showing {{shown}} of {{total}} other replies": "Visar {{shown}} av {{total}} andra svar",
+  "Switch to this branch": "Byt till den här grenen"
 }

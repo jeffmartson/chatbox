@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "تم إيقاف إنشاء الصورة",
   "The original task cannot be resumed. Please send a new image generation request.": "لا يمكن استئناف المهمة الأصلية. يرجى إرسال طلب جديد لإنشاء الصورة.",
   "This chat is no longer available.": "لم تعد هذه المحادثة متاحة.",
-  "Unable to resume image generation.": "تعذّر استئناف إنشاء الصورة."
+  "Unable to resume image generation.": "تعذّر استئناف إنشاء الصورة.",
+  "Stop all {{n}} replies": "إيقاف جميع الردود ({{n}})",
+  "Stop generating this reply": "إيقاف إنشاء هذا الرد",
+  "Wait for the current replies to finish": "انتظر حتى تكتمل الردود الحالية",
+  "Previous reply": "الرد السابق",
+  "Next reply": "الرد التالي",
+  "Expand view": "توسيع العرض",
+  "Collapse other branches": "طي الفروع الأخرى",
+  "Reply {{index}}": "الرد {{index}}",
+  "1 follow-up message": "رسالة متابعة واحدة",
+  "{{count}} follow-up messages": "{{count}} من رسائل المتابعة",
+  "Showing {{shown}} of {{total}} other replies": "يتم عرض {{shown}} من أصل {{total}} من الردود الأخرى",
+  "Switch to this branch": "التبديل إلى هذا الفرع"
 }

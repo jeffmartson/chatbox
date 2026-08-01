@@ -20,20 +20,73 @@ export type MessageForkEntry = NonNullable<Session['messageForksHash']>[string]
 export type MessageLocation = { list: Message[]; index: number }
 
 /**
- * Find the location of a message within a session (root messages or thread messages)
+ * Find the stored location of a message in root, thread, or saved fork messages.
  */
 export function findMessageLocation(session: Session, messageId: string): MessageLocation | null {
   const rootIndex = session.messages.findIndex((m) => m.id === messageId)
   if (rootIndex >= 0) {
     return { list: session.messages, index: rootIndex }
   }
-  if (!session.threads) {
-    return null
-  }
-  for (const thread of session.threads) {
+  for (const thread of session.threads ?? []) {
     const idx = thread.messages.findIndex((m) => m.id === messageId)
     if (idx >= 0) {
       return { list: thread.messages, index: idx }
+    }
+  }
+  for (const fork of Object.values(session.messageForksHash ?? {})) {
+    for (const branch of fork.lists) {
+      const idx = branch.messages.findIndex((message) => message.id === messageId)
+      if (idx >= 0) {
+        return { list: branch.messages, index: idx }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Reconstruct the isolated conversation path containing a message. Saved fork
+ * lists only store the tail after their pivot, so this joins each tail with its
+ * reachable prefix while traversing the tree.
+ */
+export function findMessageContext(session: Session, messageId: string): MessageLocation | null {
+  const search = (messages: Message[], expandedForkIds: Set<string>): MessageLocation | null => {
+    const index = messages.findIndex((message) => message.id === messageId)
+    if (index >= 0) {
+      return { list: messages, index }
+    }
+
+    for (let pivotIndex = 0; pivotIndex < messages.length; pivotIndex += 1) {
+      const pivotId = messages[pivotIndex].id
+      const fork = session.messageForksHash?.[pivotId]
+      if (!fork || expandedForkIds.has(pivotId)) {
+        continue
+      }
+
+      const nextExpandedForkIds = new Set(expandedForkIds).add(pivotId)
+      for (const branch of fork.lists) {
+        if (branch.messages.length === 0) {
+          continue
+        }
+        const branchContext = [...messages.slice(0, pivotIndex + 1), ...branch.messages]
+        const found = search(branchContext, nextExpandedForkIds)
+        if (found) {
+          return found
+        }
+      }
+    }
+
+    return null
+  }
+
+  const rootResult = search(session.messages, new Set())
+  if (rootResult) {
+    return rootResult
+  }
+  for (const thread of session.threads ?? []) {
+    const threadResult = search(thread.messages, new Set())
+    if (threadResult) {
+      return threadResult
     }
   }
   return null
@@ -43,6 +96,22 @@ export function buildSwitchForkPatch(
   session: Session,
   forkMessageId: string,
   direction: 'next' | 'prev'
+): Partial<Session> | null {
+  return buildSwitchForkTargetPatch(session, forkMessageId, direction)
+}
+
+export function buildSwitchForkToPatch(
+  session: Session,
+  forkMessageId: string,
+  position: number
+): Partial<Session> | null {
+  return buildSwitchForkTargetPatch(session, forkMessageId, position)
+}
+
+function buildSwitchForkTargetPatch(
+  session: Session,
+  forkMessageId: string,
+  target: 'next' | 'prev' | number
 ): Partial<Session> | null {
   const { messageForksHash } = session
   if (!messageForksHash) {
@@ -54,7 +123,7 @@ export function buildSwitchForkPatch(
     return null
   }
 
-  const rootResult = switchForkInMessages(session.messages, forkEntry, forkMessageId, direction)
+  const rootResult = switchForkInMessages(session.messages, forkEntry, forkMessageId, target)
   if (rootResult) {
     const { messages, fork } = rootResult
     return {
@@ -73,7 +142,7 @@ export function buildSwitchForkPatch(
     if (forkWasProcessed) {
       return thread
     }
-    const result = switchForkInMessages(thread.messages, forkEntry, forkMessageId, direction)
+    const result = switchForkInMessages(thread.messages, forkEntry, forkMessageId, target)
     if (!result) {
       return thread
     }
@@ -99,7 +168,7 @@ function switchForkInMessages(
   messages: Message[],
   forkEntry: MessageForkEntry,
   forkMessageId: string,
-  direction: 'next' | 'prev'
+  target: 'next' | 'prev' | number
 ): { messages: Message[]; fork: MessageForkEntry | null } | null {
   const forkMessageIndex = messages.findIndex((m) => m.id === forkMessageId)
   if (forkMessageIndex < 0) {
@@ -108,6 +177,12 @@ function switchForkInMessages(
 
   const currentTail = messages.slice(forkMessageIndex + 1)
   const currentPosition = forkEntry.position
+  if (
+    typeof target === 'number' &&
+    (!Number.isInteger(target) || target < 0 || target >= forkEntry.lists.length || target === currentPosition)
+  ) {
+    return null
+  }
 
   // Check if current branch is empty (user deleted all messages in this branch)
   const isCurrentBranchEmpty = currentTail.length === 0
@@ -131,8 +206,13 @@ function switchForkInMessages(
   }
 
   const total = updatedLists.length
-  const newPosition =
-    direction === 'next' ? (adjustedCurrentPosition + 1) % total : (adjustedCurrentPosition - 1 + total) % total
+  let newPosition: number
+  if (typeof target === 'number') {
+    newPosition = isCurrentBranchEmpty && target > currentPosition ? target - 1 : target
+  } else {
+    newPosition =
+      target === 'next' ? (adjustedCurrentPosition + 1) % total : (adjustedCurrentPosition - 1 + total) % total
+  }
 
   const branchMessages = updatedLists[newPosition]?.messages ?? []
 
@@ -217,6 +297,65 @@ export function buildCreateForkPatch(session: Session, forkMessageId: string): P
       return {
         messages: messages.slice(0, forkMessageIndex + 1),
         forkEntry: updatedFork,
+      }
+    }
+  )
+}
+
+/**
+ * Add a saved branch without changing the active branch.
+ *
+ * This is used by "Reply Again Below": the new candidate can stream in
+ * parallel while the user's currently selected conversation remains active.
+ */
+export function buildCreateInactiveForkPatch(
+  session: Session,
+  forkMessageId: string,
+  branchMessages: Message[]
+): Partial<Session> | null {
+  if (branchMessages.length === 0) {
+    return null
+  }
+
+  return applyForkTransform(
+    session,
+    forkMessageId,
+    () =>
+      session.messageForksHash?.[forkMessageId] ?? {
+        position: 0,
+        lists: [
+          {
+            id: `fork_list_${uuidv4()}`,
+            messages: [],
+          },
+        ],
+        createdAt: Date.now(),
+      },
+    (messages, forkEntry) => {
+      const forkMessageIndex = messages.findIndex((message) => message.id === forkMessageId)
+      if (forkMessageIndex < 0) {
+        return null
+      }
+
+      // An inactive alternative only makes sense when an active answer already
+      // follows the fork point. Callers should insert normally for a bare user
+      // message so an empty branch is never exposed in navigation.
+      if (messages.length === forkMessageIndex + 1) {
+        return null
+      }
+
+      return {
+        messages,
+        forkEntry: {
+          ...forkEntry,
+          lists: [
+            ...forkEntry.lists,
+            {
+              id: `fork_list_${uuidv4()}`,
+              messages: branchMessages,
+            },
+          ],
+        },
       }
     }
   )

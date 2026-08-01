@@ -1,10 +1,11 @@
 import { buildContext } from '@shared/context'
 import type { AttachmentResolver } from '@shared/context/types'
+import { findMessageContext } from '@shared/session/message-forks'
 import { type CompactionPoint, createMessage, type Message, type SessionSettings } from '@shared/types'
 import type { AgentModeEntrySource } from '@/analytics/agent-mode'
 import * as chatStore from '../chatStore'
 import { createAttachmentResolver } from './attachment-resolver'
-import { createNewFork, findMessageLocation } from './forks'
+import { createInactiveFork, createNewFork, findMessageLocation } from './forks'
 import { withSessionGenerationLock } from './generation-lock'
 import { insertMessageAfter } from './messages'
 import { orchestrateGeneration } from './orchestration'
@@ -18,6 +19,7 @@ export async function _generateWithoutSessionLock(
     operationType?: 'send_message' | 'regenerate'
     skipAgentModeSuggestion?: boolean
     agentModeEntrySource?: AgentModeEntrySource
+    contextMessages?: Message[]
   }
 ) {
   const session = await chatStore.getSession(sessionId)
@@ -51,21 +53,49 @@ export function generate(
  * @param sessionId Session ID
  * @param msgId Message ID
  */
-async function generateMoreWithoutSessionLock(sessionId: string, msgId: string) {
+async function generateActiveReplyWithoutSessionLock(sessionId: string, msgId: string) {
   const newAssistantMsg = createMessage('assistant', '')
   newAssistantMsg.generating = true // prevent estimating token count before generating done
   await insertMessageAfter(sessionId, newAssistantMsg, msgId)
   await _generateWithoutSessionLock(sessionId, newAssistantMsg, { operationType: 'regenerate' })
 }
 
-export function generateMore(sessionId: string, msgId: string) {
-  return withSessionGenerationLock(sessionId, () => generateMoreWithoutSessionLock(sessionId, msgId))
+async function generateInactiveReply(sessionId: string, msgId: string) {
+  const newAssistantMsg = createMessage('assistant', '')
+  newAssistantMsg.generating = true
+  const contextMessages = await createInactiveFork(sessionId, msgId, [newAssistantMsg])
+
+  if (!contextMessages) {
+    await insertMessageAfter(sessionId, newAssistantMsg, msgId)
+    await _generateWithoutSessionLock(sessionId, newAssistantMsg, { operationType: 'regenerate' })
+    return
+  }
+
+  await _generateWithoutSessionLock(sessionId, newAssistantMsg, {
+    operationType: 'regenerate',
+    contextMessages,
+  })
+}
+
+export async function generateMore(sessionId: string, msgId: string) {
+  const session = await chatStore.getSession(sessionId)
+  if (!session) {
+    return
+  }
+
+  // Picture generation has no abort signal yet, so keep it serialized. Chat
+  // replies are safe to run concurrently because their message writes are
+  // serialized by chatStore and each stream has its own AbortController.
+  if (session.type === 'picture') {
+    return withSessionGenerationLock(sessionId, () => generateActiveReplyWithoutSessionLock(sessionId, msgId))
+  }
+  return generateInactiveReply(sessionId, msgId)
 }
 
 export function generateMoreInNewFork(sessionId: string, msgId: string) {
   return withSessionGenerationLock(sessionId, async () => {
     await createNewFork(sessionId, msgId)
-    await generateMoreWithoutSessionLock(sessionId, msgId)
+    await generateActiveReplyWithoutSessionLock(sessionId, msgId)
   })
 }
 
@@ -80,7 +110,7 @@ async function regenerateInNewForkWithoutSessionLock(
   msg: Message,
   options?: { runGenerateMore?: GenerateMoreFn }
 ) {
-  const runGenerateMore = options?.runGenerateMore ?? generateMoreWithoutSessionLock
+  const runGenerateMore = options?.runGenerateMore ?? generateActiveReplyWithoutSessionLock
   const session = await chatStore.getSession(sessionId)
   if (!session) {
     return
@@ -171,18 +201,7 @@ export async function getMessageThreadContext(sessionId: string, messageId: stri
   if (!session) {
     return []
   }
-  if (session.messages.find((m) => m.id === messageId)) {
-    return session.messages
-  }
-  if (!session.threads) {
-    return []
-  }
-  for (const t of session.threads) {
-    if (t.messages.find((m) => m.id === messageId)) {
-      return t.messages
-    }
-  }
-  return []
+  return findMessageContext(session, messageId)?.list ?? []
 }
 
 // Re-export for backward compatibility

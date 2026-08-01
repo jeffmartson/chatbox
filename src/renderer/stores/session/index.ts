@@ -4,11 +4,11 @@
  * This module provides all session-related operations for Chatbox.
  * Internal helpers (prefixed with _) are intentionally not exported.
  *
- * Public exports: 40 functions + types + state
+ * Public exports: 41 functions + types + state
  * - CRUD (8): Session lifecycle operations
  * - Messages (5): Message CRUD and user input handling
  * - Threads (9): Thread/history management
- * - Forks (5): Message branching operations
+ * - Forks (6): Message branching operations
  * - Generation (8): AI generation orchestration
  * - Naming (4): Session/thread naming
  * - Export (1): Export functionality
@@ -36,8 +36,8 @@ export {
 } from './crud'
 // Export operations (1 function)
 export { exportSessionChat } from './export'
-// Fork operations (5 functions)
-export { createNewFork, deleteFork, expandFork, findMessageLocation, switchFork } from './forks'
+// Fork operations (6 functions)
+export { createNewFork, deleteFork, expandFork, findMessageLocation, switchFork, switchForkTo } from './forks'
 // Generation operations (8 functions)
 export {
   generate,

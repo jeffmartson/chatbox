@@ -453,6 +453,7 @@ export async function orchestrateGeneration(
     appendToMessage?: boolean
     skipAgentModeSuggestion?: boolean
     agentModeEntrySource?: AgentModeEntrySource
+    contextMessages?: Message[]
   }
 ) {
   const session = await chatStore.getSession(sessionId)
@@ -475,7 +476,12 @@ export async function orchestrateGeneration(
 
   await persistStreamingMessage(sessionId, targetMsg)
 
-  const found = findTargetMessageIndex(session, targetMsg.id)
+  const contextMessages = options?.contextMessages
+  const contextTargetIndex = contextMessages?.findIndex((message) => message.id === targetMsg.id) ?? -1
+  const found =
+    contextMessages && contextTargetIndex > 0
+      ? { messages: contextMessages, index: contextTargetIndex }
+      : findTargetMessageIndex(session, targetMsg.id)
   if (!found) return
   const { messages, index: targetMsgIx } = found
   const promptTargetMsgIx = options?.appendToMessage ? targetMsgIx + 1 : targetMsgIx

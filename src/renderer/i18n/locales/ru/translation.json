@@ -1245,5 +1245,17 @@
   "Image generation interrupted": "Создание изображения прервано",
   "The original task cannot be resumed. Please send a new image generation request.": "Исходную задачу нельзя возобновить. Отправьте новый запрос на создание изображения.",
   "This chat is no longer available.": "Этот чат больше недоступен.",
-  "Unable to resume image generation.": "Не удалось возобновить создание изображения."
+  "Unable to resume image generation.": "Не удалось возобновить создание изображения.",
+  "Stop all {{n}} replies": "Остановить все ответы ({{n}})",
+  "Stop generating this reply": "Остановить этот ответ",
+  "Wait for the current replies to finish": "Дождитесь завершения текущих ответов",
+  "Previous reply": "Предыдущий ответ",
+  "Next reply": "Следующий ответ",
+  "Expand view": "Развернуть просмотр",
+  "Collapse other branches": "Свернуть другие ветки",
+  "Reply {{index}}": "Ответ {{index}}",
+  "1 follow-up message": "1 последующее сообщение",
+  "{{count}} follow-up messages": "Последующих сообщений: {{count}}",
+  "Showing {{shown}} of {{total}} other replies": "Показано {{shown}} из {{total}} других ответов",
+  "Switch to this branch": "Перейти на эту ветку"
 }

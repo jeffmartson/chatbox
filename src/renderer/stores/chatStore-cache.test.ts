@@ -75,6 +75,52 @@ describe('mergeCachedGeneratingMessages', () => {
 
     expect(result.messages[0].status).toEqual([])
   })
+
+  test('preserves concurrent generating state inside saved fork branches', () => {
+    const persistedCandidate = message({
+      id: 'assistant-fork',
+      generating: true,
+      status: [],
+    })
+    const cachedCandidate = message({
+      id: 'assistant-fork',
+      generating: true,
+      cancel: () => {},
+      status: [{ type: 'preparing_tool_call', toolName: 'code_execution' }],
+    })
+    const persisted = session({
+      messages: [message({ id: 'user-1', role: 'user' }), message({ id: 'assistant-current' })],
+      messageForksHash: {
+        'user-1': {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'candidate', messages: [persistedCandidate] },
+          ],
+          createdAt: 1,
+        },
+      },
+    })
+    const cached = session({
+      messages: persisted.messages,
+      messageForksHash: {
+        'user-1': {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'candidate', messages: [cachedCandidate] },
+          ],
+          createdAt: 1,
+        },
+      },
+    })
+
+    const result = mergeCachedGeneratingMessages(persisted, cached)
+    const candidate = result.messageForksHash?.['user-1'].lists[1].messages[0]
+
+    expect(candidate?.cancel).toBe(cachedCandidate.cancel)
+    expect(candidate?.status).toEqual([{ type: 'preparing_tool_call', toolName: 'code_execution' }])
+  })
 })
 
 describe('session metadata update helpers', () => {
