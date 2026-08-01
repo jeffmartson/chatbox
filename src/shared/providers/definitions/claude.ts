@@ -1,5 +1,5 @@
-import { ModelProviderEnum, ModelProviderType } from '../../types'
 import { createBearerOAuthFetch, createOAuthCredentialManager } from '../../oauth'
+import { ModelProviderEnum, ModelProviderType } from '../../types'
 import { defineProvider } from '../registry'
 import Claude from './models/claude'
 
@@ -8,7 +8,14 @@ export const claudeProvider = defineProvider({
   name: 'Claude',
   type: ModelProviderType.Claude,
   modelsDevProviderId: 'anthropic',
-  curatedModelIds: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+  curatedModelIds: [
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5',
+  ],
   urls: {
     website: 'https://www.anthropic.com',
   },
@@ -17,27 +24,33 @@ export const claudeProvider = defineProvider({
     // https://docs.anthropic.com/en/docs/about-claude/models/overview
     models: [
       {
+        modelId: 'claude-opus-5',
+        contextWindow: 1_000_000,
+        maxOutput: 128_000,
+        capabilities: ['vision', 'reasoning', 'tool_use'],
+      },
+      {
         modelId: 'claude-opus-4-8',
         contextWindow: 1_000_000,
-        maxOutput: 32_000,
+        maxOutput: 128_000,
         capabilities: ['vision', 'reasoning', 'tool_use'],
       },
       {
         modelId: 'claude-opus-4-7',
         contextWindow: 1_000_000,
-        maxOutput: 32_000,
+        maxOutput: 128_000,
         capabilities: ['vision', 'reasoning', 'tool_use'],
       },
       {
         modelId: 'claude-opus-4-6',
         contextWindow: 1_000_000,
-        maxOutput: 32_000,
+        maxOutput: 128_000,
         capabilities: ['vision', 'reasoning', 'tool_use'],
       },
       {
         modelId: 'claude-sonnet-4-6',
-        contextWindow: 200_000,
-        maxOutput: 64_000,
+        contextWindow: 1_000_000,
+        maxOutput: 128_000,
         capabilities: ['vision', 'reasoning', 'tool_use'],
       },
       {

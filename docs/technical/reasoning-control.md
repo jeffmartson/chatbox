@@ -70,8 +70,8 @@ getReasoningControlCapabilities(provider, model): {
 
 | effectiveProvider | model-id 匹配 | kind | 档位形态 |
 |-------------------|--------------|------|---------|
-| Claude | `claude-opus-4-(7\|8)` | `anthropic-adaptive-effort` | off + low/medium/high（adaptive effort） |
-| Claude | `claude-opus-4-5` | `anthropic-effort` | off + low/medium/high（effort） |
+| Claude | `claude-opus-4-(7\|8)`、`claude-opus-5` | `anthropic-adaptive-effort` | low/medium/high（adaptive effort） |
+| Claude | `claude-opus-4-5` | `anthropic-effort` | low/medium/high（effort） |
 | Claude | `claude-3-7-sonnet`、`claude-sonnet-4`、`claude-haiku-4-5`、`claude-opus-4`(非 4.5/4.7/4.8) | `budget` | off + low/medium/high（thinking budget） |
 | Gemini | `getGoogleThinkingMode()` 为 `budget` | `budget` | thinkingBudget |
 | Gemini | `getGoogleThinkingMode()` 为 `level` | `level` | thinkingLevel |

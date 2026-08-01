@@ -140,6 +140,12 @@ describe('reasoning-control', () => {
       { level: 'medium', label: 'medium' },
       { level: 'high', label: 'high' },
     ])
+    expect(getReasoningControlOptions(ModelProviderEnum.Claude, model('claude-opus-5'))).toEqual([
+      { level: 'default', label: 'default' },
+      { level: 'low', label: 'low' },
+      { level: 'medium', label: 'medium' },
+      { level: 'high', label: 'high' },
+    ])
     // Budget-style Claude and Gemini Flash keep their explicit off.
     expect(getReasoningControlOptions(ModelProviderEnum.Claude, model('claude-sonnet-4-6'))[1]).toEqual({
       level: 'off',
@@ -201,6 +207,7 @@ describe('reasoning-control', () => {
       normalizeClaudeReasoningOptions('claude-opus-4-8', { thinking: { type: 'enabled', budgetTokens: 8192 } })
     ).toBeUndefined()
     expect(normalizeClaudeReasoningOptions('claude-opus-4-5', { effort: 'high' })).toEqual({ effort: 'high' })
+    expect(normalizeClaudeReasoningOptions('claude-opus-5', { effort: 'high' })).toEqual({ effort: 'high' })
     expect(
       normalizeClaudeReasoningOptions('claude-opus-4-7', {
         effort: 'low',
@@ -214,6 +221,7 @@ describe('reasoning-control', () => {
     expect(normalizeClaudeReasoningOptions('claude-sonnet-4-6', undefined)).toBeUndefined()
     expect(usesClaudeEffortControl('claude-opus-4-5')).toBe(true)
     expect(usesClaudeEffortControl('claude-opus-4-8')).toBe(true)
+    expect(usesClaudeEffortControl('claude-opus-5')).toBe(true)
     expect(usesClaudeEffortControl('claude-sonnet-4-6')).toBe(false)
   })
 
@@ -665,7 +673,15 @@ describe('reasoning-control', () => {
     expect(isDeepSeekReasoningModel('deepseek-chat')).toBe(false)
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-7')).toBe(true)
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-8')).toBe(true)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-5')).toBe(true)
     expect(isClaudeAdaptiveThinkingModel('claude-opus-4-5')).toBe(false)
+    // Dated ids keep matching; larger version numbers must not false-match.
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-4-7-20260115')).toBe(true)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-5-20260601')).toBe(true)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-4-70')).toBe(false)
+    expect(isClaudeAdaptiveThinkingModel('claude-opus-50')).toBe(false)
+    expect(usesClaudeEffortControl('claude-opus-4-5-20251101')).toBe(true)
+    expect(usesClaudeEffortControl('claude-opus-4-50')).toBe(false)
   })
 
   describe('stripReasoningProviderOptions', () => {

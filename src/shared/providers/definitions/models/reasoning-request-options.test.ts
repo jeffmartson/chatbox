@@ -1,3 +1,4 @@
+import type { LanguageModelV3CallOptions } from '@ai-sdk/provider'
 import type { CallChatCompletionOptions } from '@shared/models/types'
 import type { ProviderModelInfo } from '@shared/types'
 import type { ModelDependencies } from '@shared/types/adapters'
@@ -13,6 +14,16 @@ import Qwen from './qwen'
 class TestDeepSeek extends DeepSeek {
   public exposeCallSettings(options: CallChatCompletionOptions) {
     return this.getCallSettings(options)
+  }
+}
+
+class TestClaude extends Claude {
+  public exposeCallSettings(options: CallChatCompletionOptions) {
+    return this.getCallSettings(options)
+  }
+
+  public exposeChatModel() {
+    return this.getChatModel()
   }
 }
 
@@ -185,6 +196,56 @@ describe('reasoning request options', () => {
         display: 'summarized',
       },
     })
+  })
+
+  it('omits deprecated sampling parameters from Claude Opus 5 requests', async () => {
+    let requestBody: Record<string, unknown> | undefined
+    const baseFetch: typeof globalThis.fetch = (_input, init) => {
+      requestBody = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            type: 'message',
+            id: 'msg_test',
+            model: 'claude-opus-5',
+            content: [{ type: 'text', text: 'ok' }],
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      )
+    }
+    const claude = new TestClaude(
+      {
+        claudeApiKey: 'test-key',
+        claudeApiHost: 'https://api.anthropic.com/v1',
+        model: reasoningModel('claude-opus-5'),
+        temperature: 0.7,
+        topP: 0.9,
+        maxOutputTokens: 128,
+        customFetch: baseFetch,
+      },
+      createDependencies()
+    )
+    const callSettings = claude.exposeCallSettings({})
+    const request = {
+      prompt: [{ role: 'user' as const, content: [{ type: 'text' as const, text: 'Hello' }] }],
+      temperature: callSettings.temperature,
+      topP: 0.9,
+      topK: 5,
+      maxOutputTokens: callSettings.maxOutputTokens,
+      providerOptions: callSettings.providerOptions,
+    } satisfies LanguageModelV3CallOptions
+
+    expect(callSettings.temperature).toBe(0.7)
+    await claude.exposeChatModel().doGenerate(request)
+
+    expect(requestBody).toMatchObject({ model: 'claude-opus-5', max_tokens: 128 })
+    expect(requestBody).not.toHaveProperty('temperature')
+    expect(requestBody).not.toHaveProperty('top_p')
+    expect(requestBody).not.toHaveProperty('top_k')
   })
 
   it('passes DeepSeek thinking toggle to provider options without unsupported effort levels', () => {

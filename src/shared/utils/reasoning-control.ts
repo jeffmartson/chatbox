@@ -86,8 +86,8 @@ const OPENAI_NO_EFFORT_PARAM_MODELS = [/(?:^|\/)o1-(?:preview|mini)(?:[.-]|$)/i]
 // gpt-5.1 and later accept reasoning_effort: 'none'; the original gpt-5 only goes
 // down to 'minimal'. Match any dotted gpt-5.x so future versions default to 'none'.
 const OPENAI_NONE_EFFORT_MODELS = [/(?:^|\/)gpt-5\.[1-9]\d*(?:[.-]|$)/i]
-const CLAUDE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-5/i]
-const CLAUDE_ADAPTIVE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-(?:7|8)/i]
+const CLAUDE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-5(?:[.-]|$)/i]
+const CLAUDE_ADAPTIVE_EFFORT_MODELS = [/(?:^|\/)claude-opus-4-(?:7|8)(?:[.-]|$)/i, /(?:^|\/)claude-opus-5(?:[.-]|$)/i]
 const CLAUDE_BUDGET_MODELS = [
   /(?:^|\/)claude-3-7-sonnet/i,
   /(?:^|\/)claude-sonnet-4/i,
@@ -147,7 +147,7 @@ export function isClaudeAdaptiveThinkingModel(modelId: string): boolean {
 
 /**
  * Claude models whose thinking is controlled by the effort request param
- * (Opus 4.5 and the adaptive 4.7/4.8 generation) rather than a token budget.
+ * (Opus 4.5 and the adaptive 4.7/4.8/5 generations) rather than a token budget.
  */
 export function usesClaudeEffortControl(modelId: string): boolean {
   return matchesAny(modelId, [...CLAUDE_EFFORT_MODELS, ...CLAUDE_ADAPTIVE_EFFORT_MODELS])
