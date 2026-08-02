@@ -23,6 +23,11 @@ export interface ModelInterface {
   isSupportSystemMessage(): boolean
   chat: (messages: ModelMessage[], options: CallChatCompletionOptions) => Promise<StreamTextResult>
   chatStream: (messages: ModelMessage[], options: ChatStreamOptions) => AsyncGenerator<ModelStreamPart>
+  /** Apply model-specific normalization after a streamed response has completed. */
+  normalizeCompletedResponse: (
+    contentParts: MessageContentParts,
+    finishReason: string | undefined
+  ) => MessageContentParts
   paint: (
     params: {
       prompt: string

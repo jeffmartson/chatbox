@@ -1,8 +1,8 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { Provider } from 'ai'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelDependencies } from '../types/adapters'
 import type { SentryScope } from '../utils/sentry_adapter'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AbstractAISDKModel from './abstract-ai-sdk'
 import type { CallChatCompletionOptions } from './types'
 
@@ -64,11 +64,11 @@ function createDependencies(): ModelDependencies {
   }
 }
 
-function createModel(): TestModel {
+function createModel(modelId = 'test-model'): TestModel {
   return new TestModel(
     {
       model: {
-        modelId: 'test-model',
+        modelId,
         type: 'chat',
         capabilities: ['tool_use'],
       },
@@ -159,6 +159,38 @@ describe('AbstractAISDKModel tool errors', () => {
       state: 'error',
       providerMetadata: callMetadata,
       resultProviderMetadata: errorMetadata,
+    })
+  })
+})
+
+describe('AbstractAISDKModel completed response normalization', () => {
+  it('applies model-specific normalization independently of the transport provider', () => {
+    const model = createModel('deepseek/deepseek-v4-pro')
+    const parts = [{ type: 'reasoning' as const, text: 'Recovered answer' }]
+
+    expect(model.normalizeCompletedResponse(parts, 'stop')).toEqual([{ type: 'text', text: 'Recovered answer' }])
+  })
+
+  it('normalizes the completed direct chat result and its final callback update', async () => {
+    const onResultChange = vi.fn()
+    aiMocks.streamText.mockReturnValue({
+      fullStream: (function* () {
+        yield { type: 'reasoning-delta', text: 'Recovered answer' }
+      })(),
+      totalUsage: Promise.resolve({ inputTokens: 10, outputTokens: 20, totalTokens: 30 }),
+      finishReason: Promise.resolve('stop'),
+    })
+
+    const result = await createModel('deepseek/deepseek-v4-pro').chat([], { onResultChange })
+
+    expect(result).toMatchObject({
+      contentParts: [{ type: 'text', text: 'Recovered answer' }],
+      finishReason: 'stop',
+    })
+    expect(onResultChange).toHaveBeenLastCalledWith({
+      contentParts: [{ type: 'text', text: 'Recovered answer' }],
+      tokenCount: 20,
+      tokensUsed: 30,
     })
   })
 })

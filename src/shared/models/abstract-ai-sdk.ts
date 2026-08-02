@@ -33,6 +33,7 @@ import type {
 } from '../types'
 import type { ModelDependencies } from '../types/adapters'
 import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
+import { normalizeCompletedResponse } from './completed-response-normalizer'
 import { isExpectedGenerationError } from './error-classification'
 import { ApiError, ChatboxAIAPIError } from './errors'
 import { wrapOpenAICompatibleNonStreamingModel } from './openai-compatible-non-streaming'
@@ -202,6 +203,13 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
 
   public isSupportSystemMessage() {
     return true
+  }
+
+  public normalizeCompletedResponse(
+    contentParts: MessageContentParts,
+    finishReason: string | undefined
+  ): MessageContentParts {
+    return normalizeCompletedResponse(contentParts, finishReason, this.modelId)
   }
 
   protected getCallSettings(_options: CallChatCompletionOptions): CallSettings {
@@ -744,12 +752,14 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
       }
     }
 
+    const normalizedContentParts = this.normalizeCompletedResponse(contentParts, result.finishReason)
+
     options.onResultChange?.({
-      contentParts,
+      contentParts: normalizedContentParts,
       tokenCount: result.usage?.outputTokens,
       tokensUsed: result.usage?.totalTokens,
     })
-    return { contentParts, usage: result.usage, finishReason: result.finishReason }
+    return { contentParts: normalizedContentParts, usage: result.usage, finishReason: result.finishReason }
   }
 
   private async handleStreamingCompletion<T extends ToolSet>(

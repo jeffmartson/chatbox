@@ -718,6 +718,11 @@ export async function orchestrateGeneration(
       }
     }
 
+    processorState = {
+      ...processorState,
+      contentParts: model.normalizeCompletedResponse(processorState.contentParts, processorState.finishReason),
+    }
+
     targetMsg = {
       ...targetMsg,
       generating: false,

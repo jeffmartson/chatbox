@@ -1,4 +1,4 @@
-import type { ToolUseScope } from '../../types'
+import type { MessageContentParts, ToolUseScope } from '../../types'
 
 /**
  * DeepSeek chat/reasoner/R1 and pre-V4 base models have poor function calling for scoped tools.
@@ -30,6 +30,39 @@ const REASONING_MODEL_PATTERN = /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i
  */
 export function isDeepSeekReasoningModel(modelId: string): boolean {
   return REASONING_MODEL_PATTERN.test(modelId)
+}
+
+/**
+ * Some DeepSeek serving stacks occasionally classify the complete answer as reasoning and
+ * return an empty content channel with `finish_reason: stop`. Recover that exact terminal
+ * shape as a normal answer. A length-limited response remains reasoning because it may only
+ * contain an unfinished chain of thought.
+ *
+ * This is keyed by model ID instead of provider ID because DeepSeek models can be served by
+ * the native provider, OpenRouter, or a custom OpenAI-compatible endpoint.
+ */
+export function normalizeDeepSeekCompletedResponse(
+  contentParts: MessageContentParts,
+  finishReason: string | undefined,
+  modelId: string
+): MessageContentParts {
+  if (finishReason !== 'stop' || !isDeepSeekReasoningModel(modelId)) return contentParts
+
+  const meaningfulParts = contentParts.filter((part) => {
+    if (part.type === 'text' || part.type === 'reasoning') return part.text.trim().length > 0
+    return true
+  })
+  if (meaningfulParts.length !== 1 || meaningfulParts[0].type !== 'reasoning') return contentParts
+
+  const reasoningPart = meaningfulParts[0]
+  return contentParts.map((part) =>
+    part === reasoningPart
+      ? {
+          type: 'text' as const,
+          text: reasoningPart.text,
+        }
+      : part
+  )
 }
 
 /**

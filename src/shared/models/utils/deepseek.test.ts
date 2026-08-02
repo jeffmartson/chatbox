@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from './deepseek'
+import type { MessageContentParts } from '../../types'
+import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse, normalizeDeepSeekCompletedResponse } from './deepseek'
 
 describe('isDeepSeekWeakToolUse', () => {
   const scopes = ['agent', 'web-browsing', 'read-file'] as const
@@ -102,4 +103,57 @@ describe('isDeepSeekReasoningModel', () => {
       expect(isDeepSeekReasoningModel(model)).toBe(false)
     })
   }
+})
+
+describe('normalizeDeepSeekCompletedResponse', () => {
+  it('recovers a normally completed DeepSeek answer emitted only as reasoning', () => {
+    const parts: MessageContentParts = [
+      { type: 'reasoning', text: 'The answer was placed in the wrong channel.', startTime: 100, duration: 500 },
+    ]
+
+    expect(normalizeDeepSeekCompletedResponse(parts, 'stop', 'deepseek/deepseek-v4-pro')).toEqual([
+      { type: 'text', text: 'The answer was placed in the wrong channel.' },
+    ])
+  })
+
+  it('supports DeepSeek model ids used by OpenAI-compatible providers', () => {
+    const parts: MessageContentParts = [{ type: 'reasoning', text: 'Recovered answer' }]
+
+    expect(normalizeDeepSeekCompletedResponse(parts, 'stop', 'deepseek-v4-flash')).toEqual([
+      { type: 'text', text: 'Recovered answer' },
+    ])
+  })
+
+  it('does not promote length-limited reasoning', () => {
+    const parts: MessageContentParts = [{ type: 'reasoning', text: 'Unfinished reasoning' }]
+
+    expect(normalizeDeepSeekCompletedResponse(parts, 'length', 'deepseek-v4-pro')).toBe(parts)
+  })
+
+  it('does not change a normal reasoning and answer response', () => {
+    const parts: MessageContentParts = [
+      { type: 'reasoning', text: 'Reasoning' },
+      { type: 'text', text: 'Final answer' },
+    ]
+
+    expect(normalizeDeepSeekCompletedResponse(parts, 'stop', 'deepseek-v4-pro')).toBe(parts)
+  })
+
+  it('does not change tool workflows or other model families', () => {
+    const toolParts: MessageContentParts = [
+      { type: 'reasoning', text: 'Preparing a tool call' },
+      {
+        type: 'tool-call',
+        state: 'result',
+        toolCallId: 'tool-1',
+        toolName: 'search',
+        args: {},
+        result: {},
+      },
+    ]
+    const otherModelParts: MessageContentParts = [{ type: 'reasoning', text: 'Private reasoning' }]
+
+    expect(normalizeDeepSeekCompletedResponse(toolParts, 'stop', 'deepseek-v4-pro')).toBe(toolParts)
+    expect(normalizeDeepSeekCompletedResponse(otherModelParts, 'stop', 'qwen3.5')).toBe(otherModelParts)
+  })
 })
