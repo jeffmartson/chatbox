@@ -17,6 +17,8 @@ describe('resolveMessageErrorPresentation', () => {
     [10004, 'quota-exhausted'],
     [20039, 'free-quota-exhausted'],
     [20040, 'agent-mode-reward'],
+    [20041, 'ocr-quota-exhausted'],
+    [20042, 'free-ocr-quota-exhausted'],
   ] as const)('maps client error code %s to %s', (errorCode, expected) => {
     expect(resolveMessageErrorPresentation(message({ errorCode }))).toBe(expected)
   })

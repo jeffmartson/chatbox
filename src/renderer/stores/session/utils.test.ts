@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { ChatboxAIAPIError } from '@shared/models/errors'
+import { ChatboxAIAPIError, OCRError } from '@shared/models/errors'
 import type { Message, SessionSettings, Settings } from '@shared/types'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -62,5 +62,55 @@ describe('trackGenerateEvent', () => {
 
     expect(reportErrorMock).not.toHaveBeenCalled()
     expect(result.errorCode).toBe(10004)
+  })
+
+  test('persists Chatbox AI OCR quota exhaustion separately from main-model quota exhaustion', () => {
+    const cause = ChatboxAIAPIError.fromCodeName('quota', 'token_quota_exhausted')
+    expect(cause).not.toBeNull()
+    if (!cause) throw new Error('Expected a known Chatbox AI quota error')
+    const error = new OCRError('Chatbox AI', cause)
+    const message = {
+      id: 'message-1',
+      role: 'assistant',
+      contentParts: [],
+      aiProvider: 'deepseek',
+      model: 'DeepSeek API (DeepSeek V4 Pro)',
+    } as Message
+    const settings = {
+      modelId: 'deepseek-v4-pro',
+      provider: 'deepseek',
+    } as SessionSettings
+
+    const result = handleGenerationError(error, message, settings, { operationType: 'send_message' })
+
+    expect(result.errorCode).toBe(20041)
+    expect(result.errorExtra).toMatchObject({
+      aiProvider: 'Chatbox AI',
+      causeErrorCode: 10004,
+    })
+  })
+
+  test('preserves the daily-free scope when Chatbox AI OCR exhausts quota', () => {
+    const cause = ChatboxAIAPIError.fromCodeName('daily quota', 'free_token_quota_exhausted')
+    expect(cause).not.toBeNull()
+    if (!cause) throw new Error('Expected a known Chatbox AI free quota error')
+    const error = new OCRError('Chatbox AI', cause)
+    const message = {
+      id: 'message-1',
+      role: 'assistant',
+      contentParts: [],
+    } as Message
+    const settings = {
+      modelId: 'deepseek-v4-pro',
+      provider: 'deepseek',
+    } as SessionSettings
+
+    const result = handleGenerationError(error, message, settings, { operationType: 'send_message' })
+
+    expect(result.errorCode).toBe(20042)
+    expect(result.errorExtra).toMatchObject({
+      aiProvider: 'Chatbox AI',
+      causeErrorCode: 20039,
+    })
   })
 })

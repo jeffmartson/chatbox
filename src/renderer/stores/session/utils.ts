@@ -198,11 +198,12 @@ export function handleGenerationError(
     ...targetMsg,
     generating: false,
     cancel: undefined,
-    errorCode: ocrError ? (causeError instanceof BaseError ? causeError.code : errorCode) : errorCode,
+    errorCode,
     error: `${error.message}`,
     errorExtra: pickBy(
       {
         aiProvider: ocrError ? ocrError.ocrProvider : settings.provider,
+        causeErrorCode: causeError instanceof BaseError ? causeError.code : undefined,
         host:
           error instanceof NetworkError ? error.host : causeError instanceof NetworkError ? causeError.host : undefined,
         responseBody:

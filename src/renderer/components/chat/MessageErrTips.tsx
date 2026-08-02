@@ -291,12 +291,23 @@ export default function MessageErrTips(props: {
     )
   }, [language])
 
+  const handleConfigureOcr = useCallback(() => {
+    navigateToSettings('/default-models')
+  }, [])
+
   if (!msg.error) {
     return null
   }
 
-  if (errorPresentation === 'quota-exhausted' || errorPresentation === 'free-quota-exhausted') {
-    return <QuotaExhaustedCard kind={errorPresentation} onUpgrade={handleUpgradePlan} />
+  if (
+    errorPresentation === 'quota-exhausted' ||
+    errorPresentation === 'free-quota-exhausted' ||
+    errorPresentation === 'ocr-quota-exhausted' ||
+    errorPresentation === 'free-ocr-quota-exhausted'
+  ) {
+    return (
+      <QuotaExhaustedCard kind={errorPresentation} onUpgrade={handleUpgradePlan} onConfigureOcr={handleConfigureOcr} />
+    )
   }
 
   if (errorPresentation === 'agent-mode-reward') {

@@ -1,9 +1,12 @@
+import { MESSAGE_ERROR_CODES } from '@shared/models/errors'
 import type { Message } from '@shared/types'
 
 export type MessageErrorPresentation =
   | 'generic-error'
   | 'quota-exhausted'
   | 'free-quota-exhausted'
+  | 'ocr-quota-exhausted'
+  | 'free-ocr-quota-exhausted'
   | 'agent-mode-reward'
 
 /**
@@ -12,11 +15,15 @@ export type MessageErrorPresentation =
  */
 export function resolveMessageErrorPresentation(msg: Message): MessageErrorPresentation {
   switch (msg.errorCode) {
-    case 10004:
+    case MESSAGE_ERROR_CODES.CHATBOX_AI_QUOTA_EXHAUSTED:
       return 'quota-exhausted'
-    case 20039:
+    case MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_QUOTA_EXHAUSTED:
       return 'free-quota-exhausted'
-    case 20040:
+    case MESSAGE_ERROR_CODES.CHATBOX_AI_OCR_QUOTA_EXHAUSTED:
+      return 'ocr-quota-exhausted'
+    case MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_OCR_QUOTA_EXHAUSTED:
+      return 'free-ocr-quota-exhausted'
+    case MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_AGENT_MODE_QUOTA_EXHAUSTED:
       return 'agent-mode-reward'
   }
   return 'generic-error'

@@ -49,4 +49,28 @@ describe('QuotaExhaustedCard', () => {
 
     expect(screen.getByText(/Free points reset daily/)).toBeTruthy()
   })
+
+  test('explains Chatbox AI OCR quota exhaustion and opens OCR model settings', () => {
+    const onConfigureOcr = vi.fn()
+    render(
+      <MantineProvider>
+        <QuotaExhaustedCard kind="ocr-quota-exhausted" onUpgrade={vi.fn()} onConfigureOcr={onConfigureOcr} />
+      </MantineProvider>
+    )
+
+    expect(screen.getByText(/uses Chatbox AI OCR to process images/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'OCR model settings' }))
+    expect(onConfigureOcr).toHaveBeenCalledOnce()
+  })
+
+  test('uses daily-reset copy for free Chatbox AI OCR quota exhaustion', () => {
+    render(
+      <MantineProvider>
+        <QuotaExhaustedCard kind="free-ocr-quota-exhausted" onUpgrade={vi.fn()} onConfigureOcr={vi.fn()} />
+      </MantineProvider>
+    )
+
+    expect(screen.getByText(/today's free OCR points are used up/)).toBeTruthy()
+    expect(screen.getByText(/Free points reset daily/)).toBeTruthy()
+  })
 })

@@ -7,6 +7,15 @@ export class BaseError extends Error {
   }
 }
 
+export const MESSAGE_ERROR_CODES = {
+  CHATBOX_AI_QUOTA_EXHAUSTED: 10004,
+  OCR_FAILED: 10006,
+  CHATBOX_AI_FREE_QUOTA_EXHAUSTED: 20039,
+  CHATBOX_AI_FREE_AGENT_MODE_QUOTA_EXHAUSTED: 20040,
+  CHATBOX_AI_OCR_QUOTA_EXHAUSTED: 20041,
+  CHATBOX_AI_FREE_OCR_QUOTA_EXHAUSTED: 20042,
+} as const
+
 // 10000 - 19999 为通用网络接口错误
 
 export class ApiError extends BaseError {
@@ -44,13 +53,20 @@ export class AIProviderNoImplementedChatError extends BaseError {
 }
 
 export class OCRError extends BaseError {
-  public code = 10006
+  public code: number
   public ocrProvider: string
   public cause: Error
   constructor(ocrProvider: string, cause: Error) {
     super(`OCR Error (${ocrProvider}): ${cause.message}`)
     this.ocrProvider = ocrProvider
     this.cause = cause
+    if (cause instanceof BaseError && cause.code === MESSAGE_ERROR_CODES.CHATBOX_AI_QUOTA_EXHAUSTED) {
+      this.code = MESSAGE_ERROR_CODES.CHATBOX_AI_OCR_QUOTA_EXHAUSTED
+    } else if (cause instanceof BaseError && cause.code === MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_QUOTA_EXHAUSTED) {
+      this.code = MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_OCR_QUOTA_EXHAUSTED
+    } else {
+      this.code = MESSAGE_ERROR_CODES.OCR_FAILED
+    }
   }
 }
 
@@ -64,20 +80,20 @@ export class ChatboxAIAPIError extends BaseError {
     // 超出配额
     token_quota_exhausted: {
       name: 'token_quota_exhausted',
-      code: 10004, // 小于 20000 是为了兼容旧版本
+      code: MESSAGE_ERROR_CODES.CHATBOX_AI_QUOTA_EXHAUSTED, // 小于 20000 是为了兼容旧版本
       i18nKey:
         'You have used up your monthly Chatbox AI quota. Please <OpenSettingButton>go to Settings</OpenSettingButton> to view your quota usage or upgrade your plan.',
     },
     // 超出每日免费配额
     free_token_quota_exhausted: {
       name: 'free_token_quota_exhausted',
-      code: 20039,
+      code: MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_QUOTA_EXHAUSTED,
       i18nKey:
         'You have used up your daily Chatbox AI quota. Please <OpenSettingButton>go to Settings</OpenSettingButton> to view your quota usage or upgrade your plan.',
     },
     token_quota_exhausted_free: {
       name: 'token_quota_exhausted_free',
-      code: 20039,
+      code: MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_QUOTA_EXHAUSTED,
       i18nKey:
         'You have used up your daily Chatbox AI quota. Please <OpenSettingButton>go to Settings</OpenSettingButton> to view your quota usage or upgrade your plan.',
     },
@@ -312,7 +328,7 @@ export class ChatboxAIAPIError extends BaseError {
     // Free 用户在工作模式中点数耗尽，但仍可领取一次奖励额度继续当前任务
     free_agent_mode_token_quota_exhausted: {
       name: 'free_agent_mode_token_quota_exhausted',
-      code: 20040,
+      code: MESSAGE_ERROR_CODES.CHATBOX_AI_FREE_AGENT_MODE_QUOTA_EXHAUSTED,
       i18nKey: 'Your points are used up. Claim free reward quota to continue.',
     },
   }
