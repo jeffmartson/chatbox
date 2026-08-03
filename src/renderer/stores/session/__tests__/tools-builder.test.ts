@@ -14,6 +14,7 @@ const {
   getSessionAttachmentRagToolSetMock,
   skillsChangedListeners,
   requestUserExecApprovalMock,
+  cancelUserExecMock,
   userExecMock,
 } = vi.hoisted(() => ({
   discoverSkillsMock: vi.fn(),
@@ -33,6 +34,7 @@ const {
   getSessionAttachmentRagToolSetMock: vi.fn(),
   skillsChangedListeners: new Set<() => void>(),
   requestUserExecApprovalMock: vi.fn(),
+  cancelUserExecMock: vi.fn(),
   userExecMock: vi.fn(),
 }))
 
@@ -79,6 +81,7 @@ vi.mock('@/packages/skills/controller', () => ({
     installFromSandbox: installFromSandboxMock,
     loadSkill: loadSkillMock,
     userExec: userExecMock,
+    cancelUserExec: cancelUserExecMock,
   },
 }))
 
@@ -230,6 +233,7 @@ beforeEach(() => {
   })
   requestUserExecApprovalMock.mockResolvedValue('ai')
   userExecMock.mockResolvedValue({ success: true, exitCode: 0, stdout: 'ok', stderr: '' })
+  cancelUserExecMock.mockResolvedValue({ killed: true })
   installFromSandboxMock.mockResolvedValue({ success: true, skillName: 'new-skill' })
   discoverSkillsMock.mockResolvedValue([
     { name: 'test-skill', description: 'A test skill' },
@@ -643,6 +647,50 @@ describe('buildToolsForSession', () => {
 
     await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
     expect(userExecMock).not.toHaveBeenCalled()
+  })
+
+  test('cancels user_exec after host execution has started', async () => {
+    let finishExecution:
+      | ((result: { success: boolean; exitCode: number; stdout: string; stderr: string; cancelled: boolean }) => void)
+      | undefined
+    userExecMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishExecution = resolve
+        })
+    )
+    const model = createMockModel()
+    const result = await buildToolsForSession(model, {
+      sessionId: 'session-cancel',
+      webBrowsing: false,
+      messages: [],
+      agentMode: 'on',
+      sessionSettings: { agentFullAccess: true },
+    })
+    if (!result.tools.user_exec.execute) throw new Error('user_exec execute missing')
+
+    const controller = new AbortController()
+    const execution = result.tools.user_exec.execute({ command: 'sleep 30' }, {
+      toolCallId: 'tool-call-running',
+      messages: [],
+      abortSignal: controller.signal,
+    } as never)
+    await vi.waitFor(() => expect(userExecMock).toHaveBeenCalledTimes(1))
+
+    controller.abort()
+    expect(cancelUserExecMock).toHaveBeenCalledWith({
+      sessionId: 'session-cancel',
+      toolCallId: 'tool-call-running',
+    })
+    finishExecution?.({ success: false, exitCode: 130, stdout: 'partial\n', stderr: '', cancelled: true })
+
+    await expect(execution).resolves.toEqual({
+      success: false,
+      exitCode: 130,
+      stdout: 'partial\n',
+      stderr: '',
+      cancelled: true,
+    })
   })
 })
 

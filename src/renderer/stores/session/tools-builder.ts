@@ -485,7 +485,13 @@ function buildInstallSkillTool(options: BuildToolsOptions): ToolSet[string] {
 function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
   const agentFullAccess = options.sessionSettings?.agentFullAccess === true
   const userExecWorkingDirectory = options.sessionSettings?.workingDirectories?.find((dir) => dir.trim().length > 0)
-  type UserExecResult = { success: boolean; exitCode: number | null; stdout: string; stderr: string }
+  type UserExecResult = {
+    success: boolean
+    exitCode: number | null
+    stdout: string
+    stderr: string
+    cancelled?: boolean
+  }
   const executionCache = new Map<string, { command: string; promise: Promise<UserExecResult> }>()
 
   return {
@@ -557,12 +563,22 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
         }
         throwIfAborted(toolOptions.abortSignal)
         hostExecutionStarted = true
-        const result = await skillsController.userExec(execInput.command, {
-          ...(userExecWorkingDirectory ? { cwd: userExecWorkingDirectory } : {}),
-          sessionId: options.sessionId ?? options.codeExecution?.sessionId,
-          toolCallId: toolOptions.toolCallId,
-          approvalSource,
-        })
+        const sessionId = options.sessionId ?? options.codeExecution?.sessionId
+        const cancelHostExecution = () => {
+          void skillsController.cancelUserExec({ sessionId, toolCallId: toolOptions.toolCallId })
+        }
+        toolOptions.abortSignal?.addEventListener('abort', cancelHostExecution, { once: true })
+        let result: Awaited<ReturnType<typeof skillsController.userExec>>
+        try {
+          result = await skillsController.userExec(execInput.command, {
+            ...(userExecWorkingDirectory ? { cwd: userExecWorkingDirectory } : {}),
+            sessionId,
+            toolCallId: toolOptions.toolCallId,
+            approvalSource,
+          })
+        } finally {
+          toolOptions.abortSignal?.removeEventListener('abort', cancelHostExecution)
+        }
 
         try {
           options.onAgentModeActivated?.()
@@ -575,6 +591,7 @@ function buildUserExecTool(options: BuildToolsOptions): ToolSet[string] {
           exitCode: result.exitCode,
           stdout: result.stdout,
           stderr: result.stderr,
+          ...(result.cancelled ? { cancelled: true } : {}),
         }
       })
 

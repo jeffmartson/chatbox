@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import os from 'node:os'
 import type { UserExecApprovalSource } from '@shared/types/user-exec'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
+import { killProcessTree } from '../process-tree'
 import { buildPowerShellStdinScript } from '../sandbox/exec-script'
 import { getLogger } from '../util'
 import { resolveWindowsPowerShell } from '../windows-powershell'
@@ -22,6 +23,11 @@ export interface UserExecResult {
   stdout: string
   stderr: string
   exitCode: number | null
+  cancelled?: boolean
+}
+
+interface ActiveUserExecCommand {
+  cancel: () => void
 }
 
 interface UserExecEntry {
@@ -39,6 +45,19 @@ interface UserExecRunnerOptions {
 
 const DEFAULT_COMPLETED_TTL_MS = 10 * 60 * 1000
 const DEFAULT_MAX_COMPLETED_ENTRIES = 32
+const activeUserExecCommands = new Map<string, ActiveUserExecCommand>()
+
+function getUserExecKey(sessionId: string | undefined, toolCallId: string | undefined): string | null {
+  return toolCallId ? `${sessionId ?? ''}:${toolCallId}` : null
+}
+
+export function cancelUserExecCommand(params: Pick<UserExecParams, 'sessionId' | 'toolCallId'>): { killed: boolean } {
+  const key = getUserExecKey(params.sessionId, params.toolCallId)
+  const active = key ? activeUserExecCommands.get(key) : undefined
+  if (!active) return { killed: false }
+  active.cancel()
+  return { killed: true }
+}
 
 export async function executeUserExecCommand(params: UserExecParams): Promise<UserExecResult> {
   const { command, cwd: requestedCwd, timeout, sessionId, toolCallId, approvalSource } = params
@@ -98,11 +117,15 @@ export async function executeUserExecCommand(params: UserExecParams): Promise<Us
       let stdoutBytes = 0
       let stderrBytes = 0
       let settled = false
+      let cancelled = false
+      let forceKillHandle: ReturnType<typeof setTimeout> | undefined
+      const activeKey = getUserExecKey(sessionId, toolCallId)
 
       const resolveOnce = (result: UserExecResult) => {
         if (settled) return
         settled = true
         clearTimeout(timeoutHandle)
+        if (activeKey) activeUserExecCommands.delete(activeKey)
         const finishLog = buildOperationFinishLog({
           operationId,
           success: result.success,
@@ -121,15 +144,30 @@ export async function executeUserExecCommand(params: UserExecParams): Promise<Us
 
       const child = spawn(shellCommand, shellArgs, {
         cwd,
-        timeout: timeoutMs,
         stdio: [isWindows ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         env: process.env,
         shell: false,
+        // Keep the command in its own POSIX process group so cancellation also
+        // terminates descendants. Windows uses taskkill /T in killProcessTree.
+        detached: !isWindows,
       })
+
+      if (activeKey) {
+        activeUserExecCommands.set(activeKey, {
+          cancel: () => {
+            if (settled || cancelled) return
+            cancelled = true
+            clearTimeout(timeoutHandle)
+            killProcessTree(child, 'SIGTERM')
+            forceKillHandle = setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
+          },
+        })
+      }
 
       const timeoutHandle = setTimeout(() => {
         if (settled || child.killed) return
-        child.kill('SIGTERM')
+        killProcessTree(child, 'SIGTERM')
+        forceKillHandle = setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
         resolveOnce({
           success: false,
           stdout,
@@ -160,14 +198,18 @@ export async function executeUserExecCommand(params: UserExecParams): Promise<Us
         if (stderrBytes <= maxOutputBytes) stderr += data.toString()
       })
       child.on('error', (error) => {
+        if (forceKillHandle) clearTimeout(forceKillHandle)
         log.error('skills:user-exec spawn error', error)
         resolveOnce({ success: false, stdout, stderr: stderr || error.message, exitCode: null })
       })
       child.on('close', (code, signal) => {
+        if (forceKillHandle) clearTimeout(forceKillHandle)
         resolveOnce(
-          signal === 'SIGTERM'
-            ? { success: false, stdout, stderr: stderr || 'Command timed out', exitCode: null }
-            : { success: code === 0, stdout, stderr, exitCode: code }
+          cancelled
+            ? { success: false, stdout, stderr, exitCode: 130, cancelled: true }
+            : signal === 'SIGTERM'
+              ? { success: false, stdout, stderr: stderr || 'Command timed out', exitCode: null }
+              : { success: code === 0, stdout, stderr, exitCode: code }
         )
       })
     })

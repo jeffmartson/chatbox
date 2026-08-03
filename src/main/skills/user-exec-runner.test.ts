@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createUserExecRunner, type UserExecResult } from './user-exec-runner'
+import {
+  cancelUserExecCommand,
+  createUserExecRunner,
+  executeUserExecCommand,
+  type UserExecResult,
+} from './user-exec-runner'
 
 const SUCCESS_RESULT: UserExecResult = { success: true, stdout: 'ok', stderr: '', exitCode: 0 }
 
@@ -77,5 +82,26 @@ describe('createUserExecRunner', () => {
     currentTime = 301
     await runner.run(params)
     expect(execute).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe.skipIf(process.platform === 'win32')('user_exec cancellation', () => {
+  it('terminates a running command by session and tool-call identity', async () => {
+    const params = {
+      command: `printf 'started\\n'; sleep 30`,
+      sessionId: 'cancel-session',
+      toolCallId: 'cancel-tool',
+    }
+    const execution = executeUserExecCommand(params)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(cancelUserExecCommand(params)).toEqual({ killed: true })
+    await expect(execution).resolves.toMatchObject({
+      success: false,
+      stderr: '',
+      exitCode: 130,
+      cancelled: true,
+    })
+    expect(cancelUserExecCommand(params)).toEqual({ killed: false })
   })
 })

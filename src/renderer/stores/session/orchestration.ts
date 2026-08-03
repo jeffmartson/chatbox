@@ -64,18 +64,25 @@ const MAX_TOOL_CALLS_BEFORE_CONFIRMATION = 25
 type ExecutableTool = {
   execute?: (
     input: unknown,
-    context: { toolCallId?: string; approved?: boolean; approvalDetails?: AppActionApprovalDetails }
+    context: {
+      toolCallId?: string
+      approved?: boolean
+      approvalDetails?: AppActionApprovalDetails
+      abortSignal?: AbortSignal
+    }
   ) => unknown
 }
 
 export function createPausedToolCallExecutionContext(
   part: Pick<MessageContentToolCallPart, 'toolCallId' | 'pauseReason'>,
-  approvedToolCallId: string | undefined
-): { toolCallId: string; approved: boolean; approvalDetails?: AppActionApprovalDetails } {
+  approvedToolCallId: string | undefined,
+  abortSignal?: AbortSignal
+): { toolCallId: string; approved: boolean; approvalDetails?: AppActionApprovalDetails; abortSignal?: AbortSignal } {
   const approved = part.toolCallId === approvedToolCallId
   return {
     toolCallId: part.toolCallId,
     approved,
+    ...(abortSignal ? { abortSignal } : {}),
     approvalDetails:
       approved && part.pauseReason?.type === 'app_action_approval' ? part.pauseReason.details : undefined,
   }
@@ -365,6 +372,43 @@ function updateToolCallPart(
   return updateToolCallParts(message, (part) => part.toolCallId === toolCallId, updater)
 }
 
+export function cancelRunningToolCallBatch(message: Message, toolCallIds: ReadonlySet<string>): Message {
+  return updateToolCallParts(
+    message,
+    (part) => toolCallIds.has(part.toolCallId) && part.state === 'call',
+    (part) => {
+      const duration = part.startTime ? Date.now() - part.startTime : undefined
+      if (part.toolName === 'user_exec' || part.toolName === 'code_execution') {
+        return {
+          ...part,
+          state: 'result',
+          pauseReason: undefined,
+          resultStorageKey: undefined,
+          result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
+          duration,
+        }
+      }
+      return {
+        ...part,
+        state: 'error',
+        pauseReason: undefined,
+        resultStorageKey: undefined,
+        result: { error: 'Tool execution stopped by user.', cancelled: true },
+        duration,
+      }
+    }
+  )
+}
+
+export function finishPausedToolCallContinuation(message: Message, finishReason?: string): Message {
+  return {
+    ...message,
+    generating: false,
+    cancel: undefined,
+    finishReason,
+  }
+}
+
 function findToolCallPart(message: Message, toolCallId: string): MessageContentToolCallPart | undefined {
   return message.contentParts.find(
     (part): part is MessageContentToolCallPart => part.type === 'tool-call' && part.toolCallId === toolCallId
@@ -455,6 +499,14 @@ export async function orchestrateGeneration(
     skipAgentModeSuggestion?: boolean
     agentModeEntrySource?: AgentModeEntrySource
     contextMessages?: Message[]
+    /**
+     * Signal of the controller the caller previously exposed via `message.cancel`
+     * (e.g. a paused-tool-call continuation handing off to a follow-up generation).
+     * Chained into this generation's own controller so a Stop pressed during the
+     * async setup window — while the stop button still aborts the old controller —
+     * is not silently lost.
+     */
+    externalAbortSignal?: AbortSignal
   }
 ) {
   const session = await chatStore.getSession(sessionId)
@@ -488,6 +540,19 @@ export async function orchestrateGeneration(
   const promptTargetMsgIx = options?.appendToMessage ? targetMsgIx + 1 : targetMsgIx
 
   const controller = new AbortController()
+  const externalSignal = options?.externalAbortSignal
+  if (externalSignal?.aborted) {
+    controller.abort()
+  } else {
+    externalSignal?.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  if (controller.signal.aborted) {
+    // Stop was pressed while this generation was still setting up (aborting the
+    // caller's chained controller); finalize as canceled instead of streaming.
+    targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [], finishReason: 'canceled' }
+    await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+    return
+  }
   // Wire the stop button to this controller before any pre-stream network work
   // runs (agent-mode suggestion classifier, MCP/tool harness setup). Those steps
   // issue real requests that can hang; without a cancel handler in the message
@@ -765,6 +830,21 @@ export async function orchestrateGeneration(
         ...targetMsg,
         generating: false,
         cancel: undefined,
+        contentParts: [
+          ...infoParts,
+          ...processorState.contentParts.map((part) =>
+            part.type === 'tool-call' &&
+            part.state === 'call' &&
+            (part.toolName === 'user_exec' || part.toolName === 'code_execution')
+              ? {
+                  ...part,
+                  state: 'result' as const,
+                  result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
+                  duration: part.startTime ? Date.now() - part.startTime : undefined,
+                }
+              : part
+          ),
+        ],
         status: [],
         finishReason: 'canceled',
       }
@@ -999,29 +1079,36 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
   const batch = isLimitContinue ? toolCallLimitBatch : [part]
   const approvedToolCallId = isApproval ? toolCallId : undefined
   const batchIds = new Set(batch.map((batchPart) => batchPart.toolCallId))
+  const controller = new AbortController()
 
-  message = updateToolCallParts(
-    message,
-    (batchPart) => batchIds.has(batchPart.toolCallId),
-    (batchPart) => ({
-      ...batchPart,
-      state: 'call',
-      // Keep structured app-action approval details until execution finishes so an
-      // interrupted continuation can still retry the exact request the user reviewed.
-      pauseReason: batchPart.pauseReason?.type === 'app_action_approval' ? batchPart.pauseReason : undefined,
-      result: undefined,
-      resultStorageKey: undefined,
-      // Restart the timer at continuation so the reported duration excludes the
-      // time spent waiting for user approval / manual continuation.
-      startTime: Date.now(),
-      duration: undefined,
-    })
-  )
+  message = {
+    ...updateToolCallParts(
+      message,
+      (batchPart) => batchIds.has(batchPart.toolCallId),
+      (batchPart) => ({
+        ...batchPart,
+        state: 'call',
+        // Keep structured app-action approval details until execution finishes so an
+        // interrupted continuation can still retry the exact request the user reviewed.
+        pauseReason: batchPart.pauseReason?.type === 'app_action_approval' ? batchPart.pauseReason : undefined,
+        result: undefined,
+        resultStorageKey: undefined,
+        // Restart the timer at continuation so the reported duration excludes the
+        // time spent waiting for user approval / manual continuation.
+        startTime: Date.now(),
+        duration: undefined,
+      })
+    ),
+    generating: true,
+    cancel: () => controller.abort(),
+  }
   await modifyMessage(sessionId, message, false)
 
   try {
     const { tools } = await buildToolsForPausedToolCall(session, settings, message)
     for (const batchPart of batch) {
+      if (controller.signal.aborted) break
+
       const toolValue = (tools as Record<string, unknown>)[batchPart.toolName]
       const executableTool = toolValue && typeof toolValue === 'object' ? (toolValue as ExecutableTool) : undefined
       if (typeof executableTool?.execute !== 'function') {
@@ -1033,7 +1120,7 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
         // batch membership: a sibling call must pass through its own approval gate.
         const result = await executableTool.execute(
           batchPart.args,
-          createPausedToolCallExecutionContext(batchPart, approvedToolCallId)
+          createPausedToolCallExecutionContext(batchPart, approvedToolCallId, controller.signal)
         )
         message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) => ({
           ...toolPart,
@@ -1043,6 +1130,9 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
           duration: toolPart.startTime ? Date.now() - toolPart.startTime : undefined,
         }))
       } catch (error) {
+        if (controller.signal.aborted) {
+          break
+        }
         const pause = getToolCallPause(error)
         message = updateToolCallPart(message, batchPart.toolCallId, (toolPart) =>
           pause
@@ -1069,15 +1159,32 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
       await modifyMessage(sessionId, message, false, true)
     }
 
-    await modifyMessage(sessionId, message, true)
-    if (hasPausedToolCallPart(message)) {
-      // Some calls are still awaiting user approval — generation resumes once they resolve.
+    if (controller.signal.aborted) {
+      message = cancelRunningToolCallBatch(message, batchIds)
+      await modifyMessage(sessionId, finishPausedToolCallContinuation(message, 'canceled'), true)
       return
     }
+
+    if (hasPausedToolCallPart(message)) {
+      // Some calls are still awaiting user approval — generation resumes once they resolve.
+      await modifyMessage(sessionId, finishPausedToolCallContinuation(message, 'tool-call-paused'), true)
+      return
+    }
+
+    await modifyMessage(sessionId, message, true)
+    if (controller.signal.aborted) {
+      message = cancelRunningToolCallBatch(message, batchIds)
+      await modifyMessage(sessionId, finishPausedToolCallContinuation(message, 'canceled'), true)
+      return
+    }
+
     await orchestrateGeneration(
       sessionId,
       { ...message, generating: true },
-      { operationType: 'regenerate', appendToMessage: true }
+      // The message cache still points the stop button at this continuation's
+      // controller until the follow-up generation registers its own, so chain
+      // the signal across the handoff to keep Stop working in that window.
+      { operationType: 'regenerate', appendToMessage: true, externalAbortSignal: controller.signal }
     )
   } catch (error) {
     captureAgentModeException(error, {
@@ -1090,19 +1197,26 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
       pauseType: part.pauseReason?.type,
     })
     const errorMessage = error instanceof Error ? error.message : String(error)
+    const failedMessage = controller.signal.aborted
+      ? cancelRunningToolCallBatch(message, batchIds)
+      : updateToolCallParts(
+          message,
+          (batchPart) => batchIds.has(batchPart.toolCallId) && batchPart.state === 'call',
+          (batchPart) => ({
+            ...batchPart,
+            state: 'error',
+            pauseReason: undefined,
+            result: { error: errorMessage },
+            duration: batchPart.startTime ? Date.now() - batchPart.startTime : undefined,
+          })
+        )
+    // The batch has been terminally converted (cancelled or errored), so the
+    // paused finish reason must not survive: leaving it (or clearing it to
+    // undefined) would let isSuccessfulAssistantReply() count this failed
+    // continuation as a successful reply.
     await modifyMessage(
       sessionId,
-      updateToolCallParts(
-        message,
-        (batchPart) => batchIds.has(batchPart.toolCallId) && batchPart.state === 'call',
-        (batchPart) => ({
-          ...batchPart,
-          state: 'error',
-          pauseReason: undefined,
-          result: { error: errorMessage },
-          duration: batchPart.startTime ? Date.now() - batchPart.startTime : undefined,
-        })
-      ),
+      finishPausedToolCallContinuation(failedMessage, controller.signal.aborted ? 'canceled' : 'error'),
       true
     )
   }

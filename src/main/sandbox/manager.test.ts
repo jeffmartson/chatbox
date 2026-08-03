@@ -11,6 +11,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SANDBOX_EXEC_ERROR_CODES } from '../../shared/sandbox-provider'
 
@@ -29,6 +30,7 @@ import {
   editFile,
   execCode,
   initSandbox,
+  killRunningCommand,
   normalizeWindowsShellPath,
   resetSandbox,
   resetWindowsPowerShellResolutionCache,
@@ -347,6 +349,93 @@ describe('execCode on Windows without shell runtimes', () => {
         ([message]) => typeof message === 'string' && message.startsWith('agent_operation finish ')
       )
       expect(finishLogs).toHaveLength(1)
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(workDir, { recursive: true, force: true })
+    }
+  })
+
+  test('kills the sandbox command matching the requested tool call', async () => {
+    setPlatform('win32')
+    const workDir = mkdtempSync(path.join(tmpdir(), 'chatbox-parallel-kill-'))
+    const sessionId = 'parallel-kill-session'
+    const createChild = (pid: number) =>
+      Object.assign(new EventEmitter(), {
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        stdin: new PassThrough(),
+        killed: false,
+        pid,
+      })
+    const firstChild = createChild(101)
+    const secondChild = createChild(202)
+    const taskkillChild = new EventEmitter()
+    const pendingChildren = [firstChild, secondChild]
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((command: string) => {
+      if (command === 'taskkill') return taskkillChild
+      const child = pendingChildren.shift()
+      if (!child) throw new Error('Unexpected sandbox command spawn')
+      return child
+    })
+
+    try {
+      await initSandbox(workDir, sessionId)
+      const firstExecution = execCode({
+        code: 'setInterval(() => {}, 1000)',
+        language: 'node',
+        sessionId,
+        toolCallId: 'tool-1',
+      })
+      const secondExecution = execCode({
+        code: 'setInterval(() => {}, 1000)',
+        language: 'node',
+        sessionId,
+        toolCallId: 'tool-2',
+      })
+
+      expect(killRunningCommand(sessionId, 'tool-1')).toEqual({ killed: true })
+      expect(spawn).toHaveBeenCalledWith('taskkill', ['/PID', '101', '/T', '/F'], { stdio: 'ignore' })
+      expect(spawn).not.toHaveBeenCalledWith('taskkill', ['/PID', '202', '/T', '/F'], { stdio: 'ignore' })
+
+      firstChild.emit('close', 143)
+      secondChild.emit('close', 0)
+      await Promise.all([firstExecution, secondExecution])
+    } finally {
+      await resetSandbox(sessionId)
+      rmSync(workDir, { recursive: true, force: true })
+    }
+  })
+
+  test('kills a sandbox command that registers after cancellation', async () => {
+    setPlatform('win32')
+    const workDir = mkdtempSync(path.join(tmpdir(), 'chatbox-early-kill-'))
+    const sessionId = 'early-kill-session'
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      stdin: new PassThrough(),
+      killed: false,
+      pid: 303,
+    })
+    const taskkillChild = new EventEmitter()
+    ;(spawn as unknown as ReturnType<typeof vi.fn>).mockImplementation((command: string) =>
+      command === 'taskkill' ? taskkillChild : child
+    )
+
+    try {
+      await initSandbox(workDir, sessionId)
+      expect(killRunningCommand(sessionId, 'tool-before-spawn')).toEqual({ killed: false })
+
+      const execution = execCode({
+        code: 'setInterval(() => {}, 1000)',
+        language: 'node',
+        sessionId,
+        toolCallId: 'tool-before-spawn',
+      })
+
+      expect(spawn).toHaveBeenCalledWith('taskkill', ['/PID', '303', '/T', '/F'], { stdio: 'ignore' })
+      child.emit('close', 143)
+      await execution
     } finally {
       await resetSandbox(sessionId)
       rmSync(workDir, { recursive: true, force: true })

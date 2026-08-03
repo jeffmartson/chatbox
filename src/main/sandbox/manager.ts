@@ -29,6 +29,7 @@ import {
 import { shellQuote } from '../../shared/utils/shell'
 import { normalizeWindowsAbsolutePath } from '../../shared/utils/windows-path'
 import { buildOperationFinishLog, buildOperationStartLog, createOperationId } from '../operation-log'
+import { killProcessTree } from '../process-tree'
 import { runRipgrepFileList, runRipgrepSearch } from '../ripgrep-search'
 import { getLogger } from '../util'
 import { resolveWindowsPowerShell } from '../windows-powershell'
@@ -74,7 +75,9 @@ interface SandboxSession {
   userWriteGrants: WritePathGrant[]
   /** Requested configuration used to keep canonical grants stable across repeated initialization. */
   initConfigKey: string | null
-  runningChild: ChildProcess | null
+  runningChildren: Set<ChildProcess>
+  runningChildrenByToolCallId: Map<string, ChildProcess>
+  pendingCancelledToolCallIds: Set<string>
   /** Per-session sandbox config for wrapWithSandbox customConfig override */
   sandboxConfig: ReturnType<typeof buildConfig> | null
 }
@@ -101,12 +104,38 @@ function getOrCreateSession(sessionId?: string): SandboxSession {
       workingDirectoryGrant: null,
       userWriteGrants: [],
       initConfigKey: null,
-      runningChild: null,
+      runningChildren: new Set(),
+      runningChildrenByToolCallId: new Map(),
+      pendingCancelledToolCallIds: new Set(),
       sandboxConfig: null,
     }
     sessions.set(id, session)
   }
   return session
+}
+
+function terminateTrackedChild(child: ChildProcess): void {
+  killProcessTree(child, 'SIGTERM')
+  const forceKillHandle = setTimeout(() => killProcessTree(child, 'SIGKILL'), 3_000)
+  forceKillHandle.unref()
+  const clearForceKill = () => clearTimeout(forceKillHandle)
+  child.once('error', clearForceKill)
+  child.once('close', clearForceKill)
+}
+
+function trackRunningChild(session: SandboxSession, child: ChildProcess, toolCallId?: string): boolean {
+  session.runningChildren.add(child)
+  if (toolCallId) session.runningChildrenByToolCallId.set(toolCallId, child)
+
+  const cleanup = () => {
+    session.runningChildren.delete(child)
+    if (toolCallId && session.runningChildrenByToolCallId.get(toolCallId) === child) {
+      session.runningChildrenByToolCallId.delete(toolCallId)
+    }
+  }
+  child.once('error', cleanup)
+  child.once('close', cleanup)
+  return toolCallId ? session.pendingCancelledToolCallIds.delete(toolCallId) : false
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -244,37 +273,6 @@ export function resolveWindowsBash(): WindowsBashResolution | null {
 export function normalizeWindowsShellPath(p: string): string {
   if (process.platform !== 'win32') return p
   return normalizeWindowsAbsolutePath(p) ?? p
-}
-
-/**
- * Terminate a spawned child and its descendants across platforms.
- * POSIX: signal the detached process group (negative pid). Windows: `taskkill /T`
- * since detached process-group signalling does not exist there.
- */
-export function killProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): void {
-  if (process.platform === 'win32') {
-    if (child.pid) {
-      try {
-        // taskkill failing (e.g. process already gone) surfaces as an async 'error'
-        // event; swallow it so it never crashes the main process.
-        spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }).on('error', () => {})
-        return
-      } catch {
-        // fall through to child.kill
-      }
-    }
-    child.kill(signal)
-    return
-  }
-  if (child.pid) {
-    try {
-      process.kill(-child.pid, signal)
-    } catch {
-      child.kill(signal)
-    }
-  } else {
-    child.kill(signal)
-  }
 }
 
 // True when a resolved absolute path is the filesystem root, the user's home, an ancestor
@@ -793,7 +791,7 @@ export async function execCode(params: {
       // On Windows the tree is killed via taskkill /T, so detaching is unnecessary.
       detached: !isWindows,
     })
-    session.runningChild = child
+    const cancelAfterRegistration = trackRunningChild(session, child, params.toolCallId)
 
     let timedOut = false
     let settled = false
@@ -819,7 +817,6 @@ export async function execCode(params: {
     })
     child.on('error', (err) => {
       clearTimeout(timer)
-      session.runningChild = null
       if (settled) return
       settled = true
       log.warn(
@@ -838,7 +835,6 @@ export async function execCode(params: {
     })
     child.on('close', (code) => {
       clearTimeout(timer)
-      session.runningChild = null
       if (settled) return
       settled = true
       let stdout = tailTruncate(Buffer.concat(stdoutChunks).toString('utf-8'))
@@ -863,24 +859,46 @@ export async function execCode(params: {
       resolve({ stdout, stderr, exitCode })
     })
 
-    // Feed the program via stdin: node executes the piped script; bash runs the piped commands.
+    // Feed the program via stdin only after cancellation listeners are ready: node executes
+    // the piped script; bash runs the piped commands.
     child.stdin.on('error', () => {})
-    child.stdin.write(script)
-    child.stdin.end()
+    if (cancelAfterRegistration) {
+      terminateTrackedChild(child)
+    } else {
+      child.stdin.write(script)
+      child.stdin.end()
+    }
   })
 }
 
-export function killRunningCommand(sessionId?: string): { killed: boolean } {
+export function killRunningCommand(sessionId?: string, toolCallId?: string): { killed: boolean } {
   const session = getSession(sessionId)
   if (!session) return { killed: false }
 
-  const child = session.runningChild
-  if (child && !child.killed) {
-    killProcessTree(child, 'SIGTERM')
-    log.info(`Killed running sandbox command for session ${sessionId || DEFAULT_SESSION}`)
-    return { killed: true }
+  const children = toolCallId
+    ? [session.runningChildrenByToolCallId.get(toolCallId)].filter(
+        (child): child is ChildProcess => child !== undefined
+      )
+    : [...session.runningChildren]
+
+  if (toolCallId && children.length === 0) {
+    // Cancellation can arrive while execCode is still preparing the sandbox wrapper.
+    // Remember it so a child registered moments later is terminated immediately.
+    session.pendingCancelledToolCallIds.add(toolCallId)
   }
-  return { killed: false }
+
+  let killed = false
+  for (const child of children) {
+    if (child.killed) continue
+    terminateTrackedChild(child)
+    killed = true
+  }
+  if (killed) {
+    log.info(
+      `Killed running sandbox command${toolCallId ? ` ${toolCallId}` : ''} for session ${sessionId || DEFAULT_SESSION}`
+    )
+  }
+  return { killed }
 }
 
 // ─── File operations ─────────────────────────────────────────────────
@@ -1079,7 +1097,7 @@ export async function searchFiles(
       },
       terminate: killProcessTree,
       onChild: (child) => {
-        session.runningChild = child
+        if (child) trackRunningChild(session, child)
       },
     }
   )
@@ -1115,7 +1133,7 @@ export async function findFiles(
       },
       terminate: killProcessTree,
       onChild: (child) => {
-        session.runningChild = child
+        if (child) trackRunningChild(session, child)
       },
     }
   )

@@ -148,10 +148,10 @@ export function registerSandboxIPCHandlers() {
     }
   })
 
-  ipcMain.handle('sandbox:kill', (_event, params?: { sessionId?: string }) => {
+  ipcMain.handle('sandbox:kill', (_event, params?: { sessionId?: string; toolCallId?: string }) => {
     try {
       log.info('sandbox:kill')
-      return killRunningCommand(params?.sessionId)
+      return killRunningCommand(params?.sessionId, params?.toolCallId)
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)
       log.error('sandbox:kill failed', msg)

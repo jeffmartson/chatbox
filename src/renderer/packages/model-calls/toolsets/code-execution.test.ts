@@ -3,8 +3,13 @@
 import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
+const { sandboxKillMock } = vi.hoisted(() => ({ sandboxKillMock: vi.fn() }))
+
 vi.mock('@/lib/utils', () => ({
   getLogger: () => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+}))
+vi.mock('@/platform', () => ({
+  default: { type: 'desktop', sandboxKill: sandboxKillMock },
 }))
 
 import { buildCodeExecutionTools } from './code-execution'
@@ -162,6 +167,79 @@ describe('buildCodeExecutionTools', () => {
     expect(result.stdout).toBe('hello world\n')
     expect(result.stderr).toBe('')
     expect(result.exitCode).toBe(0)
+  })
+
+  test('global abort kills the sandbox command and preserves captured output', async () => {
+    let finishExecution: ((result: { stdout: string; stderr: string; exitCode: number }) => void) | undefined
+    mockProvider.exec.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishExecution = resolve
+        })
+    )
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.code_execution as {
+      execute: (
+        input: Record<string, unknown>,
+        opts: { abortSignal: AbortSignal; toolCallId: string }
+      ) => Promise<{ stdout: string; stderr: string; exitCode: number; cancelled?: boolean }>
+    }
+    const controller = new AbortController()
+    const execution = tool.execute(
+      { code: 'while true; do echo tick; done', language: 'bash' },
+      { abortSignal: controller.signal, toolCallId: 'tool-call-running' }
+    )
+    await vi.waitFor(() => expect(mockProvider.exec).toHaveBeenCalledTimes(1))
+
+    controller.abort()
+    expect(sandboxKillMock).toHaveBeenCalledWith({
+      sessionId: 'test-session',
+      toolCallId: 'tool-call-running',
+    })
+    finishExecution?.({ stdout: 'tick\n', stderr: '', exitCode: 1 })
+
+    await expect(execution).resolves.toEqual({
+      stdout: 'tick\n',
+      stderr: '',
+      exitCode: 130,
+      errorCode: undefined,
+      cancelled: true,
+    })
+  })
+
+  test('marks cancellation that happens during sandbox setup', async () => {
+    let finishSetup: ((result: { success: boolean }) => void) | undefined
+    mockProvider.init.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSetup = resolve
+        })
+    )
+    const { tools } = buildCodeExecutionTools({ sessionId: 'test-session', files: [], provider: mockProvider })
+    const tool = tools.code_execution as {
+      execute: (
+        input: Record<string, unknown>,
+        opts: { abortSignal: AbortSignal; toolCallId: string }
+      ) => Promise<{ stdout: string; stderr: string; exitCode: number; cancelled?: boolean }>
+    }
+    const controller = new AbortController()
+    const execution = tool.execute(
+      { code: 'console.log("never started")', language: 'node' },
+      { abortSignal: controller.signal, toolCallId: 'tool-call-setup' }
+    )
+    await vi.waitFor(() => expect(mockProvider.init).toHaveBeenCalledTimes(1))
+
+    controller.abort()
+    finishSetup?.({ success: true })
+
+    await expect(execution).resolves.toEqual({
+      stdout: '',
+      stderr: '',
+      exitCode: 130,
+      cancelled: true,
+    })
+    expect(mockProvider.exec).not.toHaveBeenCalled()
+    expect(sandboxKillMock).not.toHaveBeenCalled()
   })
 
   test('code_execution maps structured output to readable model text', async () => {

@@ -17,7 +17,7 @@ import {
 } from './installer'
 import { parseSkillFile } from './parser'
 import { collectSkillFiles, MAX_SKILL_FILES } from './skill-files'
-import { createDefaultUserExecRunner, type UserExecParams } from './user-exec-runner'
+import { cancelUserExecCommand, createDefaultUserExecRunner, type UserExecParams } from './user-exec-runner'
 import { isValidSkillName } from './validation'
 
 const log = getLogger('skills:ipc-handlers')
@@ -337,6 +337,9 @@ export function registerSkillsHandlers() {
   })
 
   ipcMain.handle('skills:user-exec', (_event, params: UserExecParams) => userExecRunner.run(params))
+  ipcMain.handle('skills:user-exec-cancel', (_event, params: Pick<UserExecParams, 'sessionId' | 'toolCallId'>) =>
+    cancelUserExecCommand(params)
+  )
 
   ipcMain.handle('skills:check-updates-batch', async () => {
     try {

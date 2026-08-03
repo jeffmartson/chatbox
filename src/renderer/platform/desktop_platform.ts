@@ -432,7 +432,7 @@ export default class DesktopPlatform implements Platform {
     return this.ipc.invoke('sandbox:find', params)
   }
 
-  public async sandboxKill(params?: { sessionId?: string }) {
+  public async sandboxKill(params?: { sessionId?: string; toolCallId?: string }) {
     return this.ipc.invoke('sandbox:kill', params)
   }
 

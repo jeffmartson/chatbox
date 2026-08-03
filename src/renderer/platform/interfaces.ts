@@ -179,7 +179,7 @@ export interface Platform extends Storage {
     sessionId?: string
   }): Promise<SandboxOperationResult>
   sandboxFind?(params: { dirPath: string; pattern?: string; sessionId?: string }): Promise<SandboxOperationResult>
-  sandboxKill?(params?: { sessionId?: string }): Promise<{ killed: boolean }>
+  sandboxKill?(params?: { sessionId?: string; toolCallId?: string }): Promise<{ killed: boolean }>
   sandboxReset?(params?: { sessionId?: string }): Promise<{ success: boolean; error?: string }>
   sandboxStatus?(params?: {
     sessionId?: string

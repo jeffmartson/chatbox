@@ -57,6 +57,7 @@ import { useTranslation } from 'react-i18next'
 import { ImageGenerationResultGallery } from '@/components/chat/ImageGenerationResultGallery'
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
+import { useBlob } from '@/hooks/useBlob'
 import { formatElapsedTime, MIN_STEP_DURATION_MS, useThinkingTimer } from '@/hooks/useThinkingTimer'
 import { getLogger } from '@/lib/utils'
 import { getAcceptedImageBackgroundTaskResult } from '@/packages/chatbox-cli/background-task-result'
@@ -915,9 +916,77 @@ export const DownloadArtifactsUI: FC<{ parts: MessageToolCallPart[] } & ToolCall
 
 // ─── User Exec ──────────────────────────────────────────────────────
 
+function isCommandExecutionPart(part: MessageToolCallPart): boolean {
+  return part.toolName === 'user_exec' || part.toolName === 'code_execution'
+}
+
+function getCommandExecutionCode(part: MessageToolCallPart): string | undefined {
+  return getFirstStringValue(part.args, part.toolName === 'user_exec' ? ['command'] : ['code'])
+}
+
+function parseCommandExecutionResult(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === 'object') return value as Record<string, unknown>
+  if (typeof value !== 'string') return undefined
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function useCommandExecutionResult(part: MessageToolCallPart): Record<string, unknown> | undefined {
+  const { data: storedResult } = useBlob(isCommandExecutionPart(part) ? part.resultStorageKey : undefined)
+  return parseCommandExecutionResult(storedResult) ?? parseCommandExecutionResult(part.result)
+}
+
+const CommandExecutionDetails: FC<{ part: MessageToolCallPart }> = ({ part }) => {
+  const { t } = useTranslation()
+  const command = getCommandExecutionCode(part)
+  const result = useCommandExecutionResult(part)
+  const stdout = typeof result?.stdout === 'string' ? result.stdout : ''
+  const stderr =
+    typeof result?.stderr === 'string' ? result.stderr : typeof result?.error === 'string' ? result.error : ''
+  const hasFinished = part.state === 'result' || part.state === 'error'
+
+  return (
+    <Stack gap="xs">
+      {command && (
+        <Box>
+          <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
+            {t('Command')}
+          </Text>
+          <Code block style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {command}
+          </Code>
+        </Box>
+      )}
+      {hasFinished && (
+        <Box>
+          <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
+            stdout
+          </Text>
+          <Code block style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {stdout || '—'}
+          </Code>
+        </Box>
+      )}
+      {hasFinished && stderr && (
+        <Box>
+          <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
+            stderr
+          </Text>
+          <Code block style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {stderr}
+          </Code>
+        </Box>
+      )}
+    </Stack>
+  )
+}
+
 const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
   const { t } = useTranslation()
-  const command = (part.args as Record<string, unknown>)?.command as string | undefined
   const [expanded, setExpanded] = useState(false)
 
   const isExecuting = part.state === 'call'
@@ -986,24 +1055,7 @@ const UserExecUI: FC<{ part: MessageToolCallPart }> = ({ part }) => {
             borderLeft: `2px solid ${isError || isDenied ? 'var(--chatbox-tint-error)' : 'var(--chatbox-tint-success)'}`,
           }}
         >
-          <Stack gap="xs">
-            {command && (
-              <Box>
-                <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-                  {t('Command')}
-                </Text>
-                <Code block>{command}</Code>
-              </Box>
-            )}
-            {!!part.result && (
-              <Box>
-                <Text size="xs" c="chatbox-tertiary" fw={500} mb={2}>
-                  {t('Result')}
-                </Text>
-                <Code block>{stringifyToolPayload(part.result)}</Code>
-              </Box>
-            )}
-          </Stack>
+          <CommandExecutionDetails part={part} />
         </Box>
       </Collapse>
     </Stack>
@@ -1338,6 +1390,9 @@ const TimelineToolCallDetail: FC<{ part: MessageToolCallPart } & ToolCallActionC
   if (part.toolName === 'parse_link') {
     return <ParseLinkDetails part={part} />
   }
+  if (isCommandExecutionPart(part)) {
+    return <CommandExecutionDetails part={part} />
+  }
   return <GeneralToolCallDetails part={part} />
 }
 
@@ -1398,14 +1453,22 @@ const TimelineRail: FC<{
   </>
 )
 
-const TimelineToolCallStep: FC<
-  {
-    part: MessageToolCallPart
-    isFirst: boolean
-    isLast: boolean
-    showPausedActionDetails?: boolean
-  } & ToolCallActionContext
-> = ({ part, isFirst, isLast, sessionId, messageId, showPausedActionDetails = true }) => {
+type TimelineToolCallStepProps = {
+  part: MessageToolCallPart
+  isFirst: boolean
+  isLast: boolean
+  showPausedActionDetails?: boolean
+} & ToolCallActionContext
+
+const TimelineToolCallStepContent: FC<TimelineToolCallStepProps & { commandResult?: Record<string, unknown> }> = ({
+  part,
+  isFirst,
+  isLast,
+  sessionId,
+  messageId,
+  showPausedActionDetails = true,
+  commandResult,
+}) => {
   const { t } = useTranslation()
   const acceptedImageTask = getAcceptedImageBackgroundTaskResult(part.result)
   const { data: imageRecord, isFetched: isImageRecordFetched } = useImageGenerationRecord(
@@ -1426,9 +1489,28 @@ const TimelineToolCallStep: FC<
   const backgroundElapsed = useThinkingTimer(imageRecord?.createdAt ?? acceptedImageTask?.startedAt, isBackgroundActive)
   const isPaused = part.state === 'paused'
   const isLoading = part.state === 'call' || isBackgroundActive || isImageRecordLoading || isResumingBackground
+  const commandExitCode = typeof commandResult?.exitCode === 'number' ? commandResult.exitCode : undefined
+  // Stop marks every tool in the batch with `cancelled: true`, but the shape differs:
+  // command tools settle as state 'result' (exit 130, possibly blob-offloaded), other
+  // tools become state 'error' with a small inline result. Render both as "Stopped".
+  const isCancelled = (commandResult ?? parseCommandExecutionResult(part.result))?.cancelled === true
+  const isCommandFailure =
+    isCommandExecutionPart(part) &&
+    part.state === 'result' &&
+    (commandResult?.success === false || (commandExitCode !== undefined && commandExitCode !== 0))
   const isBashNotAvailable = isBashNotAvailableResult(part)
-  const isError = part.state === 'error' || isBashNotAvailable || imageStatus === 'error' || isBackgroundUnrecoverable
-  const isDone = part.state === 'result' && !isBashNotAvailable && !isBackgroundWaiting && imageStatus !== 'error'
+  const isError =
+    (part.state === 'error' && !isCancelled) ||
+    isBashNotAvailable ||
+    imageStatus === 'error' ||
+    isBackgroundUnrecoverable ||
+    (isCommandFailure && !isCancelled)
+  const isDone =
+    part.state === 'result' &&
+    !isBashNotAvailable &&
+    !isBackgroundWaiting &&
+    imageStatus !== 'error' &&
+    !isCommandFailure
   const [expanded, setExpanded] = useAutoExpandOnSignal(isPaused || isBashNotAvailable)
   const Icon = getToolIcon(part.toolName)
   const handleResumeBackground = useCallback(async () => {
@@ -1472,7 +1554,7 @@ const TimelineToolCallStep: FC<
   const showTime = stepDuration >= MIN_STEP_DURATION_MS
 
   const stateColor =
-    isPaused || canResumeBackground
+    isPaused || canResumeBackground || isCancelled
       ? 'var(--chatbox-tint-warning)'
       : isLoading
         ? 'var(--chatbox-tint-brand)'
@@ -1480,7 +1562,7 @@ const TimelineToolCallStep: FC<
           ? 'var(--chatbox-tint-error)'
           : 'var(--chatbox-tint-success)'
   const dotBg =
-    isPaused || canResumeBackground
+    isPaused || canResumeBackground || isCancelled
       ? 'color-mix(in srgb, var(--chatbox-tint-warning) 12%, transparent)'
       : isLoading
         ? 'var(--chatbox-background-brand-secondary)'
@@ -1491,11 +1573,13 @@ const TimelineToolCallStep: FC<
   const argSummary =
     part.toolName === 'user_exec'
       ? getFirstStringValue(part.args, ['command'])
-      : part.toolName === 'create_download'
-        ? getFirstStringValue(part.result, ['file_path']) || getFirstStringValue(part.args, ['file_path'])
-        : part.toolName === 'parse_link'
-          ? getFirstStringValue(part.args, ['url']) || getFirstStringValue(part.result, ['title', 'url'])
-          : getFirstStringValue(part.args, ['path', 'file_path', 'query', 'pattern', 'command', 'skillName', 'name'])
+      : part.toolName === 'code_execution'
+        ? getFirstStringValue(part.args, ['code'])
+        : part.toolName === 'create_download'
+          ? getFirstStringValue(part.result, ['file_path']) || getFirstStringValue(part.args, ['file_path'])
+          : part.toolName === 'parse_link'
+            ? getFirstStringValue(part.args, ['url']) || getFirstStringValue(part.result, ['title', 'url'])
+            : getFirstStringValue(part.args, ['path', 'file_path', 'query', 'pattern', 'command', 'skillName', 'name'])
 
   const resultSummary =
     !argSummary && part.state === 'result'
@@ -1516,17 +1600,23 @@ const TimelineToolCallStep: FC<
           : imageStatus === 'error'
             ? t('Image generation failed')
             : t('Image generated')
-    : isPaused
-      ? t('Paused')
-      : isLoading
-        ? t('Running')
-        : isBashNotAvailable
-          ? t('Bash is not available on this Windows device.')
-          : isError
-            ? t('Failed')
-            : truncateSummary(argSummary || resultSummary || t('Completed'))
+    : isCancelled
+      ? t('Stopped')
+      : isPaused
+        ? t('Paused')
+        : isLoading
+          ? t('Running')
+          : isBashNotAvailable
+            ? t('Bash is not available on this Windows device.')
+            : isError
+              ? commandExitCode === undefined
+                ? t('Failed')
+                : `${t('Failed')} · exit ${commandExitCode}`
+              : isCommandExecutionPart(part) && commandExitCode !== undefined
+                ? `${truncateSummary(argSummary || t('Completed'))} · exit ${commandExitCode}`
+                : truncateSummary(argSummary || resultSummary || t('Completed'))
 
-  const hasDetail = isPaused ? showPausedActionDetails : part.state !== 'call'
+  const hasDetail = isPaused ? showPausedActionDetails : part.state !== 'call' || isCommandExecutionPart(part)
 
   return (
     <Box pos="relative" pl={32} style={{ minHeight: 28, overflow: 'visible' }}>
@@ -1615,6 +1705,18 @@ const TimelineToolCallStep: FC<
     </Box>
   )
 }
+
+const CommandTimelineToolCallStep: FC<TimelineToolCallStepProps> = (props) => {
+  const commandResult = useCommandExecutionResult(props.part)
+  return <TimelineToolCallStepContent {...props} commandResult={commandResult} />
+}
+
+const TimelineToolCallStep: FC<TimelineToolCallStepProps> = (props) =>
+  isCommandExecutionPart(props.part) ? (
+    <CommandTimelineToolCallStep {...props} />
+  ) : (
+    <TimelineToolCallStepContent {...props} />
+  )
 
 // A timeline step is a tool call, a reasoning ("thinking") block, or an
 // intermediate text block the assistant emitted between steps.

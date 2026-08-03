@@ -193,21 +193,36 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
       }
 
       if (abortSignal?.aborted) {
-        return { stdout: '', stderr: '[Cancelled]', exitCode: 130 }
+        return { stdout: '', stderr: '', exitCode: 130, cancelled: true }
       }
 
-      const result = await provider.exec({
-        code: codeInput.code,
-        language: codeInput.language ?? 'node',
-        timeout: codeInput.timeout ?? DEFAULT_EXEC_TIMEOUT,
-        ...(toolCallId ? { toolCallId } : {}),
-      })
+      let cancelled = false
+      const cancelExecution = () => {
+        cancelled = true
+        void platform.sandboxKill?.({
+          sessionId: context.sessionId,
+          ...(toolCallId ? { toolCallId } : {}),
+        })
+      }
+      abortSignal?.addEventListener('abort', cancelExecution, { once: true })
+      let result: Awaited<ReturnType<typeof provider.exec>>
+      try {
+        result = await provider.exec({
+          code: codeInput.code,
+          language: codeInput.language ?? 'node',
+          timeout: codeInput.timeout ?? DEFAULT_EXEC_TIMEOUT,
+          ...(toolCallId ? { toolCallId } : {}),
+        })
+      } finally {
+        abortSignal?.removeEventListener('abort', cancelExecution)
+      }
 
       return {
         stdout: truncateOutput(result.stdout),
         stderr: truncateOutput(result.stderr),
-        exitCode: result.exitCode,
+        exitCode: cancelled ? 130 : result.exitCode,
         errorCode: result.errorCode,
+        ...(cancelled ? { cancelled: true } : {}),
       }
     },
     toModelOutput: toTextModelOutput(formatCodeExecutionOutput),

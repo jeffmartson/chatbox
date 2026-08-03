@@ -6,6 +6,7 @@ interface SkillScriptResult {
   stdout: string
   stderr: string
   exitCode: number | null
+  cancelled?: boolean
 }
 
 interface SkillInstallResult {
@@ -86,6 +87,10 @@ export const skillsController = {
     }
   ): Promise<SkillScriptResult> {
     return window.electronAPI.invoke('skills:user-exec', { command, ...options })
+  },
+
+  cancelUserExec(options: { sessionId?: string; toolCallId: string }): Promise<{ killed: boolean }> {
+    return window.electronAPI.invoke('skills:user-exec-cancel', options)
   },
 
   async installMarketplaceSkill(skill: MarketplaceSkill): Promise<SkillInstallResult> {

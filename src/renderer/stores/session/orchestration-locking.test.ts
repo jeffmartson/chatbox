@@ -1,3 +1,4 @@
+import type { Message } from '@shared/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { wakeBackgroundTaskFollowUpsMock, withSessionGenerationLockMock } = vi.hoisted(() => {
@@ -25,8 +26,10 @@ vi.mock('../chatStore', () => ({}))
 
 import {
   applyPersistentToolCallPause,
+  cancelRunningToolCallBatch,
   continuePausedToolCall,
   createPausedToolCallExecutionContext,
+  finishPausedToolCallContinuation,
   retryFromLastToolCallAfterApiError,
   stopPausedToolCall,
 } from './orchestration'
@@ -70,6 +73,20 @@ describe('paused tool-call generation entry-point locking', () => {
 })
 
 describe('paused tool-call approval binding', () => {
+  it('forwards the continuation abort signal to the resumed tool', () => {
+    const controller = new AbortController()
+    const context = createPausedToolCallExecutionContext(
+      {
+        toolCallId: 'tool-1',
+        pauseReason: { type: 'user_exec_approval', command: 'sleep 30' },
+      },
+      'tool-1',
+      controller.signal
+    )
+
+    expect(context).toMatchObject({ toolCallId: 'tool-1', approved: true, abortSignal: controller.signal })
+  })
+
   it('authorizes only the tool call explicitly approved by the user', () => {
     const selected = createPausedToolCallExecutionContext(
       {
@@ -112,6 +129,76 @@ describe('paused tool-call approval binding', () => {
         undefined
       )
     ).toEqual({ toolCallId: 'tool-1', approved: false, approvalDetails: undefined })
+  })
+})
+
+describe('paused tool-call batch cancellation', () => {
+  it('cancels every uncompleted sibling without overwriting completed results', () => {
+    const message = {
+      id: 'message-1',
+      role: 'assistant',
+      contentParts: [
+        {
+          type: 'tool-call',
+          state: 'result',
+          toolCallId: 'tool-completed',
+          toolName: 'code_execution',
+          result: { stdout: 'done', stderr: '', exitCode: 0 },
+        },
+        {
+          type: 'tool-call',
+          state: 'call',
+          toolCallId: 'tool-command',
+          toolName: 'code_execution',
+          args: { code: 'while (true) {}' },
+        },
+        {
+          type: 'tool-call',
+          state: 'call',
+          toolCallId: 'tool-other',
+          toolName: 'read_file',
+          args: { file_path: 'later.txt' },
+        },
+      ],
+    } as Message
+
+    const cancelled = cancelRunningToolCallBatch(message, new Set(['tool-completed', 'tool-command', 'tool-other']))
+
+    expect(cancelled.contentParts).toMatchObject([
+      {
+        state: 'result',
+        toolCallId: 'tool-completed',
+        result: { stdout: 'done', stderr: '', exitCode: 0 },
+      },
+      {
+        state: 'result',
+        toolCallId: 'tool-command',
+        result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
+      },
+      {
+        state: 'error',
+        toolCallId: 'tool-other',
+        result: { error: 'Tool execution stopped by user.', cancelled: true },
+      },
+    ])
+  })
+
+  it('clears runtime generation controls when continuation stops', () => {
+    const cancel = vi.fn()
+    const message = {
+      id: 'message-1',
+      role: 'assistant',
+      contentParts: [],
+      generating: true,
+      cancel,
+      finishReason: 'tool-call-paused',
+    } as Message
+
+    expect(finishPausedToolCallContinuation(message, 'canceled')).toMatchObject({
+      generating: false,
+      cancel: undefined,
+      finishReason: 'canceled',
+    })
   })
 })
 
