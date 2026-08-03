@@ -405,21 +405,23 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
       ? t('This model does not support Agent Mode')
       : t('Locked after the chat starts to keep tools and context consistent — start a new chat to change')
     return (
-      <Tooltip label={tooltipLabel} disabled={!isDisabled} withArrow>
-        <Button
-          data-testid={value === 'off' ? TestId.agent.modeChat : TestId.agent.modeWork}
-          size="xs"
-          variant={isActive ? 'filled' : 'default'}
-          color={isActive ? 'chatbox-brand' : undefined}
-          fullWidth
-          disabled={isDisabled}
-          leftSection={<AgentModeStatusIcon mode={value} size={14} />}
-          // Long locales (fr/pt/ru) wrap onto a second line instead of being clipped mid-word
-          styles={{ root: { height: 'auto', minHeight: 26 }, label: { whiteSpace: 'normal', paddingBlock: 4 } }}
-          onClick={() => handleModeChange(value)}
-        >
-          {label}
-        </Button>
+      <Tooltip label={tooltipLabel} disabled={!isDisabled} withArrow zIndex={3000}>
+        <span className="flex min-w-0 flex-1">
+          <Button
+            data-testid={value === 'off' ? TestId.agent.modeChat : TestId.agent.modeWork}
+            size="xs"
+            variant={isActive ? 'filled' : 'default'}
+            color={isActive ? 'chatbox-brand' : undefined}
+            fullWidth
+            disabled={isDisabled}
+            leftSection={<AgentModeStatusIcon mode={value} size={14} />}
+            // Long locales (fr/pt/ru) wrap onto a second line instead of being clipped mid-word
+            styles={{ root: { height: 'auto', minHeight: 26 }, label: { whiteSpace: 'normal', paddingBlock: 4 } }}
+            onClick={() => handleModeChange(value)}
+          >
+            {label}
+          </Button>
+        </span>
       </Tooltip>
     )
   }
