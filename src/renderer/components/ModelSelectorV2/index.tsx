@@ -12,6 +12,7 @@ import {
   type ReactElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -80,6 +81,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
     const [mobileDetail, setMobileDetail] = useState<DetailModel | null>(null)
     const [desktopDetail, setDesktopDetail] = useState<DesktopDetailState | null>(null)
     const desktopDropdownRef = useRef<HTMLDivElement>(null)
+    const desktopDetailRef = useRef<HTMLDivElement>(null)
     const desktopDetailCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleDropdownOpen = useCallback(() => {
@@ -105,6 +107,21 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
         }
       }
     }, [])
+
+    useLayoutEffect(() => {
+      if (!desktopDetail) return
+      const dropdownRect = desktopDropdownRef.current?.getBoundingClientRect()
+      const detailRect = desktopDetailRef.current?.getBoundingClientRect()
+      if (!dropdownRect || !detailRect) return
+
+      const minTop = DESKTOP_DETAIL_VIEWPORT_MARGIN + detailRect.height / 2 - dropdownRect.top
+      const maxTop = window.innerHeight - DESKTOP_DETAIL_VIEWPORT_MARGIN - detailRect.height / 2 - dropdownRect.top
+      const top = minTop <= maxTop ? Math.min(Math.max(desktopDetail.top, minTop), maxTop) : desktopDetail.top
+
+      if (Math.abs(top - desktopDetail.top) > 0.5) {
+        setDesktopDetail((current) => (current ? { ...current, top } : current))
+      }
+    }, [desktopDetail])
 
     const chatboxProvider = useMemo(
       () =>
@@ -644,6 +661,7 @@ export const ModelSelectorV2 = forwardRef<HTMLDivElement, ModelSelectorV2Props>(
           {desktopDetail && (
             <div
               key={desktopDetail.key}
+              ref={desktopDetailRef}
               className="absolute"
               style={{
                 left: desktopDetail.left,
