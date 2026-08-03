@@ -1,5 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox-provider'
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { remapPhantomHomePath, remapPhantomHomePathForProvider } from './sandbox-paths'
 
 describe('remapPhantomHomePath', () => {
@@ -59,5 +59,36 @@ describe('remapPhantomHomePath', () => {
 
   test('handles empty input', () => {
     expect(remapPhantomHomePath('')).toBe('')
+  })
+})
+
+describe('remapPhantomHomePath /mnt/data (ChatGPT code-interpreter convention)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('rewrites /mnt/data paths to relative', () => {
+    expect(remapPhantomHomePath('/mnt/data/plot.py')).toBe('plot.py')
+    expect(remapPhantomHomePath('/mnt/data/sub/out.csv')).toBe('sub/out.csv')
+    expect(remapPhantomHomePath('/mnt/data')).toBe('.')
+  })
+
+  test('does not partial-match similar prefixes', () => {
+    expect(remapPhantomHomePath('/mnt/database/a.txt')).toBe('/mnt/database/a.txt')
+    expect(remapPhantomHomePath('/mnt/other/a.txt')).toBe('/mnt/other/a.txt')
+  })
+
+  test('keeps /mnt/data untouched on Linux hosts where it can be a real mount', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' })
+    expect(remapPhantomHomePath('/mnt/data/plot.py')).toBe('/mnt/data/plot.py')
+  })
+
+  test('remaps /mnt/data on macOS hosts', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' })
+    expect(remapPhantomHomePath('/mnt/data/plot.py')).toBe('plot.py')
+  })
+
+  test('remaps /mnt/data through the provider-aware helper', async () => {
+    await expect(remapPhantomHomePathForProvider('/mnt/data/report.html')).resolves.toBe('report.html')
   })
 })

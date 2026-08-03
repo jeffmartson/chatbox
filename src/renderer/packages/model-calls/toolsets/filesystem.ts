@@ -294,6 +294,10 @@ fs.writeFileSync(filePath, text, 'utf8')
 }
 
 export function buildFilesystemTools(context: FilesystemContext): { tools: ToolSet; description: string } {
+  // create_download only exists when the session has a sandbox provider (code execution
+  // enabled), so only reference it in tool contracts when it is actually callable.
+  const hasCreateDownload = Boolean(context.provider)
+
   const list_files: ToolSet[string] = {
     description:
       'List files in a directory. Relative paths are resolved in the session sandbox. Absolute paths read the user filesystem.',
@@ -402,7 +406,10 @@ export function buildFilesystemTools(context: FilesystemContext): { tools: ToolS
 
   const write_file: ToolSet[string] = {
     description:
-      'Write a file. Relative sandbox paths are written directly. Writing absolute user filesystem paths requires user approval unless Full Access is enabled.',
+      'Write a file. Relative sandbox paths are written directly. Writing absolute user filesystem paths requires user approval unless Full Access is enabled.' +
+      (hasCreateDownload
+        ? ' Writing a sandbox file does NOT deliver it to the user — call create_download for that.'
+        : ''),
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -546,7 +553,11 @@ Use these tools (write_file / edit_file / list_files / search_files) as the prim
 - Do NOT use phantom home paths like /home/user or /root — they do not exist. Use relative paths instead.
 - Absolute paths access the user's real filesystem. Read/list/search only when the user provided or clearly requested the path.
 - Writing or editing an absolute user filesystem path requires user approval unless it is inside a bound working directory or Full Access is enabled. Do not attempt destructive operations; file deletion is not available.
-- Keep tool results small. For large generated outputs, write a file and return a path plus a short summary.
+- Keep tool results small. For large generated outputs, write a file and return a path plus a short summary.${
+      hasCreateDownload
+        ? '\n- Writing a sandbox file does NOT give the user access to it. To deliver a file, call create_download after writing it. NEVER present sandbox paths (sandbox:, /mnt/data/, or raw file paths) as download links in your reply — they are not clickable.'
+        : ''
+    }
 `,
   }
 }

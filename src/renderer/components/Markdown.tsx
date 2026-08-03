@@ -66,6 +66,8 @@ import { ImageViewer, ImageViewerItem } from './ImageViewer'
 import IconDart from './icons/Dart'
 import IconJava from './icons/Java'
 import { MessageMermaid, SVGPreview } from './Mermaid'
+import { SandboxFileLink } from './message-parts/SandboxFileLink'
+import { parseSandboxLinkHref } from './message-parts/sandbox-link'
 import { type StreamingTextSegment, useStreamingTextSegments, wrapStreamingSegmentsInHast } from './streaming-text-fade'
 import './shiki-code.css'
 
@@ -165,16 +167,32 @@ function Markdown(props: {
                 />
               )
             },
-            a: ({ node, ...props }) => (
-              <a
-                {...props}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => {
-                  e.stopPropagation()
-                }}
-              />
-            ),
+            a: ({ node, href, children: linkChildren, ...props }) => {
+              // Models sometimes hand-write sandbox "download links" (sandbox:/mnt/data/...)
+              // instead of calling create_download. Those hrefs are dead — render a file
+              // chip that rescues the file from the session sandbox instead.
+              const sandboxTarget = parseSandboxLinkHref(href)
+              if (sandboxTarget) {
+                return (
+                  <SandboxFileLink target={sandboxTarget} sessionId={sessionId}>
+                    {linkChildren}
+                  </SandboxFileLink>
+                )
+              }
+              return (
+                <a
+                  {...props}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                  }}
+                >
+                  {linkChildren}
+                </a>
+              )
+            },
             img: ({ node, ...props }) => <MarkdownImage {...props} />,
           }),
           [

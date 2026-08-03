@@ -330,11 +330,13 @@ export function buildCodeExecutionTools(context: CodeExecutionContext): { tools:
 
   const create_download: ToolSet[string] = {
     description:
-      'Persist a sandbox-generated file to durable storage and mark it downloadable. Returns metadata for ' +
-      'rendering a download button. Use after generating files (PDFs, charts, spreadsheets, etc.) with ' +
-      'code_execution. The file must be one the sandbox produced — write it to the working directory (relative ' +
-      'paths), or on macOS/Linux to a sandbox-writable temp dir such as /tmp. If the file cannot be persisted, this returns an ' +
-      'error instead of a download; write the file inside the sandbox and try again.',
+      'Persist a sandbox-generated file to durable storage and mark it downloadable. The app renders a ' +
+      'download card in the chat. This is the ONLY way to deliver a file to the user — writing a file alone ' +
+      'does not make it accessible. Use after creating a file by any means (write_file, edit_file, or ' +
+      'code_execution). The file must be inside the sandbox — the working directory (relative paths), or on ' +
+      'macOS/Linux a sandbox-writable temp dir such as /tmp. If the file cannot be persisted, this returns an ' +
+      'error instead of a download; write the file inside the sandbox and try again. Never present sandbox ' +
+      'paths as download links in your reply text.',
     inputSchema: jsonSchema({
       type: 'object',
       properties: {
@@ -464,10 +466,11 @@ Execute focused Node.js, PowerShell, or Bash snippets. Keep scripts small and ta
 - Avoid long-running services, project scaffolding, dependency installation, and broad environment exploration.
 
 ### create_download
-After generating a file with code_execution, use this to make it downloadable. The user will see a download button in the chat.
+After creating a file the user should receive — whether via write_file, edit_file, or code_execution — call create_download to make it downloadable. The app renders a download card in the chat. This is the ONLY way the user can download a file.
 - Write downloadable outputs into the working directory (use relative paths, which resolve to the sandbox working directory). On macOS/Linux, a sandbox-writable temp dir such as \`/tmp\` also works; on Windows, keep outputs in the working directory.
 - create_download copies the file into durable storage, so it stays downloadable after the session's temporary files are cleaned up.
 - If it returns an error (e.g. the file is not inside the sandbox-writable area), re-create the file in the working directory and call create_download again — do not assume the download succeeded.
+- NEVER hand-write download links in your reply. Links like \`[download](sandbox:/mnt/data/file.py)\`, \`sandbox:\` URLs, or raw file paths are NOT clickable for the user. After a successful create_download, refer the user to the download card shown in the chat.
 `
 
   return {

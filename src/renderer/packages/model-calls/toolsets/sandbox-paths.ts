@@ -12,6 +12,18 @@ import type { SandboxProvider } from '@shared/sandbox-provider'
 // structured filesystem tools where the model passes the literal path string.
 const PHANTOM_HOME_PREFIXES = ['/home/user', '/home/sandbox']
 
+// ChatGPT's code interpreter exposes uploads and outputs under /mnt/data, so models trained
+// on it habitually address sandbox files as /mnt/data/<name>. Remap those into the working
+// directory too — except on Linux hosts, where /mnt/data can be a real mount point the user
+// actually means (macOS and Windows have no native /mnt/data).
+const PHANTOM_SANDBOX_DATA_PREFIXES = ['/mnt/data']
+
+// Read at call time so tests can stub navigator. Kept dependency-free on purpose (this
+// module is imported by tool hot paths).
+function isLinuxHost(): boolean {
+  return typeof navigator !== 'undefined' && (navigator.userAgent ?? '').includes('Linux')
+}
+
 /**
  * Rewrite a phantom-home absolute path to a path relative to the sandbox working directory.
  * Returns the input unchanged when it is not a recognized phantom-home path.
@@ -31,6 +43,15 @@ export function remapPhantomHomePath(filePath: string, realHomeDirectory?: strin
     if (filePath === prefix) return '.'
     if (filePath.startsWith(`${prefix}/`)) {
       return filePath.slice(prefix.length + 1) || '.'
+    }
+  }
+
+  if (!isLinuxHost()) {
+    for (const prefix of PHANTOM_SANDBOX_DATA_PREFIXES) {
+      if (filePath === prefix) return '.'
+      if (filePath.startsWith(`${prefix}/`)) {
+        return filePath.slice(prefix.length + 1) || '.'
+      }
     }
   }
 
