@@ -11,6 +11,7 @@ import type {
   SessionSettings,
 } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
+import { MAX_TOOL_CALLS_BEFORE_CONFIRMATION, shouldPauseOnToolCallLimit } from '@shared/utils/tool-call-limit-pause'
 import type { ModelMessage, ToolSet } from 'ai'
 import { createModel, createModelDependencies } from '@/adapters'
 import {
@@ -59,8 +60,6 @@ import {
   initializeTargetMessage,
   trackGenerateEvent,
 } from './utils'
-
-const MAX_TOOL_CALLS_BEFORE_CONFIRMATION = 25
 
 type ExecutableTool = {
   execute?: (
@@ -671,7 +670,11 @@ export async function orchestrateGeneration(
     const chatOptions = { ...prepared.chatOptions }
 
     if (Object.keys(tools).length > 0) {
-      chatOptions.tools = withToolCallLimitPause(tools as ToolSet, MAX_TOOL_CALLS_BEFORE_CONFIRMATION)
+      // Users can opt out of the periodic "Paused after N steps" confirmation
+      // per session or globally; in that case tools run without the pause wrapper.
+      chatOptions.tools = shouldPauseOnToolCallLimit(settings, globalSettings)
+        ? withToolCallLimitPause(tools as ToolSet, MAX_TOOL_CALLS_BEFORE_CONFIRMATION)
+        : (tools as ToolSet)
     }
 
     const stream = model.chatStream(coreMessages, chatOptions) as AsyncGenerator<ModelStreamPart<ToolSet>>
@@ -1008,7 +1011,61 @@ export function continuePausedToolCall(sessionId: string, messageId: string, too
   ).finally(() => wakeBackgroundTaskFollowUps(sessionId))
 }
 
-async function continuePausedToolCallWithoutSessionLock(sessionId: string, messageId: string, toolCallId: string) {
+/**
+ * "Don't ask again" on the tool-call-limit pause card: persist the opt-out
+ * (for this session or for all sessions), then resume the paused batch.
+ *
+ * The returned promise settles once the preference is persisted (so callers can
+ * report the outcome); the resumed generation itself runs on in the background.
+ */
+export async function disableToolCallLimitPauseAndContinue(
+  sessionId: string,
+  messageId: string,
+  toolCallId: string,
+  scope: 'session' | 'global'
+) {
+  // This click is a "continue" variant, so track it as one action instead of
+  // an extra pause-action event on top of the continuation below.
+  trackAgentModePauseAction({
+    type: 'tool_limit',
+    action: scope === 'global' ? 'disable_global' : 'disable_session',
+  })
+  try {
+    if (scope === 'global') {
+      settingsStore.getState().setSettings({ pauseOnToolCallLimit: false })
+      // A per-session override would keep beating the new global value in this
+      // chat, so drop it — the user asked from this chat's pause card.
+      await chatStore.updateSession(sessionId, (session) => {
+        if (!session) {
+          throw new Error('Session not found')
+        }
+        const { pauseOnToolCallLimit: _removed, ...settings } = session.settings ?? {}
+        return { ...session, settings }
+      })
+    } else {
+      await chatStore.updateSession(sessionId, (session) => {
+        if (!session) {
+          throw new Error('Session not found')
+        }
+        return { ...session, settings: { ...session.settings, pauseOnToolCallLimit: false } }
+      })
+    }
+  } finally {
+    // The click always means "continue", even when persisting the preference fails.
+    void withSessionGenerationLock(sessionId, () =>
+      continuePausedToolCallWithoutSessionLock(sessionId, messageId, toolCallId, { skipPauseActionTracking: true })
+    )
+      .finally(() => wakeBackgroundTaskFollowUps(sessionId))
+      .catch((error) => console.error('Failed to continue the paused tool call:', error))
+  }
+}
+
+async function continuePausedToolCallWithoutSessionLock(
+  sessionId: string,
+  messageId: string,
+  toolCallId: string,
+  options?: { skipPauseActionTracking?: boolean }
+) {
   const session = await chatStore.getSession(sessionId)
   const settings = await chatStore.getSessionSettings(sessionId)
   if (!session || !settings) return
@@ -1021,20 +1078,22 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
 
   const isApproval = isApprovalPauseReason(part.pauseReason)
   const approvalTarget = getApprovalTrackingTarget(part)
-  trackAgentModePauseAction({
-    type: isApproval ? 'approval' : 'tool_limit',
-    action: isApproval ? 'approve' : 'continue',
-    context:
-      isApproval && approvalTarget
-        ? {
-            sessionId,
-            mode: 'work_mode',
-            provider: settings.provider,
-            model: settings.modelId,
-          }
-        : undefined,
-    approvalTarget,
-  })
+  if (!options?.skipPauseActionTracking) {
+    trackAgentModePauseAction({
+      type: isApproval ? 'approval' : 'tool_limit',
+      action: isApproval ? 'approve' : 'continue',
+      context:
+        isApproval && approvalTarget
+          ? {
+              sessionId,
+              mode: 'work_mode',
+              provider: settings.provider,
+              model: settings.modelId,
+            }
+          : undefined,
+      approvalTarget,
+    })
+  }
 
   // A tool_call_limit continue resumes the whole paused batch; an approval continue targets
   // exactly the clicked call. Either way it's the same flow — a batch of one or many.

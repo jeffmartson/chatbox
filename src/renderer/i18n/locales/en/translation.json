@@ -1275,5 +1275,14 @@
   "Secondary Background": "Secondary Background",
   "Standard Width": "Standard Width",
   "Tertiary Background": "Tertiary Background",
-  "unknown source": "unknown source"
+  "unknown source": "unknown source",
+  "Don't ask again": "Don't ask again",
+  "For this chat": "For this chat",
+  "For all chats": "For all chats",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.",
+  "Failed to update the setting. Please try again.": "Failed to update the setting. Please try again.",
+  "Pause after every {{count}} steps": "Pause after every {{count}} steps",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings."
 }

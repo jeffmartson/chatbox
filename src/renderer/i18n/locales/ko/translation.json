@@ -1275,5 +1275,14 @@
   "Secondary Background": "보조 배경",
   "Standard Width": "표준 너비",
   "Tertiary Background": "삼차 배경",
-  "unknown source": "알 수 없는 소스"
+  "unknown source": "알 수 없는 소스",
+  "Don't ask again": "다시 묻지 않기",
+  "For this chat": "이 채팅만",
+  "For all chats": "모든 채팅",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "이제 모든 채팅에서 {{count}}단계마다 일시 중지하지 않습니다. 설정에서 다시 켤 수 있습니다.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "이제 이 채팅에서는 {{count}}단계마다 일시 중지하지 않습니다. 대화 설정에서 다시 켤 수 있습니다.",
+  "Failed to update the setting. Please try again.": "설정을 업데이트하지 못했습니다. 다시 시도해 주세요.",
+  "Pause after every {{count}} steps": "{{count}}단계마다 일시 중지",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "긴 작업은 {{count}}단계마다 일시 중지되어 확인을 요청하므로 작업이 올바르게 진행되고 있는지 확인할 수 있습니다. 끄면 중단 없이 실행됩니다.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "긴 작업은 {{count}}단계마다 일시 중지되어 확인을 요청하므로 작업이 올바르게 진행되고 있는지 확인할 수 있습니다. 각 채팅의 대화 설정에서 개별적으로 변경할 수 있습니다."
 }

@@ -1,5 +1,7 @@
 import { Box, Button, FileButton, Flex, Slider, Stack, Switch, Text, Textarea, Title } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import { chatSessionSettings, getDefaultPrompt } from '@shared/defaults'
+import { MAX_TOOL_CALLS_BEFORE_CONFIRMATION } from '@shared/utils/tool-call-limit-pause'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMemo } from 'react'
@@ -379,6 +381,20 @@ export function RouteComponent() {
               setSettings({
                 ...settings,
                 autoGenerateTitle: !settings.autoGenerateTitle,
+              })
+            }
+          />
+          <Switch
+            data-testid={TestId.settings.pauseOnToolCallLimitSwitch}
+            label={t('Pause after every {{count}} steps', { count: MAX_TOOL_CALLS_BEFORE_CONFIRMATION })}
+            checked={settings.pauseOnToolCallLimit ?? true}
+            description={t(
+              "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.",
+              { count: MAX_TOOL_CALLS_BEFORE_CONFIRMATION }
+            )}
+            onChange={() =>
+              setSettings({
+                pauseOnToolCallLimit: !(settings.pauseOnToolCallLimit ?? true),
               })
             }
           />

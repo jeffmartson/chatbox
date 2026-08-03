@@ -1275,5 +1275,14 @@
   "Secondary Background": "Вторичный фон",
   "Standard Width": "Стандартная ширина",
   "Tertiary Background": "Третичный фон",
-  "unknown source": "неизвестный источник"
+  "unknown source": "неизвестный источник",
+  "Don't ask again": "Больше не спрашивать",
+  "For this chat": "Только для этого чата",
+  "For all chats": "Для всех чатов",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "Чаты больше не будут приостанавливаться каждые {{count}} шагов. Включить снова можно в настройках.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "Этот чат больше не будет приостанавливаться каждые {{count}} шагов. Включить снова можно в настройках беседы.",
+  "Failed to update the setting. Please try again.": "Не удалось обновить настройку. Попробуйте ещё раз.",
+  "Pause after every {{count}} steps": "Пауза каждые {{count}} шагов",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "Длинные задачи приостанавливаются каждые {{count}} шагов для подтверждения, чтобы вы могли убедиться, что всё идёт по плану. Отключите, чтобы они выполнялись без остановок.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "Длинные задачи приостанавливаются каждые {{count}} шагов для подтверждения, чтобы вы могли убедиться, что всё идёт по плану. Для отдельных чатов это можно переопределить в настройках беседы."
 }

@@ -1,5 +1,6 @@
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { ActionIcon, Box, Button, FileButton, Flex, Input, Slider, Stack, Switch, Text, Textarea } from '@mantine/core'
+import { TestId } from '@shared/automation/testids'
 import { chatSessionSettings, pictureSessionSettings } from '@shared/defaults'
 import {
   createMessage,
@@ -16,6 +17,7 @@ import {
   type ReasoningControlLevel,
   type ReasoningControlOption,
 } from '@shared/utils/reasoning-control'
+import { MAX_TOOL_CALLS_BEFORE_CONFIRMATION } from '@shared/utils/tool-call-limit-pause'
 import { IconInfoCircle, IconTrash, IconUpload } from '@tabler/icons-react'
 import { pick } from 'lodash'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -460,6 +462,7 @@ export function ChatConfig({
 }) {
   const { t } = useTranslation()
   const globalSettingsStream = useSettingsStore((s) => s.stream)
+  const globalPauseOnToolCallLimit = useSettingsStore((s) => s.pauseOnToolCallLimit)
 
   return (
     <Stack gap="md">
@@ -552,6 +555,33 @@ export function ChatConfig({
           </Flex>
         </Stack>
       )}
+
+      <Stack gap="xs" py="xs">
+        <Flex align="center" justify="space-between" gap="xs">
+          <Flex align="center" gap="xs">
+            <Text size="sm" fw="600">
+              {t('Pause after every {{count}} steps', { count: MAX_TOOL_CALLS_BEFORE_CONFIRMATION })}
+            </Text>
+            <Tooltip
+              label={t(
+                "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.",
+                { count: MAX_TOOL_CALLS_BEFORE_CONFIRMATION }
+              )}
+              withArrow={true}
+              maw={320}
+              className="!whitespace-normal"
+              zIndex={3000}
+            >
+              <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
+            </Tooltip>
+          </Flex>
+          <Switch
+            data-testid={TestId.settings.sessionPauseOnToolCallLimitSwitch}
+            checked={settings?.pauseOnToolCallLimit ?? globalPauseOnToolCallLimit ?? true}
+            onChange={(v) => onSettingsChange({ pauseOnToolCallLimit: v.target.checked })}
+          />
+        </Flex>
+      </Stack>
 
       <ReasoningControlConfig settings={settings} onSettingsChange={onSettingsChange} />
     </Stack>

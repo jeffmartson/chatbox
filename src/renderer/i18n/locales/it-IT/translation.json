@@ -1275,5 +1275,14 @@
   "Secondary Background": "Sfondo secondario",
   "Standard Width": "Larghezza standard",
   "Tertiary Background": "Sfondo terziario",
-  "unknown source": "origine sconosciuta"
+  "unknown source": "origine sconosciuta",
+  "Don't ask again": "Non chiedere più",
+  "For this chat": "Solo per questa chat",
+  "For all chats": "Per tutte le chat",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "Le chat non si metteranno più in pausa ogni {{count}} passaggi. Puoi riattivarlo nelle impostazioni.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "Questa chat non si metterà più in pausa ogni {{count}} passaggi. Puoi riattivarlo nelle impostazioni della conversazione.",
+  "Failed to update the setting. Please try again.": "Impossibile aggiornare l'impostazione. Riprova.",
+  "Pause after every {{count}} steps": "Pausa ogni {{count}} passaggi",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "Le attività lunghe si mettono in pausa ogni {{count}} passaggi per chiedere conferma, così puoi verificare che siano sulla buona strada. Disattiva l'opzione per lasciarle proseguire senza interruzioni.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "Le attività lunghe si mettono in pausa ogni {{count}} passaggi per chiedere conferma, così puoi verificare che siano sulla buona strada. Ogni chat può modificare questa opzione nelle proprie impostazioni della conversazione."
 }

@@ -144,7 +144,7 @@ export function trackAgentModeSuggestionAction(props: {
 
 export function trackAgentModePauseAction(props: {
   type: 'approval' | 'tool_limit'
-  action: 'approve' | 'deny' | 'continue' | 'stop'
+  action: 'approve' | 'deny' | 'continue' | 'stop' | 'disable_session' | 'disable_global'
   context?: AgentModeTrackingContext
   approvalTarget?: AgentModeApprovalTarget
 }) {

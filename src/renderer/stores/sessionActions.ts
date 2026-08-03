@@ -42,6 +42,7 @@ export {
 } from './session/naming'
 export {
   continuePausedToolCall,
+  disableToolCallLimitPauseAndContinue,
   isRetryableToolCallStep,
   retryFromLastToolCallAfterApiError,
   stopPausedToolCall,

@@ -197,6 +197,10 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
   imageGenerateNum: z.number().optional().catch(1),
   providerOptions: ProviderOptionsSchema.optional().catch(undefined),
   autoCompaction: z.boolean().optional().catch(undefined),
+  // Whether generation pauses for user confirmation after a run of consecutive
+  // tool calls (the "Paused after N steps" card). Tri-state: undefined follows
+  // the global setting; true/false override it for this session.
+  pauseOnToolCallLimit: z.boolean().optional().catch(undefined),
   // Real local directories the user grants the agent sandbox read/write access to
   // (like /tmp): files under these paths are read/written without per-action approval.
   // Desktop only.
@@ -540,6 +544,10 @@ export const SettingsSchema = GlobalSessionSettingsSchema.extend({
 
   autoCompaction: z.boolean().default(true),
   compactionThreshold: z.number().min(0.4).max(0.9).default(0.6),
+
+  // Global default for the "Paused after N steps" tool-call confirmation.
+  // Individual sessions can override it via SessionSettingsSchema.pauseOnToolCallLimit.
+  pauseOnToolCallLimit: z.boolean().default(true),
 
   autoLaunch: z.boolean().default(false),
   autoUpdate: z.boolean().default(true), // 是否自动检查更新

@@ -1275,5 +1275,14 @@
   "Secondary Background": "الخلفية الثانوية",
   "Standard Width": "العرض القياسي",
   "Tertiary Background": "الخلفية الثالثة",
-  "unknown source": "مصدر غير معروف"
+  "unknown source": "مصدر غير معروف",
+  "Don't ask again": "عدم السؤال مرة أخرى",
+  "For this chat": "لهذه المحادثة فقط",
+  "For all chats": "لجميع المحادثات",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "لن تتوقف المحادثات مؤقتًا بعد الآن كل {{count}} خطوة. يمكنك إعادة تفعيل ذلك من الإعدادات.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "لن تتوقف هذه المحادثة مؤقتًا بعد الآن كل {{count}} خطوة. يمكنك إعادة تفعيل ذلك من إعدادات المحادثة.",
+  "Failed to update the setting. Please try again.": "تعذّر تحديث الإعداد. يُرجى المحاولة مرة أخرى.",
+  "Pause after every {{count}} steps": "الإيقاف المؤقت كل {{count}} خطوة",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "تتوقف المهام الطويلة مؤقتًا كل {{count}} خطوة للتأكيد، حتى تتحقق من أنها تسير على المسار الصحيح. أوقِف هذا الخيار لتعمل دون انقطاع.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "تتوقف المهام الطويلة مؤقتًا كل {{count}} خطوة للتأكيد، حتى تتحقق من أنها تسير على المسار الصحيح. يمكن لكل محادثة تجاوز هذا الخيار من إعدادات المحادثة الخاصة بها."
 }

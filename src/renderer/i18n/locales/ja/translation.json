@@ -1275,5 +1275,14 @@
   "Secondary Background": "セカンダリ背景",
   "Standard Width": "標準幅",
   "Tertiary Background": "ターシャリ背景",
-  "unknown source": "不明なソース"
+  "unknown source": "不明なソース",
+  "Don't ask again": "今後確認しない",
+  "For this chat": "このチャットのみ",
+  "For all chats": "すべてのチャット",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "今後、すべてのチャットで {{count}} ステップごとの一時停止を行いません。設定で再度オンにできます。",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "今後、このチャットでは {{count}} ステップごとの一時停止を行いません。会話設定で再度オンにできます。",
+  "Failed to update the setting. Please try again.": "設定を更新できませんでした。もう一度お試しください。",
+  "Pause after every {{count}} steps": "{{count}} ステップごとに一時停止",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "長時間のタスクは {{count}} ステップごとに一時停止して確認を求めるため、順調に進んでいるかチェックできます。オフにすると中断なしで実行されます。",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "長時間のタスクは {{count}} ステップごとに一時停止して確認を求めるため、順調に進んでいるかチェックできます。チャットごとに会話設定で個別に上書きできます。"
 }

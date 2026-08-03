@@ -290,6 +290,34 @@ export const StepTimelineRunning: StoryObj = {
   },
 }
 
+export const StepTimelinePausedAtStepLimit: StoryObj = {
+  name: 'Step Timeline — Paused at Step Limit',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'After a run of consecutive tool calls the generation pauses for confirmation. Besides Continue/Stop, ' +
+          'the card offers a "Don\'t ask again" menu that turns the pause off for this chat or for all chats ' +
+          '(both can be re-enabled in the corresponding settings).',
+      },
+    },
+  },
+  render: () => {
+    const parts: StepTimelinePart[] = [
+      { type: 'reasoning', text: 'Still working through the long task…', duration: 2600 },
+      makeToolCallPart({ toolName: 'read_file', state: 'result', args: { path: 'src/auth.ts' }, duration: 2100 }),
+      makeToolCallPart({
+        toolName: 'code_execution',
+        state: 'paused',
+        args: { language: 'bash', code: 'pnpm test' },
+        pauseReason: { type: 'tool_call_limit', maxToolCalls: 25 },
+        stepIndex: 25,
+      }),
+    ]
+    return <StepTimelineUI parts={parts} message={makeMessage(parts)} sessionId="session_demo" messageId="msg_demo" />
+  },
+}
+
 export const MultiplePills: StoryObj = {
   name: 'Multiple Tool Calls',
   render: () => (

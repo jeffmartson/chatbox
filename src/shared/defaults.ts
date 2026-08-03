@@ -108,6 +108,8 @@ export function settings(): Settings {
     autoCompaction: true,
     compactionThreshold: 0.6,
 
+    pauseOnToolCallLimit: true,
+
     autoLaunch: false,
     autoUpdate: true,
     betaUpdate: false,

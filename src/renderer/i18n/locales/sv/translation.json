@@ -1275,5 +1275,14 @@
   "Secondary Background": "Sekundär bakgrund",
   "Standard Width": "Standardbredd",
   "Tertiary Background": "Tertiär bakgrund",
-  "unknown source": "Okänd källa"
+  "unknown source": "Okänd källa",
+  "Don't ask again": "Fråga inte igen",
+  "For this chat": "Endast för den här chatten",
+  "For all chats": "För alla chattar",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "Chattar pausas inte längre var {{count}}:e steg. Du kan aktivera det igen i inställningarna.",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "Den här chatten pausas inte längre var {{count}}:e steg. Du kan aktivera det igen i konversationsinställningarna.",
+  "Failed to update the setting. Please try again.": "Det gick inte att uppdatera inställningen. Försök igen.",
+  "Pause after every {{count}} steps": "Pausa var {{count}}:e steg",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "Långa uppgifter pausas var {{count}}:e steg för bekräftelse, så att du kan kontrollera att de är på rätt spår. Stäng av för att låta dem köra utan avbrott.",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "Långa uppgifter pausas var {{count}}:e steg för bekräftelse, så att du kan kontrollera att de är på rätt spår. Enskilda chattar kan åsidosätta detta i sina konversationsinställningar."
 }

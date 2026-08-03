@@ -1275,5 +1275,14 @@
   "Secondary Background": "次要背景",
   "Standard Width": "标准宽度",
   "Tertiary Background": "第三背景",
-  "unknown source": "未知来源"
+  "unknown source": "未知来源",
+  "Don't ask again": "不再询问",
+  "For this chat": "仅当前对话",
+  "For all chats": "所有对话",
+  "Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.": "所有对话将不再每 {{count}} 步暂停。可在设置中重新开启。",
+  "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.": "当前对话将不再每 {{count}} 步暂停。可在对话设置中重新开启。",
+  "Failed to update the setting. Please try again.": "设置更新失败，请重试。",
+  "Pause after every {{count}} steps": "每 {{count}} 步暂停确认",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Turn off to let them run uninterrupted.": "长任务每执行 {{count}} 步会暂停等待确认，方便你检查任务是否在正轨上。关闭后任务将不间断运行。",
+  "Long tasks pause for confirmation after every {{count}} steps so you can check they're on track. Individual chats can override this in their conversation settings.": "长任务每执行 {{count}} 步会暂停等待确认，方便你检查任务是否在正轨上。各对话可在其对话设置中单独覆盖此设置。"
 }

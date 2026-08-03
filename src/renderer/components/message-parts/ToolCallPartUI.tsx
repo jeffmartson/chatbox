@@ -7,6 +7,7 @@ import {
   Code,
   Collapse,
   Group,
+  Menu,
   Paper,
   Stack,
   Text,
@@ -67,7 +68,11 @@ import { getToolName } from '@/packages/tools'
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
 import { useCurrentGeneratingId, useImageGenerationRecord } from '@/stores/imageGenerationStore'
-import { continuePausedToolCall, stopPausedToolCall } from '@/stores/sessionActions'
+import {
+  continuePausedToolCall,
+  disableToolCallLimitPauseAndContinue,
+  stopPausedToolCall,
+} from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import { useUIStore } from '@/stores/uiStore'
 import { inlineSandboxHtmlAssets } from './html-artifact-assets'
@@ -1298,6 +1303,25 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         : pauseReason?.type === 'app_action_approval'
           ? pauseReason.preview
           : stringifyToolPayload(part.args)
+  const handleDontAskAgain = (scope: 'session' | 'global') => {
+    if (!sessionId || !messageId || pauseReason?.type !== 'tool_call_limit') return
+    const count = pauseReason.maxToolCalls
+    disableToolCallLimitPauseAndContinue(sessionId, messageId, part.toolCallId, scope)
+      .then(() => {
+        toastActions.add(
+          scope === 'global'
+            ? t("Chats won't pause every {{count}} steps anymore. You can turn it back on in Settings.", { count })
+            : t(
+                "This chat won't pause every {{count}} steps anymore. You can turn it back on in Conversation Settings.",
+                { count }
+              )
+        )
+      })
+      .catch((error) => {
+        log.error('Failed to turn off the step pause:', error)
+        toastActions.add(t('Failed to update the setting. Please try again.'))
+      })
+  }
   return (
     <Stack data-testid={TestId.toolCall.approvalCard} data-tool-call-id={part.toolCallId} gap="xs">
       <Text size="xs" c="chatbox-secondary">
@@ -1323,6 +1347,33 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         >
           {isApproval ? t('Deny') : t('Stop')}
         </Button>
+        {pauseReason?.type === 'tool_call_limit' && (
+          <Menu position="bottom-start" shadow="md">
+            <Menu.Target>
+              <Button
+                data-testid={TestId.toolCall.dontAskAgain}
+                size="compact-xs"
+                variant="subtle"
+                color="gray"
+                disabled={!sessionId || !messageId}
+                rightSection={<IconChevronDown size={12} />}
+              >
+                {t("Don't ask again")}
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                data-testid={TestId.toolCall.dontAskAgainSession}
+                onClick={() => handleDontAskAgain('session')}
+              >
+                {t('For this chat')}
+              </Menu.Item>
+              <Menu.Item data-testid={TestId.toolCall.dontAskAgainGlobal} onClick={() => handleDontAskAgain('global')}>
+                {t('For all chats')}
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
       </Group>
       <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
         <Code block>{payload}</Code>

@@ -183,7 +183,13 @@ Chat Agent 不再 fallback 注入底层 `sandbox_*` 工具。
 
 `orchestration.ts` 通过 `withToolCallLimitPause()` 在达到上限时暂停，而不是返回一个普通 tool result 让模型继续循环。暂停发生在即将执行下一次工具前；用户点击继续后会执行该工具调用，并在同一条消息内继续生成。
 
-当前常量位于 `MAX_TOOL_CALLS_BEFORE_CONFIRMATION`。发布前应确认它符合产品目标值，避免测试用小阈值影响真实用户。
+当前常量位于 `MAX_TOOL_CALLS_BEFORE_CONFIRMATION`（`src/shared/utils/tool-call-limit-pause.ts`）。发布前应确认它符合产品目标值，避免测试用小阈值影响真实用户。
+
+用户可以关闭这一确认暂停（针对长期挂机任务）：
+
+- 设置项为 `pauseOnToolCallLimit`，会话级（`SessionSettingsSchema`，三态：`undefined` 跟随全局）与全局级（`SettingsSchema`，默认 `true`）各有一份，`shouldPauseOnToolCallLimit()` 按「会话覆盖全局、默认暂停」解析。
+- 暂停卡片上的 "Don't ask again" 菜单（`PausedToolCallDetails`）可选择仅当前会话或所有会话生效，写入设置后通过 `disableToolCallLimitPauseAndContinue()` 立即恢复当前暂停的批次。
+- 会话级开关在对话设置（`SessionSettings.tsx`）中可重新打开；全局开关在设置 → 聊天设置（`routes/settings/chat.tsx`）中。
 
 ## HTML 产物预览
 

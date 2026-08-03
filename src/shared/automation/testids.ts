@@ -7,7 +7,7 @@
  */
 
 export const AUTOMATION_CONTRACT_ID = 'chatbox-ui'
-export const AUTOMATION_CONTRACT_VERSION = '1.0.0'
+export const AUTOMATION_CONTRACT_VERSION = '1.1.0'
 export const AUTOMATION_CONTRACT_VERSION_ATTRIBUTE = 'data-automation-contract-version'
 
 export type AutomationReasoningLevel = 'default' | 'off' | 'low' | 'medium' | 'high'
@@ -76,6 +76,13 @@ export const TestId = {
     approve: 'tool-call-approve',
     continue: 'tool-call-continue',
     deny: 'tool-call-deny',
+    dontAskAgain: 'tool-call-dont-ask-again',
+    dontAskAgainSession: 'tool-call-dont-ask-again-session',
+    dontAskAgainGlobal: 'tool-call-dont-ask-again-global',
+  },
+  settings: {
+    pauseOnToolCallLimitSwitch: 'settings-pause-on-tool-call-limit',
+    sessionPauseOnToolCallLimitSwitch: 'session-settings-pause-on-tool-call-limit',
   },
 } as const
 
