@@ -539,7 +539,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
                       className="flex flex-col pt-5"
                       style={
                         messageViewportHeight > 0 && isNewMessage && isLastItem
-                          ? { minHeight: `${messageViewportHeight}px` }
+                          ? { minHeight: `${messageViewportHeight * 0.85}px` }
                           : undefined
                       } // key
                     >

@@ -252,4 +252,27 @@ describe('MessageList new message layout', () => {
 
     expect(container.querySelector('[style*="min-height"]')).toBeNull()
   })
+  test('only stretches the latest new message when the feature is enabled', () => {
+    const session: Session = {
+      id: 'session-1',
+      type: 'chat',
+      name: 'Session',
+      messages: [message('user-message', MessageRoleEnum.User, 'question')],
+    }
+    const ref = createRef<MessageListRef>()
+
+    const { container } = render(
+      <MantineProvider>
+        <MessageList ref={ref} currentSession={session} />
+      </MantineProvider>
+    )
+
+    expect(container.querySelector('[style*="min-height"]')).toBeNull()
+
+    act(() => {
+      ref.current?.setIsNewMessage(true)
+    })
+
+    expect(container.querySelector<HTMLElement>('[style*="min-height"]')?.style.minHeight).toBe('510px')
+  })
 })
