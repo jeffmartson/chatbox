@@ -651,7 +651,11 @@ export async function insertMessage(sessionId: string, message: Message, previou
                 if (th.id === thread.id) {
                   return {
                     ...thread,
-                    messages: [...thread.messages.slice(0, insertIndex), message, ...thread.messages.slice(insertIndex)],
+                    messages: [
+                      ...thread.messages.slice(0, insertIndex),
+                      message,
+                      ...thread.messages.slice(insertIndex),
+                    ],
                   }
                 }
                 return th

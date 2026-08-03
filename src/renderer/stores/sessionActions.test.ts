@@ -676,10 +676,7 @@ describe('fork actions', () => {
     expect(updateSessionWithMessages).toHaveBeenCalledTimes(1)
     // removeCurrentThread uses a functional updater to read the queue's
     // current session; apply it to verify the restored thread state.
-    const [updatedSessionId, updater] = updateSessionWithMessages.mock.calls[0] as [
-      string,
-      (s: Session) => Session,
-    ]
+    const [updatedSessionId, updater] = updateSessionWithMessages.mock.calls[0] as [string, (s: Session) => Session]
     expect(updatedSessionId).toBe(session.id)
     expect(typeof updater).toBe('function')
     const restored = updater(session)
@@ -875,9 +872,7 @@ describe('fork actions', () => {
           name: 'History',
           createdAt: 1,
           messages: [threadPivot, threadReply],
-          compactionPoints: [
-            { summaryMessageId: forkSummary.id, boundaryMessageId: forkBoundary.id, createdAt: 100 },
-          ],
+          compactionPoints: [{ summaryMessageId: forkSummary.id, boundaryMessageId: forkBoundary.id, createdAt: 100 }],
         },
       ],
       messageForksHash: {
