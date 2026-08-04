@@ -1,4 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
+import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom'
 import { ActionIcon, Box, Button, Flex, Loader, Menu, Stack, Text, Textarea, UnstyledButton } from '@mantine/core'
 import { useViewportSize } from '@mantine/hooks'
 import { TestId } from '@shared/automation/testids'
@@ -33,7 +34,18 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAtom, useAtomValue } from 'jotai'
 import { pick } from 'lodash'
 import type React from 'react'
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { useDropzone } from 'react-dropzone'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuidv4 } from 'uuid'
@@ -276,6 +288,8 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     const [skillCommandQuery, setSkillCommandQuery] = useState<string | null>(null)
     const [skillCommandSelectedIndex, setSkillCommandSelectedIndex] = useState(0)
     const skillCommandQueryRef = useRef<string | null>(null)
+    const skillMenuAnchorRef = useRef<HTMLDivElement | null>(null)
+    const skillMenuFloatingRef = useRef<HTMLDivElement | null>(null)
 
     const debouncedUpdateTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const resetHistoryIndexRef = useRef<() => void>(() => {})
@@ -385,6 +399,44 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       () => hasPendingApprovalToolCall(currentSession?.messages ?? []),
       [currentSession?.messages]
     )
+
+    const skillMenuOpen = skillCommandQuery !== null && matchingInputSkills.length > 0 && !isAwaitingToolApproval
+
+    // Floating UI autoUpdate：跟随 anchor（含纯 position 变化的响应式过渡），替代手写 RO/rAF 状态机
+    useLayoutEffect(() => {
+      if (!skillMenuOpen) return
+      const reference = skillMenuAnchorRef.current
+      const floating = skillMenuFloatingRef.current
+      if (!reference || !floating) return
+
+      return autoUpdate(reference, floating, () => {
+        void computePosition(reference, floating, {
+          placement: 'top-start',
+          strategy: 'fixed',
+          middleware: [
+            offset(4),
+            flip({ padding: 8 }),
+            shift({ padding: 8 }),
+            size({
+              padding: 8,
+              apply({ availableHeight, rects, elements }) {
+                Object.assign(elements.floating.style, {
+                  maxHeight: `${Math.max(48, Math.min(208, availableHeight))}px`,
+                  width: `${rects.reference.width}px`,
+                })
+              },
+            }),
+          ],
+        }).then(({ x, y, strategy }) => {
+          Object.assign(floating.style, {
+            position: strategy,
+            left: `${x}px`,
+            top: `${y}px`,
+          })
+        })
+      })
+    }, [skillMenuOpen, matchingInputSkills.length])
+
     const { providers } = useProviders()
     const {
       effectiveProviderOptions,
@@ -1329,51 +1381,71 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     }
 
     return (
-      <Box pt={0} pb={isSmallScreen ? 'md' : 'sm'} px="sm" id={dom.InputBoxID} {...getRootProps()}>
+      <Box
+        pt={0}
+        pb={isSmallScreen ? 'md' : 'sm'}
+        px="sm"
+        id={dom.InputBoxID}
+        className="overflow-visible"
+        {...getRootProps()}
+      >
         <input className="hidden" {...getInputProps()} />
-        <Stack className={cn(widthFull ? 'w-full' : 'max-w-4xl mx-auto')} gap="xs">
+        <Stack className={cn('overflow-visible', widthFull ? 'w-full' : 'max-w-4xl mx-auto')} gap="xs">
           {currentSessionId && <CompactionStatus sessionId={currentSessionId} />}
-          <Stack
+          <Box
+            ref={skillMenuAnchorRef}
             className={cn(
-              'relative rounded-lg bg-chatbox-background-secondary justify-between px-3 py-2 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.3)]',
+              // min-h + justify-between 必须同层，桌面空输入时工具栏贴底
+              'relative flex flex-col justify-between gap-xs rounded-lg bg-chatbox-background-secondary px-3 py-2 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.3)]',
               !isSmallScreen && 'min-h-[92px]'
             )}
             style={{ border: '0.5px solid var(--chatbox-border-primary)' }}
-            gap="xs"
           >
-            {skillCommandQuery !== null && matchingInputSkills.length > 0 && !isAwaitingToolApproval && (
-              <Box className="absolute left-3 right-12 bottom-[52px] z-20 max-h-52 overflow-y-auto rounded-lg border border-solid border-chatbox-border-primary bg-chatbox-background-primary py-1 shadow-lg">
-                {matchingInputSkills.map((skill, index) => (
-                  <UnstyledButton
-                    key={skill.name}
-                    className={cn(
-                      'flex w-full items-start gap-2 px-2 py-1.5 text-left transition-colors',
-                      index === skillCommandSelectedIndex
-                        ? 'bg-chatbox-background-tertiary'
-                        : 'hover:bg-chatbox-background-tertiary'
-                    )}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => insertSkillCommand(skill.name)}
-                  >
-                    <IconWand
-                      size={14}
-                      strokeWidth={1.8}
-                      className="mt-0.5 shrink-0 text-[var(--chatbox-tint-secondary)]"
-                    />
-                    <Stack gap={1} className="min-w-0 flex-1">
-                      <Text size="sm" truncate c="chatbox-primary">
-                        /{skill.name}
-                      </Text>
-                      {skill.description && (
-                        <Text size="xs" c="chatbox-secondary" lineClamp={1}>
-                          {skill.description}
-                        </Text>
+            {/*
+              skill 列表：Portal + Floating UI autoUpdate
+              - 不撑高 InputBox；逃出 overflow-hidden
+              - 持续跟随 anchor（含双向 resize / 纯 position 过渡）
+              - size middleware 按可用高度限 maxHeight
+            */}
+            {skillMenuOpen &&
+              createPortal(
+                <Box
+                  ref={skillMenuFloatingRef}
+                  className="z-[400] overflow-y-auto rounded-lg border border-solid border-chatbox-border-primary bg-chatbox-background-primary py-1 shadow-lg"
+                  style={{ position: 'fixed', top: 0, left: 0 }}
+                >
+                  {matchingInputSkills.map((skill, index) => (
+                    <UnstyledButton
+                      key={skill.name}
+                      className={cn(
+                        'flex w-full items-start gap-2 px-2 py-1.5 text-left transition-colors',
+                        index === skillCommandSelectedIndex
+                          ? 'bg-chatbox-background-tertiary'
+                          : 'hover:bg-chatbox-background-tertiary'
                       )}
-                    </Stack>
-                  </UnstyledButton>
-                ))}
-              </Box>
-            )}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => insertSkillCommand(skill.name)}
+                    >
+                      <IconWand
+                        size={14}
+                        strokeWidth={1.8}
+                        className="mt-0.5 shrink-0 text-[var(--chatbox-tint-secondary)]"
+                      />
+                      <Stack gap={1} className="min-w-0 flex-1">
+                        <Text size="sm" truncate c="chatbox-primary">
+                          /{skill.name}
+                        </Text>
+                        {skill.description && (
+                          <Text size="xs" c="chatbox-secondary" lineClamp={1}>
+                            {skill.description}
+                          </Text>
+                        )}
+                      </Stack>
+                    </UnstyledButton>
+                  ))}
+                </Box>,
+                document.body
+              )}
 
             {/* Input Row */}
             <Flex align="flex-end" gap={4}>
@@ -1833,7 +1905,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                 </Box>
               </Flex>
             </Flex>
-          </Stack>
+          </Box>
 
           <Disclaimer />
         </Stack>
