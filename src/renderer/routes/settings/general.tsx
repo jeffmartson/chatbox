@@ -230,7 +230,7 @@ export function RouteComponent() {
 
         <Stack gap="md">
           <Stack gap="xxs">
-            <Flex align="center" justify="space-between" gap="md">
+            <Flex align="center" gap={2}>
               <Text size="sm">{t('Color Presets')}</Text>
               <ActionIcon
                 variant={isEditingInterfaceColorPresets ? 'light' : 'subtle'}
