@@ -352,46 +352,58 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     const streamIterator = result.fullStream[Symbol.asyncIterator]()
     let nextChunk = streamIterator.next()
 
-    while (true) {
+    try {
+      while (true) {
+        let status = statusQueue.shift()
+        while (status) {
+          yield { type: 'status', status }
+          status = statusQueue.shift()
+        }
+
+        const currentVersion = statusQueue.getVersion()
+        const statusWait = statusQueue.waitForChange(currentVersion)
+        let next: { type: 'chunk'; iteration: IteratorResult<TextStreamPart<T>> } | { type: 'status' }
+        try {
+          next = await Promise.race([
+            nextChunk.then((iteration) => ({ type: 'chunk' as const, iteration })),
+            statusWait.promise.then(() => ({ type: 'status' as const })),
+          ])
+        } finally {
+          statusWait.cancel()
+        }
+
+        if (next.type === 'status') {
+          continue
+        }
+
+        if (next.iteration.done) {
+          break
+        }
+
+        const chunk = next.iteration.value
+        nextChunk = streamIterator.next()
+        if (chunk.type === 'error') {
+          this.handleError(chunk.error)
+        }
+
+        yield chunk
+      }
+
       let status = statusQueue.shift()
       while (status) {
         yield { type: 'status', status }
         status = statusQueue.shift()
       }
-
-      const currentVersion = statusQueue.getVersion()
-      const statusWait = statusQueue.waitForChange(currentVersion)
-      let next: { type: 'chunk'; iteration: IteratorResult<TextStreamPart<T>> } | { type: 'status' }
-      try {
-        next = await Promise.race([
-          nextChunk.then((iteration) => ({ type: 'chunk' as const, iteration })),
-          statusWait.promise.then(() => ({ type: 'status' as const })),
-        ])
-      } finally {
-        statusWait.cancel()
-      }
-
-      if (next.type === 'status') {
-        continue
-      }
-
-      if (next.iteration.done) {
-        break
-      }
-
-      const chunk = next.iteration.value
-      nextChunk = streamIterator.next()
-      if (chunk.type === 'error') {
-        this.handleError(chunk.error)
-      }
-
-      yield chunk
-    }
-
-    let status = statusQueue.shift()
-    while (status) {
-      yield { type: 'status', status }
-      status = statusQueue.shift()
+    } finally {
+      // Consumers may close this generator early (Stop drain, chunk-processing failure).
+      // Propagate the closure to the SDK stream, otherwise the prefetched read keeps
+      // provider/tool work alive after the message was already finalized. Swallow the
+      // abandoned prefetch too, so its late settlement can't become an unhandled rejection.
+      nextChunk.then(
+        () => {},
+        () => {}
+      )
+      await streamIterator.return?.().catch(() => {})
     }
   }
 

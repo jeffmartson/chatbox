@@ -98,6 +98,8 @@ export async function processStreamChunk(
   skipUpdate: boolean
   statusChunk?: ModelStreamPart<ToolSet>
   persistentToolCallPause?: unknown
+  /** The "preparing tool call" phase ended — the caller should drop any lingering preparing status. */
+  clearStatus?: boolean
 }> {
   const { contentParts } = state
   let { currentTextPart, currentReasoningPart, preparingToolInput, usage, finishReason, stepIndex } = state
@@ -252,7 +254,16 @@ export async function processStreamChunk(
         startTime: Date.now(),
       }
       contentParts.push(toolCallPart)
-      break
+      // This call's input streaming is over and execution starts now; without this the
+      // "Preparing tool call" status would keep showing through the whole (potentially
+      // long) execution on messages that have no text yet. When a parallel sibling is
+      // still streaming its input, preparingToolInput still holds that sibling's slot —
+      // keep its status, since later deltas only re-emit it on a progress change.
+      return {
+        state: nextState(),
+        skipUpdate: false,
+        clearStatus: preparingToolInput === undefined,
+      }
     }
     case 'tool-result': {
       // A tool-result can interleave while another call's input is still streaming — only touch

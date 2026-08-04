@@ -50,6 +50,7 @@ import { findMessageLocation } from './forks'
 import { cancelRunningToolCallBatch, finishAbortedGeneration } from './generation-cancellation'
 import { withSessionGenerationLock } from './generation-lock'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
+import { registerUnsettledStreamDrain, waitForUnsettledStreamDrains } from './state'
 import { createInitialState, processStreamChunk } from './stream-chunk-processor'
 import { buildToolsForSession } from './tools-builder'
 import {
@@ -535,6 +536,29 @@ export async function orchestrateGeneration(
   // cache the stop button would be a no-op until the main stream starts.
   targetMsg = { ...targetMsg, cancel: (stoppedAt = Date.now()) => controller.abort(stoppedAt) }
   updateStreamingCache(sessionId, targetMsg)
+
+  // A previous Stop may have left a tool that ignores its abortSignal still executing;
+  // its stream drain is registered per session. The generation lock already serializes
+  // the locked entry points behind it, but alternative chat replies intentionally bypass
+  // the lock, so wait here too — abortable via the freshly wired stop button. Re-check
+  // the live set after every wait: with concurrent alternative replies, another
+  // generation's Stop can register a new drain while this one was still waiting.
+  let abortedDuringDrainWait: Promise<void> | undefined
+  while (true) {
+    const unsettledDrains = waitForUnsettledStreamDrains(sessionId)
+    if (!unsettledDrains) break
+    abortedDuringDrainWait ??= new Promise<void>((resolve) => {
+      if (controller.signal.aborted) resolve()
+      else controller.signal.addEventListener('abort', () => resolve(), { once: true })
+    })
+    await Promise.race([unsettledDrains, abortedDuringDrainWait])
+    if (controller.signal.aborted) {
+      targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [], finishReason: 'canceled' }
+      await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+      return
+    }
+  }
+
   let processorState = createInitialState()
   const infoParts: MessageContentParts = []
   let promptMsgs: Message[] = []
@@ -696,55 +720,127 @@ export async function orchestrateGeneration(
       },
     }
 
-    for await (const chunk of stream) {
-      const result = await processStreamChunk(chunk, processorState, streamCallbacks)
-      processorState = result.state
-      if (result.persistentToolCallPause) {
-        processorState = applyPersistentToolCallPause(processorState, result.persistentToolCallPause)
+    // On abort, the AI SDK only closes the stream after the in-flight step settles, so a
+    // tool execution that ignores its abortSignal would keep this loop blocked on the next
+    // chunk indefinitely. Race the signal so Stop finalizes the message immediately; the
+    // generation lock is still held until the stream settles (see the drain below).
+    const streamIterator = stream[Symbol.asyncIterator]()
+    const abortWait = new Promise<{ type: 'aborted' }>((resolve) => {
+      if (controller.signal.aborted) {
+        resolve({ type: 'aborted' })
+      } else {
+        controller.signal.addEventListener('abort', () => resolve({ type: 'aborted' }), { once: true })
       }
+    })
+    let abortedMidStream = false
+    try {
+      while (true) {
+        const nextChunk = streamIterator.next()
+        const raced = await Promise.race([
+          nextChunk.then((iteration) => ({ type: 'chunk' as const, iteration })),
+          abortWait,
+        ])
+        if (raced.type === 'aborted') {
+          // Swallow the abandoned read so a late rejection doesn't surface as unhandled.
+          nextChunk.then(
+            () => {},
+            () => {}
+          )
+          abortedMidStream = true
+          break
+        }
+        if (raced.iteration.done) break
+        const chunk = raced.iteration.value
 
-      if (result.skipUpdate) {
-        if (result.statusChunk && result.statusChunk.type === 'status') {
-          targetMsg = {
-            ...targetMsg,
-            status: result.statusChunk.status ? [result.statusChunk.status] : [],
+        const result = await processStreamChunk(chunk, processorState, streamCallbacks)
+        processorState = result.state
+        if (result.persistentToolCallPause) {
+          processorState = applyPersistentToolCallPause(processorState, result.persistentToolCallPause)
+        }
+
+        if (result.skipUpdate) {
+          if (result.statusChunk && result.statusChunk.type === 'status') {
+            targetMsg = {
+              ...targetMsg,
+              status: result.statusChunk.status ? [result.statusChunk.status] : [],
+            }
+            updateStreamingCache(sessionId, targetMsg)
           }
+          continue
+        }
+
+        const nextMsg: Message = {
+          ...targetMsg,
+          contentParts: [...infoParts, ...processorState.contentParts],
+        }
+
+        const textLength = getMessageText(nextMsg, true, true).length
+        if (!firstTokenLatency && textLength > 0) {
+          firstTokenLatency = Date.now() - startTime
+        }
+
+        targetMsg = {
+          ...nextMsg,
+          status: textLength > 0 || result.clearStatus ? [] : nextMsg.status,
+          firstTokenLatency,
+        }
+
+        const shouldPersist = shouldPersistStreamingChunk(
+          chunk.type,
+          Date.now() - lastPersistTimestamp,
+          persistInterval
+        )
+        if (shouldPersist) {
+          void persistStreamingMessage(sessionId, targetMsg)
+        } else {
           updateStreamingCache(sessionId, targetMsg)
         }
-        continue
+        if (shouldPersist) {
+          lastPersistTimestamp = Date.now()
+        }
       }
-
-      const nextMsg: Message = {
-        ...targetMsg,
-        contentParts: [...infoParts, ...processorState.contentParts],
-      }
-
-      const textLength = getMessageText(nextMsg, true, true).length
-      if (!firstTokenLatency && textLength > 0) {
-        firstTokenLatency = Date.now() - startTime
-      }
-
-      targetMsg = {
-        ...nextMsg,
-        status: textLength > 0 ? [] : nextMsg.status,
-        firstTokenLatency,
-      }
-
-      const shouldPersist = shouldPersistStreamingChunk(chunk.type, Date.now() - lastPersistTimestamp, persistInterval)
-      if (shouldPersist) {
-        void persistStreamingMessage(sessionId, targetMsg)
-      } else {
-        updateStreamingCache(sessionId, targetMsg)
-      }
-      if (shouldPersist) {
-        lastPersistTimestamp = Date.now()
+    } finally {
+      // A `for await` loop closes the iterator when its body throws; this manual loop must
+      // do the same so a renderer-side failure (e.g. persisting an image chunk) doesn't
+      // leave the provider stream running after the message is finalized as an error.
+      // No-op when the stream is already exhausted. The aborted path skips this and closes
+      // via the awaited drain below, which also holds the generation lock until settle.
+      if (!abortedMidStream) {
+        await streamIterator.return?.(undefined)?.catch(() => {})
       }
     }
 
     // AI SDK v6 emits an `abort` stream part and may then close fullStream normally
     // without throwing. Check the signal before any paused/success completion path,
     // otherwise active tool calls remain in `call` state and their UI timers keep running.
-    if (await persistAbortedGenerationIfNeeded()) return
+    if (controller.signal.aborted) {
+      // A tool that ignores its abortSignal may still be executing (install_skill,
+      // write_file, MCP calls…). Create and register the drain before the fallible
+      // terminal write below, so even a persistence failure cannot release the session
+      // generation lock — or slip past the entry barrier — while the abandoned `next()`
+      // and its tool execution remain active. `return()` on the generator queues behind
+      // the pending `next()` and resolves once the stream yields or closes.
+      let drain: Promise<void> | undefined
+      if (abortedMidStream) {
+        drain = (async () => {
+          try {
+            await streamIterator.return?.(undefined)
+          } catch {
+            // The settled stream may surface its abort as a rejection; the message is
+            // already finalized, so there is nothing left to report.
+          }
+        })()
+        // Alternative chat replies bypass the session generation lock, so also expose the
+        // drain for generation entry points to await directly.
+        registerUnsettledStreamDrain(sessionId, drain)
+      }
+      try {
+        await persistAbortedGenerationIfNeeded()
+      } finally {
+        if (drain) await drain
+      }
+      return
+    }
 
     if (processorState.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')) {
       targetMsg = {

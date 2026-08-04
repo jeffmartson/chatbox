@@ -302,6 +302,43 @@ describe('processStreamChunk', () => {
     })
   })
 
+  it('clears the preparing status when the tool-call consumes its preparation state', async () => {
+    let state = createInitialState()
+    state = (await processStreamChunk(chunk('tool-input-start', { id: 'tc1', toolName: 'search' }), state, callbacks))
+      .state
+
+    const result = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'test' } }),
+      state,
+      callbacks
+    )
+
+    expect(result.clearStatus).toBe(true)
+  })
+
+  it('keeps the preparing status when a parallel sibling is still streaming its input', async () => {
+    let state = createInitialState()
+    // Sibling tc2 owns the preparing slot when tc1's tool-call chunk arrives.
+    state = (
+      await processStreamChunk(chunk('tool-input-start', { id: 'tc2', toolName: 'edit_file' }), state, callbacks)
+    ).state
+
+    const result = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc1', toolName: 'search', args: { q: 'test' } }),
+      state,
+      callbacks
+    )
+
+    expect(result.clearStatus).toBeFalsy()
+    // tc2's preparation state must survive so its later chunks can still consume it.
+    const followUp = await processStreamChunk(
+      chunk('tool-call', { toolCallId: 'tc2', toolName: 'edit_file', args: { path: 'a.ts' } }),
+      result.state,
+      callbacks
+    )
+    expect(followUp.clearStatus).toBe(true)
+  })
+
   it('preserves provider metadata on tool-call chunks', async () => {
     const providerMetadata = { google: { thoughtSignature: 'signature-1' } }
     const state = createInitialState()

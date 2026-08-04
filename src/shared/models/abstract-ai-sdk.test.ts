@@ -194,3 +194,35 @@ describe('AbstractAISDKModel completed response normalization', () => {
     })
   })
 })
+
+describe('AbstractAISDKModel chatStream closure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('closes the underlying provider stream when the consumer closes chatStream early', async () => {
+    // Consumers close chatStream early on Stop drains and chunk-processing failures;
+    // that closure must propagate to the SDK stream so provider/tool work stops too.
+    let providerStreamClosed = false
+    aiMocks.streamText.mockReturnValue({
+      fullStream: (async function* () {
+        try {
+          yield { type: 'text-delta', id: 't1', text: 'hello' }
+          yield { type: 'text-delta', id: 't1', text: ' world' }
+          yield { type: 'finish', finishReason: 'stop' }
+        } finally {
+          providerStreamClosed = true
+        }
+      })(),
+      totalUsage: Promise.resolve({ inputTokens: 0, outputTokens: 0, totalTokens: 0 }),
+      finishReason: Promise.resolve('stop'),
+    })
+
+    const stream = createModel().chatStream([], {})
+    const first = await stream.next()
+    expect(first.done).toBe(false)
+
+    await stream.return(undefined)
+    expect(providerStreamClosed).toBe(true)
+  })
+})
