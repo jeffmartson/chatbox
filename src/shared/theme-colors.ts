@@ -26,7 +26,7 @@ export const DEFAULT_INTERFACE_COLORS: InterfaceColors = {
     backgroundPrimary: '#242424',
     backgroundSecondary: '#3b3b3b',
     backgroundTertiary: '#424242',
-    brand: '#4dabf7',
+    brand: '#228be6',
   },
 }
 

@@ -1,7 +1,6 @@
 .shiki-code-wrapper pre.shiki {
   margin: 0;
   padding: 0.75em 1em;
-  background: transparent !important;
   border-radius: 0 0 var(--chatbox-radius-md) var(--chatbox-radius-md);
   overflow-x: auto;
 }

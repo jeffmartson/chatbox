@@ -333,7 +333,12 @@ export const CodeRenderer = memo(
 const InlineCode = memo((props: { children: string; className?: string }) => {
   const { children, className } = props
   return (
-    <code className={clsx('bg-chatbox-background-secondary text-[0.85em] rounded-sm px-1 py-0.5 mx-0.5', className)}>
+    <code
+      className={clsx(
+        'inline-code bg-chatbox-background-secondary text-[0.85em] rounded-sm px-1 py-0.5 mx-0.5',
+        className
+      )}
+    >
       {children}
     </code>
   )
@@ -603,12 +608,12 @@ const BlockCode = memo(
     return (
       <Stack
         gap={0}
-        className="code-block-container w-full max-w-full min-w-0 bg-chatbox-background-secondary rounded-md overflow-hidden"
+        className="code-block-container w-full max-w-full min-w-0 bg-chatbox-background-primary rounded-md overflow-hidden"
       >
         <Flex
           justify="space-between"
           className={clsx(
-            'code-block-header px-xs pl-sm pt-xs pb-0 bg-chatbox-background-secondary select-none',
+            'code-block-header px-xs pl-sm pt-xs pb-0 bg-chatbox-background-primary select-none',
             !needCollapse || !collapsed ? 'sticky top-0 z-10' : ''
           )}
         >

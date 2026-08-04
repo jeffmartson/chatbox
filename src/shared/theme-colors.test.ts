@@ -52,7 +52,7 @@ describe('interface brand color', () => {
 
   it('replaces white with the default brand color for the active theme', () => {
     expect(resolveInterfaceBrandColor('#ffffff', 'light')).toBe('#228be6')
-    expect(resolveInterfaceBrandColor('#FFFFFF', 'dark')).toBe('#4dabf7')
+    expect(resolveInterfaceBrandColor('#FFFFFF', 'dark')).toBe('#228be6')
     expect(resolveInterfaceBrandColor('#123456', 'light')).toBe('#123456')
   })
 
@@ -64,7 +64,7 @@ describe('interface brand color', () => {
       })
     ).toEqual({
       light: { ...INTERFACE_COLOR_PRESETS[0].colors.light, brand: '#228be6' },
-      dark: { ...INTERFACE_COLOR_PRESETS[0].colors.dark, brand: '#4dabf7' },
+      dark: { ...INTERFACE_COLOR_PRESETS[0].colors.dark, brand: '#228be6' },
     })
   })
 })
