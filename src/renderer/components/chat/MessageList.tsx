@@ -472,7 +472,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
               />
             )}
           </ErrorBoundary>
-          {/* Saved alternatives stay inside the pivot block, so the active branch in the main list appears last. */}
+          {/* Saved alternatives stay inside the pivot block (newest-first in ForkGroup), so the active branch appears last. */}
           {currentSession.messageForksHash?.[msg.id] && currentSession.messageForksHash[msg.id].lists.length > 1 && (
             <ForkGroup
               sessionId={currentSession.id}

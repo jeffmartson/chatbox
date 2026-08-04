@@ -167,6 +167,35 @@ describe('ForkGroup', () => {
     expect(screen.getByRole('button', { name: 'Collapse other branches' })).toBeTruthy()
   })
 
+  test('shows alternative replies newest-first so a generating reply stays on top', () => {
+    renderGroup(
+      {
+        position: 0,
+        lists: [
+          { id: 'current', messages: [] },
+          { id: 'older', messages: [message('older-reply')] },
+          {
+            id: 'generating',
+            messages: [message('generating-reply', { generating: true, cancel: () => {} })],
+          },
+        ],
+        createdAt: 1,
+      },
+      true
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand view' }))
+
+    const replyLabels = screen.getAllByText(/Reply \d+/).map((node) => node.textContent)
+    expect(replyLabels).toEqual(['Reply 3', 'Reply 2'])
+
+    const messages = screen.getAllByTestId(/^message-/)
+    expect(messages.map((node) => node.getAttribute('data-testid'))).toEqual([
+      'message-generating-reply',
+      'message-older-reply',
+    ])
+  })
+
   test('blocks branch switching during generation and explains why', () => {
     renderGroup(
       {

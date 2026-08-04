@@ -87,6 +87,9 @@ export default function ForkGroup(props: ForkGroupProps) {
     previousListIds.current = new Set(forks.lists.map((list) => list.id))
   }, [forks.lists, forks.position])
 
+  // lists append newest branches at the end; show newest-first so a Reply Again
+  // Below that is still streaming appears directly under the prompt instead of
+  // below every finished alternative.
   const alternativeBranches = forks.lists.flatMap((list, index) => {
     if (index === forks.position) {
       return []
@@ -109,7 +112,9 @@ export default function ForkGroup(props: ForkGroupProps) {
       },
     ]
   })
-  const visibleBranches = alternativeBranches.filter(({ list }) => expanded || revealedBranchIds.has(list.id))
+  const visibleBranches = [
+    ...alternativeBranches.filter(({ list }) => expanded || revealedBranchIds.has(list.id)),
+  ].reverse()
 
   const notifyControlsLocked = useCallback(() => {
     toastActions.add(lockReason, 2500)
