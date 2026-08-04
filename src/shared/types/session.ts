@@ -269,7 +269,7 @@ export const MessageBackgroundTaskSchema = z.object({
 
 // Main Message schema
 // Define a custom function type for cancel
-const CancelFunctionSchema = z.custom<(() => void) | undefined>(
+const CancelFunctionSchema = z.custom<((stoppedAt?: number) => void) | undefined>(
   (val) => val === undefined || typeof val === 'function',
   { message: 'Must be a function or undefined' }
 )

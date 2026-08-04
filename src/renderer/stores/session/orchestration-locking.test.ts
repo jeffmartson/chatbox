@@ -26,7 +26,6 @@ vi.mock('../chatStore', () => ({}))
 
 import {
   applyPersistentToolCallPause,
-  cancelRunningToolCallBatch,
   continuePausedToolCall,
   createPausedToolCallExecutionContext,
   finishPausedToolCallContinuation,
@@ -132,57 +131,7 @@ describe('paused tool-call approval binding', () => {
   })
 })
 
-describe('paused tool-call batch cancellation', () => {
-  it('cancels every uncompleted sibling without overwriting completed results', () => {
-    const message = {
-      id: 'message-1',
-      role: 'assistant',
-      contentParts: [
-        {
-          type: 'tool-call',
-          state: 'result',
-          toolCallId: 'tool-completed',
-          toolName: 'code_execution',
-          result: { stdout: 'done', stderr: '', exitCode: 0 },
-        },
-        {
-          type: 'tool-call',
-          state: 'call',
-          toolCallId: 'tool-command',
-          toolName: 'code_execution',
-          args: { code: 'while (true) {}' },
-        },
-        {
-          type: 'tool-call',
-          state: 'call',
-          toolCallId: 'tool-other',
-          toolName: 'read_file',
-          args: { file_path: 'later.txt' },
-        },
-      ],
-    } as Message
-
-    const cancelled = cancelRunningToolCallBatch(message, new Set(['tool-completed', 'tool-command', 'tool-other']))
-
-    expect(cancelled.contentParts).toMatchObject([
-      {
-        state: 'result',
-        toolCallId: 'tool-completed',
-        result: { stdout: 'done', stderr: '', exitCode: 0 },
-      },
-      {
-        state: 'result',
-        toolCallId: 'tool-command',
-        result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
-      },
-      {
-        state: 'error',
-        toolCallId: 'tool-other',
-        result: { error: 'Tool execution stopped by user.', cancelled: true },
-      },
-    ])
-  })
-
+describe('paused tool-call continuation cancellation', () => {
   it('clears runtime generation controls when continuation stops', () => {
     const cancel = vi.fn()
     const message = {

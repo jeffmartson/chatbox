@@ -46,6 +46,7 @@ import {
 } from './agent-mode-suggestion'
 import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
+import { cancelRunningToolCallBatch, finishAbortedGeneration } from './generation-cancellation'
 import { withSessionGenerationLock } from './generation-lock'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
 import { createInitialState, processStreamChunk } from './stream-chunk-processor'
@@ -372,32 +373,8 @@ function updateToolCallPart(
   return updateToolCallParts(message, (part) => part.toolCallId === toolCallId, updater)
 }
 
-export function cancelRunningToolCallBatch(message: Message, toolCallIds: ReadonlySet<string>): Message {
-  return updateToolCallParts(
-    message,
-    (part) => toolCallIds.has(part.toolCallId) && part.state === 'call',
-    (part) => {
-      const duration = part.startTime ? Date.now() - part.startTime : undefined
-      if (part.toolName === 'user_exec' || part.toolName === 'code_execution') {
-        return {
-          ...part,
-          state: 'result',
-          pauseReason: undefined,
-          resultStorageKey: undefined,
-          result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
-          duration,
-        }
-      }
-      return {
-        ...part,
-        state: 'error',
-        pauseReason: undefined,
-        resultStorageKey: undefined,
-        result: { error: 'Tool execution stopped by user.', cancelled: true },
-        duration,
-      }
-    }
-  )
+function getAbortStoppedAt(signal: AbortSignal): number {
+  return typeof signal.reason === 'number' ? signal.reason : Date.now()
 }
 
 export function finishPausedToolCallContinuation(message: Message, finishReason?: string): Message {
@@ -542,9 +519,9 @@ export async function orchestrateGeneration(
   const controller = new AbortController()
   const externalSignal = options?.externalAbortSignal
   if (externalSignal?.aborted) {
-    controller.abort()
+    controller.abort(externalSignal.reason)
   } else {
-    externalSignal?.addEventListener('abort', () => controller.abort(), { once: true })
+    externalSignal?.addEventListener('abort', () => controller.abort(externalSignal.reason), { once: true })
   }
   if (controller.signal.aborted) {
     // Stop was pressed while this generation was still setting up (aborting the
@@ -557,11 +534,18 @@ export async function orchestrateGeneration(
   // runs (agent-mode suggestion classifier, MCP/tool harness setup). Those steps
   // issue real requests that can hang; without a cancel handler in the message
   // cache the stop button would be a no-op until the main stream starts.
-  targetMsg = { ...targetMsg, cancel: () => controller.abort() }
+  targetMsg = { ...targetMsg, cancel: (stoppedAt = Date.now()) => controller.abort(stoppedAt) }
   updateStreamingCache(sessionId, targetMsg)
   let processorState = createInitialState()
   const infoParts: MessageContentParts = []
   let promptMsgs: Message[] = []
+  const persistAbortedGenerationIfNeeded = async (): Promise<boolean> => {
+    if (!controller.signal.aborted) return false
+    const stoppedAt = getAbortStoppedAt(controller.signal)
+    targetMsg = finishAbortedGeneration(targetMsg, [...infoParts, ...processorState.contentParts], stoppedAt)
+    await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+    return true
+  }
 
   try {
     const dependencies = await createModelDependencies()
@@ -754,6 +738,11 @@ export async function orchestrateGeneration(
       }
     }
 
+    // AI SDK v6 emits an `abort` stream part and may then close fullStream normally
+    // without throwing. Check the signal before any paused/success completion path,
+    // otherwise active tool calls remain in `call` state and their UI timers keep running.
+    if (await persistAbortedGenerationIfNeeded()) return
+
     if (processorState.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')) {
       targetMsg = {
         ...targetMsg,
@@ -825,32 +814,7 @@ export async function orchestrateGeneration(
       return
     }
 
-    if (controller.signal.aborted) {
-      targetMsg = {
-        ...targetMsg,
-        generating: false,
-        cancel: undefined,
-        contentParts: [
-          ...infoParts,
-          ...processorState.contentParts.map((part) =>
-            part.type === 'tool-call' &&
-            part.state === 'call' &&
-            (part.toolName === 'user_exec' || part.toolName === 'code_execution')
-              ? {
-                  ...part,
-                  state: 'result' as const,
-                  result: { success: false, exitCode: 130, stdout: '', stderr: '', cancelled: true },
-                  duration: part.startTime ? Date.now() - part.startTime : undefined,
-                }
-              : part
-          ),
-        ],
-        status: [],
-        finishReason: 'canceled',
-      }
-      await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-      return
-    }
+    if (await persistAbortedGenerationIfNeeded()) return
 
     targetMsg = handleGenerationError(err, targetMsg, settings, {
       agentMode: getSessionAgentModeEntry(sessionId, session).value,
@@ -1100,7 +1064,7 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
       })
     ),
     generating: true,
-    cancel: () => controller.abort(),
+    cancel: (stoppedAt = Date.now()) => controller.abort(stoppedAt),
   }
   await modifyMessage(sessionId, message, false)
 
@@ -1160,7 +1124,8 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
     }
 
     if (controller.signal.aborted) {
-      message = cancelRunningToolCallBatch(message, batchIds)
+      const stoppedAt = getAbortStoppedAt(controller.signal)
+      message = cancelRunningToolCallBatch(message, batchIds, stoppedAt)
       await modifyMessage(sessionId, finishPausedToolCallContinuation(message, 'canceled'), true)
       return
     }
@@ -1173,7 +1138,8 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
 
     await modifyMessage(sessionId, message, true)
     if (controller.signal.aborted) {
-      message = cancelRunningToolCallBatch(message, batchIds)
+      const stoppedAt = getAbortStoppedAt(controller.signal)
+      message = cancelRunningToolCallBatch(message, batchIds, stoppedAt)
       await modifyMessage(sessionId, finishPausedToolCallContinuation(message, 'canceled'), true)
       return
     }
@@ -1198,7 +1164,7 @@ async function continuePausedToolCallWithoutSessionLock(sessionId: string, messa
     })
     const errorMessage = error instanceof Error ? error.message : String(error)
     const failedMessage = controller.signal.aborted
-      ? cancelRunningToolCallBatch(message, batchIds)
+      ? cancelRunningToolCallBatch(message, batchIds, getAbortStoppedAt(controller.signal))
       : updateToolCallParts(
           message,
           (batchPart) => batchIds.has(batchPart.toolCallId) && batchPart.state === 'call',

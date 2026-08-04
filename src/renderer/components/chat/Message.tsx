@@ -71,6 +71,7 @@ import {
   regenerateInNewFork,
   removeMessage,
   retryFromLastToolCallAfterApiError,
+  stopGeneratingMessages,
 } from '@/stores/sessionActions'
 import * as toastActions from '@/stores/toastActions'
 import ActionMenu, { type ActionMenuItemProps } from '../ActionMenu'
@@ -221,9 +222,11 @@ const _Message: FC<Props> = (props) => {
   }, [msg, setQuote])
 
   const handleStop = useCallback(async () => {
-    msg.cancel?.()
-    if (msg.generating && msg.contentParts.length === 0) {
-      await removeMessage(sessionId, msg.id)
+    if (msg.generating) {
+      await stopGeneratingMessages(sessionId, [msg], {
+        removeMessage,
+        persistMessage: (currentSessionId, message) => modifyMessage(currentSessionId, message, true),
+      })
       return
     }
     await modifyMessage(sessionId, { ...msg, generating: false, cancel: undefined }, true)

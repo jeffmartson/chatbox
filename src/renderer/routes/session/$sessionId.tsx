@@ -13,8 +13,8 @@ import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
 import Header from '@/components/layout/Header'
 import Page from '@/components/layout/Page'
 import ThreadHistoryDrawer from '@/components/session/ThreadHistoryDrawer'
-import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { useProviders } from '@/hooks/useProviders'
+import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import useVersion from '@/hooks/useVersion'
 import { defaultSessionsForCN, defaultSessionsForEN } from '@/packages/initial_data'
 import * as remote from '@/packages/remote'
@@ -32,6 +32,7 @@ import {
   removeCurrentThread,
   removeMessage,
   startNewThread,
+  stopGeneratingMessages,
   submitNewUserMessage,
 } from '@/stores/sessionActions'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -222,20 +223,10 @@ function RouteComponent() {
     if (!currentSession) {
       return false
     }
-    for (const message of generatingMessages) {
-      message.cancel?.()
-    }
-    void Promise.all(
-      generatingMessages.map((message) =>
-        message.contentParts.length === 0
-          ? removeMessage(currentSession.id, message.id)
-          : modifyMessage(
-              currentSession.id,
-              { ...message, generating: false, cancel: undefined, finishReason: 'canceled' },
-              true
-            )
-      )
-    )
+    void stopGeneratingMessages(currentSession.id, generatingMessages, {
+      removeMessage,
+      persistMessage: (sessionId, message) => modifyMessage(sessionId, message, true),
+    })
     return true
   }, [currentSession, generatingMessages])
 

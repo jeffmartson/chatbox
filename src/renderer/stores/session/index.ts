@@ -48,6 +48,8 @@ export {
   getSessionWebBrowsing,
   regenerateInNewFork,
 } from './generation'
+export type { GenerationCancellationPersistence } from './generation-cancellation'
+export { stopGeneratingMessages } from './generation-cancellation'
 export { hasSuccessfulUserAssistantTurn, isSuccessfulAssistantReply } from './message-success'
 // Message operations (5 functions)
 export {
