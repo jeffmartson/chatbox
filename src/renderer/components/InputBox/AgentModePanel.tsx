@@ -1,4 +1,16 @@
-import { ActionIcon, Badge, Button, Divider, Flex, Group, Loader, Stack, Switch, Text } from '@mantine/core'
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Divider,
+  Flex,
+  Group,
+  Loader,
+  Stack,
+  Switch,
+  Text,
+  UnstyledButton,
+} from '@mantine/core'
 import { TestId } from '@shared/automation/testids'
 import type { AgentModeValue, KnowledgeBase } from '@shared/types'
 import {
@@ -6,6 +18,7 @@ import {
   IconChevronRight,
   IconCode,
   IconFile,
+  IconFolder,
   IconFolderCog,
   IconHammer,
   IconSettings2,
@@ -35,6 +48,7 @@ import platform from '@/platform'
 import * as chatStore from '@/stores/chatStore'
 import { useSession, useSessionSettings } from '@/stores/chatStore'
 import { useAutoValidate } from '@/stores/premiumActions'
+import { recentDirectoriesStore, useRecentDirectories } from '@/stores/recentDirectoriesStore'
 import { setSessionAgentMode, useSessionAgentMode } from '@/stores/session/agent-mode'
 import { useMcpSettings, useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -48,6 +62,10 @@ type PanelPage = 'main' | 'web-search' | 'code-execution' | 'skills' | 'mcp' | '
 // The working-directory feature needs the desktop filesystem and directory picker. Windows
 // uses the native execution backend; bound directory writes are validated in the main process.
 const supportsWorkingDirectories = platform.type === 'desktop' && !!platform.openDirectoryDialog
+
+function getDirectoryName(directory: string) {
+  return directory.split(/[\\/]/).filter(Boolean).pop() || directory
+}
 
 export interface AgentModePanelProps {
   sessionId: string
@@ -236,6 +254,11 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
     () => (isNewSession ? (newSessionState.workingDirectories ?? []) : (sessionSettings.workingDirectories ?? [])),
     [isNewSession, newSessionState.workingDirectories, sessionSettings]
   )
+  const recentDirectories = useRecentDirectories()
+  const availableRecentDirectories = useMemo(
+    () => recentDirectories.filter((dir) => !workingDirectories.includes(dir)),
+    [recentDirectories, workingDirectories]
+  )
   const agentFullAccess = isNewSession
     ? (newSessionState.agentFullAccess ?? false)
     : (sessionSettings.agentFullAccess ?? false)
@@ -264,9 +287,20 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
   const handleAddWorkingDirectory = useCallback(async () => {
     if (!platform.openDirectoryDialog) return
     const result = await platform.openDirectoryDialog()
-    if (result.canceled || !result.path || workingDirectories.includes(result.path)) return
+    if (result.canceled || !result.path) return
+    recentDirectoriesStore.getState().addDirectory(result.path)
+    if (workingDirectories.includes(result.path)) return
     await updateWorkingDirectories([...workingDirectories, result.path])
   }, [workingDirectories, updateWorkingDirectories])
+
+  const handleSelectRecentDirectory = useCallback(
+    async (dir: string) => {
+      recentDirectoriesStore.getState().addDirectory(dir)
+      if (workingDirectories.includes(dir)) return
+      await updateWorkingDirectories([...workingDirectories, dir])
+    },
+    [workingDirectories, updateWorkingDirectories]
+  )
 
   const handleRemoveWorkingDirectory = useCallback(
     async (dir: string) => {
@@ -829,7 +863,7 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
                 <IconFile size={14} className="text-[var(--chatbox-tint-tertiary)] shrink-0" />
                 <Tooltip label={dir} withArrow position="right" openDelay={400}>
                   <Text size="sm" truncate className="min-w-0">
-                    {dir.split('/').filter(Boolean).pop() || dir}
+                    {getDirectoryName(dir)}
                   </Text>
                 </Tooltip>
               </Flex>
@@ -848,6 +882,39 @@ const AgentModePanel: FC<AgentModePanelProps> = ({
               </ActionIcon>
             </Flex>
           ))}
+          {availableRecentDirectories.length > 0 && (
+            <>
+              <Divider my={4} mx="sm" label={t('Recent')} labelPosition="left" />
+              {availableRecentDirectories.map((dir) => (
+                <UnstyledButton
+                  key={dir}
+                  className={`w-full rounded px-3 py-1.5 text-left ${
+                    workModeCapabilitiesDisabled
+                      ? 'cursor-default opacity-50'
+                      : 'hover:bg-[var(--mantine-color-gray-0)] dark:hover:bg-[var(--mantine-color-dark-5)]'
+                  }`}
+                  disabled={workModeCapabilitiesDisabled}
+                  aria-label={dir}
+                  onClick={() => {
+                    if (workModeCapabilitiesDisabled) return
+                    void handleSelectRecentDirectory(dir)
+                  }}
+                >
+                  <Flex gap="xs" align="center" className="min-w-0">
+                    <IconFolder size={14} className="text-[var(--chatbox-tint-tertiary)] shrink-0" />
+                    <Stack gap={0} className="min-w-0 flex-1">
+                      <Text size="sm" truncate>
+                        {getDirectoryName(dir)}
+                      </Text>
+                      <Text size="xs" c="dimmed" truncate>
+                        {dir}
+                      </Text>
+                    </Stack>
+                  </Flex>
+                </UnstyledButton>
+              ))}
+            </>
+          )}
           <Group justify="center" py="md">
             <Button
               size="xs"

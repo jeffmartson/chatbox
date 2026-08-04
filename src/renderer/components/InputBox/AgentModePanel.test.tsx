@@ -50,9 +50,17 @@ const mocks = vi.hoisted(() => {
     lockReason: null,
   }
   const knowledgeBases: Array<{ id: number; name: string }> = []
+  const openDirectoryDialogMock = vi.fn()
   const trackWebSearchClickMock = vi.fn()
 
-  return { agentModeEntry, knowledgeBases, settingsState, trackWebSearchClickMock, uiState }
+  return {
+    agentModeEntry,
+    knowledgeBases,
+    openDirectoryDialogMock,
+    settingsState,
+    trackWebSearchClickMock,
+    uiState,
+  }
 })
 
 vi.mock('react-i18next', () => ({
@@ -92,7 +100,7 @@ vi.mock('@/packages/skills/controller', () => ({
 }))
 
 vi.mock('@/platform', () => ({
-  default: { type: 'desktop', openDirectoryDialog: vi.fn() },
+  default: { type: 'desktop', isDesktopLike: true, openDirectoryDialog: mocks.openDirectoryDialogMock },
 }))
 
 vi.mock('@/stores/chatStore', () => ({
@@ -119,6 +127,7 @@ vi.mock('@/stores/uiStore', () => ({
   useUIStore: (selector: (state: typeof mocks.uiState) => unknown) => selector(mocks.uiState),
 }))
 
+import { recentDirectoriesStore } from '@/stores/recentDirectoriesStore'
 import AgentModePanel from './AgentModePanel'
 
 const defaultProps: ComponentProps<typeof AgentModePanel> = {
@@ -143,6 +152,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.agentModeEntry.value = 'on'
   mocks.knowledgeBases.splice(0)
+  mocks.uiState.newSessionState = {}
+  recentDirectoriesStore.setState({ directories: [] })
 })
 
 describe('AgentModePanel mode buttons', () => {
@@ -285,5 +296,66 @@ describe('AgentModePanel capability availability', () => {
       expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe('false')
     }
     expect(screen.getByRole('button', { name: /^Code Execution/ }).getAttribute('aria-disabled')).toBe('false')
+  })
+})
+
+describe('AgentModePanel working directories', () => {
+  test('shows unselected recent directories in a new session', () => {
+    mocks.uiState.newSessionState = { workingDirectories: ['/Users/themez/workspace/chatbox'] }
+    recentDirectoriesStore.setState({
+      directories: ['/Users/themez/workspace/chatbox', String.raw`C:\Users\themez\workspace\chatbox-pro`],
+    })
+    renderPanel()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Working Directory/ }))
+
+    expect(screen.getByText('Recent')).toBeTruthy()
+    expect(screen.getByRole('button', { name: String.raw`C:\Users\themez\workspace\chatbox-pro` })).toBeTruthy()
+    expect(screen.getByText('chatbox-pro')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '/Users/themez/workspace/chatbox' })).toBeNull()
+  })
+
+  test('adds a recent directory to the new session and moves it to the front', () => {
+    const selectedDirectory = '/Users/themez/workspace/chatbox-pro'
+    recentDirectoriesStore.setState({ directories: ['/Users/themez/Downloads', selectedDirectory] })
+    renderPanel()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Working Directory' }))
+    fireEvent.click(screen.getByRole('button', { name: selectedDirectory }))
+
+    expect(mocks.uiState.setNewSessionState).toHaveBeenCalledOnce()
+    const updater = mocks.uiState.setNewSessionState.mock.calls[0][0]
+    expect(updater({})).toEqual({ workingDirectories: [selectedDirectory] })
+    expect(recentDirectoriesStore.getState().directories).toEqual([selectedDirectory, '/Users/themez/Downloads'])
+  })
+
+  test('remembers a directory selected from the system picker', async () => {
+    const selectedDirectory = '/Users/themez/workspace/chatbox-pro'
+    mocks.openDirectoryDialogMock.mockResolvedValue({ canceled: false, path: selectedDirectory })
+    renderPanel()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: 'Working Directory' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Folder' }))
+
+    await vi.waitFor(() => {
+      expect(mocks.uiState.setNewSessionState).toHaveBeenCalledOnce()
+    })
+    expect(recentDirectoriesStore.getState().directories).toEqual([selectedDirectory])
+  })
+
+  test('refreshes recency without duplicating a directory already selected in the session', async () => {
+    const selectedDirectory = '/Users/themez/workspace/chatbox-pro'
+    mocks.uiState.newSessionState = { workingDirectories: [selectedDirectory] }
+    recentDirectoriesStore.setState({ directories: ['/Users/themez/Downloads', selectedDirectory] })
+    mocks.openDirectoryDialogMock.mockResolvedValue({ canceled: false, path: selectedDirectory })
+    renderPanel()
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Working Directory/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Folder' }))
+
+    await vi.waitFor(() => {
+      expect(recentDirectoriesStore.getState().directories).toEqual([selectedDirectory, '/Users/themez/Downloads'])
+    })
+    expect(mocks.uiState.setNewSessionState).not.toHaveBeenCalled()
   })
 })
