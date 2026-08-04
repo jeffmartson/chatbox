@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_INTERFACE_COLORS,
   INTERFACE_COLOR_PRESETS,
   isInterfaceBrandColorAllowed,
   renameInterfaceColorPreset,
@@ -9,11 +10,16 @@ import {
 } from './theme-colors'
 
 describe('INTERFACE_COLOR_PRESETS', () => {
-  it('provides the requested Claude and Mist Blue presets', () => {
+  it('provides the default, Claude, and Mist Blue presets', () => {
     expect(INTERFACE_COLOR_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))).toEqual([
+      { id: 'default', label: 'Default' },
       { id: 'claude-classic', label: 'Claude Classic' },
       { id: 'mist-blue', label: 'Mist Blue' },
     ])
+  })
+
+  it('uses the application default colors for the default preset', () => {
+    expect(INTERFACE_COLOR_PRESETS[0].colors).toEqual(DEFAULT_INTERFACE_COLORS)
   })
 
   it('provides complete light and dark palettes for every preset', () => {

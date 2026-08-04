@@ -15,7 +15,27 @@ export type InterfaceColorPreset = {
   colors: InterfaceColors
 }
 
+export const DEFAULT_INTERFACE_COLORS: InterfaceColors = {
+  light: {
+    backgroundPrimary: '#ffffff',
+    backgroundSecondary: '#f3f3f3',
+    backgroundTertiary: '#dee2e6',
+    brand: '#228be6',
+  },
+  dark: {
+    backgroundPrimary: '#242424',
+    backgroundSecondary: '#3b3b3b',
+    backgroundTertiary: '#424242',
+    brand: '#4dabf7',
+  },
+}
+
 export const INTERFACE_COLOR_PRESETS = [
+  {
+    id: 'default',
+    label: 'Default',
+    colors: DEFAULT_INTERFACE_COLORS,
+  },
   {
     id: 'claude-classic',
     label: 'Claude Classic',
@@ -53,21 +73,6 @@ export const INTERFACE_COLOR_PRESETS = [
     },
   },
 ] satisfies ReadonlyArray<InterfaceColorPreset>
-
-export const DEFAULT_INTERFACE_COLORS: InterfaceColors = {
-  light: {
-    backgroundPrimary: '#ffffff',
-    backgroundSecondary: '#f3f3f3',
-    backgroundTertiary: '#dee2e6',
-    brand: '#228be6',
-  },
-  dark: {
-    backgroundPrimary: '#242424',
-    backgroundSecondary: '#3b3b3b',
-    backgroundTertiary: '#424242',
-    brand: '#4dabf7',
-  },
-}
 
 export function getDefaultInterfaceColors(): InterfaceColors {
   return {
