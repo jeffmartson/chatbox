@@ -7,6 +7,11 @@ minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - "@ruguoapp/*"
 
+# epub falls back to its pure-JavaScript adm-zip implementation when this
+# deprecated native optional dependency is unavailable.
+ignoredOptionalDependencies:
+  - zipfile
+
 patchedDependencies:
   fflate@0.8.3: patches/fflate@0.8.3.patch
   libsql@0.5.22: patches/libsql@0.5.22.patch

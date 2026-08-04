@@ -1,5 +1,6 @@
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { strToU8, zipSync } from 'fflate'
 import * as fs from 'fs-extra'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { parseFile, parsePdf } from './file-parser'
@@ -64,6 +65,51 @@ function assembleObjects(objects: string[]): Buffer {
   }
   pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`
   return Buffer.from(pdf, 'latin1')
+}
+
+/** Build a minimal EPUB fixture without relying on the optional native zipfile module. */
+function buildEpub(): Buffer {
+  return Buffer.from(
+    zipSync({
+      mimetype: [strToU8('application/epub+zip'), { level: 0 }],
+      'META-INF/container.xml': strToU8(`<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
+  </rootfiles>
+</container>`),
+      'OEBPS/content.opf': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<package version="2.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="BookId">epub-fallback-test</dc:identifier>
+    <dc:title>EPUB fallback test</dc:title>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml" />
+    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="chapter" />
+  </spine>
+</package>`),
+      'OEBPS/toc.ncx': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head><meta name="dtb:uid" content="epub-fallback-test" /></head>
+  <docTitle><text>EPUB fallback test</text></docTitle>
+  <navMap>
+    <navPoint id="chapter-nav" playOrder="1">
+      <navLabel><text>Fallback chapter</text></navLabel>
+      <content src="chapter.xhtml" />
+    </navPoint>
+  </navMap>
+</ncx>`),
+      'OEBPS/chapter.xhtml': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body><h1>Fallback chapter</h1><p>Parsed without the native zipfile binding.</p></body>
+</html>`),
+    })
+  )
 }
 
 describe('parsePdf', () => {
@@ -157,5 +203,27 @@ describe('parsePdf', () => {
 
     expect(text).toContain('==== Page 1 ====')
     expect(text).toContain('Routed through parseFile.')
+  })
+})
+
+describe('parseEpub', () => {
+  let tmpDir: string
+
+  beforeAll(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'epub-parser-test-'))
+  })
+
+  afterAll(async () => {
+    await fs.remove(tmpDir)
+  })
+
+  it('parses EPUB content through the pure-JavaScript fallback', async () => {
+    const filePath = path.join(tmpDir, 'fallback.epub')
+    await fs.writeFile(filePath, buildEpub())
+
+    const text = await parseFile(filePath)
+
+    expect(text).toContain('Fallback chapter')
+    expect(text).toContain('Parsed without the native zipfile binding.')
   })
 })
