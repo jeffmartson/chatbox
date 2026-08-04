@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { INTERFACE_COLOR_PRESETS, withColorOpacity } from './theme-colors'
+import {
+  INTERFACE_COLOR_PRESETS,
+  isInterfaceBrandColorAllowed,
+  renameInterfaceColorPreset,
+  resolveInterfaceBrandColor,
+  resolveInterfaceBrandColors,
+  withColorOpacity,
+} from './theme-colors'
 
 describe('INTERFACE_COLOR_PRESETS', () => {
   it('provides the requested Claude and Mist Blue presets', () => {
@@ -28,5 +35,48 @@ describe('INTERFACE_COLOR_PRESETS', () => {
 
   it('uses a 60% alpha channel for preset badge backgrounds', () => {
     expect(withColorOpacity('#d97757', 0.6)).toBe('#d9775799')
+  })
+})
+
+describe('interface brand color', () => {
+  it('rejects white regardless of letter case', () => {
+    expect(isInterfaceBrandColorAllowed('#ffffff')).toBe(false)
+    expect(isInterfaceBrandColorAllowed('#FFFFFF')).toBe(false)
+  })
+
+  it('replaces white with the default brand color for the active theme', () => {
+    expect(resolveInterfaceBrandColor('#ffffff', 'light')).toBe('#228be6')
+    expect(resolveInterfaceBrandColor('#FFFFFF', 'dark')).toBe('#4dabf7')
+    expect(resolveInterfaceBrandColor('#123456', 'light')).toBe('#123456')
+  })
+
+  it('replaces white brand colors across a complete palette', () => {
+    expect(
+      resolveInterfaceBrandColors({
+        light: { ...INTERFACE_COLOR_PRESETS[0].colors.light, brand: '#ffffff' },
+        dark: { ...INTERFACE_COLOR_PRESETS[0].colors.dark, brand: '#FFFFFF' },
+      })
+    ).toEqual({
+      light: { ...INTERFACE_COLOR_PRESETS[0].colors.light, brand: '#228be6' },
+      dark: { ...INTERFACE_COLOR_PRESETS[0].colors.dark, brand: '#4dabf7' },
+    })
+  })
+})
+
+describe('renameInterfaceColorPreset', () => {
+  const presets = [
+    {
+      id: 'custom-1',
+      label: 'Custom Preset 1',
+      colors: INTERFACE_COLOR_PRESETS[0].colors,
+    },
+  ]
+
+  it('renames the matching preset and trims the label', () => {
+    expect(renameInterfaceColorPreset(presets, 'custom-1', '  My Colors  ')[0].label).toBe('My Colors')
+  })
+
+  it('does not accept a blank label', () => {
+    expect(renameInterfaceColorPreset(presets, 'custom-1', '   ')).toBe(presets)
   })
 })

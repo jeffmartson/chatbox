@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Alert,
   Badge,
+  Box,
   Button,
   Checkbox,
   Divider,
@@ -21,12 +22,15 @@ import {
   type InterfaceColorPreset,
   type InterfaceColors,
   type InterfaceThemeColors,
+  isInterfaceBrandColorAllowed,
+  resolveInterfaceBrandColor,
+  resolveInterfaceBrandColors,
   withColorOpacity,
 } from '@shared/theme-colors'
 import { type Language, Theme } from '@shared/types'
 import { formatFileSize } from '@shared/utils'
 import { getBackupFilename } from '@shared/utils/backup'
-import { IconDeviceFloppy, IconInfoCircle, IconTrash } from '@tabler/icons-react'
+import { IconCheck, IconDeviceFloppy, IconInfoCircle, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
 import dayjs from 'dayjs'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -57,11 +61,22 @@ export const Route = createFileRoute('/settings/general')({
   component: RouteComponent,
 })
 
+const presetBadgeButtonClassName =
+  'transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transform-none motion-reduce:transition-none'
+
 export function RouteComponent() {
   const { t } = useTranslation()
   const { setSettings, ...settings } = useSettingsStore((state) => state)
   const realTheme = useUIStore((state) => state.realTheme)
-  const currentInterfaceColors = (settings.interfaceColors ?? getDefaultInterfaceColors())[realTheme]
+  const storedInterfaceColors = (settings.interfaceColors ?? getDefaultInterfaceColors())[realTheme]
+  const currentInterfaceColors = {
+    ...storedInterfaceColors,
+    brand: resolveInterfaceBrandColor(storedInterfaceColors.brand, realTheme),
+  }
+  const [isCreatingInterfaceColorPreset, setIsCreatingInterfaceColorPreset] = useState(false)
+  const [isEditingInterfaceColorPresets, setIsEditingInterfaceColorPresets] = useState(false)
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
+  const [presetLabel, setPresetLabel] = useState('')
 
   const updateCurrentInterfaceColors = (updater: (colors: InterfaceThemeColors) => InterfaceThemeColors) => {
     setSettings((draft) => {
@@ -80,37 +95,82 @@ export function RouteComponent() {
 
   const applyInterfaceColorPreset = (colors: InterfaceColors) => {
     setSettings((draft) => {
-      draft.interfaceColors = {
-        light: { ...colors.light },
-        dark: { ...colors.dark },
-      }
+      draft.interfaceColors = resolveInterfaceBrandColors(colors)
     })
   }
 
   const saveInterfaceColorPreset = () => {
+    const label = presetLabel.trim()
+    if (!label) return
+
     setSettings((draft) => {
-      const currentColors = draft.interfaceColors ?? getDefaultInterfaceColors()
+      const currentColors = resolveInterfaceBrandColors(draft.interfaceColors ?? getDefaultInterfaceColors())
       draft.interfaceColorPresets ??= []
       draft.interfaceColorPresets.push({
         id: crypto.randomUUID(),
-        label: t('Custom Preset {{number}}', { number: draft.interfaceColorPresets.length + 1 }),
+        label,
         colors: {
           light: { ...currentColors.light },
           dark: { ...currentColors.dark },
         },
       })
     })
+    setIsCreatingInterfaceColorPreset(false)
+    setPresetLabel('')
   }
 
   const deleteInterfaceColorPreset = (presetId: string) => {
     setSettings((draft) => {
       draft.interfaceColorPresets = (draft.interfaceColorPresets ?? []).filter((preset) => preset.id !== presetId)
     })
+    if (editingPresetId === presetId) cancelEditingInterfaceColorPreset()
+  }
+
+  const startEditingInterfaceColorPreset = (preset: InterfaceColorPreset) => {
+    applyInterfaceColorPreset(preset.colors)
+    setIsCreatingInterfaceColorPreset(false)
+    setEditingPresetId(preset.id)
+    setPresetLabel(preset.label)
+  }
+
+  const cancelEditingInterfaceColorPreset = () => {
+    setEditingPresetId(null)
+    setPresetLabel('')
+  }
+
+  const saveEditedInterfaceColorPreset = () => {
+    const label = presetLabel.trim()
+    if (!editingPresetId || !label) return
+
+    setSettings((draft) => {
+      const colors = resolveInterfaceBrandColors(draft.interfaceColors ?? getDefaultInterfaceColors())
+      draft.interfaceColorPresets = (draft.interfaceColorPresets ?? []).map((preset) =>
+        preset.id === editingPresetId
+          ? {
+              ...preset,
+              label,
+              colors: {
+                light: { ...colors.light },
+                dark: { ...colors.dark },
+              },
+            }
+          : preset
+      )
+    })
+    cancelEditingInterfaceColorPreset()
   }
 
   const colorPresets = [
-    ...INTERFACE_COLOR_PRESETS.map((preset) => ({ ...preset, isCustom: false })),
-    ...(settings.interfaceColorPresets ?? []).map((preset) => ({ ...preset, isCustom: true })),
+    ...INTERFACE_COLOR_PRESETS.map((preset) => ({
+      ...preset,
+      colors: resolveInterfaceBrandColors(preset.colors),
+      isCustom: false,
+    })),
+    ...(settings.interfaceColorPresets ?? []).map((preset) => ({
+      ...preset,
+      colors: resolveInterfaceBrandColors(preset.colors),
+      isCustom: true,
+    })),
   ] satisfies Array<InterfaceColorPreset & { isCustom: boolean }>
 
   return (
@@ -169,72 +229,152 @@ export function RouteComponent() {
         </SimpleGrid>
 
         <Stack gap="md">
-          <SimpleGrid cols={2} spacing="md">
-            <Stack gap="md">
-              <InterfaceColorInput
-                label={t('Primary Background')}
-                value={currentInterfaceColors.backgroundPrimary}
-                onCommit={(value) => setInterfaceColor('backgroundPrimary', value)}
-              />
-              <InterfaceColorInput
-                label={t('Secondary Background')}
-                value={currentInterfaceColors.backgroundSecondary}
-                onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
-              />
-            </Stack>
-            <Stack gap="md">
-              <InterfaceColorInput
-                label={t('Tertiary Background')}
-                value={currentInterfaceColors.backgroundTertiary}
-                onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
-              />
-              <InterfaceColorInput
-                label={t('Brand Color')}
-                value={currentInterfaceColors.brand}
-                onCommit={(value) => setInterfaceColor('brand', value)}
-              />
-            </Stack>
-          </SimpleGrid>
-          <SimpleGrid cols={2} spacing="md">
-            <Button variant="outline" onClick={resetInterfaceColors}>
-              {t('Reset Colors')}
-            </Button>
-            <Button leftSection={<IconDeviceFloppy size={14} />} onClick={saveInterfaceColorPreset}>
-              {t('Save Current Colors')}
-            </Button>
-          </SimpleGrid>
           <Stack gap="xxs">
-            <Text size="sm">{t('Color Presets')}</Text>
-            <Flex gap="xs" wrap="wrap">
+            <Flex align="center" justify="space-between" gap="md">
+              <Text size="sm">{t('Color Presets')}</Text>
+              <ActionIcon
+                variant={isEditingInterfaceColorPresets ? 'light' : 'subtle'}
+                size="sm"
+                aria-label={isEditingInterfaceColorPresets ? t('Save') : t('Edit')}
+                disabled={
+                  isEditingInterfaceColorPresets &&
+                  Boolean(editingPresetId || isCreatingInterfaceColorPreset) &&
+                  !presetLabel.trim()
+                }
+                onClick={() => {
+                  if (isEditingInterfaceColorPresets) {
+                    if (editingPresetId) {
+                      saveEditedInterfaceColorPreset()
+                    } else if (isCreatingInterfaceColorPreset) {
+                      saveInterfaceColorPreset()
+                    } else {
+                      cancelEditingInterfaceColorPreset()
+                    }
+                  } else {
+                    setIsCreatingInterfaceColorPreset(false)
+                  }
+                  setIsEditingInterfaceColorPresets((value) => !value)
+                }}
+              >
+                {isEditingInterfaceColorPresets ? <IconCheck size={14} /> : <IconPencil size={14} />}
+              </ActionIcon>
+            </Flex>
+            <Flex
+              columnGap="xs"
+              rowGap={isEditingInterfaceColorPresets ? 12 : 'xs'}
+              py={isEditingInterfaceColorPresets ? 5 : 0}
+              wrap="wrap"
+            >
               {colorPresets.map((preset) => (
-                <Flex key={preset.id} gap={2} align="center">
+                <Box key={preset.id} pos="relative">
                   <Badge
                     component="button"
                     type="button"
+                    className={presetBadgeButtonClassName}
                     variant="filled"
                     style={{
                       backgroundColor: withColorOpacity(preset.colors[realTheme].brand, 0.6),
                       cursor: 'pointer',
+                      height: 30,
+                      maxWidth: 160,
                     }}
-                    onClick={() => applyInterfaceColorPreset(preset.colors)}
+                    onClick={() => {
+                      if (isEditingInterfaceColorPresets && preset.isCustom) {
+                        startEditingInterfaceColorPreset(preset)
+                      } else {
+                        applyInterfaceColorPreset(preset.colors)
+                      }
+                    }}
                   >
-                    {t(preset.label)}
+                    {preset.isCustom ? preset.label : t(preset.label)}
                   </Badge>
-                  {preset.isCustom && (
+                  {isEditingInterfaceColorPresets && preset.isCustom && (
                     <ActionIcon
-                      variant="subtle"
+                      pos="absolute"
+                      top={-5}
+                      right={-5}
+                      variant="filled"
                       color="red"
-                      size="sm"
+                      size={16}
+                      radius="xl"
                       aria-label={t('Delete')}
                       onClick={() => deleteInterfaceColorPreset(preset.id)}
                     >
-                      <IconTrash size={14} />
+                      <IconTrash size={10} />
                     </ActionIcon>
                   )}
-                </Flex>
+                </Box>
               ))}
+              {!isCreatingInterfaceColorPreset && (
+                <Badge
+                  component="button"
+                  type="button"
+                  className={presetBadgeButtonClassName}
+                  circle
+                  variant="outline"
+                  aria-label={t('New Preset')}
+                  style={{ cursor: 'pointer', height: 30, width: 30 }}
+                  styles={{ label: { display: 'flex', width: '100%', justifyContent: 'center' } }}
+                  onClick={() => {
+                    cancelEditingInterfaceColorPreset()
+                    setPresetLabel(`Custom Preset ${(settings.interfaceColorPresets?.length ?? 0) + 1}`)
+                    setIsCreatingInterfaceColorPreset(true)
+                  }}
+                >
+                  <IconPlus size={14} />
+                </Badge>
+              )}
             </Flex>
           </Stack>
+          {(isCreatingInterfaceColorPreset || editingPresetId) && (
+            <Stack gap="md">
+              <TextInput
+                autoFocus
+                label={t('Name')}
+                value={presetLabel}
+                onChange={(event) => setPresetLabel(event.currentTarget.value)}
+              />
+              <SimpleGrid cols={2} spacing="md">
+                <Stack gap="md">
+                  <InterfaceColorInput
+                    label={t('Primary Background')}
+                    value={currentInterfaceColors.backgroundPrimary}
+                    onCommit={(value) => setInterfaceColor('backgroundPrimary', value)}
+                  />
+                  <InterfaceColorInput
+                    label={t('Secondary Background')}
+                    value={currentInterfaceColors.backgroundSecondary}
+                    onCommit={(value) => setInterfaceColor('backgroundSecondary', value)}
+                  />
+                </Stack>
+                <Stack gap="md">
+                  <InterfaceColorInput
+                    label={t('Tertiary Background')}
+                    value={currentInterfaceColors.backgroundTertiary}
+                    onCommit={(value) => setInterfaceColor('backgroundTertiary', value)}
+                  />
+                  <InterfaceColorInput
+                    label={t('Brand Color')}
+                    value={currentInterfaceColors.brand}
+                    isColorAllowed={isInterfaceBrandColorAllowed}
+                    onCommit={(value) => setInterfaceColor('brand', value)}
+                  />
+                </Stack>
+              </SimpleGrid>
+              <SimpleGrid cols={2} spacing="md">
+                <Button variant="outline" onClick={resetInterfaceColors}>
+                  {t('Reset Colors')}
+                </Button>
+                <Button
+                  leftSection={<IconDeviceFloppy size={14} />}
+                  disabled={!presetLabel.trim()}
+                  onClick={editingPresetId ? saveEditedInterfaceColorPreset : saveInterfaceColorPreset}
+                >
+                  {editingPresetId ? t('Save') : t('Save Preset')}
+                </Button>
+              </SimpleGrid>
+            </Stack>
+          )}
         </Stack>
 
         {/* Font Size */}

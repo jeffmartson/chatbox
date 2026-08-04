@@ -76,6 +76,32 @@ export function getDefaultInterfaceColors(): InterfaceColors {
   }
 }
 
+export function isInterfaceBrandColorAllowed(color: string): boolean {
+  return color.toLowerCase() !== '#ffffff'
+}
+
+export function resolveInterfaceBrandColor(color: string, theme: InterfaceTheme): string {
+  return isInterfaceBrandColorAllowed(color) ? color : DEFAULT_INTERFACE_COLORS[theme].brand
+}
+
+export function resolveInterfaceBrandColors(colors: InterfaceColors): InterfaceColors {
+  return {
+    light: { ...colors.light, brand: resolveInterfaceBrandColor(colors.light.brand, 'light') },
+    dark: { ...colors.dark, brand: resolveInterfaceBrandColor(colors.dark.brand, 'dark') },
+  }
+}
+
+export function renameInterfaceColorPreset(
+  presets: InterfaceColorPreset[],
+  presetId: string,
+  label: string
+): InterfaceColorPreset[] {
+  const trimmedLabel = label.trim()
+  if (!trimmedLabel) return presets
+
+  return presets.map((preset) => (preset.id === presetId ? { ...preset, label: trimmedLabel } : preset))
+}
+
 export function withColorOpacity(color: string, opacity: number): string {
   const alpha = Math.round(Math.min(Math.max(opacity, 0), 1) * 255)
   return `${color}${alpha.toString(16).padStart(2, '0')}`

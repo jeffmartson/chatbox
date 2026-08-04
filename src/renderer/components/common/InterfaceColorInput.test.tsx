@@ -10,12 +10,20 @@ vi.mock('@mantine/core', async (importOriginal) => {
 
   return {
     ...actual,
-    ColorInput: ({ label, value, onChange, onChangeEnd, onBlur }: ColorInputProps) => (
+    ColorInput: ({ label, value, maxLength, onChange, onChangeEnd, onBlur }: ColorInputProps) => (
       <div>
         <input
           aria-label={typeof label === 'string' ? label : undefined}
           value={typeof value === 'string' ? value : ''}
-          onChange={(event) => onChange?.(event.currentTarget.value)}
+          maxLength={maxLength}
+          onChange={(event) => {
+            const inputValue = event.currentTarget.value
+            onChange?.(inputValue)
+            if (/^#[0-9a-f]{3}$/i.test(inputValue)) {
+              const [, r, g, b] = inputValue
+              onChangeEnd?.(`#${r}${r}${g}${g}${b}${b}`)
+            }
+          }}
           onBlur={onBlur}
         />
         <button type="button" onClick={() => onChangeEnd?.(typeof value === 'string' ? value : '')}>
@@ -56,6 +64,64 @@ describe('InterfaceColorInput', () => {
 
     expect(onChange).toHaveBeenCalledOnce()
     expect(onChange).toHaveBeenCalledWith('#abcdef')
+  })
+
+  it('keeps a partially deleted three-digit color instead of expanding it', () => {
+    const onChange = vi.fn()
+
+    render(<InterfaceColorInput label="Primary Background" value="#ffffff" onCommit={onChange} />)
+
+    fireEvent.change(screen.getByLabelText('Primary Background'), { target: { value: '#fff' } })
+
+    expect((screen.getByLabelText('Primary Background') as HTMLInputElement).value).toBe('#fff')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps the hash prefix and limits input to six hexadecimal digits', () => {
+    const onChange = vi.fn()
+
+    render(<InterfaceColorInput label="Primary Background" value="#ffffff" onCommit={onChange} />)
+
+    const input = screen.getByLabelText('Primary Background')
+    fireEvent.change(input, { target: { value: '' } })
+    expect((input as HTMLInputElement).value).toBe('#')
+
+    fireEvent.change(input, { target: { value: '12g34h567' } })
+    expect((input as HTMLInputElement).value).toBe('#123456')
+    expect((input as HTMLInputElement).maxLength).toBe(7)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('restores the previous color when the completed value is not allowed', () => {
+    const onChange = vi.fn()
+
+    render(
+      <InterfaceColorInput
+        label="Brand Color"
+        value="#228be6"
+        isColorAllowed={(color) => color !== '#ffffff'}
+        onCommit={onChange}
+      />
+    )
+
+    const input = screen.getByLabelText('Brand Color')
+    fireEvent.change(input, { target: { value: '#FFFFFF' } })
+    fireEvent.blur(input)
+
+    expect((input as HTMLInputElement).value).toBe('#228be6')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('still allows white when no color restriction is provided', () => {
+    const onChange = vi.fn()
+
+    render(<InterfaceColorInput label="Primary Background" value="#000000" onCommit={onChange} />)
+
+    const input = screen.getByLabelText('Primary Background')
+    fireEvent.change(input, { target: { value: '#ffffff' } })
+    fireEvent.blur(input)
+
+    expect(onChange).toHaveBeenCalledWith('#ffffff')
   })
 
   it('does not commit the same color again when blur follows picking end', () => {
