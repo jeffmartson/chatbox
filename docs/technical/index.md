@@ -14,6 +14,7 @@
 | [AI 供应商系统](./ai-providers.md) | 模型供应商注册表、OAuth 登录集成、模型类层级、能力声明、自建供应商 |
 | [思考控制（Reasoning Control）](./reasoning-control.md) | 思考控制支持条件判定（provider + 写死 model id）、effectiveProvider/apiStyle 映射、参数流转与请求侧兜底 |
 | [Gemini 工具调用 Thought Signatures](./gemini-tool-call-thought-signatures.md) | Gemini 3 function calling 的 signature 规则、并行工具调用历史序列化、25 次暂停继续问题复盘 |
+| [Gemini 流式错误拦截与重试安全](./gemini-stream-error-handling.md) | mid-stream 错误帧检测、MidStreamApiError 重试安全分类、网关范围决策与依赖升级维护清单 |
 | [会话管理系统](./session-management.md) | 数据模型、模块拆分、新会话机制、线程历史、消息分叉 |
 | [存储架构](./storage.md) | 混合存储策略、跨平台方案、版本迁移历史 |
 | [数据备份归档](./data-backup.md) | ZIP v2 格式、资源范围、流式导入导出、事务恢复与安全限制 |

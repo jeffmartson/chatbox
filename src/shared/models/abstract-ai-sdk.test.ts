@@ -3,7 +3,8 @@ import type { Provider } from 'ai'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelDependencies } from '../types/adapters'
 import type { SentryScope } from '../utils/sentry_adapter'
-import AbstractAISDKModel from './abstract-ai-sdk'
+import AbstractAISDKModel, { isRetryableStatusError } from './abstract-ai-sdk'
+import { ApiError, MidStreamApiError } from './errors'
 import type { CallChatCompletionOptions } from './types'
 
 const aiMocks = vi.hoisted(() => ({
@@ -224,5 +225,25 @@ describe('AbstractAISDKModel chatStream closure', () => {
 
     await stream.return(undefined)
     expect(providerStreamClosed).toBe(true)
+  })
+})
+
+describe('isRetryableStatusError', () => {
+  it('never retries MidStreamApiError regardless of status code', () => {
+    expect(isRetryableStatusError(new MidStreamApiError('shutdown', '{"error":{}}', 503))).toBe(false)
+    expect(isRetryableStatusError(new MidStreamApiError('rate limited', undefined, 429))).toBe(false)
+  })
+
+  it('retries plain ApiError with retryable status codes', () => {
+    expect(isRetryableStatusError(new ApiError('unavailable', undefined, 503))).toBe(true)
+    expect(isRetryableStatusError(new ApiError('rate limited', undefined, 429))).toBe(true)
+    expect(isRetryableStatusError(new ApiError('bad request', undefined, 400))).toBe(false)
+    expect(isRetryableStatusError(new ApiError('no status'))).toBe(false)
+  })
+
+  it('retries plain objects with a retryable statusCode', () => {
+    expect(isRetryableStatusError({ statusCode: 502 })).toBe(true)
+    expect(isRetryableStatusError({ statusCode: 401 })).toBe(false)
+    expect(isRetryableStatusError(new Error('nope'))).toBe(false)
   })
 })

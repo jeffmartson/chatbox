@@ -29,6 +29,11 @@ export class ApiError extends BaseError {
   }
 }
 
+// Upstream failed after part of the response had already streamed. Never safe
+// to auto-retry: the provider may have billed the partial generation, and the
+// partial text has already reached the UI, so a silent retry would duplicate it.
+export class MidStreamApiError extends ApiError {}
+
 export class NetworkError extends BaseError {
   public code = 10002
   public host: string

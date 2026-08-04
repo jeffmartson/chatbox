@@ -11,6 +11,7 @@ import {
   type PrepareStepFunction,
   type Provider,
   type ProviderMetadata,
+  RetryError,
   simulateStreamingMiddleware,
   stepCountIs,
   streamText,
@@ -35,7 +36,7 @@ import type { ModelDependencies } from '../types/adapters'
 import { getReasoningControlCapabilities, stripReasoningProviderOptions } from '../utils/reasoning-control'
 import { normalizeCompletedResponse } from './completed-response-normalizer'
 import { isExpectedGenerationError } from './error-classification'
-import { ApiError, ChatboxAIAPIError } from './errors'
+import { ApiError, ChatboxAIAPIError, MidStreamApiError } from './errors'
 import { wrapOpenAICompatibleNonStreamingModel } from './openai-compatible-non-streaming'
 import { stopWhenPersistentToolCallPause } from './persistent-tool-call-pause'
 import { repairToolCallJson } from './tool-call-json-repair'
@@ -46,6 +47,7 @@ import type {
   ModelStatus,
   ModelStreamPart,
 } from './types'
+import { extractStreamErrorMessage } from './utils/stream-error-message'
 
 const RETRY_CONFIG = {
   MAX_ATTEMPTS: 5,
@@ -62,7 +64,14 @@ function isRetryableStatusCode(code: number): boolean {
   return code === 429 || (code >= 500 && code < 600)
 }
 
-function isRetryableStatusError(error: unknown): boolean {
+export function isRetryableStatusError(error: unknown): boolean {
+  // A failure after part of the response streamed is never billing-safe to
+  // retry, regardless of status code: the partial generation may already be
+  // billed, and a silent re-run would append a fresh response after the
+  // already-rendered partial text.
+  if (error instanceof MidStreamApiError) {
+    return false
+  }
   if (APICallError.isInstance(error)) {
     const statusCode = error.statusCode
     return statusCode !== undefined && isRetryableStatusCode(statusCode)
@@ -707,6 +716,17 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
   }
 
   private handleError(error: unknown, context: string = ''): never {
+    // When a retried attempt fails again, ai-retry wraps the failure in the AI
+    // SDK's RetryError; unwrap so the original error's message/statusCode/
+    // responseBody reach the UI instead of the generic "Failed after N attempts".
+    // (Relies on RetryError.lastError holding the raw thrown error — re-check on
+    // ai-retry upgrades.)
+    if (
+      RetryError.isInstance(error) &&
+      (error.lastError instanceof ApiError || APICallError.isInstance(error.lastError))
+    ) {
+      return this.handleError(error.lastError, context)
+    }
     if (APICallError.isInstance(error)) {
       const responseBody = this.sanitizeResponseBody(error.statusCode, error.responseBody)
       throw new ApiError(`Error from ${this.name}${context}`, responseBody, error.statusCode)
@@ -717,7 +737,9 @@ export default abstract class AbstractAISDKModel implements ModelInterface {
     if (error instanceof ChatboxAIAPIError) {
       throw error
     }
-    throw new ApiError(`Error from ${this.name}${context}: ${error}`)
+    // Mid-stream provider errors are often plain objects ({ message, type, code });
+    // interpolating them yields "[object Object]".
+    throw new ApiError(`Error from ${this.name}${context}: ${extractStreamErrorMessage(error)}`)
   }
 
   /**

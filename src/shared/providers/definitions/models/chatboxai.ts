@@ -19,6 +19,7 @@ import type {
   ModelStreamPart,
 } from '../../../models/types'
 import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import { maybeWrapGeminiErrorResponse } from '../../../models/utils/gemini-stream-error'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
 import type { StreamTextResult, ToolUseScope } from '../../../types'
 import { type ChatboxAILicenseDetail, ModelProviderEnum, type ProviderModelInfo } from '../../../types'
@@ -98,7 +99,16 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
   }
 
   private async chatboxAIFetch(url: RequestInfo | URL, options?: RequestInit) {
-    return this.dependencies.request.fetchWithOptions(url.toString(), options, { parseChatboxRemoteError: true })
+    const urlString = url.toString()
+    const response = await this.dependencies.request.fetchWithOptions(urlString, options, {
+      parseChatboxRemoteError: true,
+    })
+    // @ai-sdk/google silently strips mid-stream {"error":...} SSE; intercept before the SDK.
+    // Intentionally ChatboxAI-gateway-only: the mid-stream error frames come from our
+    // backend's graceful-shutdown coordination (chatbox-backend #548). Direct Gemini
+    // providers (gemini.ts / custom-gemini.ts) don't route through this fetch and are
+    // out of scope until the same frame shape is confirmed from Google's own API.
+    return maybeWrapGeminiErrorResponse(urlString, response)
   }
 
   static isSupportTextEmbedding() {
