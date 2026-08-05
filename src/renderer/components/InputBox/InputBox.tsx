@@ -13,6 +13,7 @@ import { KNOWLEDGE_BASE_MAX_FILE_SIZE, KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL } from
 import { isDeepSeekWeakToolUse } from '@shared/models/utils/deepseek'
 import { getModel } from '@shared/providers'
 import { formatNumber } from '@shared/utils'
+import { resolveReasoningProviderOptions } from '@shared/utils/reasoning-control'
 import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
@@ -452,7 +453,11 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       isNewSession,
       model,
       providers,
-      sessionProviderOptions: currentSessionMergedSettings?.providerOptions,
+      sessionProviderOptions: resolveReasoningProviderOptions(
+        currentSessionMergedSettings,
+        model?.provider,
+        model?.modelId
+      ),
     })
 
     // Get current messages for token counting - will only recalculate when stable messages actually change

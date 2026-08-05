@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { settings as defaultSettings } from '../defaults'
-import { SettingsSchema } from './settings'
+import { SessionSettingsSchema, SettingsSchema } from './settings'
 
 describe('SettingsSchema RAG default models', () => {
   test('parses default embedding and rerank model selections', () => {
@@ -116,5 +116,34 @@ describe('SettingsSchema VibeDrop publication history', () => {
     })
 
     expect(parsed.vibedropSessionPublications).toBeUndefined()
+  })
+})
+
+describe('SessionSettingsSchema per-model provider options', () => {
+  test('parses the per-model map alongside the legacy shared field', () => {
+    const parsed = SessionSettingsSchema.parse({
+      provider: 'chatbox-ai',
+      modelId: 'deepseek-v4-pro',
+      providerOptions: { deepseek: { thinking: { type: 'enabled' }, reasoningEffort: 'max' } },
+      providerOptionsByModel: {
+        'chatbox-ai:deepseek-v4-pro': { claude: { thinking: { type: 'enabled' }, effort: 'max' } },
+        'chatbox-ai:claude-sonnet-4-20250514': { claude: { thinking: { type: 'enabled', budgetTokens: 4096 } } },
+      },
+    })
+
+    expect(parsed.providerOptionsByModel?.['chatbox-ai:deepseek-v4-pro']?.claude?.effort).toBe('max')
+    expect(parsed.providerOptionsByModel?.['chatbox-ai:claude-sonnet-4-20250514']?.claude?.thinking?.budgetTokens).toBe(
+      4096
+    )
+  })
+
+  test('drops an invalid map without failing the whole settings parse', () => {
+    const parsed = SessionSettingsSchema.parse({
+      provider: 'chatbox-ai',
+      providerOptionsByModel: 'not-a-map',
+    })
+
+    expect(parsed.providerOptionsByModel).toBeUndefined()
+    expect(parsed.provider).toBe('chatbox-ai')
   })
 })

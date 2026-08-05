@@ -12,6 +12,8 @@ import {
   isOpenAIReasoningEffortSupported,
   normalizeClaudeReasoningOptions,
   normalizeOpenAIReasoningOptions,
+  resolveReasoningProviderOptions,
+  setReasoningProviderOptionsForModel,
   stripReasoningProviderOptions,
   usesClaudeEffortControl,
 } from './reasoning-control'
@@ -88,15 +90,15 @@ describe('reasoning-control', () => {
     ).toBeUndefined()
   })
 
-  it('maps DeepSeek and Qwen toggle-style reasoning', () => {
-    const deepseek = getReasoningProviderOptions(ModelProviderEnum.DeepSeek, model('deepseek-reasoner'), 'medium')
+  it('maps DeepSeek effort levels and Qwen budget reasoning', () => {
+    const deepseek = getReasoningProviderOptions(ModelProviderEnum.DeepSeek, model('deepseek-reasoner'), 'low')
     const deepseekV4 = getReasoningProviderOptions(ModelProviderEnum.DeepSeek, model('deepseek-v4-pro'), 'medium')
     const deepseekV32 = getReasoningProviderOptions(ModelProviderEnum.DeepSeek, model('deepseek-v3.2-thinking'), 'high')
     const qwen = getReasoningProviderOptions(ModelProviderEnum.Qwen, model('qwen3.7-max'), 'high')
 
-    expect(deepseek?.deepseek?.thinking).toEqual({ type: 'enabled' })
-    expect(deepseekV4?.deepseek?.thinking).toEqual({ type: 'enabled' })
-    expect(deepseekV32?.deepseek?.thinking).toEqual({ type: 'enabled' })
+    expect(deepseek?.deepseek).toEqual({ thinking: { type: 'enabled' } })
+    expect(deepseekV4?.deepseek).toEqual({ thinking: { type: 'enabled' }, reasoningEffort: 'high' })
+    expect(deepseekV32?.deepseek).toEqual({ thinking: { type: 'enabled' } })
     expect(getReasoningControlLevel(ModelProviderEnum.DeepSeek, model('deepseek-v3.2-thinking'), deepseekV32)).toBe(
       'high'
     )
@@ -424,36 +426,114 @@ describe('reasoning-control', () => {
     })
     expect(getReasoningControlCapabilities(ModelProviderEnum.DeepSeek, v4)).toEqual({
       supported: true,
-      kind: 'toggle',
+      kind: 'deepseek-effort',
     })
     expect(getReasoningControlOptions(ModelProviderEnum.DeepSeek, v4)).toEqual([
       { level: 'default', label: 'default' },
       { level: 'off', label: 'off' },
-      { level: 'high', label: 'on' },
+      { level: 'low', label: 'low' },
+      { level: 'medium', label: 'medium' },
+      { level: 'high', label: 'high' },
     ])
     expect(options?.deepseek).toEqual({ thinking: { type: 'enabled' } })
   })
 
-  it('supports DeepSeek v4 toggle through ChatboxAI OpenAI-compatible API style', () => {
+  it.each([
+    {
+      apiStyle: 'openai' as const,
+      low: { deepseek: { thinking: { type: 'enabled' as const }, reasoningEffort: 'low' as const } },
+      medium: { deepseek: { thinking: { type: 'enabled' as const }, reasoningEffort: 'high' as const } },
+      high: { deepseek: { thinking: { type: 'enabled' as const }, reasoningEffort: 'max' as const } },
+      off: { deepseek: { thinking: { type: 'disabled' as const } } },
+    },
+    {
+      apiStyle: 'anthropic' as const,
+      low: { claude: { thinking: { type: 'enabled' as const }, effort: 'low' as const } },
+      medium: { claude: { thinking: { type: 'enabled' as const }, effort: 'high' as const } },
+      high: { claude: { thinking: { type: 'enabled' as const }, effort: 'max' as const } },
+      off: { claude: { thinking: { type: 'disabled' as const } } },
+    },
+    {
+      apiStyle: 'openai-responses' as const,
+      low: { openai: { reasoningEffort: 'low' as const, forceReasoning: true } },
+      medium: { openai: { reasoningEffort: 'high' as const, forceReasoning: true } },
+      high: { openai: { reasoningEffort: 'max' as const, forceReasoning: true } },
+      off: { openai: { reasoningEffort: 'none' as const, forceReasoning: true } },
+    },
+  ])('supports ChatboxAI DeepSeek effort through $apiStyle API style', ({ apiStyle, low, medium, high, off }) => {
     const modelInfo: ProviderModelInfo = {
       modelId: 'deepseek-v4-pro',
-      apiStyle: 'openai',
+      apiStyle,
+      capabilities: ['tool_use'],
     }
-    const onOptions = getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'high')
-    const offOptions = getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'off')
 
     expect(getReasoningControlCapabilities(ModelProviderEnum.ChatboxAI, modelInfo)).toEqual({
       supported: true,
+      kind: 'deepseek-effort',
+    })
+    expect(getReasoningControlOptions(ModelProviderEnum.ChatboxAI, modelInfo).map((option) => option.level)).toEqual([
+      'default',
+      'off',
+      'low',
+      'medium',
+      'high',
+    ])
+    expect(getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'low')).toEqual(low)
+    expect(getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'medium')).toEqual(medium)
+    expect(getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'high')).toEqual(high)
+    expect(getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, modelInfo, 'off')).toEqual(off)
+    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, modelInfo, low)).toBe('low')
+    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, modelInfo, medium)).toBe('medium')
+    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, modelInfo, high)).toBe('high')
+    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, modelInfo, off)).toBe('off')
+  })
+
+  it('reads missing or invalid V4 effort as default instead of inventing a level', () => {
+    const v4 = model('deepseek-v4-pro', 'openai')
+
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.ChatboxAI, v4, {
+        deepseek: { thinking: { type: 'enabled' } },
+      })
+    ).toBe('default')
+    expect(
+      getReasoningControlLevel(ModelProviderEnum.ChatboxAI, v4, {
+        deepseek: { thinking: { type: 'enabled' }, reasoningEffort: 'medium' },
+      })
+    ).toBe('default')
+  })
+
+  it('keeps older DeepSeek models on toggle controls without sending V4 effort', () => {
+    const reasoner = model('deepseek-reasoner', 'anthropic')
+
+    expect(getReasoningControlCapabilities(ModelProviderEnum.ChatboxAI, reasoner)).toEqual({
+      supported: true,
       kind: 'toggle',
     })
-    expect(getReasoningControlOptions(ModelProviderEnum.ChatboxAI, modelInfo)).toEqual([
-      { level: 'default', label: 'default' },
-      { level: 'off', label: 'off' },
-      { level: 'high', label: 'on' },
-    ])
-    expect(onOptions?.deepseek).toEqual({ thinking: { type: 'enabled' } })
-    expect(offOptions?.deepseek).toEqual({ thinking: { type: 'disabled' } })
-    expect(getReasoningControlLevel(ModelProviderEnum.ChatboxAI, modelInfo, onOptions)).toBe('high')
+    expect(getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, reasoner, 'high')).toEqual({
+      claude: { thinking: { type: 'enabled' } },
+    })
+  })
+
+  it('replaces stale ChatboxAI DeepSeek options when the server changes API style', () => {
+    const anthropicModel = model('deepseek-v4-pro', 'anthropic')
+    const responsesModel = model('deepseek-v4-pro', 'openai-responses')
+    const anthropicOptions = getReasoningProviderOptions(ModelProviderEnum.ChatboxAI, anthropicModel, 'low', {
+      deepseek: { thinking: { type: 'enabled' }, reasoningEffort: 'max' },
+    })
+    const responsesOptions = getReasoningProviderOptions(
+      ModelProviderEnum.ChatboxAI,
+      responsesModel,
+      'high',
+      anthropicOptions
+    )
+
+    expect(anthropicOptions).toEqual({
+      claude: { thinking: { type: 'enabled' }, effort: 'low' },
+    })
+    expect(responsesOptions).toEqual({
+      openai: { reasoningEffort: 'max', forceReasoning: true },
+    })
   })
 
   it('does not use unreliable capabilities to enable unknown DeepSeek model ids', () => {
@@ -708,6 +788,107 @@ describe('reasoning-control', () => {
     it('returns the same reference when there is nothing to strip', () => {
       const input = {}
       expect(stripReasoningProviderOptions(input)).toBe(input)
+    })
+  })
+
+  describe('per-model reasoning provider options', () => {
+    const deepseekOptions = { claude: { thinking: { type: 'enabled' as const }, effort: 'max' as const } }
+    const claudeOptions = { claude: { thinking: { type: 'enabled' as const, budgetTokens: 4096 } } }
+
+    it('scopes options to the provider+model they were written for', () => {
+      const written = setReasoningProviderOptionsForModel(
+        undefined,
+        ModelProviderEnum.ChatboxAI,
+        'deepseek-v4-pro',
+        deepseekOptions
+      )
+
+      // The legacy shared field is cleared; the map is the single source of truth.
+      expect(written.providerOptions).toBeUndefined()
+      expect(written.providerOptionsByModel).toEqual({ 'chatbox-ai:deepseek-v4-pro': deepseekOptions })
+      expect(resolveReasoningProviderOptions(written, ModelProviderEnum.ChatboxAI, 'deepseek-v4-pro')).toEqual(
+        deepseekOptions
+      )
+      // A switched model must not inherit another model's parameters.
+      expect(
+        resolveReasoningProviderOptions(written, ModelProviderEnum.ChatboxAI, 'claude-sonnet-4-20250514')
+      ).toBeUndefined()
+      expect(resolveReasoningProviderOptions(written, ModelProviderEnum.OpenAI, 'gpt-5.5')).toBeUndefined()
+    })
+
+    it('keeps entries of other models and removes an entry on the default level', () => {
+      const first = setReasoningProviderOptionsForModel(
+        undefined,
+        ModelProviderEnum.ChatboxAI,
+        'deepseek-v4-pro',
+        deepseekOptions
+      )
+      const second = setReasoningProviderOptionsForModel(
+        first,
+        ModelProviderEnum.ChatboxAI,
+        'claude-sonnet-4-20250514',
+        claudeOptions
+      )
+
+      expect(second.providerOptionsByModel).toEqual({
+        'chatbox-ai:deepseek-v4-pro': deepseekOptions,
+        'chatbox-ai:claude-sonnet-4-20250514': claudeOptions,
+      })
+
+      const cleared = setReasoningProviderOptionsForModel(
+        second,
+        ModelProviderEnum.ChatboxAI,
+        'deepseek-v4-pro',
+        undefined
+      )
+      expect(cleared.providerOptions).toBeUndefined()
+      expect(cleared.providerOptionsByModel).toEqual({ 'chatbox-ai:claude-sonnet-4-20250514': claudeOptions })
+      expect(resolveReasoningProviderOptions(cleared, ModelProviderEnum.ChatboxAI, 'deepseek-v4-pro')).toBeUndefined()
+    })
+
+    it('never reads the legacy shared field', () => {
+      expect(
+        resolveReasoningProviderOptions(
+          { providerOptions: claudeOptions },
+          ModelProviderEnum.Claude,
+          'claude-sonnet-4-5'
+        )
+      ).toBeUndefined()
+      expect(
+        resolveReasoningProviderOptions(
+          { providerOptions: claudeOptions, providerOptionsByModel: {} },
+          ModelProviderEnum.Claude,
+          'claude-sonnet-4-5'
+        )
+      ).toBeUndefined()
+      expect(resolveReasoningProviderOptions(undefined, ModelProviderEnum.Claude, 'claude-sonnet-4-5')).toBeUndefined()
+    })
+  })
+
+  describe('request-edge hardening for cross-model DeepSeek values', () => {
+    it('drops enabled Claude thinking without budgetTokens on budget-style models', () => {
+      // Shape only the DeepSeek-Anthropic writer produces; real Anthropic budget models
+      // reject enabled thinking without budget_tokens.
+      expect(
+        normalizeClaudeReasoningOptions('claude-sonnet-4-20250514', { thinking: { type: 'enabled' }, effort: 'max' })
+      ).toBeUndefined()
+      expect(
+        normalizeClaudeReasoningOptions('claude-sonnet-4-20250514', {
+          thinking: { type: 'enabled', budgetTokens: 1024 },
+        })
+      ).toEqual({ thinking: { type: 'enabled', budgetTokens: 1024 } })
+    })
+
+    it('clamps DeepSeek-only Claude effort values on effort-style models', () => {
+      expect(normalizeClaudeReasoningOptions('claude-opus-4-5', { effort: 'max' })).toEqual({ effort: 'high' })
+      expect(normalizeClaudeReasoningOptions('claude-opus-4-8', { effort: 'xhigh' })).toEqual({ effort: 'high' })
+    })
+
+    it('rejects the DeepSeek-only max effort for OpenAI models', () => {
+      expect(isOpenAIReasoningEffortSupported('gpt-5.5', 'max')).toBe(false)
+      expect(
+        normalizeOpenAIReasoningOptions('gpt-5.5', { reasoningEffort: 'max', forceReasoning: true })
+      ).toBeUndefined()
     })
   })
 })

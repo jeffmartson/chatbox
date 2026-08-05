@@ -1,4 +1,4 @@
-import { isDeepSeekReasoningModel } from '../models/utils/deepseek'
+import { isDeepSeekReasoningEffortModel, isDeepSeekReasoningModel } from '../models/utils/deepseek'
 import type { ModelProvider, ProviderModelInfo, ProviderOptions } from '../types'
 import { ModelProviderEnum } from '../types'
 import {
@@ -11,6 +11,62 @@ import {
 // 'default' sends no reasoning-related parameters at all (the provider's server-side
 // default applies); 'off' force-sends the provider's explicit disable parameters.
 export type ReasoningControlLevel = 'default' | 'off' | 'low' | 'medium' | 'high'
+
+/**
+ * Session-level storage for reasoning provider options. `providerOptionsByModel`
+ * scopes options to the provider+model they were written for, so switching models
+ * within a session never sends parameters a different model cannot accept. The
+ * legacy shared `providerOptions` field is never read anymore (pre-map sessions
+ * simply start from the 'default' level again); writes clear it.
+ *
+ * The per-model binding also prepares for the planned UI move: thinking levels
+ * will be edited from the model picker (an "edit thinking" affordance per model)
+ * instead of the input-box control, and that UI needs each model's level stored
+ * independently.
+ */
+export interface ReasoningProviderOptionsSource {
+  providerOptions?: ProviderOptions
+  providerOptionsByModel?: Record<string, ProviderOptions>
+}
+
+export function getReasoningOptionsModelKey(provider: string | undefined, modelId: string | undefined): string {
+  return `${provider || ''}:${modelId || ''}`
+}
+
+/**
+ * Resolves the reasoning provider options that apply to the given provider+model.
+ * Options never cross model boundaries — a model without its own map entry gets
+ * `undefined` (the 'default' level), not another model's parameters.
+ */
+export function resolveReasoningProviderOptions(
+  source: ReasoningProviderOptionsSource | undefined,
+  provider: string | undefined,
+  modelId: string | undefined
+): ProviderOptions | undefined {
+  return source?.providerOptionsByModel?.[getReasoningOptionsModelKey(provider, modelId)]
+}
+
+/**
+ * Returns the settings patch that stores `next` for the given provider+model.
+ * Writes the per-model map (deleting the entry when `next` is undefined, i.e.
+ * the 'default' level) and clears the legacy shared field so the map is the
+ * single source of truth from then on.
+ */
+export function setReasoningProviderOptionsForModel(
+  source: ReasoningProviderOptionsSource | undefined,
+  provider: string | undefined,
+  modelId: string | undefined,
+  next: ProviderOptions | undefined
+): ReasoningProviderOptionsSource {
+  const key = getReasoningOptionsModelKey(provider, modelId)
+  const byModel: Record<string, ProviderOptions> = { ...source?.providerOptionsByModel }
+  if (next) {
+    byModel[key] = next
+  } else {
+    delete byModel[key]
+  }
+  return { providerOptions: undefined, providerOptionsByModel: byModel }
+}
 
 export type ReasoningControlDisabledReason =
   | 'requires-anthropic-api-style'
@@ -26,6 +82,7 @@ export interface ReasoningControlCapabilities {
     | 'anthropic-adaptive-effort'
     | 'anthropic-effort'
     | 'budget'
+    | 'deepseek-effort'
     | 'level'
     | 'openai-effort'
     | 'openrouter-reasoning'
@@ -45,6 +102,7 @@ const DEFAULT_CAPABILITIES: ReasoningControlCapabilities = {
 }
 
 type ReasoningEffortLevel = Exclude<ReasoningControlLevel, 'default' | 'off'>
+type DeepSeekReasoningEffort = 'low' | 'high' | 'max'
 
 const CLAUDE_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
   low: 1024,
@@ -64,6 +122,15 @@ const GEMINI_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
 const GEMINI_LEVEL_READBACK_MIN: Record<Exclude<ReasoningEffortLevel, 'low'>, number> = {
   medium: 4096,
   high: 10240,
+}
+
+// DeepSeek's official APIs expose low/high/max rather than the UI's
+// low/medium/high. Preserve three distinct controls by mapping the middle UI
+// level to DeepSeek high and the highest UI level to DeepSeek max.
+const DEEPSEEK_EFFORT_BY_LEVEL: Record<ReasoningEffortLevel, DeepSeekReasoningEffort> = {
+  low: 'low',
+  medium: 'high',
+  high: 'max',
 }
 
 const QWEN_THINKING_BUDGET_BY_LEVEL: Record<ReasoningEffortLevel, number> = {
@@ -166,8 +233,14 @@ export function normalizeClaudeReasoningOptions(
 ): ProviderOptions['claude'] {
   if (!claude) return undefined
   if (usesClaudeEffortControl(modelId)) {
-    return claude.effort ? { effort: claude.effort } : undefined
+    if (!claude.effort) return undefined
+    // 'xhigh'/'max' are DeepSeek-Anthropic-only values; clamp to the strongest
+    // level Claude effort models accept.
+    return { effort: claude.effort === 'xhigh' || claude.effort === 'max' ? 'high' : claude.effort }
   }
+  // Budget-style models reject enabled thinking without budget_tokens (a shape only
+  // the DeepSeek-Anthropic writer produces); treat it as 'default' instead.
+  if (claude.thinking?.type === 'enabled' && claude.thinking.budgetTokens == null) return undefined
   return claude.thinking ? { thinking: claude.thinking } : undefined
 }
 
@@ -177,6 +250,9 @@ export function normalizeClaudeReasoningOptions(
  * reject the minimal/none off values.
  */
 export function isOpenAIReasoningEffortSupported(modelId: string, effort: string): boolean {
+  // 'max' is a DeepSeek-only effort; OpenAI models reject it. The DeepSeek
+  // Responses path branches off before this check, so it is never affected.
+  if (effort === 'max') return false
   if (matchesAny(modelId, OPENAI_NO_EFFORT_PARAM_MODELS)) return false
   if (matchesAny(modelId, OPENAI_NO_DISABLE_MODELS) && (effort === 'minimal' || effort === 'none')) return false
   return true
@@ -298,11 +374,18 @@ export function getReasoningControlCapabilities(
   }
 
   const effectiveProvider = getEffectiveProvider(provider, model)
+  const isChatboxDeepSeek = isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)
   const disabledReason = getApiStyleDisabledReason(provider, effectiveProvider, model)
   if (disabledReason) {
     return { supported: false, kind: 'toggle', disabledReason }
   }
 
+  // ChatboxAI's server-selected API style may change independently of the client.
+  // DeepSeek V4 officially supports effort controls in OpenAI Chat, Anthropic,
+  // and Responses formats; older reasoning models retain toggle controls.
+  if (isChatboxDeepSeek) {
+    return { supported: true, kind: isDeepSeekReasoningEffortModel(modelId) ? 'deepseek-effort' : 'toggle' }
+  }
   if (effectiveProvider === ModelProviderEnum.Claude && matchesAny(modelId, CLAUDE_ADAPTIVE_EFFORT_MODELS)) {
     return { supported: true, kind: 'anthropic-adaptive-effort' }
   }
@@ -318,10 +401,10 @@ export function getReasoningControlCapabilities(
     if (mode === 'level') return { supported: true, kind: 'level' }
   }
   if (effectiveProvider === ModelProviderEnum.DeepSeek && isDeepSeekThinkingModel(model)) {
-    return { supported: true, kind: 'toggle' }
+    return { supported: true, kind: isDeepSeekReasoningEffortModel(modelId) ? 'deepseek-effort' : 'toggle' }
   }
   if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
-    return { supported: true, kind: 'toggle' }
+    return { supported: true, kind: isDeepSeekReasoningEffortModel(modelId) ? 'deepseek-effort' : 'toggle' }
   }
   if (isOpenAIStyleEffectiveProvider(effectiveProvider) && isGptEffortModel(modelId)) {
     return { supported: true, kind: 'openai-effort' }
@@ -371,7 +454,8 @@ function getApiStyleDisabledReason(
   if (
     isDeepSeekReasoningModel(modelId) &&
     effectiveProvider !== ModelProviderEnum.DeepSeek &&
-    !isOpenAICompatibleApiStyle(provider, model)
+    !isOpenAICompatibleApiStyle(provider, model) &&
+    !isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)
   ) {
     return 'requires-deepseek-api-style'
   }
@@ -415,24 +499,37 @@ function deriveReasoningControlLevel(
   if (!capabilities.supported) return 'default'
 
   const effectiveProvider = getEffectiveProvider(provider, model)
-  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
-    const deepseekThinking = providerOptions?.deepseek?.thinking
-    if (deepseekThinking) {
-      return deepseekThinking.type === 'enabled' ? 'high' : 'off'
+  if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
+    const modelId = model?.modelId || ''
+    if (model?.apiStyle === 'anthropic') {
+      return deriveDeepSeekLevel(modelId, providerOptions?.claude?.thinking?.type, providerOptions?.claude?.effort)
     }
-    const legacyType = getLegacyOpenAICompatibleThinkingType(providerOptions?.openaiCompatible?.reasoning)
-    if (legacyType === 'enabled') return 'high'
-    if (legacyType === 'disabled') return 'off'
-    return 'default'
+    if (model?.apiStyle === 'openai-responses') {
+      return deriveDeepSeekResponsesLevel(modelId, providerOptions?.openai?.reasoningEffort)
+    }
+    return deriveDeepSeekLevel(
+      modelId,
+      providerOptions?.deepseek?.thinking?.type ??
+        getLegacyOpenAICompatibleThinkingType(providerOptions?.openaiCompatible?.reasoning),
+      providerOptions?.deepseek?.reasoningEffort
+    )
+  }
+  if (model && isOpenAICompatibleApiStyle(provider, model) && isDeepSeekThinkingModel(model)) {
+    return deriveDeepSeekLevel(
+      model.modelId,
+      providerOptions?.deepseek?.thinking?.type ??
+        getLegacyOpenAICompatibleThinkingType(providerOptions?.openaiCompatible?.reasoning),
+      providerOptions?.deepseek?.reasoningEffort
+    )
   }
   if (effectiveProvider === ModelProviderEnum.Claude) {
     if (capabilities.kind === 'anthropic-adaptive-effort' || capabilities.kind === 'anthropic-effort') {
-      return providerOptions?.claude?.effort || 'default'
+      return normalizeEffortToLevel(providerOptions?.claude?.effort)
     }
     const thinking = providerOptions?.claude?.thinking
     if (!thinking) return 'default'
     if (thinking.type !== 'enabled') return 'off'
-    const budget = thinking.budgetTokens
+    const budget = thinking.budgetTokens ?? 0
     if (budget >= CLAUDE_BUDGET_BY_LEVEL.high) return 'high'
     if (budget >= CLAUDE_BUDGET_BY_LEVEL.medium) return 'medium'
     return 'low'
@@ -463,9 +560,11 @@ function deriveReasoningControlLevel(
     return 'low'
   }
   if (effectiveProvider === ModelProviderEnum.DeepSeek) {
-    const thinking = providerOptions?.deepseek?.thinking
-    if (!thinking) return 'default'
-    return thinking.type === 'enabled' ? 'high' : 'off'
+    return deriveDeepSeekLevel(
+      model?.modelId || '',
+      providerOptions?.deepseek?.thinking?.type,
+      providerOptions?.deepseek?.reasoningEffort
+    )
   }
   if (effectiveProvider === ModelProviderEnum.Qwen || effectiveProvider === ModelProviderEnum.QwenPortal) {
     const openaiCompatible = providerOptions?.openaiCompatible
@@ -528,10 +627,25 @@ export function getReasoningProviderOptions(
     return stripReasoningProviderOptions(previous)
   }
 
-  const next: ProviderOptions = { ...(previous || {}) }
+  // ChatboxAI can change a DeepSeek model's apiStyle in the remote catalog.
+  // Drop the old protocol namespace before writing the new one so a persisted
+  // session never carries Anthropic/OpenAI/Responses controls simultaneously.
+  const next: ProviderOptions = isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)
+    ? { ...(stripReasoningProviderOptions(previous) || {}) }
+    : { ...(previous || {}) }
 
   if (level === 'off') {
-    if (effectiveProvider === ModelProviderEnum.Claude) {
+    if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
+      if (model?.apiStyle === 'anthropic') {
+        next.claude = { thinking: { type: 'disabled' } }
+      } else if (model?.apiStyle === 'openai-responses') {
+        // @ai-sdk/openai does not recognize DeepSeek ids as reasoning models;
+        // forceReasoning makes it serialize the official `reasoning.effort` body.
+        next.openai = { reasoningEffort: 'none', forceReasoning: true }
+      } else {
+        next.deepseek = { thinking: { type: 'disabled' } }
+      }
+    } else if (effectiveProvider === ModelProviderEnum.Claude) {
       next.claude = { thinking: { type: 'disabled', budgetTokens: 0 } }
     } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
       next.deepseek = { thinking: { type: 'disabled' } }
@@ -554,14 +668,28 @@ export function getReasoningProviderOptions(
     return compactProviderOptions(next)
   }
 
-  if (effectiveProvider === ModelProviderEnum.Claude) {
+  if (isChatboxAIDeepSeekWithOfficialApiStyle(provider, model)) {
+    const effort = isDeepSeekReasoningEffortModel(model?.modelId || '') ? DEEPSEEK_EFFORT_BY_LEVEL[level] : undefined
+    if (model?.apiStyle === 'anthropic') {
+      next.claude = { thinking: { type: 'enabled' }, ...(effort ? { effort } : {}) }
+    } else if (model?.apiStyle === 'openai-responses') {
+      next.openai = { reasoningEffort: effort, forceReasoning: true }
+    } else {
+      next.deepseek = { thinking: { type: 'enabled' }, ...(effort ? { reasoningEffort: effort } : {}) }
+    }
+  } else if (effectiveProvider === ModelProviderEnum.Claude) {
     if (capabilities.kind === 'anthropic-adaptive-effort' || capabilities.kind === 'anthropic-effort') {
       next.claude = { effort: level }
     } else {
       next.claude = { thinking: { type: 'enabled', budgetTokens: CLAUDE_BUDGET_BY_LEVEL[level] } }
     }
   } else if (isOpenAICompatibleApiStyle(provider, model as ProviderModelInfo) && isDeepSeekThinkingModel(model)) {
-    next.deepseek = { thinking: { type: 'enabled' } }
+    next.deepseek = {
+      thinking: { type: 'enabled' },
+      ...(isDeepSeekReasoningEffortModel(model?.modelId || '')
+        ? { reasoningEffort: DEEPSEEK_EFFORT_BY_LEVEL[level] }
+        : {}),
+    }
   } else if (isOpenAIStyleEffectiveProvider(effectiveProvider)) {
     // Keep compatible wire mappings in pickOpenAICompatibleReasoningOptions in sync when
     // adding an OpenAI option here. OpenAI-only SDK flags must not leak to compatible APIs.
@@ -595,7 +723,12 @@ export function getReasoningProviderOptions(
       next.google = { thinkingConfig: { thinkingBudget: GEMINI_BUDGET_BY_LEVEL[level], includeThoughts: true } }
     }
   } else if (effectiveProvider === ModelProviderEnum.DeepSeek) {
-    next.deepseek = { thinking: { type: 'enabled' } }
+    next.deepseek = {
+      thinking: { type: 'enabled' },
+      ...(isDeepSeekReasoningEffortModel(model?.modelId || '')
+        ? { reasoningEffort: DEEPSEEK_EFFORT_BY_LEVEL[level] }
+        : {}),
+    }
   } else if (effectiveProvider === ModelProviderEnum.Qwen || effectiveProvider === ModelProviderEnum.QwenPortal) {
     next.openaiCompatible = {
       enable_thinking: true,
@@ -607,8 +740,46 @@ export function getReasoningProviderOptions(
 }
 
 function isDeepSeekThinkingModel(model: ProviderModelInfo | null | undefined): boolean {
-  if (!model?.modelId) return false
-  return isDeepSeekReasoningModel(model.modelId)
+  return !!model?.modelId && isDeepSeekReasoningModel(model.modelId)
+}
+
+function isChatboxAIDeepSeekWithOfficialApiStyle(
+  provider: ModelProvider | undefined,
+  model: ProviderModelInfo | null | undefined
+): boolean {
+  return (
+    provider === ModelProviderEnum.ChatboxAI &&
+    !!model &&
+    isDeepSeekReasoningModel(model.modelId) &&
+    (!model.apiStyle ||
+      model.apiStyle === 'openai' ||
+      model.apiStyle === 'anthropic' ||
+      (model.apiStyle === 'openai-responses' && isDeepSeekReasoningEffortModel(model.modelId)))
+  )
+}
+
+function deriveDeepSeekLevel(
+  modelId: string,
+  thinkingType: 'enabled' | 'disabled' | undefined,
+  effort: string | undefined
+): ReasoningControlLevel {
+  if (thinkingType === 'disabled') return 'off'
+  if (!isDeepSeekReasoningEffortModel(modelId)) return thinkingType === 'enabled' ? 'high' : 'default'
+  if (thinkingType !== 'enabled' && !effort) return 'default'
+  return normalizeDeepSeekEffortToLevel(effort)
+}
+
+function deriveDeepSeekResponsesLevel(modelId: string, effort: string | undefined): ReasoningControlLevel {
+  if (!isDeepSeekReasoningEffortModel(modelId) || !effort) return 'default'
+  if (effort === 'none') return 'off'
+  return normalizeDeepSeekEffortToLevel(effort)
+}
+
+function normalizeDeepSeekEffortToLevel(effort: string | undefined): ReasoningControlLevel {
+  if (effort === 'low') return 'low'
+  if (effort === 'high') return 'medium'
+  if (effort === 'max' || effort === 'xhigh') return 'high'
+  return 'default'
 }
 
 function getGoogleOffThinkingConfig(modelId: string): NonNullable<ProviderOptions['google']>['thinkingConfig'] {

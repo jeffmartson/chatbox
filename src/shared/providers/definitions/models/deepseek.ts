@@ -3,7 +3,11 @@ import type { LanguageModelV3 } from '@ai-sdk/provider'
 import AbstractAISDKModel, { type CallSettings } from '../../../models/abstract-ai-sdk'
 import { ApiError } from '../../../models/errors'
 import type { CallChatCompletionOptions } from '../../../models/types'
-import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import {
+  isDeepSeekReasoningModel,
+  isDeepSeekWeakToolUse,
+  normalizeDeepSeekReasoningEffort,
+} from '../../../models/utils/deepseek'
 import type { ProviderModelInfo, ToolUseScope } from '../../../types'
 import type { ModelDependencies } from '../../../types/adapters'
 
@@ -38,7 +42,12 @@ export default class DeepSeek extends AbstractAISDKModel {
   }
 
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
-    const thinkingType = options.providerOptions?.deepseek?.thinking?.type
+    const deepseekOptions = options.providerOptions?.deepseek
+    const thinkingType = deepseekOptions?.thinking?.type
+    const reasoningEffort = normalizeDeepSeekReasoningEffort(
+      this.options.model.modelId,
+      deepseekOptions?.reasoningEffort
+    )
     const isThinkingMode = this.isSupportReasoning() && thinkingType !== 'disabled'
     const settings: CallSettings = {
       maxOutputTokens: this.options.maxOutputTokens,
@@ -50,12 +59,11 @@ export default class DeepSeek extends AbstractAISDKModel {
       settings.topP = this.options.topP
     }
 
-    if (this.isSupportReasoning() && thinkingType) {
+    if (this.isSupportReasoning() && (thinkingType || reasoningEffort)) {
       settings.providerOptions = {
         deepseek: {
-          thinking: {
-            type: thinkingType,
-          },
+          ...(thinkingType ? { thinking: { type: thinkingType } } : {}),
+          ...(reasoningEffort ? { reasoningEffort } : {}),
         } satisfies DeepSeekChatOptions,
       }
     }

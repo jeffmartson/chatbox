@@ -23,6 +23,11 @@ const STRONG_MODEL_PATTERN = /distill|vl\d/i
 // Matches DeepSeek models that support reasoning/thinking (reasoner, R1, V-series).
 const REASONING_MODEL_PATTERN = /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i
 
+// DeepSeek V4 is the first model family whose official APIs expose thinking effort.
+const REASONING_EFFORT_MODEL_PATTERN = /(?:^|\/)deepseek-v4(?:[._-]|$)/i
+
+const DEEPSEEK_REASONING_EFFORTS = new Set(['low', 'high', 'max', 'xhigh'])
+
 /**
  * Returns true if the given model ID is a DeepSeek reasoning/thinking model.
  * Shared by capability detection (reasoning controls) and request construction
@@ -30,6 +35,19 @@ const REASONING_MODEL_PATTERN = /(?:^|\/)deepseek-(?:reasoner|r1|v[0-9.]+)/i
  */
 export function isDeepSeekReasoningModel(modelId: string): boolean {
   return REASONING_MODEL_PATTERN.test(modelId)
+}
+
+/** Returns true for DeepSeek models that support the official effort parameter. */
+export function isDeepSeekReasoningEffortModel(modelId: string): boolean {
+  return REASONING_EFFORT_MODEL_PATTERN.test(modelId)
+}
+
+/** Drops stale or unsupported DeepSeek effort values at the request boundary. */
+export function normalizeDeepSeekReasoningEffort(modelId: string, effort: string | undefined) {
+  if (!isDeepSeekReasoningEffortModel(modelId) || !effort || !DEEPSEEK_REASONING_EFFORTS.has(effort)) {
+    return undefined
+  }
+  return effort as 'low' | 'high' | 'max' | 'xhigh'
 }
 
 /**

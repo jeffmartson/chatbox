@@ -18,7 +18,11 @@ import type {
   ModelInterface,
   ModelStreamPart,
 } from '../../../models/types'
-import { isDeepSeekReasoningModel, isDeepSeekWeakToolUse } from '../../../models/utils/deepseek'
+import {
+  isDeepSeekReasoningModel,
+  isDeepSeekWeakToolUse,
+  normalizeDeepSeekReasoningEffort,
+} from '../../../models/utils/deepseek'
 import { maybeWrapGeminiErrorResponse } from '../../../models/utils/gemini-stream-error'
 import { getChatboxAPIOrigin } from '../../../request/chatboxai_pool'
 import type { StreamTextResult, ToolUseScope } from '../../../types'
@@ -176,7 +180,17 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
   protected getCallSettings(options: CallChatCompletionOptions): CallSettings {
     if (this.options.model.apiStyle === 'anthropic') {
       let providerOptions: CallSettings['providerOptions'] = {}
-      const claudeOptions = normalizeClaudeReasoningOptions(this.options.model.modelId, options.providerOptions?.claude)
+      const isDeepSeek = isDeepSeekReasoningModel(this.options.model.modelId)
+      const rawClaudeOptions = options.providerOptions?.claude
+      const deepSeekEffort = normalizeDeepSeekReasoningEffort(this.options.model.modelId, rawClaudeOptions?.effort)
+      const claudeOptions = isDeepSeek
+        ? rawClaudeOptions?.thinking
+          ? {
+              thinking: rawClaudeOptions.thinking,
+              ...(rawClaudeOptions.thinking.type !== 'disabled' && deepSeekEffort ? { effort: deepSeekEffort } : {}),
+            }
+          : undefined
+        : normalizeClaudeReasoningOptions(this.options.model.modelId, rawClaudeOptions)
       if (claudeOptions) {
         providerOptions = {
           anthropic: { ...claudeOptions },
@@ -187,10 +201,13 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
         providerOptions,
         maxOutputTokens: this.options.maxOutputTokens ?? getDefaultAnthropicMaxOutputTokens(this.options.model),
       }
-      if (this.options.temperature !== undefined) {
-        callSettings.temperature = this.options.temperature
-      } else if (this.options.topP !== undefined) {
-        callSettings.topP = this.options.topP
+      const isDeepSeekThinking = isDeepSeek && claudeOptions?.thinking?.type !== 'disabled'
+      if (!isDeepSeekThinking) {
+        if (this.options.temperature !== undefined) {
+          callSettings.temperature = this.options.temperature
+        } else if (this.options.topP !== undefined) {
+          callSettings.topP = this.options.topP
+        }
       }
       return callSettings
     }
@@ -209,13 +226,22 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
     if (this.options.model.apiStyle === 'openai-responses') {
       // Responses 的服务端状态（item_reference / previous_response_id）无法跨 provider 解析。
       // store=false 让 AI SDK 内联完整历史，不依赖服务端状态。
+      const isDeepSeek = isDeepSeekReasoningModel(this.options.model.modelId)
+      const openAIOptions = options.providerOptions?.openai
+      const responseEffort = openAIOptions?.reasoningEffort
+      const deepSeekEffort = normalizeDeepSeekReasoningEffort(this.options.model.modelId, responseEffort)
+      const reasoningOptions = isDeepSeek
+        ? deepSeekEffort || responseEffort === 'none'
+          ? { reasoningEffort: responseEffort, forceReasoning: true }
+          : undefined
+        : normalizeOpenAIReasoningOptions(this.options.model.modelId, openAIOptions)
+      const isDeepSeekThinking = isDeepSeek && reasoningOptions?.reasoningEffort !== 'none'
       return {
-        temperature: this.options.temperature,
-        topP: this.options.topP,
+        ...(!isDeepSeekThinking ? { temperature: this.options.temperature, topP: this.options.topP } : {}),
         maxOutputTokens: this.options.maxOutputTokens,
         providerOptions: {
           openai: {
-            ...normalizeOpenAIReasoningOptions(this.options.model.modelId, options.providerOptions?.openai),
+            ...reasoningOptions,
             store: false,
           },
         },
@@ -226,15 +252,29 @@ export default class ChatboxAI extends AbstractAISDKModel implements ModelInterf
       options.providerOptions
     )
     if (isDeepSeekReasoningModel(this.options.model.modelId)) {
+      const deepseekOptions = options.providerOptions?.deepseek
       const thinkingType =
-        options.providerOptions?.deepseek?.thinking?.type ??
+        deepseekOptions?.thinking?.type ??
         getLegacyOpenAICompatibleThinkingType(options.providerOptions?.openaiCompatible?.reasoning)
+      const reasoningEffort = normalizeDeepSeekReasoningEffort(
+        this.options.model.modelId,
+        deepseekOptions?.reasoningEffort
+      )
+      const providerOptions =
+        thinkingType || reasoningEffort
+          ? {
+              deepseek: {
+                ...(thinkingType ? { thinking: { type: thinkingType } } : {}),
+                ...(reasoningEffort ? { reasoningEffort } : {}),
+              },
+            }
+          : undefined
+      const isThinkingMode = thinkingType !== 'disabled'
 
       return {
-        temperature: this.options.temperature,
-        topP: this.options.topP,
+        ...(!isThinkingMode ? { temperature: this.options.temperature, topP: this.options.topP } : {}),
         maxOutputTokens: this.options.maxOutputTokens,
-        providerOptions: thinkingType ? { deepseek: { thinking: { type: thinkingType } } } : undefined,
+        providerOptions,
       }
     }
     return {

@@ -11,6 +11,7 @@ import type {
   SessionSettings,
 } from '@shared/types'
 import { getMessageText } from '@shared/utils/message'
+import { resolveReasoningProviderOptions } from '@shared/utils/reasoning-control'
 import { MAX_TOOL_CALLS_BEFORE_CONFIRMATION, shouldPauseOnToolCallLimit } from '@shared/utils/tool-call-limit-pause'
 import type { ModelMessage, ToolSet } from 'ai'
 import { createModel, createModelDependencies } from '@/adapters'
@@ -573,6 +574,9 @@ export async function orchestrateGeneration(
   try {
     const dependencies = await createModelDependencies()
     const model = await createModel(settings, dependencies)
+    // Reasoning options are scoped to the provider+model they were configured for;
+    // resolving here guarantees a switched model never inherits another model's parameters.
+    const reasoningProviderOptions = resolveReasoningProviderOptions(settings, settings.provider, settings.modelId)
     const sessionKnowledgeBaseMap = uiStore.getState().sessionKnowledgeBaseMap
     const knowledgeBase = sessionKnowledgeBaseMap[sessionId]
     const webBrowsing = getSessionWebBrowsing(sessionId, settings.provider)
@@ -593,18 +597,18 @@ export async function orchestrateGeneration(
       lastUserMessage &&
       isFirstUserTurn(messages, promptTargetMsgIx)
     ) {
-      const suggestionModel = await createAgentModeSuggestionModel(
-        settings,
-        globalSettings.threadNamingModel,
-        dependencies,
-        model
-      )
+      const namingModel = globalSettings.threadNamingModel
+      const suggestionModel = await createAgentModeSuggestionModel(settings, namingModel, dependencies, model)
+      // The classifier may be a different model than the conversation; resolve the
+      // reasoning options for whichever model actually runs the classification.
       const decision = await shouldSuggestAgentMode({
         sessionId,
         model: suggestionModel,
         userMessage: lastUserMessage,
         signal: controller.signal,
-        providerOptions: settings.providerOptions,
+        // The session's thinking level applies when the classifier falls back to the
+        // conversation model; a separate naming model runs with its own defaults.
+        providerOptions: suggestionModel === model ? reasoningProviderOptions : undefined,
       })
 
       // If the user cancelled while the classifier was running, finalize the
@@ -674,7 +678,7 @@ export async function orchestrateGeneration(
       agentModeLocked: Boolean(agentModeEntry?.locked),
       agentModeSupported,
       signal: controller.signal,
-      providerOptions: settings.providerOptions,
+      providerOptions: reasoningProviderOptions,
       // Retrying from an archived thread must use that thread's points.
       compactionPoints: getCompactionPointsForTarget(session, targetMsg.id),
       preserveLastPromptMessageToolCalls: Boolean(options?.appendToMessage),

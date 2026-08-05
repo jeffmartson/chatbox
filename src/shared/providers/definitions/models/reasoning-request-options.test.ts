@@ -248,7 +248,7 @@ describe('reasoning request options', () => {
     expect(requestBody).not.toHaveProperty('top_k')
   })
 
-  it('passes DeepSeek thinking toggle to provider options without unsupported effort levels', () => {
+  it('passes DeepSeek thinking toggle and official effort levels to provider options', () => {
     const deepseek = new TestDeepSeek(
       {
         apiKey: 'test-key',
@@ -266,6 +266,7 @@ describe('reasoning request options', () => {
           thinking: {
             type: 'enabled',
           },
+          reasoningEffort: 'max',
         },
       },
     })
@@ -288,6 +289,7 @@ describe('reasoning request options', () => {
         thinking: {
           type: 'enabled',
         },
+        reasoningEffort: 'max',
       },
     })
     expect(disabled.temperature).toBe(0.7)

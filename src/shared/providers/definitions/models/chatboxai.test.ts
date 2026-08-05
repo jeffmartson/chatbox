@@ -71,7 +71,10 @@ function createDependencies(): ModelDependencies {
   }
 }
 
-function createModel(model: ProviderModelInfo, overrides: { maxOutputTokens?: number } = {}) {
+function createModel(
+  model: ProviderModelInfo,
+  overrides: { maxOutputTokens?: number; temperature?: number; topP?: number } = {}
+) {
   return new TestChatboxAI(
     {
       licenseKey: 'test-license',
@@ -83,6 +86,8 @@ function createModel(model: ProviderModelInfo, overrides: { maxOutputTokens?: nu
       language: 'en',
       dalleStyle: 'vivid',
       maxOutputTokens: overrides.maxOutputTokens,
+      temperature: overrides.temperature,
+      topP: overrides.topP,
     },
     { uuid: 'test-uuid' },
     createDependencies()
@@ -380,6 +385,7 @@ describe('ChatboxAI openai-responses models', () => {
           thinking: {
             type: 'enabled',
           },
+          reasoningEffort: 'max',
         },
       },
     })
@@ -389,7 +395,120 @@ describe('ChatboxAI openai-responses models', () => {
         thinking: {
           type: 'enabled',
         },
+        reasoningEffort: 'max',
       },
+    })
+  })
+
+  it('maps ChatboxAI DeepSeek thinking and effort to Anthropic provider options', () => {
+    const model = createModel({
+      modelId: 'deepseek-v4-pro',
+      type: 'chat',
+      apiStyle: 'anthropic',
+      capabilities: ['tool_use'],
+    })
+
+    const enabled = model.exposeCallSettings({
+      providerOptions: {
+        claude: { thinking: { type: 'enabled' }, effort: 'max' },
+      },
+    })
+    const disabled = model.exposeCallSettings({
+      providerOptions: {
+        claude: { thinking: { type: 'disabled' }, effort: 'max' },
+      },
+    })
+
+    expect(enabled.providerOptions).toEqual({
+      anthropic: { thinking: { type: 'enabled' }, effort: 'max' },
+    })
+    expect(disabled.providerOptions).toEqual({
+      anthropic: { thinking: { type: 'disabled' } },
+    })
+  })
+
+  it('maps ChatboxAI DeepSeek effort to Responses provider options', () => {
+    const model = createModel({
+      modelId: 'deepseek-v4-pro',
+      type: 'chat',
+      apiStyle: 'openai-responses',
+      capabilities: ['tool_use'],
+    })
+
+    const high = model.exposeCallSettings({
+      providerOptions: {
+        openai: { reasoningEffort: 'max', forceReasoning: true },
+      },
+    })
+    const disabled = model.exposeCallSettings({
+      providerOptions: {
+        openai: { reasoningEffort: 'none', forceReasoning: true },
+      },
+    })
+
+    expect(high.providerOptions).toEqual({
+      openai: { reasoningEffort: 'max', forceReasoning: true, store: false },
+    })
+    expect(disabled.providerOptions).toEqual({
+      openai: { reasoningEffort: 'none', forceReasoning: true, store: false },
+    })
+  })
+
+  it.each(['openai', 'anthropic', 'openai-responses'] as const)(
+    'drops sampling settings for ChatboxAI DeepSeek thinking through %s',
+    (apiStyle) => {
+      const model = createModel(
+        {
+          modelId: 'deepseek-v4-pro',
+          type: 'chat',
+          apiStyle,
+          capabilities: ['reasoning'],
+        },
+        { temperature: 0.7, topP: 0.9 }
+      )
+
+      const settings = model.exposeCallSettings({})
+
+      expect(settings.temperature).toBeUndefined()
+      expect(settings.topP).toBeUndefined()
+    }
+  )
+
+  it('restores sampling settings when ChatboxAI DeepSeek thinking is explicitly disabled', () => {
+    const model = createModel(
+      {
+        modelId: 'deepseek-v4-pro',
+        type: 'chat',
+        apiStyle: 'openai',
+        capabilities: ['reasoning'],
+      },
+      { temperature: 0.7, topP: 0.9 }
+    )
+
+    const settings = model.exposeCallSettings({
+      providerOptions: { deepseek: { thinking: { type: 'disabled' } } },
+    })
+
+    expect(settings.temperature).toBe(0.7)
+    expect(settings.topP).toBe(0.9)
+  })
+
+  it('drops V4-only effort persisted on an older ChatboxAI DeepSeek model', () => {
+    const model = createModel({
+      modelId: 'deepseek-reasoner',
+      type: 'chat',
+      apiStyle: 'anthropic',
+      capabilities: ['reasoning'],
+    })
+
+    const settings = model.exposeCallSettings({
+      providerOptions: {
+        claude: { thinking: { type: 'enabled' }, effort: 'max' },
+      },
+    })
+
+    expect(settings.providerOptions).toEqual({
+      anthropic: { thinking: { type: 'enabled' } },
     })
   })
 

@@ -10,30 +10,20 @@ import {
   type Session,
   type SessionSettings,
 } from '@shared/types'
-import {
-  getReasoningControlLevel,
-  getReasoningControlOptions,
-  getReasoningProviderOptions,
-  type ReasoningControlLevel,
-  type ReasoningControlOption,
-} from '@shared/utils/reasoning-control'
 import { MAX_TOOL_CALLS_BEFORE_CONFIRMATION } from '@shared/utils/tool-call-limit-pause'
 import { IconInfoCircle, IconTrash, IconUpload } from '@tabler/icons-react'
 import { pick } from 'lodash'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AdaptiveModal } from '@/components/common/AdaptiveModal'
 import { AssistantAvatar } from '@/components/common/Avatar'
 import LazyNumberInput from '@/components/common/LazyNumberInput'
 import MaxContextMessageCountSlider from '@/components/common/MaxContextMessageCountSlider'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
-import SegmentedControl from '@/components/common/SegmentedControl'
 import SliderWithInput from '@/components/common/SliderWithInput'
 import { handleImageInputAndSave, ImageInStorage } from '@/components/Image'
 import ImageStyleSelect from '@/components/ImageStyleSelect'
-import { resolveReasoningModelInfo } from '@/components/InputBox/useReasoningControlState'
 import { AppTooltip as Tooltip } from '@/components/ui/tooltip'
-import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { trackingEvent } from '@/packages/event'
 import storage from '@/storage'
@@ -361,98 +351,6 @@ const SessionSettingsModal = NiceModal.create(
 
 export default SessionSettingsModal
 
-function getReasoningOptionLabel(option: ReasoningControlOption, t: (key: string) => string): string {
-  switch (option.label) {
-    case 'default':
-      return t('Default')
-    case 'off':
-      return t('Off')
-    case 'on':
-      return t('On')
-    case 'low':
-      return t('Low')
-    case 'medium':
-      return t('Medium')
-    case 'high':
-      return t('High')
-  }
-}
-
-// Unified thinking control driven by the shared reasoning-control semantics, replacing
-// the previous per-provider controls (Claude budget, OpenAI effort, Gemini budget/level).
-// Reads and writes the same providerOptions as the input-box ReasoningControlButton so
-// both surfaces always agree on levels and request parameters.
-function ReasoningControlConfig({
-  settings,
-  onSettingsChange,
-}: {
-  settings: Session['settings']
-  onSettingsChange: (data: Session['settings']) => void
-}) {
-  const { t } = useTranslation()
-  const { providers } = useProviders()
-  const provider = settings?.provider
-  const modelId = settings?.modelId
-
-  const modelInfo = useMemo(() => {
-    if (!provider || !modelId) return null
-    const providerInfo = providers.find((item) => item.id === provider)
-    return resolveReasoningModelInfo({ provider, modelId }, providerInfo)
-  }, [providers, provider, modelId])
-
-  const options = useMemo(() => getReasoningControlOptions(provider, modelInfo), [provider, modelInfo])
-  const level = useMemo(
-    () => getReasoningControlLevel(provider, modelInfo, settings?.providerOptions),
-    [provider, modelInfo, settings?.providerOptions]
-  )
-
-  const handleChange = useCallback(
-    (value: string) => {
-      onSettingsChange({
-        providerOptions: getReasoningProviderOptions(
-          provider,
-          modelInfo,
-          value as ReasoningControlLevel,
-          settings?.providerOptions
-        ),
-      })
-    },
-    [onSettingsChange, provider, modelInfo, settings?.providerOptions]
-  )
-
-  if (options.length === 0) {
-    return null
-  }
-
-  return (
-    <Stack gap="md" style={{ minWidth: 0 }}>
-      <Flex align="center" gap="xs">
-        <Text size="sm" fw="600">
-          {t('Thinking Effort')}
-        </Text>
-        <Tooltip
-          label={t('Default sends no thinking parameters and lets the model decide')}
-          withArrow={true}
-          maw={320}
-          className="!whitespace-normal"
-          zIndex={3000}
-        >
-          <ScalableIcon icon={IconInfoCircle} size={20} className="text-chatbox-tint-tertiary" />
-        </Tooltip>
-      </Flex>
-
-      <div style={{ minWidth: 0, overflowX: 'auto' }}>
-        <SegmentedControl
-          key={`reasoning-control:${options.map((o) => o.level).join(',')}`}
-          value={level}
-          onChange={handleChange}
-          data={options.map((o) => ({ label: getReasoningOptionLabel(o, t), value: o.level }))}
-        />
-      </div>
-    </Stack>
-  )
-}
-
 export function ChatConfig({
   settings,
   onSettingsChange,
@@ -582,8 +480,6 @@ export function ChatConfig({
           />
         </Flex>
       </Stack>
-
-      <ReasoningControlConfig settings={settings} onSettingsChange={onSettingsChange} />
     </Stack>
   )
 }

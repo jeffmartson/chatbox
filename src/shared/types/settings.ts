@@ -122,15 +122,15 @@ const ClaudeParamsSchema = z.object({
   thinking: z
     .object({
       type: z.enum(['enabled', 'disabled']).default('enabled'),
-      budgetTokens: z.number().catch(1024),
+      budgetTokens: z.number().optional().catch(undefined),
     })
     .optional()
     .catch(undefined),
-  effort: z.enum(['low', 'medium', 'high']).optional().catch(undefined),
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
 })
 
 const OpenAIParamsSchema = z.object({
-  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional().catch(undefined),
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
   reasoningSummary: z.enum(['auto', 'concise', 'detailed']).optional().catch(undefined),
   include: z.array(z.string()).optional().catch(undefined),
   forceReasoning: z.boolean().optional().catch(undefined),
@@ -151,6 +151,7 @@ const DeepSeekParamsSchema = z.object({
     })
     .optional()
     .catch(undefined),
+  reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
 })
 
 const ReasoningOptionsSchema = z.object({
@@ -195,7 +196,14 @@ export const SessionSettingsSchema = GlobalSessionSettingsSchema.extend({
   modelId: z.string().optional().catch(undefined),
   dalleStyle: z.enum(['vivid', 'natural']).optional().catch('vivid'),
   imageGenerateNum: z.number().optional().catch(1),
+  // Legacy shared reasoning options; no longer read (superseded by
+  // providerOptionsByModel) and cleared on writes. Kept in the schema so old
+  // clients' data still parses.
   providerOptions: ProviderOptionsSchema.optional().catch(undefined),
+  // Reasoning options scoped to the `${provider}:${modelId}` they were written for,
+  // so switching models never applies another model's thinking parameters.
+  // See resolveReasoningProviderOptions.
+  providerOptionsByModel: z.record(z.string(), ProviderOptionsSchema).optional().catch(undefined),
   autoCompaction: z.boolean().optional().catch(undefined),
   // Whether generation pauses for user confirmation after a run of consecutive
   // tool calls (the "Paused after N steps" card). Tri-state: undefined follows

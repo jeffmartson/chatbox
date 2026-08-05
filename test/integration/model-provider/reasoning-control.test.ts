@@ -220,12 +220,12 @@ const CALL_CASES: ThinkingCallCase[] = [
     expectNoReasoning: true,
   },
   {
-    name: 'DeepSeek V4 Flash on enables thinking',
+    name: 'DeepSeek V4 Flash high enables max thinking effort',
     provider: ModelProviderEnum.DeepSeek,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     modelId: 'deepseek-v4-flash',
     level: 'high',
-    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' } } },
+    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' }, reasoningEffort: 'max' } },
     maxTokens: 2048,
     temperature: 0.7,
     topP: 0.9,
@@ -248,12 +248,12 @@ const CALL_CASES: ThinkingCallCase[] = [
     expectNoReasoning: true,
   },
   {
-    name: 'DeepSeek V4 Pro on enables thinking',
+    name: 'DeepSeek V4 Pro high enables max thinking effort',
     provider: ModelProviderEnum.DeepSeek,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     modelId: 'deepseek-v4-pro',
     level: 'high',
-    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' } } },
+    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' }, reasoningEffort: 'max' } },
     maxTokens: 2048,
     temperature: 0.7,
     topP: 0.9,
@@ -444,25 +444,25 @@ const CALL_CASES: ThinkingCallCase[] = [
     prompt: REASONING_PROMPT,
   },
   {
-    name: 'ChatboxAI DeepSeek V4 Pro off maps to gateway DeepSeek thinking disable',
+    name: 'ChatboxAI DeepSeek V4 Pro off maps to Anthropic gateway thinking disable',
     provider: ModelProviderEnum.ChatboxAI,
     apiKeyEnv: 'CHATBOX_LICENSE_KEY',
     modelId: 'deepseek-v4-pro',
-    apiStyle: 'openai',
+    apiStyle: 'anthropic',
     level: 'off',
-    expectedProviderOptions: { deepseek: { thinking: { type: 'disabled' } } },
+    expectedProviderOptions: { claude: { thinking: { type: 'disabled' } } },
     maxTokens: 1024,
     prompt: REASONING_PROMPT,
     expectNoReasoning: true,
   },
   {
-    name: 'ChatboxAI DeepSeek V4 Pro on maps to gateway DeepSeek thinking enable',
+    name: 'ChatboxAI DeepSeek V4 Pro high maps to Anthropic gateway max effort',
     provider: ModelProviderEnum.ChatboxAI,
     apiKeyEnv: 'CHATBOX_LICENSE_KEY',
     modelId: 'deepseek-v4-pro',
-    apiStyle: 'openai',
+    apiStyle: 'anthropic',
     level: 'high',
-    expectedProviderOptions: { deepseek: { thinking: { type: 'enabled' } } },
+    expectedProviderOptions: { claude: { thinking: { type: 'enabled' }, effort: 'max' } },
     maxTokens: 2048,
     prompt: REASONING_PROMPT,
     expectReasoning: true,
@@ -515,6 +515,7 @@ interface CapturedDeepSeekRequest {
   thinking?: {
     type?: string
   }
+  reasoning_effort?: string
 }
 
 async function captureDeepSeekRequests<T>(
@@ -601,6 +602,11 @@ describe.runIf(activeCases.length > 0)('Thinking control provider integration te
           expect(request.thinking).toEqual({
             type: testCase.expectedSamplingParameters === 'included' ? 'disabled' : 'enabled',
           })
+          if (testCase.expectedSamplingParameters === 'omitted') {
+            expect(request.reasoning_effort).toBe('max')
+          } else {
+            expect(request.reasoning_effort).toBeUndefined()
+          }
           if (testCase.expectedSamplingParameters === 'included') {
             expect(request.temperature).toBe(testCase.temperature)
             expect(request.top_p).toBe(testCase.topP)
