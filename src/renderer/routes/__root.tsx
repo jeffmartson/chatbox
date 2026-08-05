@@ -329,7 +329,7 @@ function Root() {
       <Grid container className="h-full relative z-[1]">
         <Sidebar />
         <Box
-          className="h-full w-full box-border"
+          className="relative h-full w-full box-border"
           sx={{
             flexGrow: 1,
             transition: (theme) =>
@@ -346,6 +346,10 @@ function Root() {
               : {}),
           }}
         >
+          <Box
+            className="title-bar absolute inset-x-0 top-0 hidden sm:block"
+            sx={{ height: showSidebar ? '10px' : '5px' }}
+          />
           <Box
             className="h-full box-border"
             sx={{
