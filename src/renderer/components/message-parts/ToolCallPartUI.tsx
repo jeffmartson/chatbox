@@ -1328,15 +1328,60 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         {title}
       </Text>
       <Group gap="xs">
-        <Button
-          data-testid={isApproval ? TestId.toolCall.approve : TestId.toolCall.continue}
-          size="compact-xs"
-          color="chatbox-brand"
-          disabled={!sessionId || !messageId}
-          onClick={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
-        >
-          {isApproval ? t('Approve') : t('Continue')}
-        </Button>
+        {pauseReason?.type === 'tool_call_limit' ? (
+          <Button.Group>
+            <Button
+              data-testid={TestId.toolCall.continue}
+              size="compact-xs"
+              color="chatbox-brand"
+              disabled={!sessionId || !messageId}
+              onClick={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
+            >
+              {t('Continue')}
+            </Button>
+            <Menu position="bottom-start" shadow="md">
+              <Menu.Target>
+                <Button
+                  data-testid={TestId.toolCall.dontAskAgain}
+                  size="compact-xs"
+                  color="chatbox-brand"
+                  px={6}
+                  disabled={!sessionId || !messageId}
+                  aria-label={t('More continue options')}
+                  style={{ borderInlineStart: '1px solid rgba(255, 255, 255, 0.4)' }}
+                >
+                  <IconChevronDown size={12} />
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown maw="min(20rem, calc(100vw - 1.5rem))">
+                <Menu.Item
+                  data-testid={TestId.toolCall.dontAskAgainSession}
+                  style={{ whiteSpace: 'normal' }}
+                  onClick={() => handleDontAskAgain('session')}
+                >
+                  {t("Continue, and don't pause this chat again")}
+                </Menu.Item>
+                <Menu.Item
+                  data-testid={TestId.toolCall.dontAskAgainGlobal}
+                  style={{ whiteSpace: 'normal' }}
+                  onClick={() => handleDontAskAgain('global')}
+                >
+                  {t("Continue, and don't pause any chat again")}
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Button.Group>
+        ) : (
+          <Button
+            data-testid={isApproval ? TestId.toolCall.approve : TestId.toolCall.continue}
+            size="compact-xs"
+            color="chatbox-brand"
+            disabled={!sessionId || !messageId}
+            onClick={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
+          >
+            {isApproval ? t('Approve') : t('Continue')}
+          </Button>
+        )}
         <Button
           data-testid={TestId.toolCall.deny}
           size="compact-xs"
@@ -1347,33 +1392,6 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         >
           {isApproval ? t('Deny') : t('Stop')}
         </Button>
-        {pauseReason?.type === 'tool_call_limit' && (
-          <Menu position="bottom-start" shadow="md">
-            <Menu.Target>
-              <Button
-                data-testid={TestId.toolCall.dontAskAgain}
-                size="compact-xs"
-                variant="subtle"
-                color="gray"
-                disabled={!sessionId || !messageId}
-                rightSection={<IconChevronDown size={12} />}
-              >
-                {t("Don't ask again")}
-              </Button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item
-                data-testid={TestId.toolCall.dontAskAgainSession}
-                onClick={() => handleDontAskAgain('session')}
-              >
-                {t('For this chat')}
-              </Menu.Item>
-              <Menu.Item data-testid={TestId.toolCall.dontAskAgainGlobal} onClick={() => handleDontAskAgain('global')}>
-                {t('For all chats')}
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-        )}
       </Group>
       <Box style={{ maxHeight: APPROVAL_PAYLOAD_MAX_HEIGHT, overflow: 'auto' }}>
         <Code block>{payload}</Code>

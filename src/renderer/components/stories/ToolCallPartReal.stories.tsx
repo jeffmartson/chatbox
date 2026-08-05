@@ -296,9 +296,9 @@ export const StepTimelinePausedAtStepLimit: StoryObj = {
     docs: {
       description: {
         story:
-          'After a run of consecutive tool calls the generation pauses for confirmation. Besides Continue/Stop, ' +
-          'the card offers a "Don\'t ask again" menu that turns the pause off for this chat or for all chats ' +
-          '(both can be re-enabled in the corresponding settings).',
+          'After a run of consecutive tool calls the generation pauses for confirmation. Continue is a split ' +
+          'button: the main segment continues once, while the chevron menu offers "Continue, and don\'t pause ' +
+          'this chat / any chat again" (both can be re-enabled in the corresponding settings).',
       },
     },
   },
