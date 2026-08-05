@@ -128,8 +128,6 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
   return (
     <Popover
       position="top-start"
-      withArrow
-      arrowOffset={showWebSearchMovedTip ? 18 : 5}
       shadow="md"
       opened={(showWebSearchMovedTip || opened) && !settingsOpened && !disabled}
       onChange={setOpened}
