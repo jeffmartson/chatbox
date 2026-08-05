@@ -22,6 +22,7 @@ export const JK_EVENTS = {
   AGENT_MODE_FREE_POINTS_CARD: 'agent_mode_free_points_card',
   AGENT_MODE_FREE_POINTS_CARD_CLICK: 'agent_mode_free_points_card_click',
   AGENT_MODE_FREE_POINTS_CLAIM_SUCCESS: 'agent_mode_free_points_claim_success',
+  MERMAID_RENDER_FAILED: 'mermaid_render_failed',
 } as const
 
 export const JK_PAGE_NAMES = {

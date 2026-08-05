@@ -4,6 +4,8 @@ import { ChartBarStacked } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gallery, Item } from 'react-photoswipe-gallery'
+import { trackJkAutoEvent } from '@/analytics/jk'
+import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import { cn } from '@/lib/utils'
 import { copyToClipboard } from '@/packages/navigator'
 import * as picUtils from '@/packages/pic_utils'
@@ -38,8 +40,19 @@ export function MessageMermaid(props: { source: string; theme: 'light' | 'dark';
         if (cancelled) {
           return
         }
+        const reason = getErrorReason(error)
         console.error('Failed to render Mermaid diagram:', error)
-        setRenderError(getErrorReason(error))
+        trackJkAutoEvent(JK_EVENTS.MERMAID_RENDER_FAILED, {
+          pageName: JK_PAGE_NAMES.CHAT_PAGE,
+          content: source,
+          contentType: 'mermaid',
+          props: {
+            content_add_info: {
+              content: reason,
+            },
+          },
+        })
+        setRenderError(reason)
       }
     })()
 
@@ -235,7 +248,7 @@ async function mermaidCodeToSvgCode(source: string, theme: 'light' | 'dark') {
     await import('core-js/actual/structured-clone.js')
   }
   const { default: mermaid } = await import('mermaid')
-  mermaid.initialize({ theme: theme === 'light' ? 'default' : 'dark' })
+  mermaid.initialize({ theme: theme === 'light' ? 'default' : 'dark', suppressErrorRendering: true })
   const id = `mermaidtmp${Math.random().toString(36).substring(2, 15)}`
   const result = await mermaid.render(id, source)
   // 考虑到 mermaid 工具内部本身已经使用了 dompurify 进行处理，因此可以先假设它的输出是安全的

@@ -6,14 +6,20 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@/test-utils'
 
 const mocks = vi.hoisted(() => ({
+  initialize: vi.fn(),
   render: vi.fn(),
+  trackJkAutoEvent: vi.fn(),
 }))
 
 vi.mock('mermaid', () => ({
   default: {
-    initialize: vi.fn(),
+    initialize: mocks.initialize,
     render: mocks.render,
   },
+}))
+
+vi.mock('@/analytics/jk', () => ({
+  trackJkAutoEvent: mocks.trackJkAutoEvent,
 }))
 
 vi.mock('react-i18next', () => ({
@@ -41,12 +47,15 @@ vi.mock('../stores/toastActions', () => ({
   add: vi.fn(),
 }))
 
+import { JK_EVENTS, JK_PAGE_NAMES } from '@/analytics/jk-events'
 import { MessageMermaid } from './Mermaid'
 
 describe('MessageMermaid', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.initialize.mockReset()
     mocks.render.mockReset()
+    mocks.trackJkAutoEvent.mockReset()
   })
 
   afterEach(() => {
@@ -61,5 +70,16 @@ describe('MessageMermaid', () => {
 
     expect(await screen.findByText('structuredClone is not a function')).toBeTruthy()
     expect(document.querySelector('code')?.textContent).toBe(source)
+    expect(mocks.initialize).toHaveBeenCalledWith({ theme: 'default', suppressErrorRendering: true })
+    expect(mocks.trackJkAutoEvent).toHaveBeenCalledWith(JK_EVENTS.MERMAID_RENDER_FAILED, {
+      pageName: JK_PAGE_NAMES.CHAT_PAGE,
+      content: source,
+      contentType: 'mermaid',
+      props: {
+        content_add_info: {
+          content: 'structuredClone is not a function',
+        },
+      },
+    })
   })
 })
