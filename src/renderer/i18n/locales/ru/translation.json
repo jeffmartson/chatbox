@@ -687,6 +687,7 @@
   "No models found matching your search": "Моделей, соответствующих вашему поиску, не найдено",
   "No more marketplace results for current query": "Больше результатов в маркетплейсе по данному запросу нет",
   "No permission to write file": "Нет разрешения на запись файла",
+  "No readable content was found in this attachment. Please check the file and try again.": "В этом вложении не найдено содержимое, доступное для чтения. Проверьте файл и повторите попытку.",
   "No results found": "Результаты не найдены",
   "No retry available": "Повторная попытка недоступна",
   "No rewards yet": "Наград пока нет",

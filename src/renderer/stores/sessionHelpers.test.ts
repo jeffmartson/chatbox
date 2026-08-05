@@ -9,6 +9,7 @@ const {
   parserState,
   defaultEmbeddingModelState,
   mockParseFileLocally,
+  mockParseFileWithMineru,
   mockGetSessionRagConfig,
   mockUploadAndCreateUserFile,
   mockSetBlob,
@@ -36,6 +37,7 @@ const {
     parserState: parser,
     defaultEmbeddingModelState: defaultEmbeddingModel,
     mockParseFileLocally: vi.fn(),
+    mockParseFileWithMineru: vi.fn(),
     mockGetSessionRagConfig: vi.fn(async () => ({
       models: { embedding: 'chatbox-ai:text-embedding-3-small', rerank: 'chatbox-ai:rerank' },
       capabilities: {
@@ -58,6 +60,7 @@ vi.mock('@/platform', () => ({
   default: {
     type: 'desktop',
     parseFileLocally: mockParseFileLocally,
+    parseFileWithMineru: mockParseFileWithMineru,
   },
 }))
 
@@ -96,7 +99,7 @@ vi.mock('./settingsStore', () => ({
       licenseActivationMethod: licenseActivationState.method,
       defaultEmbeddingModel: defaultEmbeddingModelState.value,
       extension: {
-        documentParser: { type: parserState.type },
+        documentParser: { type: parserState.type, mineru: { apiToken: 'mineru-token' } },
       },
     }),
   },
@@ -171,6 +174,7 @@ describe('preprocessFile local parser fallback', () => {
     parserState.type = 'local'
     defaultEmbeddingModelState.value = undefined
     mockParseFileLocally.mockReset()
+    mockParseFileWithMineru.mockReset()
     mockGetSessionRagConfig.mockClear()
     mockUploadAndCreateUserFile.mockReset()
     mockSetBlob.mockClear()
@@ -210,6 +214,21 @@ describe('preprocessFile local parser fallback', () => {
     expect(result.content).toBe('remote recovered content')
   })
 
+  it('rejects empty content returned by the Chatbox AI fallback', async () => {
+    const file = createFile('empty-cloud-result.pdf')
+    blobStore.set('local-key', '   \n\t')
+    blobStore.set('remote-key', '   \n\t')
+    mockParseFileLocally.mockResolvedValueOnce({ isSupported: true, key: 'local-key' })
+    mockUploadAndCreateUserFile.mockResolvedValueOnce('remote-key')
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' })
+
+    expect(mockUploadAndCreateUserFile).toHaveBeenCalledWith('licensed-key', file)
+    expect(result.content).toBe('')
+    expect(result.storageKey).toBe('')
+    expect(result.error).toBe('empty_attachment_content')
+  })
+
   it('falls back to Chatbox AI for text files when local parsing fails', async () => {
     const file = createFile('readme.txt', 'text content')
     blobStore.set('remote-key', 'remote text content')
@@ -221,6 +240,30 @@ describe('preprocessFile local parser fallback', () => {
     expect(mockUploadAndCreateUserFile).toHaveBeenCalledWith('licensed-key', file)
     expect(result.error).toBeUndefined()
     expect(result.content).toBe('remote text content')
+  })
+
+  it('does not fall back to Chatbox AI for pasted text when local processing fails', async () => {
+    const file = createFile('pasted_text_123.txt', 'pasted text content')
+    mockParseFileLocally.mockRejectedValueOnce(new Error('local failed'))
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' }, { source: 'pasted-text' })
+
+    expect(mockUploadAndCreateUserFile).not.toHaveBeenCalled()
+    expect(result.content).toBe('')
+    expect(result.storageKey).toBe('')
+    expect(result.error).toBe('local_parser_failed')
+  })
+
+  it('rejects empty local content for pasted text without falling back to Chatbox AI', async () => {
+    const file = createFile('pasted_text_456.txt', 'pasted text content')
+    mockParseFileLocally.mockResolvedValueOnce({ isSupported: true, key: 'missing-local-key' })
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' }, { source: 'pasted-text' })
+
+    expect(mockUploadAndCreateUserFile).not.toHaveBeenCalled()
+    expect(result.content).toBe('')
+    expect(result.storageKey).toBe('')
+    expect(result.error).toBe('empty_attachment_content')
   })
 
   it('keeps local_parser_failed when local parsing throws without a license', async () => {
@@ -247,6 +290,33 @@ describe('preprocessFile local parser fallback', () => {
         }),
       })
     )
+  })
+
+  it('rejects empty local content without a license for ordinary attachments', async () => {
+    const file = createFile('empty-without-license.pdf')
+    licenseState.key = undefined
+    mockParseFileLocally.mockResolvedValueOnce({ isSupported: true, key: 'missing-local-key' })
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' })
+
+    expect(mockUploadAndCreateUserFile).not.toHaveBeenCalled()
+    expect(result.content).toBe('')
+    expect(result.storageKey).toBe('')
+    expect(result.error).toBe('empty_attachment_content')
+  })
+
+  it('reprocesses whitespace-only cached content instead of returning an empty attachment', async () => {
+    const file = createFile('cached-empty.pdf')
+    const durableKey = `file:/tmp/${file.name}-${file.size}-${file.lastModified}`
+    blobStore.set(durableKey, '   \n\t')
+    blobStore.set('local-key', 'reparsed content')
+    mockParseFileLocally.mockResolvedValueOnce({ isSupported: true, key: 'local-key' })
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' })
+
+    expect(mockParseFileLocally).toHaveBeenCalledWith(file)
+    expect(result.error).toBeUndefined()
+    expect(result.content).toBe('reparsed content')
   })
 
   it('surfaces storage quota failures without attempting a cloud fallback', async () => {
@@ -277,6 +347,18 @@ describe('preprocessFile local parser fallback', () => {
     const [reportedError, context] = mockReportError.mock.calls[0]
     expect(reportedError.stack).not.toContain(quotaError.message)
     expect(JSON.stringify(context)).not.toContain(file.name)
+  })
+
+  it('rejects whitespace-only content returned by MinerU', async () => {
+    const file = createFile('empty-mineru.pdf')
+    parserState.type = 'mineru'
+    mockParseFileWithMineru.mockResolvedValueOnce({ success: true, content: '   \n\t' })
+
+    const result = await prepareFileAttachment(file, { provider: '', modelId: '' })
+
+    expect(result.content).toBe('')
+    expect(result.storageKey).toBe('')
+    expect(result.error).toBe('empty_attachment_content')
   })
 
   it('preserves storage quota failures thrown during the cloud parser fallback', async () => {

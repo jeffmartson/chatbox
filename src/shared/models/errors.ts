@@ -341,6 +341,11 @@ export class ChatboxAIAPIError extends BaseError {
       code: 20041,
       i18nKey: 'Failed to parse file. Please try again or use a different file format.',
     },
+    empty_attachment_content: {
+      name: 'empty_attachment_content',
+      code: 20043,
+      i18nKey: 'No readable content was found in this attachment. Please check the file and try again.',
+    },
     // Free 用户在工作模式中点数耗尽，但仍可领取一次奖励额度继续当前任务
     free_agent_mode_token_quota_exhausted: {
       name: 'free_agent_mode_token_quota_exhausted',

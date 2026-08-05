@@ -13,6 +13,9 @@ export const LOCAL_PARSER_PDF_PASSWORD_PROTECTED_ERROR = 'pdf_password_protected
 /** A file that exceeds the local parser size guard (see LOCAL_PARSER_MAX_PDF_FILE_SIZE). */
 export const LOCAL_PARSER_FILE_TOO_LARGE_ERROR = 'local_parser_file_too_large'
 
+/** File preprocessing completed without producing any readable attachment content. */
+export const EMPTY_ATTACHMENT_CONTENT_ERROR = 'empty_attachment_content'
+
 /**
  * Upper bound on PDF size for local parsing. pdfjs reads the whole file into a
  * Buffer and keeps another copy internally, so a very large PDF can hold 2-3x its

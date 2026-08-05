@@ -139,6 +139,7 @@ describe('ChatboxAIAPIError', () => {
     [20040, 'free_agent_mode_token_quota_exhausted'],
     [20041, 'file_preprocess_failed'],
     [20042, 'file_storage_quota_exceeded'],
+    [20043, 'empty_attachment_content'],
   ] as const)('getDetail maps client error code %s to %s', (code, name) => {
     const detail = ChatboxAIAPIError.getDetail(code)
 

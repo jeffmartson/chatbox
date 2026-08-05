@@ -823,12 +823,13 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     resetHistoryIndexRef.current = resetHistoryIndex
 
     type SubmitOptions = { allowUnreadySessionAttachments?: boolean }
+    type InsertFilesOptions = { source?: 'pasted-text' }
     const handleSubmitRef = useRef<(needGenerating?: boolean, options?: SubmitOptions) => void>(() => {})
     const getPreviousHistoryInputRef = useRef(getPreviousHistoryInput)
     getPreviousHistoryInputRef.current = getPreviousHistoryInput
     const getNextHistoryInputRef = useRef(getNextHistoryInput)
     getNextHistoryInputRef.current = getNextHistoryInput
-    const insertFilesRef = useRef<(files: File[]) => void>(() => {})
+    const insertFilesRef = useRef<(files: File[], options?: InsertFilesOptions) => void>(() => {})
 
     const handleSubmit = async (needGenerating = true, options: SubmitOptions = {}) => {
       if (
@@ -1059,7 +1060,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
       }
     }
 
-    const startFilePreprocessing = (file: File) => {
+    const startFilePreprocessing = (file: File, options: InsertFilesOptions = {}) => {
       const fileKey = StorageKeyGenerator.fileUniqKey(file)
       activeFilePreprocessingKeysRef.current.add(fileKey)
 
@@ -1068,7 +1069,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         .prepareFileAttachment(
           file,
           { provider: model?.provider || '', modelId: model?.modelId || '' },
-          { agentMode: isAgentModeActive }
+          { agentMode: isAgentModeActive, source: options.source }
         )
         .then(async (preprocessedFile) => {
           if (!activeFilePreprocessingKeysRef.current.has(fileKey)) {
@@ -1127,7 +1128,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     // so they keep the standard file-type validation and accept filter.
     const isAgentModeActive = agentModeUIState.isActive
 
-    const insertFiles = async (files: File[]) => {
+    const insertFiles = async (files: File[], options: InsertFilesOptions = {}) => {
       const MAX_IMAGES = 8
       const MAX_ATTACHMENTS = 20
       // 用本地累加器跟踪本次新增数量：同步循环内 state/ref 可能尚未刷新，靠它做无竞态的限额判断
@@ -1206,7 +1207,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               (f) => f.name === file.name && f.lastModified === file.lastModified
             )
             if (fileIndex >= 0 && fileIndex < MAX_ATTACHMENTS) {
-              const preprocessPromise = startFilePreprocessing(file)
+              const preprocessPromise = startFilePreprocessing(file, options)
               return {
                 ...storeFilePromise(markFileProcessing({ ...prev, draftMessageId }, file), file, preprocessPromise),
                 attachments: newAttachments,
@@ -1295,7 +1296,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
                   const file = new File([text], `pasted_text_${Date.now()}.txt`, {
                     type: 'text/plain',
                   })
-                  insertFilesRef.current([file])
+                  insertFilesRef.current([file], { source: 'pasted-text' })
                   messageInputFieldRef.current?.setValue(prePasteText) // 删除掉默认粘贴进去的长文本
                 }
               })

@@ -114,6 +114,7 @@ function _errorI18nKeys(t: (key: string) => string) {
     'The current search provider does not support reading webpages. Please <OpenExtensionSettingButton>choose a different search provider</OpenExtensionSettingButton> that supports this capability.'
   )
   t('Failed to parse file. Please try again or use a different file format.')
+  t('No readable content was found in this attachment. Please check the file and try again.')
   t('Your points are used up. Claim free reward quota to continue.')
   // END GENERATED ERROR I18N KEYS
 

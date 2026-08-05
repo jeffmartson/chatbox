@@ -1,5 +1,5 @@
 import { isSessionAttachmentRagSupportedFilePath, isSupportedFile, isTextFilePath } from '@shared/file-extensions'
-import { NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES } from '@shared/file-parse-errors'
+import { EMPTY_ATTACHMENT_CONTENT_ERROR, NON_RECOVERABLE_LOCAL_PARSER_ERROR_CODES } from '@shared/file-parse-errors'
 import { searchSessionMessages } from '@shared/services/native-session-search'
 import type {
   ExportChatFormat,
@@ -69,6 +69,11 @@ type ContentStats = {
   previewContent: string
 }
 
+type AttachmentPreparationOptions = {
+  agentMode?: boolean
+  source?: 'pasted-text'
+}
+
 type FilePreprocessStage =
   | 'cache_read'
   | 'cloud_parse'
@@ -92,6 +97,7 @@ class FilePreprocessFailure extends Error {
 const EXPECTED_FILE_PREPROCESS_ERROR_CODES = new Set([
   'chatbox_ai_parser_failed',
   'document_parser_not_configured',
+  EMPTY_ATTACHMENT_CONTENT_ERROR,
   'local_parser_failed',
   'mineru_api_token_required',
   'parsing_cancelled',
@@ -383,19 +389,40 @@ async function fallbackToChatboxAIParser(
     if (isStorageQuotaError(error)) {
       throw new FilePreprocessFailure(FILE_STORAGE_QUOTA_EXCEEDED_ERROR, 'cloud_parse', error)
     }
+    if (error instanceof Error && error.message === EMPTY_ATTACHMENT_CONTENT_ERROR) {
+      throw error
+    }
     throw new Error('chatbox_ai_parser_failed')
   }
+}
+
+type LocalParserFallbackOptions = {
+  allowChatboxAIFallback?: boolean
+  forceChatboxAIFallback?: boolean
+}
+
+function shouldFallbackToChatboxAI(options: LocalParserFallbackOptions): boolean {
+  return (
+    Boolean(options.forceChatboxAIFallback) || (options.allowChatboxAIFallback !== false && canFallbackToChatboxAI())
+  )
 }
 
 async function parseFileWithLocalFallback(
   file: File,
   uniqKey: string,
-  options: { forceChatboxAIFallback?: boolean } = {}
+  options: LocalParserFallbackOptions = {}
 ): Promise<{ content: string; storageKey: string; tokenCountMap: Record<string, number>; parserType: string }> {
   try {
     const result = await parseFileWithLocalParser(file, uniqKey)
-    if (!hasParsedText(result.content) && (options.forceChatboxAIFallback || canFallbackToChatboxAI())) {
-      return await fallbackToChatboxAIParser(file, uniqKey, 'empty_content')
+    if (!hasParsedText(result.content)) {
+      if (shouldFallbackToChatboxAI(options)) {
+        return await fallbackToChatboxAIParser(file, uniqKey, 'empty_content')
+      }
+      throw new FilePreprocessFailure(
+        EMPTY_ATTACHMENT_CONTENT_ERROR,
+        'local_parse',
+        new Error('Local parser returned empty content')
+      )
     }
     return result
   } catch (error) {
@@ -420,7 +447,7 @@ async function parseFileWithLocalFallback(
       throw new FilePreprocessFailure(FILE_STORAGE_QUOTA_EXCEEDED_ERROR, 'local_parse', error)
     }
 
-    if (options.forceChatboxAIFallback || canFallbackToChatboxAI()) {
+    if (shouldFallbackToChatboxAI(options)) {
       return await fallbackToChatboxAIParser(file, uniqKey, 'local_parser_failed')
     }
 
@@ -444,10 +471,12 @@ async function parseFileWithChatboxAI(
   // Get uploaded file content
   const content = (await storage.getBlob(uploadedKey).catch(() => '')) || ''
 
-  // Store content to unique key
-  if (content) {
-    await storage.setBlob(uniqKey, content)
+  if (!hasParsedText(content)) {
+    throw new Error(EMPTY_ATTACHMENT_CONTENT_ERROR)
   }
+
+  // Store content to unique key
+  await storage.setBlob(uniqKey, content)
 
   return { content, storageKey: uniqKey, tokenCountMap: {}, parserType: 'chatbox-ai' }
 }
@@ -473,8 +502,8 @@ async function parseFileWithMineruService(
     throw new Error('parsing_cancelled')
   }
 
-  if (!result.success || !result.content) {
-    throw new Error('third_party_parser_failed')
+  if (!result.success || !result.content || !hasParsedText(result.content)) {
+    throw new Error(EMPTY_ATTACHMENT_CONTENT_ERROR)
   }
 
   const content = result.content
@@ -493,8 +522,8 @@ async function parseFileWithMineruService(
  */
 export async function prepareFileAttachment(
   file: File,
-  settings: SessionSettings,
-  options?: { agentMode?: boolean }
+  _settings: SessionSettings,
+  options?: AttachmentPreparationOptions
 ): Promise<AttachmentPreparationResult> {
   let stage: FilePreprocessStage = 'cache_read'
   try {
@@ -505,7 +534,7 @@ export async function prepareFileAttachment(
 
     // Check if file has already been processed (cache hit)
     const existingContent = await storage.getBlob(uniqKey).catch(() => null)
-    if (existingContent) {
+    if (existingContent && hasParsedText(existingContent)) {
       log.debug(`File already preprocessed: ${file.name}, using cached content.`)
       const existingTokenMap: Record<string, number> = (await storage.getItem(`${uniqKey}_tokenMap`, {})) as Record<
         string,
@@ -600,7 +629,9 @@ export async function prepareFileAttachment(
     stage = 'parse'
     if (isTextFilePath(file.name)) {
       log.debug(`Text file detected, using local parser: ${file.name}`)
-      result = await parseFileWithLocalFallback(file, uniqKey)
+      result = await parseFileWithLocalFallback(file, uniqKey, {
+        allowChatboxAIFallback: options?.source !== 'pasted-text',
+      })
     } else {
       const parserConfig = getEffectiveDocumentParserConfig()
       log.debug(`Using document parser: ${parserConfig.type} for file: ${file.name}`)
@@ -629,7 +660,10 @@ export async function prepareFileAttachment(
             result = await parseFileWithMineruService(file, uniqKey, apiToken)
           } catch (error) {
             log.error(`MinerU parsing failed for "${file.name}":`, error)
-            if (error instanceof Error && error.message.startsWith('third_party_parser')) {
+            if (
+              error instanceof Error &&
+              (error.message === EMPTY_ATTACHMENT_CONTENT_ERROR || error.message.startsWith('third_party_parser'))
+            ) {
               throw error
             }
             throw new Error('third_party_parser_failed')
