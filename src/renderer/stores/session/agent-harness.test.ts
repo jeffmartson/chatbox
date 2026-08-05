@@ -448,4 +448,55 @@ describe('prepareAgentGenerationHarness', () => {
     const stepSettings = await prepared.chatOptions.prepareStep?.({ steps: [] } as never)
     expect(stepSettings?.activeTools).not.toContain('chatbox_cli')
   })
+
+  test('keeps a still-generating resumed message with its tool calls in the model context', async () => {
+    const messages: Message[] = [
+      {
+        id: 'user-1',
+        role: MessageRoleEnum.User,
+        contentParts: [{ type: 'text', text: 'Count from 1 to 30 with one tool call each.' }],
+      },
+      {
+        id: 'assistant-1',
+        role: MessageRoleEnum.Assistant,
+        // A paused-tool-call continuation hands off to the follow-up generation while
+        // the message is still flagged generating; its tool results must stay in context.
+        generating: true,
+        contentParts: [
+          {
+            type: 'tool-call',
+            state: 'result',
+            toolCallId: 'tool-26',
+            toolName: 'code_execution',
+            args: { code: 'console.log(26)' },
+            result: { stdout: '26' },
+          },
+        ],
+      },
+    ]
+
+    const prepared = await prepareAgentGenerationHarness({
+      session: createSession(),
+      settings: { provider: ModelProviderEnum.ChatboxAI, modelId: 'test-model' } as SessionSettings,
+      globalSettings: {} as Settings,
+      configs: { uuid: 'config-1' } as Config,
+      messages,
+      targetMsgIx: messages.length,
+      model: createMockModel(),
+      dependencies: {} as never,
+      webBrowsing: false,
+      agentModeValue: 'on',
+      agentModeLocked: true,
+      agentModeSupported: true,
+      signal: new AbortController().signal,
+      preserveLastPromptMessageToolCalls: true,
+      sandboxProviderFactory: () => sandboxProviderMock as unknown as SandboxProvider,
+      isPro: () => true,
+    })
+
+    expect(prepared.promptMsgs.some((message) => message.id === 'assistant-1')).toBe(true)
+    const serialized = JSON.stringify(prepared.coreMessages)
+    expect(serialized).toContain('tool-26')
+    expect(serialized).toContain('console.log(26)')
+  })
 })

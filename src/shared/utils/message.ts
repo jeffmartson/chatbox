@@ -77,6 +77,44 @@ export function cloneMessage(message: Message): Message {
   return cloneDeep(message)
 }
 
+// No generation survives an app restart or renderer reload, so any message whose
+// last persist predates this module's load is not actually generating anymore.
+const MODULE_BOOT_TIME = Date.now()
+
+/**
+ * Finalize a message left `generating: true` in storage by a crash, force-quit,
+ * or reload. Streaming persists refresh `timestamp` every couple of seconds, so a
+ * generating message persisted before boot is definitionally stale. Without this,
+ * the message is stuck spinning in the UI and — worse — silently excluded from
+ * every future model context by the completed-message eligibility filter.
+ *
+ * Interrupted `call`-state tool parts become errors (still retryable via the
+ * last-tool-step retry); `paused` parts keep their approval cards.
+ */
+export function finalizeStaleGeneratingMessage(message: Message, bootTime = MODULE_BOOT_TIME): Message {
+  if (!message.generating || (message.timestamp !== undefined && message.timestamp >= bootTime)) {
+    return message
+  }
+  const now = Date.now()
+  return {
+    ...message,
+    generating: false,
+    cancel: undefined,
+    contentParts: message.contentParts.map((part) =>
+      part.type === 'tool-call' && part.state === 'call'
+        ? {
+            ...part,
+            state: 'error',
+            pauseReason: undefined,
+            resultStorageKey: undefined,
+            result: { error: 'Tool execution was interrupted before its result was persisted.' },
+            duration: part.startTime ? now - part.startTime : undefined,
+          }
+        : part
+    ),
+  }
+}
+
 export function isEmptyMessage(message: Message): boolean {
   return getMessageText(message, true, true).length === 0 && !message.files?.length && !message.links?.length
 }
@@ -124,6 +162,23 @@ export function fixMessageRoleSequence(messages: Message[]): Message[] {
   return result
 }
 
+function hasCompletedToolCalls(message: Message): boolean {
+  return Boolean(
+    message.contentParts?.some(
+      (part) => part.type === 'tool-call' && (part.state === 'result' || part.state === 'error')
+    )
+  )
+}
+
+/**
+ * Completed tool calls carry no text but are real model content: a resumed
+ * tool-call-only assistant message must stay in the request, otherwise the
+ * model loses the tool history it is supposed to continue from.
+ */
+function isEmptyForModelRequest(message: Message): boolean {
+  return !hasCompletedToolCalls(message) && isEmptyMessage(message)
+}
+
 /**
  * SequenceMessages organizes and orders messages to follow the sequence: system -> user -> assistant -> user -> etc.
  * 这个方法只能用于 llm 接口请求前的参数构造，因为会过滤掉消息中的无关字段，所以不适用于其他消息存储的场景
@@ -153,7 +208,7 @@ export function sequenceMessages(msgs: Message[]): Message[] {
   let isFirstUserMsg = true // Special handling for the first user message
   for (const msg of msgs) {
     // Skip the already processed system messages or empty messages
-    if (msg.role === 'system' || isEmptyMessage(msg)) {
+    if (msg.role === 'system' || isEmptyForModelRequest(msg)) {
       continue
     }
     // Merge consecutive messages from the same role
@@ -163,6 +218,15 @@ export function sequenceMessages(msgs: Message[]): Message[] {
     }
     // Merge all assistant messages as a quote block if constructing the first user message
     if (isEmptyMessage(next) && isFirstUserMsg && msg.role === 'assistant') {
+      // Quoting flattens the message to text and would erase completed tool calls
+      // (the resumed history a continuation depends on, e.g. with a message limit
+      // of 0). Keep the message whole behind a placeholder user turn instead.
+      if (hasCompletedToolCalls(msg)) {
+        ret.push({ id: 'user_before_assistant_id', role: 'user', contentParts: [{ type: 'text', text: 'OK.' }] })
+        isFirstUserMsg = false
+        next = msg
+        continue
+      }
       const text = getMessageText(msg)
       // Split and quote each line, preserving empty lines
       const lines = text.split('\n')
@@ -179,14 +243,14 @@ export function sequenceMessages(msgs: Message[]): Message[] {
       continue
     }
     // If not the first user message, add the current message to the result and start a new one
-    if (!isEmptyMessage(next)) {
+    if (!isEmptyForModelRequest(next)) {
       ret.push(next)
       isFirstUserMsg = false
     }
     next = msg
   }
   // Add the last message if it's not empty
-  if (!isEmptyMessage(next)) {
+  if (!isEmptyForModelRequest(next)) {
     ret.push(next)
   }
   // If there's only one system message, convert it to a user message

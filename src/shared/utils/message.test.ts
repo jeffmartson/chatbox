@@ -8,6 +8,7 @@ import type { Message, MessageContentParts, MessagePicture } from '../types'
 import {
   cloneMessage,
   countMessageWords,
+  finalizeStaleGeneratingMessage,
   fixMessageRoleSequence,
   getMessageText,
   isEmptyMessage,
@@ -679,6 +680,44 @@ describe('sequenceMessages', () => {
     expect(getMessageText(result[0])).toBe('kept')
   })
 
+  it('keeps a text-less assistant message whose content is completed tool calls', () => {
+    const toolCallPart: MessageContentParts[number] = {
+      type: 'tool-call',
+      state: 'result',
+      toolCallId: 'tool-26',
+      toolName: 'code_execution',
+      args: { code: 'console.log(26)' },
+      result: { stdout: '26' },
+    }
+    const input = [
+      createMessage({ id: 'u1', role: 'user', contentParts: [textPart('count to 30')] }),
+      createMessage({ id: 'a1', role: 'assistant', contentParts: [toolCallPart] }),
+    ]
+
+    const result = sequenceMessages(input)
+
+    expect(result.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(result[1].contentParts).toEqual([toolCallPart])
+  })
+
+  it('does not quote a leading assistant message that carries completed tool calls', () => {
+    const toolCallPart: MessageContentParts[number] = {
+      type: 'tool-call',
+      state: 'result',
+      toolCallId: 'tool-26',
+      toolName: 'code_execution',
+      args: { code: 'console.log(26)' },
+      result: { stdout: '26' },
+    }
+    const input = [createMessage({ id: 'a1', role: 'assistant', contentParts: [toolCallPart] })]
+
+    const result = sequenceMessages(input)
+
+    expect(result.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(getMessageText(result[0])).toBe('OK.')
+    expect(result[1].contentParts).toEqual([toolCallPart])
+  })
+
   it('skips empty messages and merges consecutive same-role messages', () => {
     const messages = [
       createMessage({ id: 'u0', role: 'user', contentParts: [] }),
@@ -721,5 +760,86 @@ describe('sequenceMessages', () => {
     expect(firstCall[0].contentParts).toEqual([textPart('> raw answer\n')])
     expect(secondCall[0].contentParts).toEqual([textPart('> raw answer\n')])
     expect(source[0].contentParts).toEqual([textPart('raw answer')])
+  })
+})
+
+describe('finalizeStaleGeneratingMessage', () => {
+  const bootTime = 1_000_000
+
+  it('finalizes a generating message persisted before boot', () => {
+    const message = createMessage({
+      role: 'assistant',
+      generating: true,
+      timestamp: bootTime - 5_000,
+      contentParts: [textPart('partial answer')],
+    })
+
+    const result = finalizeStaleGeneratingMessage(message, bootTime)
+
+    expect(result.generating).toBe(false)
+    expect(result.contentParts).toEqual([textPart('partial answer')])
+  })
+
+  it('converts interrupted call-state tool parts to retryable errors and keeps paused parts', () => {
+    const message = createMessage({
+      role: 'assistant',
+      generating: true,
+      timestamp: bootTime - 5_000,
+      contentParts: [
+        {
+          type: 'tool-call',
+          state: 'call',
+          toolCallId: 'tool-1',
+          toolName: 'user_exec',
+          args: { command: 'sleep 100' },
+          startTime: bootTime - 6_000,
+        },
+        {
+          type: 'tool-call',
+          state: 'paused',
+          toolCallId: 'tool-2',
+          toolName: 'user_exec',
+          args: { command: 'rm file' },
+          pauseReason: { type: 'user_exec_approval', command: 'rm file' },
+        },
+      ],
+    })
+
+    const result = finalizeStaleGeneratingMessage(message, bootTime)
+
+    expect(result.generating).toBe(false)
+    const [interrupted, paused] = result.contentParts as Extract<MessageContentParts[number], { type: 'tool-call' }>[]
+    expect(interrupted.state).toBe('error')
+    expect(interrupted.result).toEqual({ error: 'Tool execution was interrupted before its result was persisted.' })
+    expect(interrupted.duration).toBeGreaterThan(0)
+    expect(paused.state).toBe('paused')
+    expect(paused.pauseReason).toEqual({ type: 'user_exec_approval', command: 'rm file' })
+  })
+
+  it('leaves a generating message persisted after boot untouched', () => {
+    const message = createMessage({
+      role: 'assistant',
+      generating: true,
+      timestamp: bootTime + 5_000,
+      contentParts: [textPart('streaming')],
+    })
+
+    expect(finalizeStaleGeneratingMessage(message, bootTime)).toBe(message)
+  })
+
+  it('finalizes a generating message without a timestamp', () => {
+    const message = createMessage({ role: 'assistant', generating: true, contentParts: [textPart('old')] })
+
+    expect(finalizeStaleGeneratingMessage(message, bootTime).generating).toBe(false)
+  })
+
+  it('leaves non-generating messages untouched', () => {
+    const message = createMessage({
+      role: 'assistant',
+      timestamp: bootTime - 5_000,
+      contentParts: [textPart('done')],
+    })
+
+    expect(finalizeStaleGeneratingMessage(message, bootTime)).toBe(message)
   })
 })

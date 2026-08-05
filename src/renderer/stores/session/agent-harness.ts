@@ -234,7 +234,13 @@ export async function prepareAgentGenerationHarness(
   }
 
   const attachmentResolver = createAttachmentResolver()
-  const messagesForPrompt = await refreshSessionAttachmentStatuses(messages.slice(0, targetMsgIx))
+  const messagesForPrompt = (await refreshSessionAttachmentStatuses(messages.slice(0, targetMsgIx))).map((message) =>
+    // A resumed continuation keeps its target message flagged `generating` for the UI,
+    // but its tool calls/results are exactly the context the follow-up request must
+    // continue from — without this the eligibility filter drops the whole message and
+    // the model restarts the task from scratch.
+    message.id === resumedMessage?.id && message.generating ? { ...message, generating: false } : message
+  )
   const preserveToolCallMessageIds = getToolCallPreserveMessageIds(
     messages,
     targetMsgIx,

@@ -1,6 +1,12 @@
 import type { Session, SessionMeta, SessionMetaRecord } from '@shared/types'
 import { mapValues } from 'lodash'
-import { migrateMessage } from '../../shared/utils/message'
+import { finalizeStaleGeneratingMessage, migrateMessage } from '../../shared/utils/message'
+
+// Also finalizes messages a crash/reload left flagged `generating` — otherwise
+// they spin forever in the UI and are silently dropped from every model context.
+function loadMessage(message: Parameters<typeof migrateMessage>[0]) {
+  return finalizeStaleGeneratingMessage(migrateMessage(message))
+}
 
 export function migrateSession(session: Session): Session {
   return {
@@ -10,17 +16,17 @@ export function migrateSession(session: Session): Session {
       temperature: undefined,
       ...session.settings,
     },
-    messages: session.messages?.map((m) => migrateMessage(m)) || [],
+    messages: session.messages?.map((m) => loadMessage(m)) || [],
     threads: session.threads?.map((t) => ({
       ...t,
-      messages: t.messages.map((m) => migrateMessage(m)) || [],
+      messages: t.messages.map((m) => loadMessage(m)) || [],
     })),
     messageForksHash: mapValues(session.messageForksHash || {}, (forks) => ({
       ...forks,
       lists:
         forks.lists?.map((list) => ({
           ...list,
-          messages: list.messages?.map((m) => migrateMessage(m)) || [],
+          messages: list.messages?.map((m) => loadMessage(m)) || [],
         })) || [],
     })),
   }
