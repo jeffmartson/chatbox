@@ -10,6 +10,7 @@ import {
   isSupportedFile,
 } from '@shared/file-extensions'
 import { KNOWLEDGE_BASE_MAX_FILE_SIZE, KNOWLEDGE_BASE_MAX_FILE_SIZE_LABEL } from '@shared/knowledge-base'
+import { listPendingApprovalToolCalls } from '@shared/message-approval'
 import { isDeepSeekWeakToolUse } from '@shared/models/utils/deepseek'
 import { getModel } from '@shared/providers'
 import { formatNumber } from '@shared/utils'
@@ -75,6 +76,7 @@ import * as picUtils from '@/packages/pic_utils'
 import { skillsController, subscribeSkillsChanged } from '@/packages/skills/controller'
 import platform from '@/platform'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
+import { notifyApprovalInputNudge } from '@/stores/approvalAttentionStore'
 import * as atoms from '@/stores/atoms'
 import { compactionUIStateMapAtom } from '@/stores/atoms/compactionAtoms'
 import * as chatStore from '@/stores/chatStore'
@@ -113,7 +115,7 @@ import { ImageUploadInput } from './ImageUploadInput'
 import { MessageInputField, type MessageInputFieldRef } from './MessageInputField'
 import { cleanupFile, markFileProcessing, onFileProcessed, storeFilePromise } from './preprocessState'
 import ReasoningControlButton from './ReasoningControlButton'
-import { getTrailingSkillCommand, hasPendingApprovalToolCall, insertSkillCommandText } from './skillCommand'
+import { getTrailingSkillCommand, insertSkillCommandText } from './skillCommand'
 import TokenCountMenu from './TokenCountMenu'
 import { useReasoningControlState } from './useReasoningControlState'
 
@@ -396,10 +398,11 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
 
     const { session: currentSession } = useSession(sessionId || null)
     const { sessionSettings: currentSessionMergedSettings } = useSessionSettings(sessionId || null)
-    const isAwaitingToolApproval = useMemo(
-      () => hasPendingApprovalToolCall(currentSession?.messages ?? []),
+    const pendingApprovalToolCallId = useMemo(
+      () => listPendingApprovalToolCalls(currentSession?.messages ?? [])[0]?.toolCallId,
       [currentSession?.messages]
     )
+    const isAwaitingToolApproval = Boolean(pendingApprovalToolCallId)
 
     const skillMenuOpen = skillCommandQuery !== null && matchingInputSkills.length > 0 && !isAwaitingToolApproval
 
@@ -1454,7 +1457,15 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
               )}
 
             {/* Input Row */}
-            <Flex align="flex-end" gap={4}>
+            <Flex
+              align="flex-end"
+              gap={4}
+              // Clicking the locked input while approval is pending surfaces the
+              // floating approval pill even when the card is visible in the list.
+              onClickCapture={
+                pendingApprovalToolCallId ? () => notifyApprovalInputNudge(pendingApprovalToolCallId) : undefined
+              }
+            >
               <MessageInputField
                 ref={messageInputFieldRef}
                 isNewSession={isNewSession}

@@ -1,5 +1,3 @@
-import type { Message } from '@shared/types'
-
 export type SkillCommandTrigger = {
   query: string
   start: number
@@ -25,17 +23,4 @@ export function insertSkillCommandText(value: string, skillName: string): string
 
   const separator = value.length === 0 || /\s$/.test(value) ? '' : ' '
   return `${value}${separator}${command} `
-}
-
-export function hasPendingApprovalToolCall(messages: Pick<Message, 'contentParts'>[]): boolean {
-  return messages.some((message) =>
-    message.contentParts.some(
-      (part) =>
-        part.type === 'tool-call' &&
-        part.state === 'paused' &&
-        (part.pauseReason?.type === 'user_exec_approval' ||
-          part.pauseReason?.type === 'file_mutation_approval' ||
-          part.pauseReason?.type === 'app_action_approval')
-    )
-  )
 }

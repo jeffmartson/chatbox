@@ -1,4 +1,5 @@
 import { buildContext } from '@shared/context'
+import { isApprovalPauseReason } from '@shared/message-approval'
 import type { ModelInterface, ModelStreamPart } from '@shared/models/types'
 import type {
   AppActionApprovalDetails,
@@ -399,14 +400,6 @@ function findPausedToolCallLimitBatch(message: Message, toolCallId: string): Mes
   return message.contentParts.filter(
     (part): part is MessageContentToolCallPart =>
       part.type === 'tool-call' && part.state === 'paused' && part.pauseReason?.type === 'tool_call_limit'
-  )
-}
-
-function isApprovalPauseReason(pauseReason: MessageContentToolCallPart['pauseReason']): boolean {
-  return (
-    pauseReason?.type === 'user_exec_approval' ||
-    pauseReason?.type === 'file_mutation_approval' ||
-    pauseReason?.type === 'app_action_approval'
   )
 }
 

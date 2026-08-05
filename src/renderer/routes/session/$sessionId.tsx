@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
 import { JK_PAGE_NAMES } from '@/analytics/jk-events'
 import MessageList, { type MessageListRef } from '@/components/chat/MessageList'
+import PendingApprovalPill from '@/components/chat/PendingApprovalPill'
 import { ChatboxWelcomeCard } from '@/components/common/ChatboxWelcomeCard'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import InputBox, { type InputBoxPayload } from '@/components/InputBox/InputBox'
@@ -266,6 +267,13 @@ function RouteComponent() {
             </Box>
           </Box>
         )}
+
+        {/* 悬浮审批胶囊：审批卡片滚出视口时出现在输入框上方 */}
+        <Box className="pointer-events-none absolute left-0 right-0 z-10" style={{ bottom: '100%' }} px="sm" mb="xs">
+          <ErrorBoundary name="session-approval-pill">
+            <PendingApprovalPill session={currentSession} />
+          </ErrorBoundary>
+        </Box>
 
         {/* <ScrollButtons /> */}
         <ErrorBoundary name="session-inputbox">

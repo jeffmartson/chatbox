@@ -15,6 +15,7 @@ import {
   UnstyledButton,
 } from '@mantine/core'
 import { TestId } from '@shared/automation/testids'
+import { isApprovalPauseReason } from '@shared/message-approval'
 import { ChatboxAIAPIError } from '@shared/models/errors'
 import { SANDBOX_EXEC_ERROR_CODES } from '@shared/sandbox-provider'
 import type {
@@ -53,7 +54,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import clsx from 'clsx'
-import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { type FC, type ReactNode, type Ref, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImageGenerationResultGallery } from '@/components/chat/ImageGenerationResultGallery'
 import { ChatboxAIErrorMessage } from '@/components/common/ChatboxAIErrorMessage'
@@ -67,6 +68,12 @@ import { resumeImageGenerationWithFollowUp } from '@/packages/chatbox-cli/image-
 import { getToolName } from '@/packages/tools'
 import type { SearchResultItem } from '@/packages/web-search'
 import platform from '@/platform'
+import {
+  registerApprovalActionsElement,
+  setApprovalActionsVisible,
+  unregisterApprovalActionsElement,
+  useApprovalCardHighlighted,
+} from '@/stores/approvalAttentionStore'
 import { useCurrentGeneratingId, useImageGenerationRecord } from '@/stores/imageGenerationStore'
 import {
   continuePausedToolCall,
@@ -192,6 +199,35 @@ function useAutoExpandOnSignal(signal: boolean): [boolean, (next: boolean | ((pr
     prevSignal.current = signal
   }, [signal])
   return [expanded, setExpanded]
+}
+
+// Report whether a pending approval's Approve/Deny actions are visible in the viewport,
+// so the floating approval pill above the input box appears whenever they are not.
+// Observed on the actions row (not the whole card): a tall card whose buttons are
+// scrolled off-screen still needs the pill. Unmounting (virtualized list) and a
+// collapsed step (zero height) both count as not visible. Also registers the element
+// so the pill's "View" action can scroll to it. Keyed per component instance because
+// the same card can be mounted twice (message list + search dialog).
+function useApprovalCardVisibilityReport(toolCallId: string, enabled: boolean) {
+  const instanceId = useId()
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!enabled) return
+    const element = ref.current
+    if (!element) return
+    registerApprovalActionsElement(toolCallId, instanceId, element)
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[entries.length - 1]
+      setApprovalActionsVisible(toolCallId, instanceId, entry?.isIntersecting ?? false)
+    })
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      unregisterApprovalActionsElement(toolCallId, instanceId)
+      setApprovalActionsVisible(toolCallId, instanceId, false)
+    }
+  }, [toolCallId, instanceId, enabled])
+  return ref
 }
 
 // ─── Tool Icon Mapping ──────────────────────────────────────────────
@@ -1132,13 +1168,18 @@ const ToolCallRunningDots: FC = () => (
   </Group>
 )
 
+// Full-size, high-salience decision buttons shared by all approval cards: the
+// Approve/Deny pair is what users miss, so it carries the card's visual weight.
+const APPROVAL_ACTION_BUTTON_PROPS = { size: 'sm', h: 32, px: 'lg', radius: 'xl' } as const
+
 const ImageGenerationApprovalCard: FC<{
   toolCallId: string
   details: ImageGenerationApprovalDetails
   disabled: boolean
   onApprove: () => void
   onDeny: () => void
-}> = ({ toolCallId, details, disabled, onApprove, onDeny }) => {
+  actionsRef?: Ref<HTMLDivElement>
+}> = ({ toolCallId, details, disabled, onApprove, onDeny, actionsRef }) => {
   const { t, i18n } = useTranslation()
   const usesChatboxQuota = details.billing === 'chatbox_quota'
   const computePointsRemainingRatio = details.computePointsRemainingRatio ?? details.computePointsRemaining
@@ -1231,10 +1272,11 @@ const ImageGenerationApprovalCard: FC<{
         </Stack>
       </Alert>
 
-      <Group gap="xs">
+      <Group gap="xs" ref={actionsRef}>
         <Button
           data-testid={TestId.toolCall.approve}
-          size="compact-sm"
+          {...APPROVAL_ACTION_BUTTON_PROPS}
+          leftSection={<IconCheck size={14} stroke={2.5} />}
           color="chatbox-brand"
           disabled={disabled}
           onClick={onApprove}
@@ -1243,7 +1285,7 @@ const ImageGenerationApprovalCard: FC<{
         </Button>
         <Button
           data-testid={TestId.toolCall.deny}
-          size="compact-sm"
+          {...APPROVAL_ACTION_BUTTON_PROPS}
           variant="light"
           color="gray"
           disabled={disabled}
@@ -1263,6 +1305,8 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
 }) => {
   const { t } = useTranslation()
   const pauseReason = part.pauseReason
+  const isApproval = isApprovalPauseReason(pauseReason)
+  const approvalActionsRef = useApprovalCardVisibilityReport(part.toolCallId, isApproval)
   if (
     pauseReason?.type === 'app_action_approval' &&
     pauseReason.action === 'image.generate' &&
@@ -1275,14 +1319,10 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         disabled={!sessionId || !messageId}
         onApprove={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
         onDeny={() => sessionId && messageId && stopPausedToolCall(sessionId, messageId, part.toolCallId)}
+        actionsRef={approvalActionsRef}
       />
     )
   }
-
-  const isApproval =
-    pauseReason?.type === 'user_exec_approval' ||
-    pauseReason?.type === 'file_mutation_approval' ||
-    pauseReason?.type === 'app_action_approval'
   const title =
     pauseReason?.type === 'tool_call_limit'
       ? t('Paused after {{count}} steps. Check whether the task is on track, then continue or stop to adjust.', {
@@ -1327,7 +1367,7 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
       <Text size="xs" c="chatbox-secondary">
         {title}
       </Text>
-      <Group gap="xs">
+      <Group gap="xs" ref={approvalActionsRef}>
         {pauseReason?.type === 'tool_call_limit' ? (
           <Button.Group>
             <Button
@@ -1374,7 +1414,8 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         ) : (
           <Button
             data-testid={isApproval ? TestId.toolCall.approve : TestId.toolCall.continue}
-            size="compact-xs"
+            {...(isApproval ? APPROVAL_ACTION_BUTTON_PROPS : { size: 'compact-xs' as const })}
+            leftSection={isApproval ? <IconCheck size={14} stroke={2.5} /> : undefined}
             color="chatbox-brand"
             disabled={!sessionId || !messageId}
             onClick={() => sessionId && messageId && continuePausedToolCall(sessionId, messageId, part.toolCallId)}
@@ -1384,7 +1425,7 @@ const PausedToolCallDetails: FC<{ part: MessageToolCallPart } & ToolCallActionCo
         )}
         <Button
           data-testid={TestId.toolCall.deny}
-          size="compact-xs"
+          {...(isApproval ? APPROVAL_ACTION_BUTTON_PROPS : { size: 'compact-xs' as const })}
           variant="light"
           color="chatbox-error"
           disabled={!sessionId || !messageId}
@@ -1581,6 +1622,12 @@ const TimelineToolCallStepContent: FC<TimelineToolCallStepProps & { commandResul
     imageStatus !== 'error' &&
     !isCommandFailure
   const [expanded, setExpanded] = useAutoExpandOnSignal(isPaused || isBashNotAvailable)
+  const isApprovalPaused = isPaused && isApprovalPauseReason(part.pauseReason)
+  const approvalHighlighted = useApprovalCardHighlighted(part.toolCallId) && isApprovalPaused
+  // The pill's "View" action must reveal the card even if the user collapsed the step.
+  useEffect(() => {
+    if (approvalHighlighted) setExpanded(true)
+  }, [approvalHighlighted, setExpanded])
   const Icon = getToolIcon(part.toolName)
   const handleResumeBackground = useCallback(async () => {
     if (!acceptedImageTask || !sessionId || !canResumeBackground || isResumingBackground) return
@@ -1759,6 +1806,9 @@ const TimelineToolCallStepContent: FC<TimelineToolCallStepProps & { commandResul
       <ImageGenerationResultGallery images={imageRecord?.generatedImages ?? []} />
       <Collapse in={expanded && hasDetail}>
         <Box
+          // The rotating locate ring plays only after the pill's "View" action, as
+          // the "here it is" feedback — not as a permanent attention grabber.
+          className={approvalHighlighted ? 'chatbox-approval-ring' : undefined}
           mt={6}
           mb={2}
           p={10}
@@ -1766,6 +1816,8 @@ const TimelineToolCallStepContent: FC<TimelineToolCallStepProps & { commandResul
             borderRadius: 'var(--mantine-radius-md)',
             backgroundColor: 'color-mix(in srgb, var(--chatbox-background-gray-secondary) 72%, transparent)',
             color: 'var(--chatbox-tint-secondary)',
+            // Amber accent marks "decision needed" apart from routine tool details.
+            borderLeft: isApprovalPaused ? '3px solid var(--chatbox-tint-warning)' : undefined,
           }}
         >
           <TimelineToolCallDetail part={part} sessionId={sessionId} messageId={messageId} />

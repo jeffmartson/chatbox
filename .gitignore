@@ -195,3 +195,6 @@ plan.md
 tmp-*.*
 tmp_*.*
 /docs/superpowers/plans
+
+# Local pnpm store accidentally created by pnpm install in worktrees
+.pnpm-store/

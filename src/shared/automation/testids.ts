@@ -79,6 +79,10 @@ export const TestId = {
     dontAskAgain: 'tool-call-dont-ask-again',
     dontAskAgainSession: 'tool-call-dont-ask-again-session',
     dontAskAgainGlobal: 'tool-call-dont-ask-again-global',
+    approvalPill: 'tool-call-approval-pill',
+    approvalPillView: 'tool-call-approval-pill-view',
+    approvalPillApprove: 'tool-call-approval-pill-approve',
+    approvalPillDeny: 'tool-call-approval-pill-deny',
   },
   settings: {
     pauseOnToolCallLimitSwitch: 'settings-pause-on-tool-call-limit',

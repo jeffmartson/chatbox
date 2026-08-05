@@ -333,3 +333,48 @@ div[data-vaul-overlay] {
 div[data-vaul-drawer] {
   z-index: 2000;
 }
+
+/* Rotating border beam on the pending-approval card (ToolCallPartUI): a bright amber
+   segment travels around a faint ring. Without @property support the ring degrades
+   to a static gradient border. */
+@property --chatbox-approval-ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes chatbox-approval-ring-spin {
+  to {
+    --chatbox-approval-ring-angle: 360deg;
+  }
+}
+
+.chatbox-approval-ring {
+  position: relative;
+}
+
+/* The band is drawn just inside the card edge (inset: 0), because ancestor containers
+   (Collapse, virtualized list items) clip anything that sticks out of the card. */
+.chatbox-approval-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--chatbox-approval-ring-angle),
+    color-mix(in srgb, var(--chatbox-tint-warning) 18%, transparent),
+    color-mix(in srgb, var(--chatbox-tint-warning) 95%, transparent) 12%,
+    color-mix(in srgb, var(--chatbox-tint-warning) 18%, transparent) 30%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: chatbox-approval-ring-spin 2.5s linear infinite;
+  pointer-events: none;
+}

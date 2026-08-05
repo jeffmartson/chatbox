@@ -27,6 +27,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type StateSnapshot, Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
+import { buildMessageRenderItems, type MessageRenderItem } from '@/components/chat/message-render-items'
 import { platformTypeAtom } from '@/hooks/useNeedRoomForWinControls'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { cn } from '@/lib/utils'
@@ -89,18 +90,6 @@ export interface MessageListProps {
   currentSession: Session
 }
 
-type MessageRenderItem =
-  | {
-      type: 'message'
-      key: string
-      messages: [SessionMessage]
-    }
-  | {
-      type: 'group'
-      key: string
-      messages: [SessionMessage] | [SessionMessage, SessionMessage]
-    }
-
 const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) => {
   const { t } = useTranslation()
   const isSmallScreen = useIsSmallScreen()
@@ -129,53 +118,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     return null
   }, [currentMessageList])
 
-  const renderItems = useMemo<MessageRenderItem[]>(() => {
-    let latestUserIndex = -1
-
-    for (let i = currentMessageList.length - 1; i >= 0; i--) {
-      if (currentMessageList[i].role === 'user') {
-        latestUserIndex = i
-        break
-      }
-    }
-
-    const shouldGroupLastTurn =
-      latestUserIndex >= 0 &&
-      (latestUserIndex === currentMessageList.length - 1 ||
-        (latestUserIndex + 1 < currentMessageList.length &&
-          currentMessageList[latestUserIndex + 1].role === 'assistant' &&
-          !currentMessageList[latestUserIndex + 1].isForkMarker))
-
-    const items: MessageRenderItem[] = []
-
-    for (let i = 0; i < currentMessageList.length; i++) {
-      if (shouldGroupLastTurn && i === latestUserIndex) {
-        const groupedMessages: [SessionMessage] | [SessionMessage, SessionMessage] =
-          latestUserIndex + 1 < currentMessageList.length &&
-          currentMessageList[latestUserIndex + 1].role === 'assistant'
-            ? [currentMessageList[i], currentMessageList[i + 1]]
-            : [currentMessageList[i]]
-
-        items.push({
-          type: 'group',
-          key: `group-${groupedMessages.map((message) => message.id).join('-')}`,
-          messages: groupedMessages,
-        })
-        if (groupedMessages.length === 2) {
-          i++
-        }
-        continue
-      }
-
-      items.push({
-        type: 'message',
-        key: currentMessageList[i].id,
-        messages: [currentMessageList[i]],
-      })
-    }
-
-    return items
-  }, [currentMessageList])
+  const renderItems = useMemo<MessageRenderItem[]>(
+    () => buildMessageRenderItems(currentMessageList),
+    [currentMessageList]
+  )
 
   const userMessageAnchors = useMemo<MessageMinimapAnchor[]>(() => {
     const assistantTextByUserId = new Map<string, string>()
