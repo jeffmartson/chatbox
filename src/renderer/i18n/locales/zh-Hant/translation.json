@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "有 {{count}} 個項目未能包含在備份中。詳情請查看備份內的 manifest.json。",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}：{{current}} / {{total}}",
   "Background Image": "背景圖片",
+  "Background Image Opacity": "背景圖片不透明度",
   "Background Settings": "背景設定",
   "Balanced: Good balance between cost and context preservation": "平衡：在成本與保留上下文之間取得良好平衡",
   "Bash is not available on this Windows device.": "此 Windows 裝置上沒有可用的 Bash。",

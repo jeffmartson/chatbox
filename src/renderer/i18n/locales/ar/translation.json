@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "تعذر تضمين {{count}} عنصرًا. راجع manifest.json داخل النسخة الاحتياطية للحصول على التفاصيل.",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}: {{current}} / {{total}}",
   "Background Image": "صورة الخلفية",
+  "Background Image Opacity": "شفافية صورة الخلفية",
   "Background Settings": "إعدادات الخلفية",
   "Balanced: Good balance between cost and context preservation": "متوازن: توازن جيد بين التكلفة والحفاظ على السياق",
   "Bash is not available on this Windows device.": "Bash غير متاح على جهاز Windows هذا.",

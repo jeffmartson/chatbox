@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "Не удалось включить {{count}} элементов. Подробности см. в файле manifest.json внутри резервной копии.",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}: {{current}} / {{total}}",
   "Background Image": "Фоновое изображение",
+  "Background Image Opacity": "Непрозрачность фонового изображения",
   "Background Settings": "Настройки фона",
   "Balanced: Good balance between cost and context preservation": "Сбалансированный: хороший баланс между стоимостью и сохранением контекста",
   "Bash is not available on this Windows device.": "Bash недоступен на этом устройстве с Windows.",

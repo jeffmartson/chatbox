@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "{{count}}개 항목을 백업에 포함하지 못했습니다. 자세한 내용은 백업의 manifest.json을 확인하세요.",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}: {{current}} / {{total}}",
   "Background Image": "배경 이미지",
+  "Background Image Opacity": "배경 이미지 불투명도",
   "Background Settings": "배경 설정",
   "Balanced: Good balance between cost and context preservation": "균형 잡힘: 비용과 컨텍스트 보존 간의 적절한 균형",
   "Bash is not available on this Windows device.": "이 Windows 기기에서는 Bash를 사용할 수 없습니다.",

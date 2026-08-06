@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "{{count}} Elemente konnten nicht in die Sicherung aufgenommen werden. Details finden Sie in der Datei manifest.json der Sicherung.",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}: {{current}} / {{total}}",
   "Background Image": "Hintergrundbild",
+  "Background Image Opacity": "Deckkraft des Hintergrundbilds",
   "Background Settings": "Hintergrundeinstellungen",
   "Balanced: Good balance between cost and context preservation": "Ausgewogen: Gutes Gleichgewicht zwischen Kosten und Kontexterhaltung",
   "Bash is not available on this Windows device.": "Bash ist auf diesem Windows-Gerät nicht verfügbar.",

@@ -155,6 +155,7 @@
   "{{count}} item(s) could not be included. See manifest.json in the backup for details.": "{{count}} elementer kunne ikke tas med. Se manifest.json i sikkerhetskopien for detaljer.",
   "{{phase}}: {{current}} / {{total}}": "{{phase}}: {{current}} / {{total}}",
   "Background Image": "Bakgrunnsbilde",
+  "Background Image Opacity": "Bakgrunnsbildeopasitet",
   "Background Settings": "Bakgrunnsinnstillinger",
   "Balanced: Good balance between cost and context preservation": "Balansert: God balanse mellom kostnad og bevaring av kontekst",
   "Bash is not available on this Windows device.": "Bash er ikke tilgjengelig på denne Windows-enheten.",
