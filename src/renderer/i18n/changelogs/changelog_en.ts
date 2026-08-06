@@ -1,4 +1,11 @@
 const changelog = `
+## v1.22.2 - 2026.08.06
+1. Refined the classic message layout and overall interface, with customizable accent colors and color presets
+2. Organized alternative replies into collapsible branches for easier comparison and clearer conversation context
+3. Improved Work Mode for long-running tasks, approvals, and command compatibility
+4. Added Claude Opus 5 support and improved DeepSeek thinking compatibility
+5. Fixed issues with file parsing, automatic scrolling, Mermaid rendering, and overall stability
+
 ## v1.22.1 - 2026.07.28
 1. Added Work Mode: the AI can run code, use tools, work with files on your computer, find past conversations, and generate images to complete complex tasks
 2. Added Skills: install and manage reusable AI abilities, with a regularly updated built-in library
