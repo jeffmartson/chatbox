@@ -383,20 +383,26 @@ const _Message: FC<Props> = (props) => {
     await NiceModal.show('report-content', { contentId: getMessageText(msg) || msg.id })
   }, [msg])
 
-  const onDelMsg = useCallback(() => {
-    if (generationLocked) {
-      notifyGenerationLocked()
-      return
+  const onDelMsg = useCallback(async () => {
+    // Deleting a still-streaming reply must stop it first: the stream writes by
+    // message id and would keep running invisibly after the message is gone.
+    if (msg.generating) {
+      await handleStop()
     }
-    removeMessage(sessionId, msg.id)
-  }, [generationLocked, msg.id, notifyGenerationLocked, sessionId])
+    await removeMessage(sessionId, msg.id)
+  }, [handleStop, msg, sessionId])
 
   const onEditClick = useCallback(async () => {
-    if (generationLocked) {
+    // The UI hides the edit entry for a streaming message, but guard anyway:
+    // saving a snapshot of it would be silently overwritten by the next chunk.
+    if (msg.generating) {
       notifyGenerationLocked()
       return
     }
-    await NiceModal.show('message-edit', { sessionId, msg: msg })
+    // Plain saves are safe while replies stream (writes are serialized and the
+    // in-flight context was snapshotted at generation start), but Save & Resend
+    // is a regenerate-class action and stays locked like Retry.
+    await NiceModal.show('message-edit', { sessionId, msg, hideSaveAndResend: generationLocked })
   }, [generationLocked, msg, notifyGenerationLocked, sessionId])
 
   const onViewMessageJson = useCallback(async () => {
@@ -620,7 +626,6 @@ const _Message: FC<Props> = (props) => {
                 icon: IconPencil,
                 testId: TestId.message.actionMenuEdit,
                 onClick: onEditClick,
-                disabled: generationLocked && !isSmallScreen,
               },
             !(props.sessionType === 'picture' && msg.role === 'assistant') && {
               text: t('copy'),
@@ -663,14 +668,13 @@ const _Message: FC<Props> = (props) => {
           ]
         : []),
       {
-        doubleCheck: !generationLocked,
+        doubleCheck: true,
         text: t('delete'),
         icon: IconTrash,
         testId: TestId.message.actionDelete,
         confirmTestId: TestId.message.actionDeleteConfirm,
         confirmPanelTestId: TestId.message.deleteConfirmation,
         onClick: onDelMsg,
-        disabled: generationLocked && !isSmallScreen,
       },
     ],
     [
@@ -1071,9 +1075,8 @@ const _Message: FC<Props> = (props) => {
           <MessageActionIcon
             testId={TestId.message.actionBarEdit}
             icon={IconPencil}
-            tooltip={generationLocked ? t('Wait for the current replies to finish') : t('Edit')}
+            tooltip={t('Edit')}
             onClick={onEditClick}
-            disabled={generationLocked && !isSmallScreen}
           />
         )}
         {!(props.sessionType === 'picture' && msg.role === 'assistant') && (

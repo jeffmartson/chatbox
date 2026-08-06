@@ -16,23 +16,32 @@ import * as chatStore from '../chatStore'
 // wraps them in the renderer's `chatStore.updateSessionWithMessages` queue.
 export { findMessageLocation }
 
+// Every fork mutation is a full-session write and must pass
+// `preserveCachedGeneratingMessages`: alternative replies stream outside the
+// session generation lock with cache-only chunk updates, so a plain write would
+// roll their visible content back to the last 2s persistence snapshot.
+
 /**
  * Create a new fork branch at the specified message
  */
 export async function createNewFork(sessionId: string, forkMessageId: string) {
-  await chatStore.updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error('Session not found')
-    }
-    const patch = buildCreateForkPatch(session, forkMessageId)
-    if (!patch) {
-      return session
-    }
-    return {
-      ...session,
-      ...patch,
-    }
-  })
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      const patch = buildCreateForkPatch(session, forkMessageId)
+      if (!patch) {
+        return session
+      }
+      return {
+        ...session,
+        ...patch,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 /**
@@ -83,57 +92,69 @@ export async function createInactiveFork(
  * Switch between fork branches
  */
 export async function switchFork(sessionId: string, forkMessageId: string, direction: 'next' | 'prev') {
-  await chatStore.updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error('Session not found')
-    }
-    const patch = buildSwitchForkPatch(session, forkMessageId, direction)
-    if (!patch) {
-      return session
-    }
-    return {
-      ...session,
-      ...patch,
-    } as typeof session
-  })
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      const patch = buildSwitchForkPatch(session, forkMessageId, direction)
+      if (!patch) {
+        return session
+      }
+      return {
+        ...session,
+        ...patch,
+      } as typeof session
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 /**
  * Switch directly to a saved fork branch by its position.
  */
 export async function switchForkTo(sessionId: string, forkMessageId: string, position: number) {
-  await chatStore.updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error('Session not found')
-    }
-    const patch = buildSwitchForkToPatch(session, forkMessageId, position)
-    if (!patch) {
-      return session
-    }
-    return {
-      ...session,
-      ...patch,
-    } as typeof session
-  })
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      const patch = buildSwitchForkToPatch(session, forkMessageId, position)
+      if (!patch) {
+        return session
+      }
+      return {
+        ...session,
+        ...patch,
+      } as typeof session
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 /**
  * Delete the current fork branch
  */
 export async function deleteFork(sessionId: string, forkMessageId: string) {
-  await chatStore.updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error('Session not found')
-    }
-    const patch = buildDeleteForkPatch(session, forkMessageId)
-    if (!patch) {
-      return session
-    }
-    return {
-      ...session,
-      ...patch,
-    }
-  })
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      const patch = buildDeleteForkPatch(session, forkMessageId)
+      if (!patch) {
+        return session
+      }
+      return {
+        ...session,
+        ...patch,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 /**
@@ -141,17 +162,21 @@ export async function deleteFork(sessionId: string, forkMessageId: string) {
  * @deprecated
  */
 export async function expandFork(sessionId: string, forkMessageId: string) {
-  await chatStore.updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error('Session not found')
-    }
-    const patch = buildExpandForkPatch(session, forkMessageId)
-    if (!patch) {
-      return session
-    }
-    return {
-      ...session,
-      ...patch,
-    }
-  })
+  await chatStore.updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error('Session not found')
+      }
+      const patch = buildExpandForkPatch(session, forkMessageId)
+      if (!patch) {
+        return session
+      }
+      return {
+        ...session,
+        ...patch,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }

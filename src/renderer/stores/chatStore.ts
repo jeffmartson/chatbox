@@ -781,48 +781,55 @@ export async function updateMessage(
 }
 
 export async function removeMessage(sessionId: string, messageId: string) {
-  return await updateSessionWithMessages(sessionId, (session) => {
-    if (!session) {
-      throw new Error(`session ${sessionId} not found`)
-    }
+  // Messages can be deleted while other replies stream; their cache-only chunk
+  // updates must survive this full-session write. Preserving never resurrects
+  // the removed message: the merge only maps over messages that still exist.
+  return await updateSessionWithMessages(
+    sessionId,
+    (session) => {
+      if (!session) {
+        throw new Error(`session ${sessionId} not found`)
+      }
 
-    const messageToDelete =
-      session.messages.find((m) => m.id === messageId) ??
-      session.threads?.flatMap((thread) => thread.messages).find((m) => m.id === messageId) ??
-      Object.values(session.messageForksHash ?? {})
-        .flatMap((fork) => fork.lists)
-        .flatMap((list) => list.messages)
-        .find((m) => m.id === messageId)
-    const isSummaryMessage = messageToDelete?.isSummary === true
+      const messageToDelete =
+        session.messages.find((m) => m.id === messageId) ??
+        session.threads?.flatMap((thread) => thread.messages).find((m) => m.id === messageId) ??
+        Object.values(session.messageForksHash ?? {})
+          .flatMap((fork) => fork.lists)
+          .flatMap((list) => list.messages)
+          .find((m) => m.id === messageId)
+      const isSummaryMessage = messageToDelete?.isSummary === true
 
-    const newMessages = session.messages.filter((m) => m.id !== messageId)
-    const newThreads = session.threads?.map((thread) => ({
-      ...thread,
-      messages: thread.messages.filter((m) => m.id !== messageId),
-      compactionPoints: isSummaryMessage
-        ? thread.compactionPoints?.filter((cp) => cp.summaryMessageId !== messageId)
-        : thread.compactionPoints,
-    }))
+      const newMessages = session.messages.filter((m) => m.id !== messageId)
+      const newThreads = session.threads?.map((thread) => ({
+        ...thread,
+        messages: thread.messages.filter((m) => m.id !== messageId),
+        compactionPoints: isSummaryMessage
+          ? thread.compactionPoints?.filter((cp) => cp.summaryMessageId !== messageId)
+          : thread.compactionPoints,
+      }))
 
-    const newCompactionPoints = isSummaryMessage
-      ? session.compactionPoints?.filter((cp) => cp.summaryMessageId !== messageId)
-      : session.compactionPoints
+      const newCompactionPoints = isSummaryMessage
+        ? session.compactionPoints?.filter((cp) => cp.summaryMessageId !== messageId)
+        : session.compactionPoints
 
-    // Clean up empty fork branches after message removal and auto-switch if needed
-    const { messages: finalMessages, messageForksHash: newMessageForksHash } = cleanupEmptyForkBranches(
-      removeMessageFromSavedForks(session.messageForksHash, messageId),
-      newMessages,
-      newThreads
-    )
+      // Clean up empty fork branches after message removal and auto-switch if needed
+      const { messages: finalMessages, messageForksHash: newMessageForksHash } = cleanupEmptyForkBranches(
+        removeMessageFromSavedForks(session.messageForksHash, messageId),
+        newMessages,
+        newThreads
+      )
 
-    return {
-      ...session,
-      messages: finalMessages,
-      threads: newThreads,
-      messageForksHash: newMessageForksHash,
-      compactionPoints: newCompactionPoints,
-    }
-  })
+      return {
+        ...session,
+        messages: finalMessages,
+        threads: newThreads,
+        messageForksHash: newMessageForksHash,
+        compactionPoints: newCompactionPoints,
+      }
+    },
+    { preserveCachedGeneratingMessages: true }
+  )
 }
 
 function removeMessageFromSavedForks(
