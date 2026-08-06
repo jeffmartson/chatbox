@@ -197,7 +197,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
               <IconX size={14} />
             </ActionIcon>
           </div>
-        ) : (
+        ) : opened ? (
           <AgentModePanel
             sessionId={sessionId}
             providerId={providerId}
@@ -210,7 +210,7 @@ const AgentModeButton: FC<AgentModeButtonProps> = ({
             onSkillSelect={onSkillSelect}
             onClose={handleClose}
           />
-        )}
+        ) : null}
       </Popover.Dropdown>
     </Popover>
   )

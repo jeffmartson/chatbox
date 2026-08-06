@@ -39,7 +39,7 @@ vi.mock('@/stores/session/agent-mode', () => ({
 
 vi.mock('@/platform', () => ({ default: { type: 'desktop' } }))
 
-vi.mock('./AgentModePanel', () => ({ default: () => null }))
+vi.mock('./AgentModePanel', () => ({ default: () => <div>Agent mode menu</div> }))
 
 import AgentModeButton from './AgentModeButton'
 
@@ -93,6 +93,7 @@ describe('AgentModeButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
 
     expect(screen.queryByText('Web Search has moved')).toBeNull()
+    expect(screen.queryByText('Agent mode menu')).toBeNull()
     expect(window.localStorage.getItem('chatbox.web-search-moved-tip-dismissed.v1')).toBe('true')
 
     view.unmount()
