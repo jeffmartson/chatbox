@@ -15,7 +15,6 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 import {
   IconChevronRight,
-  IconClipboard,
   IconFileText,
   IconHome,
   IconMail,
@@ -46,7 +45,7 @@ export const Route = createFileRoute('/about')({
 })
 
 function RouteComponent() {
-  const { t, i18n: _i18n } = useTranslation()
+  const { t } = useTranslation()
   const version = useVersion()
   const language = useLanguage()
   const isSmallScreen = useIsSmallScreen()
@@ -118,11 +117,6 @@ function RouteComponent() {
               icon={<IconHome className="w-full h-full" />}
               title={t('Official Site')}
               link={buildChatboxUrl(`/redirect_app/homepage/${language}`)}
-            />
-            <ListItem
-              icon={<IconClipboard className="w-full h-full" />}
-              title={t('Survey')}
-              link={_i18n.language === 'zh-Hans' ? 'https://jsj.top/f/fcMYEa' : 'https://jsj.top/f/RUMbvY'}
             />
             <ListItem
               icon={<IconPencil className="w-full h-full" />}
