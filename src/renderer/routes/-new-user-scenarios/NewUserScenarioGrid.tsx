@@ -15,7 +15,7 @@ interface NewUserScenarioGridProps {
 
 const scenarioIconMap = {
   document: iconSummary,
-  rehearsal: iconChat,
+  resume: iconChat,
   academic: iconCursor,
   exam: iconPan,
   webpage: iconBrowserWindow,
