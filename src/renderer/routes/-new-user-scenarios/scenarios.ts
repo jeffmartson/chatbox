@@ -14,8 +14,30 @@ export interface NewUserScenario extends LocalizedScenarioContent {
   english: LocalizedScenarioContent
 }
 
+/**
+ * Stable sentinel appended to onboarding scenario system prompts for SLS / analytics
+ * filtering. Do not change the format without updating chatbox-analysis detection.
+ *
+ * Format: `<!-- chatbox:onboarding-scenario:<id> -->`
+ */
+export function onboardingScenarioMarker(scenarioId: string): string {
+  return `<!-- chatbox:onboarding-scenario:${scenarioId} -->`
+}
+
+/** Append the stable onboarding marker if missing (idempotent). */
+export function withOnboardingScenarioMarker(systemPrompt: string, scenarioId: string): string {
+  const marker = onboardingScenarioMarker(scenarioId)
+  if (systemPrompt.includes(marker)) return systemPrompt
+  return `${systemPrompt.trimEnd()}\n\n${marker}`
+}
+
 export function resolveNewUserScenarioContent(scenario: NewUserScenario, language: string): LocalizedScenarioContent {
-  return language.toLowerCase().startsWith('zh') ? scenario : scenario.english
+  const content = language.toLowerCase().startsWith('zh') ? scenario : scenario.english
+  return {
+    sessionTitle: content.sessionTitle,
+    firstUserMessage: content.firstUserMessage,
+    systemPrompt: withOnboardingScenarioMarker(content.systemPrompt, scenario.id),
+  }
 }
 
 export const DOCUMENT_SUMMARY_SYSTEM_PROMPT = `你是 Chatbox 的文档总结助手，负责帮助用户总结、提炼和分析文档内容。
