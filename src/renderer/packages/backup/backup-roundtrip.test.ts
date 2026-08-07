@@ -1,6 +1,6 @@
 import type { CopilotDetail, Session, SessionMetaRecord, Settings } from '@shared/types'
 import { unzipSync, zipSync } from 'fflate'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bytesToBase64 } from './codec'
 import { exportBackupArchive } from './export-backup'
 import { importBackupArchive } from './import-backup'
@@ -148,7 +148,12 @@ function combine(chunks: Uint8Array[]): Uint8Array {
 }
 
 describe('ZIP backup round trip', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('restores independent sessions and shared resources, remapping conflicting blob keys', async () => {
+    const nativeRandomUuid = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      throw new Error('Web Crypto randomUUID is unavailable')
+    })
     const source = new MemoryStorage()
     const sourceMeta = new MemoryMetaStorage()
     for (const [index, id] of ['one', 'two'].entries()) {
@@ -198,6 +203,7 @@ describe('ZIP backup round trip', () => {
     expect(restoredTwo.messages[0].contentParts[1]).toMatchObject({ storageKey: restoredKey.storageKey })
     expect(destination.blobs.get(restoredKey.storageKey)).toBe('data:image/png;base64,AAECAw==')
     expect(destinationMeta.records.size).toBe(2)
+    expect(nativeRandomUuid).not.toHaveBeenCalled()
   })
 
   it('round-trips global settings, copilots, and session settings while pruning unavailable images', async () => {
