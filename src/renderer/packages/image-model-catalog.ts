@@ -1,9 +1,9 @@
 import { isUsingOAuth, mergeSharedOAuthProviderSettings } from '@shared/oauth'
-import type { PlatformType } from '@shared/platform'
 import { ModelProviderEnum, ModelProviderType, type ProviderModelInfo, type Settings } from '@shared/types'
 import { getLogger } from '@/lib/utils'
 import { getModelManifest, type RemoteModelInfo } from '@/packages/remote'
 import platform from '@/platform'
+import type { PlatformType } from '@/platform/interfaces'
 import { settingsStore } from '@/stores/settingsStore'
 
 const log = getLogger('image-model-catalog')

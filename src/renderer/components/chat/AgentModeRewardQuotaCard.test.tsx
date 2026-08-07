@@ -31,7 +31,7 @@ function renderCard({
   rewardClaimed = false,
   resumeFailed = false,
 }: {
-  onAction?: ReturnType<typeof vi.fn>
+  onAction?: () => void
   claimFailed?: boolean
   rewardClaimed?: boolean
   resumeFailed?: boolean

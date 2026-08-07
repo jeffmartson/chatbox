@@ -39,7 +39,7 @@ describe('automation test ID contract', () => {
       TestId.message.actionBarEdit,
       TestId.message.actionBarCopy,
     ]
-    const actionMenuIds = [
+    const actionMenuIds: string[] = [
       TestId.message.actionMenuRetry,
       TestId.message.actionMenuRetryBelow,
       TestId.message.actionMenuEdit,

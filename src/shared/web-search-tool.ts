@@ -32,6 +32,13 @@ function formatWebSearchOutput(output: unknown): string {
     .join('\n\n')
 }
 
+function toWebSearchModelOutput({ output }: { output: unknown }): { type: 'text'; value: string } {
+  return {
+    type: 'text',
+    value: formatWebSearchOutput(output),
+  }
+}
+
 export function createWebSearchTool(
   executor: (query: string, abortSignal?: AbortSignal) => Promise<WebSearchToolResult>
 ): ToolSet[string] {
@@ -50,9 +57,6 @@ export function createWebSearchTool(
       const searchInput = input as { query: string }
       return await executor(searchInput.query, abortSignal)
     },
-    toModelOutput: ({ output }) => ({
-      type: 'text',
-      value: formatWebSearchOutput(output),
-    }),
+    toModelOutput: toWebSearchModelOutput,
   }
 }

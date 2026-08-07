@@ -243,6 +243,8 @@ function Root() {
         router.navigate({
           to: `/session/${sid}`,
           replace: true,
+          params: (current) => current,
+          search: (current) => current,
         })
       }
     })()
@@ -259,7 +261,11 @@ function Root() {
           const settingsPath = path.substring('/settings'.length)
           navigateToSettings(settingsPath || '/')
         } else {
-          router.navigate({ to: path })
+          router.navigate({
+            to: path,
+            params: (current) => current,
+            search: (current) => current,
+          })
         }
       })
     }

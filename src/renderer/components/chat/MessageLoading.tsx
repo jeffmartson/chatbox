@@ -107,8 +107,11 @@ export function PreparingToolCallStatus(props: {
 }) {
   const { status } = props
   const { t } = useTranslation()
-  const label = status.toolName ? `${t('Preparing')} ${getToolName(status.toolName)}` : t('Preparing tool call')
-  const progress = formatPreparingProgress(status.progress, t)
+  const translate = t as (key: string, options?: Record<string, unknown>) => string
+  const label = status.toolName
+    ? `${translate('Preparing')} ${getToolName(status.toolName)}`
+    : translate('Preparing tool call')
+  const progress = formatPreparingProgress(status.progress, translate)
 
   return (
     <Group gap={6} align="center" wrap="nowrap" mt={6} mb={2} className="max-w-full">
@@ -127,7 +130,7 @@ export function PreparingToolCallStatus(props: {
 
 function formatPreparingProgress(
   progress: Extract<NonNullable<Message['status']>[number], { type: 'preparing_tool_call' }>['progress'],
-  t: ReturnType<typeof useTranslation>['t']
+  t: (key: string, options?: Record<string, unknown>) => string
 ): string | null {
   if (!progress) return null
   if (progress.kind === 'lines') {
