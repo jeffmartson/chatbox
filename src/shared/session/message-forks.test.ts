@@ -6,6 +6,7 @@ import {
   buildSwitchForkToPatch,
   findMessageContext,
   findMessageLocation,
+  findMessageSourceThread,
   forkTailStartIndex,
 } from './message-forks'
 
@@ -291,5 +292,132 @@ describe('compaction summaries anchored to the fork pivot', () => {
     const context = findMessageContext(session, alternativeReply.id)
 
     expect(context?.list.map((m) => m.id)).toEqual([pivot.id, summary.id, alternativeReply.id])
+  })
+})
+
+describe('searchMessageContext path reconstruction', () => {
+  test('resolves the owning thread for a branch saved under an archived thread', () => {
+    const threadUser = message('thread-user', 'user')
+    const threadReply = message('thread-reply', 'assistant')
+    const alternativeReply = message('thread-alternative', 'assistant')
+    const session: Session = {
+      id: 'session-12',
+      name: 'Session',
+      messages: [message('active-user', 'user')],
+      threads: [
+        {
+          id: 'thread-1',
+          name: 'Thread',
+          createdAt: 1,
+          messages: [threadUser, threadReply],
+        },
+      ],
+      messageForksHash: {
+        [threadUser.id]: {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'alternative', messages: [alternativeReply] },
+          ],
+          createdAt: 1,
+        },
+      },
+    }
+
+    const context = findMessageContext(session, alternativeReply.id)
+    expect(context?.list.map((m) => m.id)).toEqual([threadUser.id, alternativeReply.id])
+    expect(findMessageSourceThread(session, alternativeReply.id)?.id).toBe('thread-1')
+    expect(findMessageSourceThread(session, threadReply.id)?.id).toBe('thread-1')
+  })
+
+  test('ignores branches whose pivot is no longer reachable', () => {
+    const orphanReply = message('orphan-reply', 'assistant')
+    const session: Session = {
+      id: 'session-13',
+      name: 'Session',
+      messages: [message('user-1', 'user'), message('assistant-1', 'assistant')],
+      messageForksHash: {
+        'deleted-pivot': {
+          position: 0,
+          lists: [
+            { id: 'current', messages: [] },
+            { id: 'orphan', messages: [orphanReply] },
+          ],
+          createdAt: 1,
+        },
+      },
+    }
+
+    expect(findMessageContext(session, orphanReply.id)).toBeNull()
+    expect(findMessageSourceThread(session, orphanReply.id)).toBeNull()
+  })
+
+  test('stays fast when a long conversation has many fork points', () => {
+    // Regression guard: every Reply Again (Below) leaves a fork entry behind,
+    // so long conversations accumulate dozens of pivots. The previous
+    // top-down expansion re-explored shared prefixes per pivot subset
+    // (~2^pivots contexts), freezing the UI on the next inactive-branch
+    // lookup; the pivot-chain walk stays linear.
+    const messages: Message[] = []
+    const messageForksHash: NonNullable<Session['messageForksHash']> = {}
+    for (let turn = 0; turn < 60; turn++) {
+      const user = message(`user-${turn}`, 'user')
+      const reply = message(`assistant-${turn}`, 'assistant')
+      messages.push(user, reply)
+      messageForksHash[user.id] = {
+        position: 0,
+        lists: [
+          { id: `active-${turn}`, messages: [] },
+          { id: `saved-${turn}`, messages: [message(`alternative-${turn}`, 'assistant')] },
+        ],
+        createdAt: turn,
+      }
+    }
+    const inactiveCandidate = message('inactive-candidate', 'assistant')
+    messageForksHash['user-59'].lists.push({ id: 'candidate', messages: [inactiveCandidate] })
+    const session: Session = { id: 'session-14', name: 'Session', messages, messageForksHash }
+
+    const startedAt = performance.now()
+    const context = findMessageContext(session, inactiveCandidate.id)
+    const elapsedMs = performance.now() - startedAt
+
+    expect(context?.list.map((m) => m.id).slice(-2)).toEqual(['user-59', inactiveCandidate.id])
+    expect(context?.index).toBe(context ? context.list.length - 1 : -1)
+    expect(elapsedMs).toBeLessThan(1_000)
+  })
+
+  test('reconstructs deeply nested branch chains without re-expanding prefixes', () => {
+    // fork branch -> nested fork branch -> ... five levels deep
+    const rootUser = message('chain-root', 'user')
+    const rootReply = message('chain-root-reply', 'assistant')
+    const session: Session = {
+      id: 'session-15',
+      name: 'Session',
+      messages: [rootUser, rootReply],
+      messageForksHash: {},
+    }
+    const forksHash = session.messageForksHash as NonNullable<Session['messageForksHash']>
+    let pivotId = rootUser.id
+    const expectedPath = [rootUser.id]
+    for (let depth = 0; depth < 5; depth++) {
+      const branchReply = message(`chain-reply-${depth}`, 'assistant')
+      const branchUser = message(`chain-user-${depth}`, 'user')
+      forksHash[pivotId] = {
+        position: 0,
+        lists: [
+          { id: `chain-active-${depth}`, messages: [] },
+          { id: `chain-saved-${depth}`, messages: [branchReply, branchUser] },
+        ],
+        createdAt: depth,
+      }
+      expectedPath.push(branchReply.id, branchUser.id)
+      pivotId = branchUser.id
+    }
+
+    const deepest = `chain-user-4`
+    const context = findMessageContext(session, deepest)
+
+    expect(context?.list.map((m) => m.id)).toEqual(expectedPath)
+    expect(context?.list[context.index]?.id).toBe(deepest)
   })
 })
