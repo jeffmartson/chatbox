@@ -64,8 +64,12 @@ vi.mock('./Message', () => ({
   default: ({ msg }: { msg: Message }) => <div data-testid={`message-${msg.id}`}>{msg.role}</div>,
 }))
 
+const minimapRenderLog = vi.hoisted(() => [] as unknown[])
 vi.mock('./MessageMinimapRail', () => ({
-  default: () => null,
+  default: (props: { anchors: unknown }) => {
+    minimapRenderLog.push(props.anchors)
+    return null
+  },
 }))
 
 vi.mock('./MessageNavigation', () => ({
@@ -274,5 +278,61 @@ describe('MessageList new message layout', () => {
     })
 
     expect(container.querySelector<HTMLElement>('[style*="min-height"]')?.style.minHeight).toBe('510px')
+  })
+})
+
+describe('MessageList minimap anchors', () => {
+  beforeEach(() => {
+    minimapRenderLog.length = 0
+  })
+
+  function buildSession(assistantText: string): Session {
+    return {
+      id: 'session-1',
+      type: 'chat',
+      name: 'Session',
+      messages: [
+        message('user-1', MessageRoleEnum.User, 'first question'),
+        message('assistant-1', MessageRoleEnum.Assistant, 'first answer'),
+        message('user-2', MessageRoleEnum.User, 'second question'),
+        message('assistant-2', MessageRoleEnum.Assistant, assistantText),
+      ],
+    }
+  }
+
+  test('keeps the anchors reference stable across session cache replacements with identical previews', () => {
+    // Streaming replaces the session object on every chunk; once the reply has
+    // grown past the preview length, anchors must keep their identity so the
+    // memoized rail does not re-render per token.
+    const longReply = 'streamed reply '.repeat(40)
+    const { rerender } = render(
+      <MantineProvider>
+        <MessageList currentSession={buildSession(longReply)} />
+      </MantineProvider>
+    )
+    rerender(
+      <MantineProvider>
+        <MessageList currentSession={buildSession(`${longReply} more streamed tokens past the preview cutoff`)} />
+      </MantineProvider>
+    )
+
+    expect(minimapRenderLog.length).toBeGreaterThanOrEqual(2)
+    expect(minimapRenderLog.at(-1)).toBe(minimapRenderLog[0])
+  })
+
+  test('produces new anchors when a preview-visible text changes', () => {
+    const { rerender } = render(
+      <MantineProvider>
+        <MessageList currentSession={buildSession('short answer')} />
+      </MantineProvider>
+    )
+    rerender(
+      <MantineProvider>
+        <MessageList currentSession={buildSession('short answer grew')} />
+      </MantineProvider>
+    )
+
+    expect(minimapRenderLog.length).toBeGreaterThanOrEqual(2)
+    expect(minimapRenderLog.at(-1)).not.toBe(minimapRenderLog[0])
   })
 })
