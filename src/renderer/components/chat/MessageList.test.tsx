@@ -97,9 +97,22 @@ vi.mock('../common/ScalableIcon', () => ({
   ScalableIcon: () => null,
 }))
 
+const isSmallScreenMock = vi.hoisted(() => ({ value: false }))
 vi.mock('@/hooks/useScreenChange', () => ({
-  useIsSmallScreen: () => false,
+  useIsSmallScreen: () => isSmallScreenMock.value,
 }))
+
+const previewTextSpy = vi.hoisted(() => ({ calls: 0 }))
+vi.mock('./message-navigation-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./message-navigation-utils')>()
+  return {
+    ...actual,
+    getMessagePreviewText: (...args: Parameters<typeof actual.getMessagePreviewText>) => {
+      previewTextSpy.calls++
+      return actual.getMessagePreviewText(...args)
+    },
+  }
+})
 
 vi.mock('@/hooks/useNeedRoomForWinControls', () => ({
   platformTypeAtom: {},
@@ -284,6 +297,8 @@ describe('MessageList new message layout', () => {
 describe('MessageList minimap anchors', () => {
   beforeEach(() => {
     minimapRenderLog.length = 0
+    previewTextSpy.calls = 0
+    isSmallScreenMock.value = false
   })
 
   function buildSession(assistantText: string): Session {
@@ -334,5 +349,23 @@ describe('MessageList minimap anchors', () => {
 
     expect(minimapRenderLog.length).toBeGreaterThanOrEqual(2)
     expect(minimapRenderLog.at(-1)).not.toBe(minimapRenderLog[0])
+  })
+
+  test('skips anchor computation entirely on small screens', () => {
+    isSmallScreenMock.value = true
+
+    const { rerender } = render(
+      <MantineProvider>
+        <MessageList currentSession={buildSession('short answer')} />
+      </MantineProvider>
+    )
+    rerender(
+      <MantineProvider>
+        <MessageList currentSession={buildSession('short answer grew')} />
+      </MantineProvider>
+    )
+
+    expect(previewTextSpy.calls).toBe(0)
+    expect(minimapRenderLog.length).toBe(0)
   })
 })

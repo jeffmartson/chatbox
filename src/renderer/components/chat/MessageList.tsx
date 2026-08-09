@@ -55,6 +55,8 @@ import { areMinimapAnchorsEqual, getMessagePreviewText, isUserNavigationMessage 
 import SummaryMessage from './SummaryMessage'
 import { createSmoothFollowOutputController } from './smooth-follow-output'
 
+const EMPTY_MINIMAP_ANCHORS: MessageMinimapAnchor[] = []
+
 // LRU-like cache with max size to prevent unbounded memory growth
 const MAX_SCROLL_CACHE_SIZE = 100
 const sessionScrollPositionCache = new Map<string, StateSnapshot>()
@@ -127,6 +129,13 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   // re-join the whole conversation text nor re-render the memoized rail.
   const previousAnchorsRef = useRef<MessageMinimapAnchor[]>([])
   const userMessageAnchors = useMemo<MessageMinimapAnchor[]>(() => {
+    // Small screens never show the rail, so skip the anchor scan entirely
+    // (it would otherwise run on every streaming chunk on mobile).
+    if (isSmallScreen) {
+      previousAnchorsRef.current = EMPTY_MINIMAP_ANCHORS
+      return EMPTY_MINIMAP_ANCHORS
+    }
+
     const assistantTextByUserId = new Map<string, string>()
 
     for (let i = 0; i < currentMessageList.length; i++) {
@@ -161,7 +170,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     }
     previousAnchorsRef.current = anchors
     return anchors
-  }, [currentMessageList, renderItems])
+  }, [currentMessageList, renderItems, isSmallScreen])
   const showMinimap = !isSmallScreen && userMessageAnchors.length > 0
 
   const virtuoso = useRef<VirtuosoHandle>(null)
