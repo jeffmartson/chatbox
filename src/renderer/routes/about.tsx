@@ -21,10 +21,9 @@ import {
   IconMessage2,
   IconPencil,
   IconRefresh,
-  IconX,
 } from '@tabler/icons-react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Fragment, type ReactElement, useState } from 'react'
+import { Fragment, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ScalableIcon } from '@/components/common/ScalableIcon'
 import BrandGithub from '@/components/icons/BrandGithub'
@@ -198,7 +197,6 @@ function DesktopUpdateSection() {
   const status = useUpdateStore((s) => s.status)
   const progress = useUpdateStore((s) => s.progress)
   const updateVersion = useUpdateStore((s) => s.version)
-  const error = useUpdateStore((s) => s.error)
 
   const handleCheck = async () => {
     useUpdateStore.setState({ status: 'checking', error: null })
