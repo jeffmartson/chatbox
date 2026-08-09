@@ -1,4 +1,8 @@
 const changelog = `
+## v1.22.3 - 2026.08.09
+1. Fixed a performance issue that could cause lag when regenerating replies or switching response branches in long conversations
+2. Improved backup export compatibility on devices where backups could fail to export
+
 ## v1.22.2 - 2026.08.06
 1. Refined the classic message layout and overall interface, with customizable accent colors and color presets
 2. Organized alternative replies into collapsible branches for easier comparison and clearer conversation context
