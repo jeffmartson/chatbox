@@ -34,6 +34,7 @@ import storage from '@/storage'
 import { StorageKeyGenerator } from '@/storage/StoreStorage'
 import * as chatStore from '../chatStore'
 import { markFirstSuccessfulChatCompleted } from '../firstSuccessfulChat'
+import { markSessionReplyCompleted } from '../sessionActivityStore'
 import * as settingActions from '../settingActions'
 import { settingsStore } from '../settingsStore'
 import { uiStore } from '../uiStore'
@@ -51,6 +52,7 @@ import { createAttachmentResolver } from './attachment-resolver'
 import { findMessageLocation } from './forks'
 import { cancelRunningToolCallBatch, finishAbortedGeneration } from './generation-cancellation'
 import { withSessionGenerationLock } from './generation-lock'
+import { beginSessionGeneration, settleSessionGeneration } from './generation-runtime'
 import { modifyMessage, persistStreamingMessage, updateStreamingCache } from './messages'
 import { registerUnsettledStreamDrain, waitForUnsettledStreamDrains } from './state'
 import { createInitialState, processStreamChunk } from './stream-chunk-processor'
@@ -461,9 +463,63 @@ export function shouldPersistStreamingChunk(
   return chunkType === 'tool-call' || elapsedMs >= persistInterval
 }
 
+function exposeGenerationCancel(sessionId: string, targetMsg: Message, cancel: NonNullable<Message['cancel']>): void {
+  targetMsg.cancel = cancel
+  chatStore.updateSessionCacheSync(sessionId, (session) => {
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found while exposing generation cancel`)
+    }
+    const location = findMessageLocation(session, targetMsg.id)
+    if (location) {
+      location.list[location.index].cancel = cancel
+    }
+    return session
+  })
+}
+
 export async function orchestrateGeneration(
   sessionId: string,
   targetMsg: Message,
+  options?: {
+    operationType?: 'send_message' | 'regenerate'
+    appendToMessage?: boolean
+    skipAgentModeSuggestion?: boolean
+    agentModeEntrySource?: AgentModeEntrySource
+    contextMessages?: Message[]
+    externalAbortSignal?: AbortSignal
+  }
+) {
+  const controller = new AbortController()
+  const cancel: NonNullable<Message['cancel']> = (stoppedAt = Date.now()) => controller.abort(stoppedAt)
+  const externalSignal = options?.externalAbortSignal
+  if (externalSignal?.aborted) {
+    controller.abort(externalSignal.reason)
+  } else {
+    externalSignal?.addEventListener('abort', () => controller.abort(externalSignal.reason), { once: true })
+  }
+
+  // Expose cancel on both the local target and the authoritative cached message
+  // so clone-based regenerate/continuation paths are cancellable before setup awaits.
+  exposeGenerationCancel(sessionId, targetMsg, cancel)
+  beginSessionGeneration(sessionId)
+  let finalMessage: Message | undefined
+  try {
+    finalMessage = await runGeneration(sessionId, targetMsg, { controller, cancel }, options)
+  } finally {
+    settleSessionGeneration(sessionId)
+    if (finalMessage) {
+      markSessionReplyCompleted(sessionId, finalMessage)
+    }
+  }
+}
+
+async function runGeneration(
+  sessionId: string,
+  targetMsg: Message,
+  generationControl: {
+    controller: AbortController
+    cancel: NonNullable<Message['cancel']>
+  },
   options?: {
     operationType?: 'send_message' | 'regenerate'
     appendToMessage?: boolean
@@ -480,13 +536,27 @@ export async function orchestrateGeneration(
     externalAbortSignal?: AbortSignal
   }
 ) {
+  const { controller, cancel } = generationControl
+  const finishCanceledSetup = async (persist = true): Promise<Message> => {
+    targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [], finishReason: 'canceled' }
+    if (persist) {
+      await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+    }
+    return targetMsg
+  }
+
   const session = await chatStore.getSession(sessionId)
+  if (controller.signal.aborted) return finishCanceledSetup(Boolean(session))
+
   const settings = await chatStore.getSessionSettings(sessionId)
+  if (controller.signal.aborted) return finishCanceledSetup()
+
   const globalSettings = settingsStore.getState().getSettings()
   const configs = await platform.getConfig()
+  if (controller.signal.aborted) return finishCanceledSetup()
 
   if (!session || !settings) {
-    return
+    return targetMsg
   }
 
   trackGenerateEvent(sessionId, settings, globalSettings, session.type, options)
@@ -496,9 +566,14 @@ export async function orchestrateGeneration(
   const persistInterval = 2000
   let lastPersistTimestamp = Date.now()
 
-  targetMsg = await initializeTargetMessage(targetMsg, settings, globalSettings, session.type)
+  targetMsg = {
+    ...(await initializeTargetMessage(targetMsg, settings, globalSettings, session.type)),
+    cancel,
+  }
+  if (controller.signal.aborted) return finishCanceledSetup()
 
   await persistStreamingMessage(sessionId, targetMsg)
+  if (controller.signal.aborted) return finishCanceledSetup()
 
   const contextMessages = options?.contextMessages
   const contextTargetIndex = contextMessages?.findIndex((message) => message.id === targetMsg.id) ?? -1
@@ -506,30 +581,9 @@ export async function orchestrateGeneration(
     contextMessages && contextTargetIndex > 0
       ? { messages: contextMessages, index: contextTargetIndex }
       : findTargetMessageIndex(session, targetMsg.id)
-  if (!found) return
+  if (!found) return targetMsg
   const { messages, index: targetMsgIx } = found
   const promptTargetMsgIx = options?.appendToMessage ? targetMsgIx + 1 : targetMsgIx
-
-  const controller = new AbortController()
-  const externalSignal = options?.externalAbortSignal
-  if (externalSignal?.aborted) {
-    controller.abort(externalSignal.reason)
-  } else {
-    externalSignal?.addEventListener('abort', () => controller.abort(externalSignal.reason), { once: true })
-  }
-  if (controller.signal.aborted) {
-    // Stop was pressed while this generation was still setting up (aborting the
-    // caller's chained controller); finalize as canceled instead of streaming.
-    targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [], finishReason: 'canceled' }
-    await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-    return
-  }
-  // Wire the stop button to this controller before any pre-stream network work
-  // runs (agent-mode suggestion classifier, MCP/tool harness setup). Those steps
-  // issue real requests that can hang; without a cancel handler in the message
-  // cache the stop button would be a no-op until the main stream starts.
-  targetMsg = { ...targetMsg, cancel: (stoppedAt = Date.now()) => controller.abort(stoppedAt) }
-  updateStreamingCache(sessionId, targetMsg)
 
   // A previous Stop may have left a tool that ignores its abortSignal still executing;
   // its stream drain is registered per session. The generation lock already serializes
@@ -549,7 +603,7 @@ export async function orchestrateGeneration(
     if (controller.signal.aborted) {
       targetMsg = { ...targetMsg, generating: false, cancel: undefined, status: [], finishReason: 'canceled' }
       await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-      return
+      return targetMsg
     }
   }
 
@@ -617,7 +671,7 @@ export async function orchestrateGeneration(
           finishReason: 'canceled',
         }
         await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-        return
+        return targetMsg
       }
 
       trackWorkModeSuggestionDecision(
@@ -650,7 +704,7 @@ export async function orchestrateGeneration(
           finishReason: 'agent-mode-suggested',
         }
         await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-        return
+        return targetMsg
       }
 
       await setSessionAgentMode(sessionId, 'off')
@@ -836,7 +890,7 @@ export async function orchestrateGeneration(
       } finally {
         if (drain) await drain
       }
-      return
+      return targetMsg
     }
 
     if (processorState.contentParts.some((part) => part.type === 'tool-call' && part.state === 'paused')) {
@@ -851,7 +905,7 @@ export async function orchestrateGeneration(
         usage: processorState.usage,
       }
       await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-      return
+      return targetMsg
     }
 
     for (const part of processorState.contentParts) {
@@ -907,17 +961,19 @@ export async function orchestrateGeneration(
         usage: processorState.usage,
       }
       await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
-      return
+      return targetMsg
     }
 
-    if (await persistAbortedGenerationIfNeeded()) return
+    if (await persistAbortedGenerationIfNeeded()) return targetMsg
 
     targetMsg = handleGenerationError(err, targetMsg, settings, {
       agentMode: getSessionAgentModeEntry(sessionId, session).value,
       operationType: options?.operationType,
     })
     await persistStreamingMessage(sessionId, targetMsg, { refreshCounting: true })
+    return targetMsg
   }
+  return targetMsg
 }
 
 async function buildToolsForPausedToolCall(session: Session, settings: SessionSettings, targetMsg: Message) {

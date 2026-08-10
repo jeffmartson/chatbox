@@ -9,6 +9,8 @@ import { getDefaultStore } from 'jotai'
 import { createContext, type MutableRefObject, type ReactNode, useContext, useEffect, useRef } from 'react'
 import { currentSessionIdAtom, showThreadHistoryDrawerAtom } from '@/stores/atoms'
 import { QueryKeys } from '@/stores/chatStore'
+import { beginSessionGeneration, resetSessionGenerationRuntime } from '@/stores/session/generation-runtime'
+import { resetSessionActivityStore, sessionActivityStore } from '@/stores/sessionActivityStore'
 import SessionItem from '../session/SessionItem'
 import SessionList from '../session/SessionList'
 import ThreadHistoryDrawer from '../session/ThreadHistoryDrawer'
@@ -117,15 +119,30 @@ const threadedSession: Session = {
 }
 
 export const SessionItemStates: StoryObj = {
-  name: 'Session item selected starred and picture states',
+  name: 'Session item selected generating completed and picture states',
   parameters: {
     uiInventoryTargets: ['src/renderer/components/session/SessionItem'],
   },
-  render: () => (
+  render: () => <SessionItemStatesFixture />,
+}
+
+function SessionItemStatesFixture() {
+  useEffect(() => {
+    beginSessionGeneration(sessionMetas[1].id)
+    sessionActivityStore.setState({
+      unreadCompletedSessionIds: { [sessionMetas[2].id]: true },
+    })
+    return () => {
+      resetSessionGenerationRuntime()
+      resetSessionActivityStore()
+    }
+  }, [])
+
+  return (
     <Stack gap="lg">
       <SurfaceLabel
         title="SessionItem"
-        description="Actual session list row with assistant avatar, selected state, starred state, and picture session variant."
+        description="Actual session list row with selected, generating, unread-completed, starred, and picture states."
       />
       <Paper withBorder radius="md" p="xs" maw={360}>
         <Stack gap={2}>
@@ -135,7 +152,7 @@ export const SessionItemStates: StoryObj = {
         </Stack>
       </Paper>
     </Stack>
-  ),
+  )
 }
 
 export const ThreadHistoryDrawerStates: StoryObj = {

@@ -16,7 +16,9 @@ import { sortSessionRecords } from '@/storage/SessionMetaStorage'
 import * as atoms from '../atoms'
 import * as chatStore from '../chatStore'
 import * as scrollActions from '../scrollActions'
+import { clearSessionActivity } from '../sessionActivityStore'
 import { initEmptyChatSession, initEmptyPictureSession } from '../sessionHelpers'
+import { getGenerationControlMessages } from './generation-state'
 
 /**
  * Create a new session and switch to it
@@ -259,6 +261,9 @@ export async function clear(sessionId: string) {
   if (!session) {
     return
   }
+  for (const message of getGenerationControlMessages(session)) {
+    message.cancel?.()
+  }
   if (platform.type === 'desktop') {
     try {
       await platform.getSessionAttachmentRagController().deleteSessionAttachments(sessionId)
@@ -266,13 +271,13 @@ export async function clear(sessionId: string) {
       console.warn('Failed to cleanup session attachment RAG entries while clearing session:', error)
     }
   }
-  session.messages.forEach((msg) => {
-    msg?.cancel?.()
-  })
-  return await chatStore.updateSessionWithMessages(session.id, {
+  const updated = await chatStore.updateSessionWithMessages(session.id, {
     messages: session.messages.filter((m) => m.role === 'system').slice(0, 1),
     threads: undefined,
+    messageForksHash: undefined,
   })
+  clearSessionActivity(session.id)
+  return updated
 }
 
 // Re-export copySession for use by threads.ts (moveThreadToConversations)
